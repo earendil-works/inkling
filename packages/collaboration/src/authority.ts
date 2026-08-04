@@ -273,6 +273,7 @@ export function makeDocumentAuthority(
         idempotencyKey,
         kind,
         payload: encodeJournalWire(metadata, comments, bodyUpdate),
+        previousSequence: state.sequence,
         revision: metadata.headRevision,
       });
 

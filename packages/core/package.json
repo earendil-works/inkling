@@ -9,6 +9,7 @@
     "./ports": "./src/application/ports.ts"
   },
   "scripts": {
+    "test": "node --test test/*.test.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {

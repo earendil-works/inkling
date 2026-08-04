@@ -175,7 +175,17 @@ export function journalLayer(
                   return existing;
                 }
               }
-              const sequence = (entries.at(-1)?.sequence ?? 0) + 1;
+              const latestSequence = entries.at(-1)?.sequence;
+              if (latestSequence !== undefined && latestSequence !== input.previousSequence) {
+                return yield* Effect.fail(
+                  new StorageError({
+                    message: "The journal sequence does not match the document authority.",
+                    operation: "append journal",
+                    retryable: false,
+                  }),
+                );
+              }
+              const sequence = input.previousSequence + 1;
               const recordWithoutChecksum = {
                 documentId: input.documentId,
                 ...(input.idempotencyKey === undefined
@@ -333,6 +343,7 @@ function decodeJournal(
         idempotencyKey: record.idempotencyKey,
         kind: record.kind,
         payload,
+        previousSequence: record.sequence - 1,
         revision: record.revision as JournalEntry["revision"],
         sequence: record.sequence,
       });

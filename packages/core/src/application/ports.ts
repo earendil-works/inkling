@@ -48,6 +48,7 @@ export interface JournalEntryInput {
   readonly revision: DocumentRevision;
   readonly kind: JournalEntryKind;
   readonly payload: Uint8Array;
+  readonly previousSequence: number;
   readonly idempotencyKey?: string | undefined;
 }
 
