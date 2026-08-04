@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -185,15 +185,50 @@ test(
         );
         assert.equal(attachment.status, 200);
         const attachmentMetadata = (await attachment.json()) as { id: string };
-        const downloaded = await fetch(
-          `${baseUrl}/api/documents/${document.metadata.id}/attachments/${attachmentMetadata.id}`,
-          { headers: authorization },
+        const attachmentUrl = `${baseUrl}/api/documents/${document.metadata.id}/attachments/${attachmentMetadata.id}`;
+        const unpublish = await fetch(
+          `${baseUrl}/api/documents/${document.metadata.id}/unpublish`,
+          { headers: authorization, method: "POST" },
         );
+        assert.equal(unpublish.status, 200);
+        assert.equal((await fetch(attachmentUrl)).status, 403);
+        const downloaded = await fetch(attachmentUrl, { headers: authorization });
+        assert.match(downloaded.headers.get("Content-Disposition") ?? "", /decision\.txt/u);
         assert.equal(await downloaded.text(), "attachment content");
+        const republish = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/publish`, {
+          headers: authorization,
+          method: "POST",
+        });
+        assert.equal(republish.status, 200);
+        const publicAttachment = await fetch(attachmentUrl);
+        assert.equal(publicAttachment.status, 200);
+        assert.match(publicAttachment.headers.get("Cache-Control") ?? "", /public/u);
 
         const backup = await fetch(`${baseUrl}/api/admin/backup`, { headers: authorization });
         assert.equal(backup.status, 200);
         assert.ok((await backup.arrayBuffer()).byteLength > 500);
+
+        await writeFile(
+          path.join(
+            directory,
+            "objects",
+            "workspaces",
+            "local",
+            "documents",
+            document.metadata.id,
+            "attachments",
+            attachmentMetadata.id,
+          ),
+          "corrupted attachment",
+        );
+        const verification = await fetch(`${baseUrl}/api/admin/verify`, {
+          headers: authorization,
+        });
+        assert.equal(verification.status, 200);
+        assert.match(
+          JSON.stringify((await verification.json()) as unknown),
+          /Digest mismatch:.*attachments/u,
+        );
         return { apiKey, documentId: document.metadata.id };
       });
 
@@ -209,6 +244,74 @@ test(
     }
   },
 );
+
+test("backup corruption is rejected and a fresh installation restores portably", async () => {
+  const sourceDirectory = await mkdtemp(path.join(tmpdir(), "jot-backup-source-"));
+  const targetDirectory = await mkdtemp(path.join(tmpdir(), "jot-backup-target-"));
+  try {
+    const source = await withServer(sourceDirectory, async (baseUrl) => {
+      const authorization = await setupApiKey(baseUrl, "source backup");
+      const created = await fetch(`${baseUrl}/api/documents`, {
+        body: JSON.stringify({
+          body: "Portable recovery body",
+          creationKey: "portable-recovery",
+          title: "Portable recovery",
+        }),
+        headers: { ...authorization, "Content-Type": "application/json" },
+        method: "POST",
+      });
+      assert.equal(created.status, 200);
+      const document = (await created.json()) as DocumentWire;
+      const backup = await fetch(`${baseUrl}/api/admin/backup`, { headers: authorization });
+      assert.equal(backup.status, 200);
+      return {
+        archive: new Uint8Array(await backup.arrayBuffer()),
+        authorization,
+        documentId: document.metadata.id,
+      };
+    });
+
+    await withServer(targetDirectory, async (baseUrl) => {
+      const targetAuthorization = await setupApiKey(baseUrl, "restore operator");
+      const decoded = JSON.parse(new TextDecoder().decode(source.archive)) as {
+        objects: { digest: string }[];
+      };
+      const firstObject = decoded.objects[0];
+      assert.ok(firstObject);
+      firstObject.digest = "0".repeat(64);
+      const corrupted = new TextEncoder().encode(JSON.stringify(decoded));
+      const rejected = await fetch(`${baseUrl}/api/admin/restore`, {
+        body: corrupted,
+        headers: { ...targetAuthorization, "Content-Type": "application/json" },
+        method: "POST",
+      });
+      assert.equal(rejected.status, 400);
+
+      const restored = await fetch(`${baseUrl}/api/admin/restore`, {
+        body: source.archive,
+        headers: { ...targetAuthorization, "Content-Type": "application/json" },
+        method: "POST",
+      });
+      assert.equal(restored.status, 200);
+      const document = await readDocument(baseUrl, source.documentId, source.authorization);
+      assert.equal(document.body, "Portable recovery body");
+      const verification = await fetch(`${baseUrl}/api/admin/verify`, {
+        headers: source.authorization,
+      });
+      const verificationResult = (await verification.json()) as {
+        checkedObjects: number;
+        errors: unknown[];
+      };
+      assert.ok(verificationResult.checkedObjects > 0);
+      assert.deepEqual(verificationResult.errors, []);
+    });
+  } finally {
+    await Promise.all([
+      rm(sourceDirectory, { force: true, recursive: true }),
+      rm(targetDirectory, { force: true, recursive: true }),
+    ]);
+  }
+});
 
 interface DocumentWire {
   readonly body: string;
@@ -238,6 +341,37 @@ async function withServer<A>(
       }),
     ),
   );
+}
+
+async function setupApiKey(
+  baseUrl: string,
+  label: string,
+): Promise<Readonly<Record<string, string>>> {
+  const setup = await fetch(`${baseUrl}/api/auth/setup`, {
+    body: JSON.stringify({ password: "correct horse battery staple" }),
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
+  });
+  assert.equal(setup.status, 200);
+  const cookie = setup.headers
+    .getSetCookie()
+    .map((value) => value.split(";")[0])
+    .join("; ");
+  const csrf = cookieValue(cookie, "jot_csrf");
+  assert.ok(csrf);
+  const keyResponse = await fetch(`${baseUrl}/api/api-keys`, {
+    body: JSON.stringify({ label }),
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: cookie,
+      Origin: baseUrl,
+      "X-CSRF-Token": csrf,
+    },
+    method: "POST",
+  });
+  assert.equal(keyResponse.status, 200);
+  const key = ((await keyResponse.json()) as { key: string }).key;
+  return { Authorization: `Bearer ${key}` };
 }
 
 async function readDocument(

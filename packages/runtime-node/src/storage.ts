@@ -21,6 +21,12 @@ import type {
 import { decodeBase64, encodeBase64 } from "@earendil-works/jot-collaboration";
 
 const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
+
+const objectMetadataSchema = Schema.Struct({
+  digest: Schema.String,
+  mediaType: Schema.optional(Schema.String),
+});
 
 const journalRecordSchema = Schema.Struct({
   checksum: Schema.String,
@@ -49,37 +55,54 @@ export function objectStoreLayer(
       const fileSystem = yield* FileSystem.FileSystem;
       const digest = yield* Digest;
       const root = path.join(dataDirectory, "objects");
-      yield* fileSystem.makeDirectory(root, { recursive: true }).pipe(
-        Effect.mapError(() => undefined),
-        Effect.catchAll(() => Effect.void),
+      const metadataRoot = path.join(dataDirectory, "object-metadata");
+      yield* Effect.forEach([root, metadataRoot], (directory) =>
+        fileSystem.makeDirectory(directory, { recursive: true }).pipe(
+          Effect.mapError(() => undefined),
+          Effect.catchAll(() => Effect.void),
+        ),
       );
 
+      const metadataPath = (key: string) => safePath(metadataRoot, `${key}.json`);
       const service: ObjectStoreService = {
         delete: (key) =>
-          safePath(root, key).pipe(
-            Effect.flatMap((filePath) =>
-              fileSystem
-                .remove(filePath, { force: true })
-                .pipe(Effect.mapError((cause) => storageFailure("delete object", cause))),
+          Effect.all([safePath(root, key), metadataPath(key)]).pipe(
+            Effect.flatMap(([filePath, sidecarPath]) =>
+              Effect.forEach([filePath, sidecarPath], (target) =>
+                fileSystem
+                  .remove(target, { force: true })
+                  .pipe(Effect.mapError((cause) => storageFailure("delete object", cause))),
+              ),
             ),
+            Effect.asVoid,
           ),
         get: (key) =>
-          safePath(root, key).pipe(
-            Effect.flatMap((filePath) =>
+          Effect.all([safePath(root, key), metadataPath(key)]).pipe(
+            Effect.flatMap(([filePath, sidecarPath]) =>
               fileSystem.exists(filePath).pipe(
                 Effect.mapError((cause) => storageFailure("inspect object", cause)),
                 Effect.flatMap((exists) =>
                   exists
-                    ? fileSystem.readFile(filePath).pipe(
-                        Effect.mapError((cause) => storageFailure("read object", cause)),
-                        Effect.flatMap((bytes) =>
-                          digest.sha256(bytes).pipe(
-                            Effect.map((objectDigest): StoredObject => ({
-                              bytes,
-                              digest: objectDigest,
-                              mediaType: mediaTypeForKey(key),
-                            })),
-                          ),
+                    ? Effect.all({
+                        bytes: fileSystem
+                          .readFile(filePath)
+                          .pipe(Effect.mapError((cause) => storageFailure("read object", cause))),
+                        metadata: readObjectMetadata(fileSystem, sidecarPath),
+                      }).pipe(
+                        Effect.flatMap(({ bytes, metadata }) =>
+                          metadata === undefined
+                            ? digest.sha256(bytes).pipe(
+                                Effect.map((objectDigest): StoredObject => ({
+                                  bytes,
+                                  digest: objectDigest,
+                                  mediaType: mediaTypeForKey(key),
+                                })),
+                              )
+                            : Effect.succeed({
+                                bytes,
+                                digest: metadata.digest,
+                                mediaType: metadata.mediaType ?? mediaTypeForKey(key),
+                              }),
                         ),
                       )
                     : Effect.succeed(undefined),
@@ -122,6 +145,7 @@ export function objectStoreLayer(
         put: (key, bytes, options) =>
           Effect.gen(function* () {
             const filePath = yield* safePath(root, key);
+            const sidecarPath = yield* metadataPath(key);
             const actualDigest = yield* digest.sha256(bytes);
             if (actualDigest !== options.digest) {
               return yield* Effect.fail(
@@ -133,6 +157,13 @@ export function objectStoreLayer(
               );
             }
             yield* atomicWrite(fileSystem, filePath, bytes);
+            yield* atomicWrite(
+              fileSystem,
+              sidecarPath,
+              textEncoder.encode(
+                JSON.stringify({ digest: options.digest, mediaType: options.mediaType }),
+              ),
+            );
           }),
       };
       return service;
@@ -361,6 +392,27 @@ function decodeJournal(
     }
     return entries;
   });
+}
+
+function readObjectMetadata(
+  fileSystem: FileSystem.FileSystem,
+  filePath: string,
+): Effect.Effect<typeof objectMetadataSchema.Type | undefined, StorageError> {
+  return fileSystem.exists(filePath).pipe(
+    Effect.mapError((cause) => storageFailure("inspect object metadata", cause)),
+    Effect.flatMap((exists) =>
+      exists
+        ? fileSystem.readFile(filePath).pipe(
+            Effect.mapError((cause) => storageFailure("read object metadata", cause)),
+            Effect.flatMap((bytes) =>
+              Schema.decodeUnknown(Schema.parseJson(objectMetadataSchema))(
+                textDecoder.decode(bytes),
+              ).pipe(Effect.mapError((cause) => storageFailure("decode object metadata", cause))),
+            ),
+          )
+        : Effect.succeed(undefined),
+    ),
+  );
 }
 
 function atomicWrite(
