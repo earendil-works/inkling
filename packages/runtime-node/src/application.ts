@@ -491,14 +491,27 @@ export function makeLocalJotApplication(
           const actor = yield* commentActor(principal, request.authorDisplayName);
           const threadId = yield* ids.generate("thread");
           const messageId = yield* ids.generate("message");
-          const comments = yield* room
-            .createThread(
-              principal,
-              { anchor: request.anchor, body: request.body, id: threadId, messageId },
-              actor,
-              new Date().toISOString(),
-            )
-            .pipe(Effect.mapError(toApplicationError));
+          const comments = yield* (
+            "anchor" in request
+              ? room.createThread(
+                  principal,
+                  { anchor: request.anchor, body: request.body, id: threadId, messageId },
+                  actor,
+                  new Date().toISOString(),
+                )
+              : room.createThreadAtOffsets(
+                  principal,
+                  {
+                    body: request.body,
+                    end: request.selection.end,
+                    id: threadId,
+                    messageId,
+                    start: request.selection.start,
+                  },
+                  actor,
+                  new Date().toISOString(),
+                )
+          ).pipe(Effect.mapError(toApplicationError));
           yield* projectDocument(room);
           yield* scheduleCheckpoint(room);
           return comments as CommentStateDto;

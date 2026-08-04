@@ -40,7 +40,10 @@ import type {
   TextReplacement,
 } from "@earendil-works/jot-core";
 
-import { reanchorAfterReplacement } from "./anchors.ts";
+import {
+  createCommentAnchor as createRelativeAnchor,
+  reanchorAfterReplacement,
+} from "./anchors.ts";
 import { decodeBase64, encodeBase64 } from "./binary.ts";
 import {
   applyDocumentUpdate,
@@ -167,6 +170,18 @@ export interface DocumentAuthorityService {
   readonly createThread: (
     principal: Principal,
     input: CreateThreadInput,
+    actor: CommentActor,
+    now: string,
+  ) => Effect.Effect<CommentState, AuthorityError>;
+  readonly createThreadAtOffsets: (
+    principal: Principal,
+    input: {
+      readonly id: string;
+      readonly messageId: string;
+      readonly body: string;
+      readonly start: number;
+      readonly end: number;
+    },
     actor: CommentActor,
     now: string,
   ) => Effect.Effect<CommentState, AuthorityError>;
@@ -363,7 +378,9 @@ export function makeDocumentAuthority(
     const updateComments = (
       principal: Principal,
       now: string,
-      operation: (comments: CommentState) => Effect.Effect<CommentState, DomainError>,
+      operation: (
+        comments: CommentState,
+      ) => Effect.Effect<CommentState, DomainError | CollaborationError>,
     ): Effect.Effect<CommentState, AuthorityError> =>
       withLock(
         Effect.gen(function* () {
@@ -431,6 +448,27 @@ export function makeDocumentAuthority(
       createThread: (principal, input, actor, now) =>
         updateComments(principal, now, (comments) =>
           createCommentThread(comments, input, actor, now),
+        ),
+      createThreadAtOffsets: (principal, input, actor, now) =>
+        updateComments(principal, now, (comments) =>
+          Effect.gen(function* () {
+            const anchor = yield* createRelativeAnchor(
+              state.collaborative.body,
+              input.start,
+              input.end,
+            );
+            return yield* createCommentThread(
+              comments,
+              {
+                anchor,
+                body: input.body,
+                id: input.id,
+                messageId: input.messageId,
+              },
+              actor,
+              now,
+            );
+          }),
         ),
       deleteMessage: (principal, threadId, messageId, actor, now) =>
         updateComments(principal, now, (comments) =>

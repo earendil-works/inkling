@@ -196,11 +196,18 @@ export const PublicDocumentResponseSchema = Schema.Struct({
 });
 export type PublicDocumentResponse = typeof PublicDocumentResponseSchema.Type;
 
-export const CreateThreadRequestSchema = Schema.Struct({
-  anchor: CommentAnchorSchema,
-  authorDisplayName: NonEmptyString,
-  body: NonEmptyString,
-});
+export const CreateThreadRequestSchema = Schema.Union(
+  Schema.Struct({
+    anchor: CommentAnchorSchema,
+    authorDisplayName: NonEmptyString,
+    body: NonEmptyString,
+  }),
+  Schema.Struct({
+    authorDisplayName: NonEmptyString,
+    body: NonEmptyString,
+    selection: Schema.Struct({ end: Revision, start: Revision }),
+  }),
+);
 export type CreateThreadRequest = typeof CreateThreadRequestSchema.Type;
 
 export const ReplyRequestSchema = Schema.Struct({

@@ -36,6 +36,18 @@ importers:
         specifier: 4.13.0
         version: 4.13.0
 
+  packages/cli:
+    dependencies:
+      '@earendil-works/jot-protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@earendil-works/jot-runtime-node':
+        specifier: workspace:*
+        version: link:../runtime-node
+      effect:
+        specifier: 3.22.1
+        version: 3.22.1
+
   packages/collaboration:
     dependencies:
       '@earendil-works/jot-core':
@@ -98,7 +110,19 @@ importers:
     devDependencies:
       vite:
         specifier: 8.2.0
-        version: 8.2.0(@types/node@25.0.3)
+        version: 8.2.0(@types/node@25.0.3)(yaml@2.8.2)
+
+  packages/importers:
+    dependencies:
+      '@earendil-works/jot-core':
+        specifier: workspace:*
+        version: link:../core
+      effect:
+        specifier: 3.22.1
+        version: 3.22.1
+      yaml:
+        specifier: 2.8.2
+        version: 2.8.2
 
   packages/protocol:
     dependencies:
@@ -1592,6 +1616,11 @@ packages:
     peerDependencies:
       yjs: ^13.0.0
 
+  yaml@2.8.2:
+    resolution: {integrity: sha512-mplynKqc1C2hTVYxd0PU2xQAc22TI1vShAYGksCCfxbn/dFwnHTNi1bvYsBTkhdUNtGIf5xNOg938rrSSYvS9A==}
+    engines: {node: '>= 14.6'}
+    hasBin: true
+
   yjs@13.6.32:
     resolution: {integrity: sha512-lfiJIIC4Xayt5ItynE407ehlE03pCjeOc4hkR4yxxvvNJ4kuiN25B0g+Qp8XagYz361LLL7DCzR5bvFJ81QKtQ==}
     engines: {node: '>=16.0.0', npm: '>=8.0.0'}
@@ -2812,7 +2841,7 @@ snapshots:
 
   uuid@11.1.1: {}
 
-  vite@8.2.0(@types/node@25.0.3):
+  vite@8.2.0(@types/node@25.0.3)(yaml@2.8.2):
     dependencies:
       lightningcss: 1.33.0
       picomatch: 4.0.5
@@ -2822,6 +2851,7 @@ snapshots:
     optionalDependencies:
       '@types/node': 25.0.3
       fsevents: 2.3.3
+      yaml: 2.8.2
 
   w3c-keyname@2.2.8: {}
 
@@ -2838,6 +2868,8 @@ snapshots:
     dependencies:
       lib0: 0.2.117
       yjs: 13.6.32
+
+  yaml@2.8.2: {}
 
   yjs@13.6.32:
     dependencies:
