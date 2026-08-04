@@ -1,6 +1,6 @@
 import { Context, Data, type Effect, type Stream } from "effect";
 
-import type { CatalogSummary, Principal } from "@earendil-works/jot-core";
+import type { CatalogSummary, Principal, WorkspaceIdentity } from "@earendil-works/jot-core";
 import type {
   ApiKeyCreated,
   ApiKeyDto,
@@ -44,6 +44,12 @@ export interface CollaborationConnection {
   ) => Effect.Effect<ServerCollaborationMessage, ApplicationError>;
 }
 
+export interface ApplicationDiagnostics {
+  readonly activeDocumentRooms: number;
+  readonly dirtyDocuments: number;
+  readonly generatedAt: string;
+}
+
 export interface BackupVerification {
   readonly checkedObjects: number;
   readonly errors: readonly string[];
@@ -52,6 +58,7 @@ export interface BackupVerification {
 export interface AttachmentContent {
   readonly bytes: Uint8Array;
   readonly metadata: AttachmentMetadataDto;
+  readonly publicCache: boolean;
 }
 
 export interface SessionResult {
@@ -93,6 +100,10 @@ export interface JotApplicationService {
   readonly documentRuntimeConfiguration: (
     documentId: string,
   ) => Effect.Effect<DocumentRuntimeConfiguration, ApplicationError>;
+  readonly allDocumentRuntimeConfigurations: () => Effect.Effect<
+    readonly DocumentRuntimeConfiguration[],
+    ApplicationError
+  >;
   readonly currentDocumentProjection: (
     documentId: string,
   ) => Effect.Effect<DocumentResponse, ApplicationError>;
@@ -100,6 +111,7 @@ export interface JotApplicationService {
     document: DocumentResponse,
   ) => Effect.Effect<void, ApplicationError>;
   readonly markCatalogDeleted: (documentId: string) => Effect.Effect<void, ApplicationError>;
+  readonly releaseDocumentRoom: (documentId: string) => Effect.Effect<void>;
   /** Flushes all active document rooms to immutable checkpoints. */
   readonly checkpointAll: () => Effect.Effect<void, ApplicationError>;
   readonly exportWorkspace: (
@@ -110,6 +122,12 @@ export interface JotApplicationService {
     archive: Uint8Array,
   ) => Effect.Effect<BackupVerification, ApplicationError>;
   readonly verifyWorkspace: (
+    credentials: RequestCredentials,
+  ) => Effect.Effect<BackupVerification, ApplicationError>;
+  readonly diagnostics: (
+    credentials: RequestCredentials,
+  ) => Effect.Effect<ApplicationDiagnostics, ApplicationError>;
+  readonly repairCatalog: (
     credentials: RequestCredentials,
   ) => Effect.Effect<BackupVerification, ApplicationError>;
   readonly uploadAttachment: (
@@ -138,6 +156,9 @@ export interface JotApplicationService {
   ) => Effect.Effect<AuthenticationStatus, ApplicationError>;
   readonly setupOwner: (password: string) => Effect.Effect<SessionResult, ApplicationError>;
   readonly login: (password: string) => Effect.Effect<SessionResult, ApplicationError>;
+  readonly loginWorkspaceIdentity: (
+    identity: WorkspaceIdentity,
+  ) => Effect.Effect<SessionResult, ApplicationError>;
   readonly logout: (credentials: RequestCredentials) => Effect.Effect<void, ApplicationError>;
   readonly listDocuments: (
     credentials: RequestCredentials,
@@ -231,6 +252,9 @@ export interface JotApplicationService {
     credentials: RequestCredentials,
     documentId: string,
   ) => Effect.Effect<DocumentMetadataDto, ApplicationError>;
+  readonly readPublicDocument: (
+    documentId: string,
+  ) => Effect.Effect<PublicDocumentResponse, ApplicationError>;
   readonly readPublicRfc: (
     rfcNumber: number,
   ) => Effect.Effect<PublicDocumentResponse, ApplicationError>;

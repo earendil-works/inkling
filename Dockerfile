@@ -7,9 +7,12 @@ ENV NODE_ENV=production \
 RUN corepack enable && useradd --create-home --uid 10001 jot
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json .npmrc ./
 COPY packages ./packages
-RUN pnpm install --frozen-lockfile && pnpm run build
+RUN pnpm install --frozen-lockfile \
+      --filter @earendil-works/jot-cli... \
+      --filter @earendil-works/jot-frontend \
+    && pnpm --filter @earendil-works/jot-frontend run build
 
 RUN mkdir -p /data && chown -R jot:jot /app /data
 USER jot

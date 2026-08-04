@@ -27,6 +27,7 @@ import type { ServerType } from "@hono/node-server";
 interface ConnectedClient {
   readonly documentId: string;
   readonly socket: WebSocket;
+  readonly updateTimes: number[];
 }
 
 export function installWebSocketServer(
@@ -48,7 +49,11 @@ export function installWebSocketServer(
       socket.destroy();
       return;
     }
-    const documentId = decodeURIComponent(match[1]);
+    const documentId = safeDecodeURIComponent(match[1]);
+    if (documentId === undefined) {
+      socket.destroy();
+      return;
+    }
     const requestCredentials: RequestCredentials = {
       capabilityToken: url.searchParams.get("cap") ?? undefined,
       guestName: url.searchParams.get("guest") ?? undefined,
@@ -72,7 +77,11 @@ export function installWebSocketServer(
       let connection: CollaborationConnection | undefined;
       let eventsFiber: Fiber.RuntimeFiber<void, never> | undefined;
       let initialized = false;
-      const client: ConnectedClient = { documentId, socket };
+      const client: ConnectedClient = { documentId, socket, updateTimes: [] };
+      if ([...clients].filter((other) => other.documentId === documentId).length >= 64) {
+        socket.close(4029, "participant_limit");
+        return;
+      }
       clients.add(client);
 
       const fail = (error: unknown): Effect.Effect<void> => {
@@ -152,6 +161,25 @@ export function installWebSocketServer(
                 );
               }
               if (message.type === "body-update") {
+                const threshold = Date.now() - 10_000;
+                const firstRecent = client.updateTimes.findIndex(
+                  (acceptedAt) => acceptedAt >= threshold,
+                );
+                client.updateTimes.splice(
+                  0,
+                  firstRecent === -1 ? client.updateTimes.length : firstRecent,
+                );
+                if (client.updateTimes.length >= 200) {
+                  return yield* Effect.fail(
+                    new ApplicationError({
+                      code: "update_rate_limit",
+                      message: "The collaboration update rate limit was exceeded.",
+                      retryable: true,
+                      status: 429,
+                    }),
+                  );
+                }
+                client.updateTimes.push(Date.now());
                 const update = yield* decodeBase64(message.update);
                 yield* currentConnection.acceptUpdate(update, message.clientUpdateId);
                 return;
@@ -218,6 +246,14 @@ function send(
       }),
     ),
   );
+}
+
+function safeDecodeURIComponent(value: string): string | undefined {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return undefined;
+  }
 }
 
 function isAllowedOrigin(request: IncomingMessage, host: string): boolean {

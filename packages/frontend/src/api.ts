@@ -1,6 +1,8 @@
 import { Context, Data, Effect, Layer, Schema } from "effect";
 
 import {
+  ApiKeyCreatedSchema,
+  ApiKeySchema,
   AttachmentMetadataSchema,
   AuthenticationStatusSchema,
   CatalogResponseSchema,
@@ -12,6 +14,8 @@ import {
   ShareResponseSchema,
 } from "@earendil-works/jot-protocol";
 import type {
+  ApiKeyCreated,
+  ApiKeyDto,
   AttachmentMetadataDto,
   AuthenticationStatus,
   CatalogResponse,
@@ -34,6 +38,9 @@ export class ApiError extends Data.TaggedError("ApiError")<{
 
 export interface ApiClientService {
   readonly authenticationStatus: Effect.Effect<AuthenticationStatus, ApiError>;
+  readonly createApiKey: (label: string) => Effect.Effect<ApiKeyCreated, ApiError>;
+  readonly listApiKeys: Effect.Effect<readonly ApiKeyDto[], ApiError>;
+  readonly revokeApiKey: (keyId: string) => Effect.Effect<void, ApiError>;
   readonly setup: (password: string) => Effect.Effect<void, ApiError>;
   readonly login: (password: string) => Effect.Effect<void, ApiError>;
   readonly logout: Effect.Effect<void, ApiError>;
@@ -203,6 +210,7 @@ export function makeApiClient(capabilityToken?: string): ApiClientService {
 
   return {
     authenticationStatus: request("/api/auth/status", AuthenticationStatusSchema),
+    createApiKey: (label) => mutation("/api/api-keys", ApiKeyCreatedSchema, "POST", { label }),
     createDocument: (input) => mutation("/api/documents", DocumentResponseSchema, "POST", input),
     createThread: (documentId, anchor, body, authorDisplayName) =>
       mutation(
@@ -234,6 +242,7 @@ export function makeApiClient(capabilityToken?: string): ApiClientService {
         "PATCH",
         { body },
       ),
+    listApiKeys: request("/api/api-keys", Schema.Array(ApiKeySchema)),
     listDocuments: (query = "") =>
       request(`/api/documents?q=${encodeURIComponent(query)}`, CatalogResponseSchema),
     login: (password) =>
@@ -254,6 +263,10 @@ export function makeApiClient(capabilityToken?: string): ApiClientService {
         CommentStateSchema,
         "POST",
         { authorDisplayName, body, parentId },
+      ),
+    revokeApiKey: (keyId) =>
+      mutation(`/api/api-keys/${encodeURIComponent(keyId)}`, Schema.Unknown, "DELETE").pipe(
+        Effect.asVoid,
       ),
     resolveThread: (documentId, threadId, resolved) =>
       mutation(

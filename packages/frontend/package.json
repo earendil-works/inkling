@@ -7,6 +7,7 @@
     "build": "vite build",
     "dev": "vite",
     "preview": "vite preview",
+    "test": "vite build && node --test test/*.test.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
@@ -25,6 +26,7 @@
     "yjs": "13.6.32"
   },
   "devDependencies": {
+    "playwright-core": "1.62.1",
     "vite": "8.2.0"
   }
 }

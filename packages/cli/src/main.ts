@@ -96,6 +96,17 @@ function main(arguments_: readonly string[]): Effect.Effect<void, unknown> {
         console.log(`Restored and verified ${result.checkedObjects} objects.`);
         return;
       }
+      case "repair": {
+        const result = yield* client.repairCatalog;
+        if (result.errors.length > 0) {
+          for (const error of result.errors) console.error(error);
+          return yield* usageFailure(
+            `Catalog repair found ${result.errors.length} unrecoverable document(s).`,
+          );
+        }
+        console.log(`Rebuilt the catalog from ${result.checkedObjects} checkpoints.`);
+        return;
+      }
       case "verify": {
         const result = yield* client.verifyWorkspace;
         if (result.errors.length > 0) {
@@ -145,15 +156,43 @@ function main(arguments_: readonly string[]): Effect.Effect<void, unknown> {
         console.log(`Updated ${id} to revision ${updated.metadata.headRevision}.`);
         return;
       }
+      case "replace": {
+        const target = yield* documentTarget(instance, arguments_, 1);
+        const source = yield* argument(arguments_, target.nextIndex, "Markdown path or -");
+        const body =
+          source === "-"
+            ? yield* readStandardInput()
+            : yield* fileOperation("read replacement Markdown", () => readFile(source, "utf8"));
+        const current = yield* client.read(target.documentId);
+        const updated = yield* client.replaceBody(
+          target.documentId,
+          body,
+          current.metadata.headRevision,
+        );
+        console.log(`Replaced ${target.documentId} at revision ${updated.metadata.headRevision}.`);
+        return;
+      }
+      case "rename": {
+        const target = yield* documentTarget(instance, arguments_, 1);
+        const title = yield* argument(arguments_, target.nextIndex, "title");
+        const current = yield* client.read(target.documentId);
+        const updated = yield* client.metadata(target.documentId, {
+          expectedRevision: current.metadata.headRevision,
+          title,
+        });
+        console.log(`Renamed ${target.documentId} to ${updated.title}.`);
+        return;
+      }
       case "metadata": {
         const target = yield* documentTarget(instance, arguments_, 1);
         const id = target.documentId;
         const field = yield* argument(arguments_, target.nextIndex, "field");
         const value = yield* argument(arguments_, target.nextIndex + 1, "value");
         const current = yield* client.read(id);
+        const patch = yield* metadataFieldPatch(field, value);
         const updated = yield* client.metadata(id, {
+          ...patch,
           expectedRevision: current.metadata.headRevision,
-          [field]: field === "labels" ? value.split(",").map((item) => item.trim()) : value,
         });
         console.log(`Updated ${updated.title} to revision ${updated.headRevision}.`);
         return;
@@ -394,6 +433,52 @@ function printDocument(document: DocumentResponse): void {
   }
 }
 
+function metadataFieldPatch(
+  field: string,
+  value: string,
+): Effect.Effect<Readonly<Record<string, unknown>>, Error> {
+  if (new Set(["authors", "reviewers", "approvers"]).has(field)) {
+    const people = value.split(",").map((item) => {
+      const match = /^\s*(.*?)\s*<([^>]+)>\s*$/u.exec(item);
+      const email = match?.[2]?.trim();
+      return {
+        displayName: match?.[1]?.trim() || email || "",
+        email: email ?? "",
+        id: email?.toLocaleLowerCase("en") ?? "",
+      };
+    });
+    return people.every((person) => person.displayName.length > 0 && person.email.includes("@"))
+      ? Effect.succeed({ [field]: people })
+      : usageFailure(`${field} must use Name <email>, separated by commas.`);
+  }
+  if (field === "labels") {
+    return Effect.succeed({
+      labels: value
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
+    });
+  }
+  if (field === "relatedDocuments") {
+    return Effect.succeed({
+      relatedDocuments: value.split(",").map((item) => {
+        const [documentId, relationship] = item.trim().split(":", 2);
+        return relationship === undefined ? { documentId } : { documentId, relationship };
+      }),
+    });
+  }
+  if (field === "targetDecisionDate" || field === "legacySourceUrl") {
+    return Effect.succeed({ [field]: value === "none" ? null : value });
+  }
+  if (new Set(["lifecycleState", "sensitivity", "title", "visibility"]).has(field)) {
+    return Effect.succeed({
+      [field]: value,
+      ...(field === "visibility" && value === "public" ? { confirmConfidentialPublic: true } : {}),
+    });
+  }
+  return usageFailure(`Unsupported metadata field: ${field}`);
+}
+
 function parseRange(
   value: string | undefined,
 ): Effect.Effect<{ readonly start: number; readonly end: number } | undefined, Error> {
@@ -501,6 +586,7 @@ function uploadImportedDocument(
         suffix: thread.suffix,
       })),
       metadata: imported.metadata,
+      people: imported.people,
       publish: false,
     };
     let created = yield* client.importDocument(request);
@@ -530,12 +616,35 @@ function uploadImportedDocument(
     }
     console.log(`${created.metadata.id}\t${created.metadata.title}`);
     for (const warning of imported.warnings) console.error(`warning: ${warning}`);
+    for (const thread of imported.comments) {
+      if (!importedCommentCanAnchor(imported.body, thread)) {
+        console.error(
+          `warning: skipped comment thread ${thread.legacyId ?? "without legacy ID"}; its quote is missing or ambiguous`,
+        );
+      }
+    }
     if (imported.relatedRfcNumbers.length > 0) {
       console.error(
         `warning: related RFC numbers require document ID mapping: ${imported.relatedRfcNumbers.join(", ")}`,
       );
     }
   });
+}
+
+function importedCommentCanAnchor(
+  body: string,
+  thread: ImportedDocument["comments"][number],
+): boolean {
+  if (
+    thread.originalStart !== undefined &&
+    thread.originalEnd !== undefined &&
+    thread.originalStart <= thread.originalEnd &&
+    body.slice(thread.originalStart, thread.originalEnd) === thread.quote
+  ) {
+    return true;
+  }
+  const first = body.indexOf(thread.quote);
+  return thread.quote.length > 0 && first !== -1 && body.indexOf(thread.quote, first + 1) === -1;
 }
 
 function importedAttachments(
@@ -640,10 +749,12 @@ Usage:
   jot list | jot search QUERY
   jot import-rfc MARKDOWN [--people PEOPLE_JSON] [--publish]
   jot import-jot MARKDOWN SIDECAR_JSON [--publish]
-  jot backup DESTINATION | jot restore BACKUP | jot verify
+  jot backup DESTINATION | jot restore BACKUP | jot verify | jot repair
   jot read [DOCUMENT] [--lines START:END]
   jot create TITLE [--rfc] [--body MARKDOWN]
   jot edit [DOCUMENT] OLD_TEXT NEW_TEXT
+  jot rename [DOCUMENT] TITLE
+  jot replace [DOCUMENT] MARKDOWN_PATH|-
   jot metadata [DOCUMENT] FIELD VALUE
   jot delete|publish|unpublish [DOCUMENT]
   jot share [DOCUMENT] disabled|view|comment|edit

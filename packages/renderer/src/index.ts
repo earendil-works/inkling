@@ -41,10 +41,12 @@ export const MarkdownRendererLive = Layer.succeed(MarkdownRenderer, makeMarkdown
 export function makeMarkdownRenderer(): MarkdownRendererService {
   return {
     render: (markdown, options = {}) =>
-      Effect.try({
-        catch: (cause) => new RenderError({ cause, message: "Markdown rendering failed." }),
-        try: () => renderMarkdown(markdown, options),
-      }),
+      markdown.length > 5_000_000
+        ? Effect.fail(new RenderError({ message: "Markdown exceeds the 5 MB render limit." }))
+        : Effect.try({
+            catch: (cause) => new RenderError({ cause, message: "Markdown rendering failed." }),
+            try: () => renderMarkdown(markdown, options),
+          }),
   };
 }
 
@@ -94,6 +96,9 @@ function renderMarkdown(markdown: string, options: RenderOptions): RenderedMarkd
     const language = token.info.trim().split(/\s+/u)[0]?.toLocaleLowerCase("en") ?? "";
     const source = token.content;
     if (language === "mermaid") {
+      if (source.length > 100_000) {
+        return `<pre class="jot-code jot-code--rejected"><code>Mermaid diagram exceeds the 100 KB render limit.</code></pre>\n`;
+      }
       return `<div class="jot-mermaid" data-mermaid><pre><code>${parser.utils.escapeHtml(source)}</code></pre><div class="jot-mermaid__controls"><button type="button" data-mermaid-zoom-in aria-label="Zoom in">+</button><button type="button" data-mermaid-zoom-out aria-label="Zoom out">−</button><button type="button" data-mermaid-reset>Reset</button></div></div>\n`;
     }
     const highlighted =

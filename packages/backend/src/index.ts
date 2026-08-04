@@ -25,6 +25,7 @@ import { ApplicationError, JotApplication } from "./application.ts";
 import type { JotApplicationService, RequestCredentials, SessionResult } from "./application.ts";
 
 export type {
+  ApplicationDiagnostics,
   AttachmentContent,
   BackupVerification,
   CollaborationConnection,
@@ -48,7 +49,20 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
   const version = options.version ?? "development";
 
   app.use("*", async (context, next) => {
+    const startedAt = Date.now();
+    const requestId = crypto.randomUUID();
     await next();
+    context.header("X-Request-Id", requestId);
+    console.log(
+      JSON.stringify({
+        durationMs: Date.now() - startedAt,
+        method: context.req.method,
+        operation: operationCategory(context.req.path),
+        requestId,
+        result: context.res.status < 400 ? "success" : "failure",
+        status: context.res.status,
+      }),
+    );
     context.header("Referrer-Policy", "strict-origin-when-cross-origin");
     context.header("X-Content-Type-Options", "nosniff");
     context.header("X-Frame-Options", "DENY");
@@ -175,8 +189,11 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
           context.req.param("documentId"),
           context.req.param("attachmentId"),
         ),
-      ({ bytes, metadata }) => {
-        context.header("Cache-Control", "private, max-age=3600");
+      ({ bytes, metadata, publicCache }) => {
+        context.header(
+          "Cache-Control",
+          publicCache ? "public, max-age=31536000, immutable" : "private, max-age=3600",
+        );
         context.header("Content-Type", metadata.mediaType);
         context.header("ETag", `"${metadata.digest}"`);
         context.header(
@@ -359,6 +376,25 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
     ),
   );
 
+  app.get("/api/public/documents/:documentId", (context) =>
+    execute(context, options, (service) =>
+      service.readPublicDocument(context.req.param("documentId")),
+    ),
+  );
+
+  app.get("/public/documents/:documentId", (context) =>
+    execute(
+      context,
+      options,
+      (service) => service.readPublicDocument(context.req.param("documentId")),
+      (document) => {
+        context.header("Cache-Control", "public, max-age=300, stale-while-revalidate=3600");
+        context.header("Content-Security-Policy", contentSecurityPolicy);
+        return context.html(publicDocumentHtml(document));
+      },
+    ),
+  );
+
   app.get("/api/public/rfc/:number", (context) =>
     execute(context, options, (service) =>
       positiveInteger(context.req.param("number"), "RFC number").pipe(
@@ -450,6 +486,16 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
     execute(context, options, (service) => service.verifyWorkspace(credentials(context))),
   );
 
+  app.get("/api/admin/diagnostics", (context) =>
+    execute(context, options, (service) => service.diagnostics(credentials(context))),
+  );
+
+  app.post("/api/admin/repair", (context) =>
+    execute(context, options, (service) =>
+      mutation(context, service.repairCatalog(credentials(context))),
+    ),
+  );
+
   app.post("/api/api-keys", (context) =>
     execute(context, options, (service) =>
       mutation(context, readJson(context, ApiKeyCreateRequestSchema)).pipe(
@@ -483,6 +529,17 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
 }
 
 const inlineAttachmentTypes = new Set(["image/gif", "image/jpeg", "image/png", "image/webp"]);
+
+function operationCategory(pathname: string): string {
+  if (pathname.includes("/attachments")) return "attachment";
+  if (pathname.includes("/comments")) return "comment";
+  if (pathname.includes("/publish")) return "publication";
+  if (pathname.includes("/auth/")) return "authentication";
+  if (pathname.includes("/admin/")) return "administration";
+  if (pathname.includes("/documents")) return "document";
+  if (pathname.includes("/rfc/")) return "public-rfc";
+  return "http";
+}
 
 function execute<A>(
   context: HonoContext,
@@ -756,7 +813,7 @@ function publicCatalogHtml(titleValue: string, catalog: CatalogResponse): string
     .map(({ excerpt, metadata }) => {
       const href =
         metadata.rfcNumber === undefined
-          ? `/documents/${encodeURIComponent(metadata.id)}`
+          ? `/public/documents/${encodeURIComponent(metadata.id)}`
           : `/rfc/${String(metadata.rfcNumber).padStart(4, "0")}`;
       const labels = metadata.labels
         .map((label) => `<a href="/keyword/${encodeURIComponent(label)}">${escapeHtml(label)}</a>`)

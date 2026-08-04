@@ -1,16 +1,18 @@
-import { Effect, Fiber, Layer, Schema, Stream } from "effect";
+import { Effect, Either, Fiber, Layer, Schema, Stream } from "effect";
 
 import {
   activateDocument,
   applyCatalogSummary,
   authenticateApiKey,
   authorizeDocument,
+  authorizeWorkspace,
   authenticateSession,
   AuthenticationError,
   AuthorizationError,
   BodyEditError,
   createApiKey,
   createDocumentMetadata,
+  createWorkspaceSession,
   Digest,
   documentActions,
   documentId,
@@ -32,6 +34,7 @@ import {
   setupOwner,
   StorageError,
   tombstoneDocument,
+  upsertPerson,
   WorkspaceStateStore,
   loginOwner,
   logoutSession,
@@ -63,6 +66,7 @@ import type { DocumentAuthorityService, DocumentSnapshot } from "@earendil-works
 import { ApplicationError, JotApplication } from "./application.ts";
 import type {
   CollaborationConnection,
+  DocumentRuntimeConfiguration,
   JotApplicationService,
   RequestCredentials,
 } from "./application.ts";
@@ -153,6 +157,8 @@ const persistedStateSchema = Schema.Struct({
 });
 
 export interface LocalApplicationOptions {
+  readonly allowOwnerSetup?: boolean | undefined;
+  readonly authenticationMethods?: readonly ("password" | "google")[] | undefined;
   readonly workspaceId?: string | undefined;
   readonly ownsDocumentPrivateState?: boolean | undefined;
   readonly principalResolver?:
@@ -197,7 +203,10 @@ export function makeLocalJotApplication(
     const ownerPrincipal: Principal = { kind: "workspace", personId: ownerId, role: "owner" };
 
     const saveState = (next: LocalWorkspaceState): Effect.Effect<void, StorageError> =>
-      stateStore.save(next).pipe(Effect.tap(() => Effect.sync(() => (state = next))));
+      stateStore.save(next).pipe(
+        Effect.tap(() => persistCatalogProjections(next, objectStore, digest).pipe(Effect.ignore)),
+        Effect.tap(() => Effect.sync(() => (state = next))),
+      );
 
     const withState = stateMutex.withPermits(1);
 
@@ -388,25 +397,72 @@ export function makeLocalJotApplication(
         return yield* applicationFailure("forbidden", "This principal cannot comment.", 403);
       });
 
+    const runtimeConfiguration = (
+      rawDocumentId: string,
+    ): Effect.Effect<DocumentRuntimeConfiguration, ApplicationError> =>
+      Effect.gen(function* () {
+        const id = yield* documentId(rawDocumentId).pipe(Effect.mapError(toApplicationError));
+        const entry = state.catalog.entries.find(
+          (candidate) => candidate.documentId === id && candidate.status === "active",
+        );
+        if (entry === undefined) {
+          return yield* applicationFailure("not_found", "The document does not exist.", 404);
+        }
+        return {
+          capabilities: state.capabilities.filter((capability) => capability.documentId === id),
+          documentId: id,
+          rfcNumber: entry.rfcNumber,
+          summary: entry.summary,
+          workspaceId: state.workspaceId,
+        };
+      });
+
+    const readPublished = (
+      rawDocumentId: string,
+      canonicalPath: string,
+    ): Effect.Effect<PublicDocumentResponse, ApplicationError> =>
+      Effect.gen(function* () {
+        const room = yield* getRoom(rawDocumentId);
+        const current = yield* room
+          .snapshot(ownerPrincipal, new Date().toISOString())
+          .pipe(Effect.mapError(toApplicationError));
+        const publishedRevision = current.metadata.publishedRevision;
+        if (current.metadata.visibility !== "public" || publishedRevision === undefined) {
+          return yield* applicationFailure(
+            "not_found",
+            "The published document does not exist.",
+            404,
+          );
+        }
+        const published = yield* provideAuthorityDependencies(
+          loadDocumentRevision(
+            { documentId: current.metadata.id, workspaceId: state.workspaceId },
+            publishedRevision,
+          ),
+        ).pipe(Effect.mapError(toApplicationError));
+        const rendered = yield* renderer
+          .render(published.body, { rewriteUrl: rewriteRfcUrl })
+          .pipe(Effect.mapError(toApplicationError));
+        return {
+          canonicalPath,
+          description: excerpt(published.body),
+          headings: rendered.headings,
+          html: rendered.html,
+          metadata: {
+            ...published.metadata,
+            publishedRevision,
+          } as DocumentMetadataDto,
+        };
+      });
+
     const service: JotApplicationService = {
       authorizeRequest: resolvePrincipal,
-      documentRuntimeConfiguration: (rawDocumentId) =>
-        Effect.gen(function* () {
-          const id = yield* documentId(rawDocumentId).pipe(Effect.mapError(toApplicationError));
-          const entry = state.catalog.entries.find(
-            (candidate) => candidate.documentId === id && candidate.status === "active",
-          );
-          if (entry === undefined) {
-            return yield* applicationFailure("not_found", "The document does not exist.", 404);
-          }
-          return {
-            capabilities: state.capabilities.filter((capability) => capability.documentId === id),
-            documentId: id,
-            rfcNumber: entry.rfcNumber,
-            summary: entry.summary,
-            workspaceId: state.workspaceId,
-          };
-        }),
+      documentRuntimeConfiguration: runtimeConfiguration,
+      allDocumentRuntimeConfigurations: () =>
+        Effect.forEach(
+          state.catalog.entries.filter((entry) => entry.status === "active"),
+          (entry) => runtimeConfiguration(entry.documentId),
+        ),
       currentDocumentProjection: (rawDocumentId) =>
         getRoom(rawDocumentId).pipe(Effect.flatMap((room) => snapshotFor(room, ownerPrincipal))),
       applyDocumentProjection: (document) =>
@@ -418,6 +474,16 @@ export function makeLocalJotApplication(
             ),
           ),
         ),
+      releaseDocumentRoom: (rawDocumentId) =>
+        Effect.gen(function* () {
+          const room = rooms.get(rawDocumentId);
+          const checkpointFiber = checkpointFibers.get(rawDocumentId);
+          if (checkpointFiber !== undefined) yield* Fiber.interrupt(checkpointFiber);
+          if (room !== undefined) yield* room.close;
+          checkpointFibers.delete(rawDocumentId);
+          dirtySince.delete(rawDocumentId);
+          rooms.delete(rawDocumentId);
+        }),
       markCatalogDeleted: (rawDocumentId) =>
         Effect.gen(function* () {
           const id = yield* documentId(rawDocumentId).pipe(Effect.mapError(toApplicationError));
@@ -429,6 +495,16 @@ export function makeLocalJotApplication(
               ),
             ),
           );
+        }),
+      diagnostics: (credentials) =>
+        Effect.gen(function* () {
+          const principal = yield* resolvePrincipal(credentials);
+          yield* requireOwner(principal);
+          return {
+            activeDocumentRooms: rooms.size,
+            dirtyDocuments: checkpointFibers.size,
+            generatedAt: new Date().toISOString(),
+          };
         }),
       exportWorkspace: (credentials) =>
         Effect.gen(function* () {
@@ -498,6 +574,76 @@ export function makeLocalJotApplication(
               workspaceState: state,
             }),
           );
+        }),
+      repairCatalog: (credentials) =>
+        Effect.gen(function* () {
+          const principal = yield* resolvePrincipal(credentials);
+          yield* requireOwner(principal);
+          const prefix = `workspaces/${state.workspaceId}/documents/`;
+          const keys = yield* objectStore.list(prefix).pipe(Effect.mapError(toApplicationError));
+          const documentIds = [
+            ...new Set(
+              keys.flatMap((key) => {
+                const match = /^workspaces\/[^/]+\/documents\/([^/]+)\/head\.json$/u.exec(key);
+                return match?.[1] === undefined ? [] : [match[1]];
+              }),
+            ),
+          ].toSorted();
+          const deletedEntries = state.catalog.entries.filter(
+            (entry) => entry.status === "deleted",
+          );
+          let rebuilt: WorkspaceCatalogState = {
+            entries: deletedEntries,
+            nextRfcNumber: Math.max(
+              1,
+              ...deletedEntries.map((entry) => (entry.rfcNumber ?? 0) + 1),
+            ),
+            people: state.catalog.people,
+          };
+          const errors: string[] = [];
+          for (const rawDocumentId of documentIds) {
+            if (deletedEntries.some((entry) => entry.documentId === rawDocumentId)) continue;
+            const recovered = yield* provideAuthorityDependencies(
+              makeDocumentAuthority({
+                documentId: yield* documentId(rawDocumentId).pipe(
+                  Effect.mapError(toApplicationError),
+                ),
+                workspaceId: state.workspaceId,
+              }),
+            ).pipe(
+              Effect.flatMap((room) =>
+                room
+                  .snapshot(ownerPrincipal, new Date().toISOString())
+                  .pipe(Effect.map((snapshot) => ({ room, snapshot }))),
+              ),
+              Effect.mapError(toApplicationError),
+              Effect.either,
+            );
+            if (Either.isLeft(recovered)) {
+              errors.push(`${rawDocumentId}: ${recovered.left.message}`);
+              continue;
+            }
+            const { room, snapshot } = recovered.right;
+            const reserved = yield* reserveDocument(rebuilt, {
+              allocateRfc: false,
+              creationKey: `repair:${rawDocumentId}`,
+              documentId: rawDocumentId,
+              requestedRfcNumber: snapshot.metadata.rfcNumber,
+            }).pipe(Effect.mapError(toApplicationError));
+            rebuilt = yield* activateDocument(reserved.state, room.documentId).pipe(
+              Effect.flatMap((catalog) =>
+                applyCatalogSummary(catalog, summaryFromSnapshot(snapshot)),
+              ),
+              Effect.mapError(toApplicationError),
+            );
+            rooms.set(room.documentId, room);
+          }
+          if (errors.length === 0) {
+            yield* saveState({ ...state, catalog: rebuilt }).pipe(
+              Effect.mapError(toApplicationError),
+            );
+          }
+          return { checkedObjects: documentIds.length, errors };
         }),
       restoreWorkspace: (credentials, archive) =>
         Effect.gen(function* () {
@@ -655,10 +801,12 @@ export function makeLocalJotApplication(
           const contentDigest = yield* digest
             .sha256(bytes)
             .pipe(Effect.mapError(toApplicationError));
+          const dimensions = imageDimensions(mediaType, bytes);
           const metadata: AttachmentMetadataDto = {
             createdAt: now,
             digest: contentDigest,
             filename: normalizedFilename,
+            ...(dimensions === undefined ? {} : dimensions),
             id: attachmentId,
             mediaType,
             size: bytes.byteLength,
@@ -703,9 +851,24 @@ export function makeLocalJotApplication(
         Effect.gen(function* () {
           const room = yield* getRoom(rawDocumentId);
           const principal = yield* resolvePrincipal(credentials, rawDocumentId);
-          yield* room
-            .snapshot(principal, new Date().toISOString())
-            .pipe(Effect.mapError(toApplicationError), Effect.asVoid);
+          const attachmentReadAt = new Date().toISOString();
+          const authorizedMetadata = yield* room.snapshot(principal, attachmentReadAt).pipe(
+            Effect.map((snapshot) => snapshot.metadata),
+            Effect.catchAll(() =>
+              room.snapshot(ownerPrincipal, attachmentReadAt).pipe(
+                Effect.tap((snapshot) =>
+                  authorizeDocument(
+                    principal,
+                    "read-published",
+                    snapshot.metadata,
+                    attachmentReadAt,
+                  ),
+                ),
+                Effect.map((snapshot) => snapshot.metadata),
+              ),
+            ),
+            Effect.mapError(toApplicationError),
+          );
           const metadata = state.attachments[room.documentId]?.find(
             (attachment) => attachment.id === attachmentId,
           );
@@ -723,7 +886,14 @@ export function makeLocalJotApplication(
               true,
             );
           }
-          return { bytes: stored.bytes, metadata };
+          return {
+            bytes: stored.bytes,
+            metadata,
+            publicCache:
+              principal.kind === "anonymous" &&
+              authorizedMetadata.visibility === "public" &&
+              authorizedMetadata.publishedRevision !== undefined,
+          };
         }),
       checkpointAll: () =>
         Effect.forEach(rooms.values(), (room) =>
@@ -805,9 +975,15 @@ export function makeLocalJotApplication(
         }),
       authenticationStatus: (credentials) =>
         Effect.gen(function* () {
-          const needsSetup = state.authentication.ownerPasswordHash === undefined;
+          const needsSetup =
+            options.allowOwnerSetup !== false &&
+            state.authentication.ownerPasswordHash === undefined;
           if (needsSetup) {
-            return { authenticated: false, needsSetup: true };
+            return {
+              authenticated: false,
+              authenticationMethods: options.authenticationMethods ?? ["password"],
+              needsSetup: true,
+            };
           }
           const principal = yield* resolvePrincipal(credentials).pipe(
             Effect.catchAll(() => Effect.succeed({ kind: "anonymous" } as const)),
@@ -815,10 +991,22 @@ export function makeLocalJotApplication(
           return principal.kind === "workspace" || principal.kind === "api-key"
             ? {
                 authenticated: true,
+                authenticationMethods: options.authenticationMethods ?? ["password"],
                 needsSetup: false,
-                principal: { displayName: "Owner", id: principal.personId, role: principal.role },
+                principal: {
+                  displayName:
+                    state.authentication.sessions.find(
+                      (session) => session.personId === principal.personId,
+                    )?.displayName ?? "Owner",
+                  id: principal.personId,
+                  role: principal.role,
+                },
               }
-            : { authenticated: false, needsSetup: false };
+            : {
+                authenticated: false,
+                authenticationMethods: options.authenticationMethods ?? ["password"],
+                needsSetup: false,
+              };
         }),
       createApiKey: (credentials, label) =>
         Effect.gen(function* () {
@@ -844,7 +1032,9 @@ export function makeLocalJotApplication(
       createDocument: (credentials, request) =>
         Effect.gen(function* () {
           const principal = yield* resolvePrincipal(credentials);
-          yield* requireOwner(principal);
+          yield* authorizeWorkspace(principal, "create-document").pipe(
+            Effect.mapError(toApplicationError),
+          );
           const now = new Date().toISOString();
           const generatedId = yield* ids.generate("doc");
           const reservation = yield* withState(
@@ -1027,11 +1217,21 @@ export function makeLocalJotApplication(
           const snapshot = yield* room
             .snapshot(ownerPrincipal, importedAt)
             .pipe(Effect.mapError(toApplicationError));
+          const directoryEntries = yield* Effect.forEach(request.people ?? [], (entry) =>
+            personId(entry.email.toLocaleLowerCase("en")).pipe(
+              Effect.mapError(toApplicationError),
+              Effect.map((id) => ({
+                aliases: entry.aliases ?? [],
+                person: { displayName: entry.displayName, email: entry.email, id },
+              })),
+            ),
+          );
           yield* withState(
             activateDocument(state.catalog, room.documentId).pipe(
               Effect.flatMap((catalog) =>
                 applyCatalogSummary(catalog, summaryFromSnapshot(snapshot)),
               ),
+              Effect.map((catalog) => directoryEntries.reduce(upsertPerson, catalog)),
               Effect.mapError(toApplicationError),
               Effect.flatMap((catalog) =>
                 saveState({ ...state, catalog }).pipe(Effect.mapError(toApplicationError)),
@@ -1156,15 +1356,7 @@ export function makeLocalJotApplication(
       listPublicDocuments: (query, lifecycleState, label) =>
         Effect.gen(function* () {
           const normalizedQuery = normalizeSearchText(query);
-          const entries = publicCatalog(state.catalog).filter(
-            (summary) =>
-              (normalizedQuery.length === 0 ||
-                normalizeSearchText(
-                  `${summary.rfcNumber ?? ""} ${summary.title} ${summary.normalizedBody} ${summary.labels.join(" ")}`,
-                ).includes(normalizedQuery)) &&
-              (lifecycleState === undefined || summary.state === lifecycleState) &&
-              (label === undefined || summary.labels.includes(label)),
-          );
+          const entries = publicCatalog(state.catalog);
           const documents = yield* Effect.forEach(entries, (summary) => {
             const publishedRevision = summary.publishedRevision;
             if (publishedRevision === undefined) return Effect.succeed(undefined);
@@ -1175,10 +1367,23 @@ export function makeLocalJotApplication(
               ),
             ).pipe(
               Effect.mapError(toApplicationError),
-              Effect.map((snapshot) => ({
-                excerpt: excerpt(snapshot.body),
-                metadata: snapshot.metadata as DocumentMetadataDto,
-              })),
+              Effect.map((snapshot) => {
+                const searchText = normalizeSearchText(
+                  `${snapshot.metadata.rfcNumber ?? ""} ${snapshot.metadata.title} ${snapshot.body} ${snapshot.metadata.labels.join(" ")}`,
+                );
+                return (normalizedQuery.length === 0 || searchText.includes(normalizedQuery)) &&
+                  (lifecycleState === undefined ||
+                    snapshot.metadata.lifecycleState === lifecycleState) &&
+                  (label === undefined || snapshot.metadata.labels.includes(label))
+                  ? {
+                      excerpt: excerpt(snapshot.body),
+                      metadata: {
+                        ...snapshot.metadata,
+                        publishedRevision,
+                      } as DocumentMetadataDto,
+                    }
+                  : undefined;
+              }),
             );
           });
           return {
@@ -1189,7 +1394,10 @@ export function makeLocalJotApplication(
         }),
       listDocuments: (credentials, query) =>
         Effect.gen(function* () {
-          yield* resolvePrincipal(credentials).pipe(Effect.flatMap(requireOwner));
+          const principal = yield* resolvePrincipal(credentials);
+          yield* authorizeWorkspace(principal, "read-catalog").pipe(
+            Effect.mapError(toApplicationError),
+          );
           const summaries = searchCatalog(state.catalog, query);
           const documents = yield* Effect.forEach(summaries, (summary) =>
             getRoom(summary.documentId).pipe(
@@ -1206,6 +1414,29 @@ export function makeLocalJotApplication(
       login: (password) =>
         withState(
           loginOwner(state.authentication, password, new Date().toISOString()).pipe(
+            Effect.provideService(SecretHasher, hasher),
+            Effect.provideService(SecureToken, tokens),
+            Effect.mapError(toApplicationError),
+            Effect.flatMap((created) =>
+              tokens.generate(24).pipe(
+                Effect.mapError(toApplicationError),
+                Effect.flatMap((csrfToken) =>
+                  saveState({ ...state, authentication: created.state }).pipe(
+                    Effect.mapError(toApplicationError),
+                    Effect.as({
+                      csrfToken,
+                      expiresAt: created.expiresAt,
+                      sessionToken: created.token,
+                    }),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      loginWorkspaceIdentity: (identity) =>
+        withState(
+          createWorkspaceSession(state.authentication, identity, new Date().toISOString()).pipe(
             Effect.provideService(SecretHasher, hasher),
             Effect.provideService(SecureToken, tokens),
             Effect.mapError(toApplicationError),
@@ -1262,6 +1493,8 @@ export function makeLocalJotApplication(
           const principal = yield* resolvePrincipal(credentials, rawDocumentId);
           return yield* snapshotFor(room, principal, startLine, endLine);
         }),
+      readPublicDocument: (rawDocumentId) =>
+        readPublished(rawDocumentId, `/public/documents/${encodeURIComponent(rawDocumentId)}`),
       readPublicRfc: (rfcNumber) =>
         Effect.gen(function* () {
           const entry = state.catalog.entries.find(
@@ -1271,33 +1504,13 @@ export function makeLocalJotApplication(
               item.summary?.visibility === "public" &&
               item.summary.publishedRevision !== undefined,
           );
-          const summary = entry?.summary;
-          const publishedRevision = summary?.publishedRevision;
-          if (entry === undefined || summary === undefined || publishedRevision === undefined) {
+          if (entry === undefined) {
             return yield* applicationFailure("not_found", "The published RFC does not exist.", 404);
           }
-          const snapshot = yield* provideAuthorityDependencies(
-            loadDocumentRevision(
-              { documentId: entry.documentId, workspaceId: state.workspaceId },
-              publishedRevision,
-            ),
-          ).pipe(Effect.mapError(toApplicationError));
-          const rendered = yield* renderer
-            .render(snapshot.body, {
-              rewriteUrl: rewriteRfcUrl,
-            })
-            .pipe(Effect.mapError(toApplicationError));
-          const room = yield* getRoom(entry.documentId);
-          const current = yield* room
-            .snapshot(ownerPrincipal, new Date().toISOString())
-            .pipe(Effect.mapError(toApplicationError));
-          return {
-            canonicalPath: `/rfc/${String(rfcNumber).padStart(4, "0")}`,
-            description: summary.excerpt,
-            headings: rendered.headings,
-            html: rendered.html,
-            metadata: current.metadata as DocumentMetadataDto,
-          } satisfies PublicDocumentResponse;
+          return yield* readPublished(
+            entry.documentId,
+            `/rfc/${String(rfcNumber).padStart(4, "0")}`,
+          );
         }),
       replaceBody: (credentials, rawDocumentId, request) =>
         Effect.gen(function* () {
@@ -1358,34 +1571,40 @@ export function makeLocalJotApplication(
           );
         }),
       setupOwner: (password) =>
-        withState(
-          setupOwner(state.authentication, password).pipe(
-            Effect.provideService(SecretHasher, hasher),
-            Effect.mapError(toApplicationError),
-            Effect.flatMap((authentication) =>
-              loginOwner(authentication, password, new Date().toISOString()).pipe(
+        options.allowOwnerSetup === false
+          ? applicationFailure(
+              "owner_setup_disabled",
+              "Local owner setup is disabled for this deployment.",
+              403,
+            )
+          : withState(
+              setupOwner(state.authentication, password).pipe(
                 Effect.provideService(SecretHasher, hasher),
-                Effect.provideService(SecureToken, tokens),
                 Effect.mapError(toApplicationError),
-              ),
-            ),
-            Effect.flatMap((created) =>
-              tokens.generate(24).pipe(
-                Effect.mapError(toApplicationError),
-                Effect.flatMap((csrfToken) =>
-                  saveState({ ...state, authentication: created.state }).pipe(
+                Effect.flatMap((authentication) =>
+                  loginOwner(authentication, password, new Date().toISOString()).pipe(
+                    Effect.provideService(SecretHasher, hasher),
+                    Effect.provideService(SecureToken, tokens),
                     Effect.mapError(toApplicationError),
-                    Effect.as({
-                      csrfToken,
-                      expiresAt: created.expiresAt,
-                      sessionToken: created.token,
-                    }),
+                  ),
+                ),
+                Effect.flatMap((created) =>
+                  tokens.generate(24).pipe(
+                    Effect.mapError(toApplicationError),
+                    Effect.flatMap((csrfToken) =>
+                      saveState({ ...state, authentication: created.state }).pipe(
+                        Effect.mapError(toApplicationError),
+                        Effect.as({
+                          csrfToken,
+                          expiresAt: created.expiresAt,
+                          sessionToken: created.token,
+                        }),
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ),
       unpublish: (credentials, rawDocumentId) =>
         Effect.gen(function* () {
           const room = yield* getRoom(rawDocumentId);
@@ -1488,6 +1707,42 @@ export function makeLocalJotApplication(
 
 export function localApplicationLayer(options: LocalApplicationOptions = {}) {
   return Layer.effect(JotApplication, makeLocalJotApplication(options));
+}
+
+function persistCatalogProjections(
+  state: LocalWorkspaceState,
+  objectStore: typeof ObjectStore.Service,
+  digest: typeof Digest.Service,
+): Effect.Effect<void, StorageError> {
+  return Effect.gen(function* () {
+    const internalBytes = textEncoder.encode(JSON.stringify(state.catalog));
+    const publicBytes = textEncoder.encode(
+      JSON.stringify({
+        documents: publicCatalog(state.catalog).map((summary) => ({
+          documentId: summary.documentId,
+          publishedRevision: summary.publishedRevision,
+          rfcNumber: summary.rfcNumber,
+        })),
+        generatedAt: new Date().toISOString(),
+        schemaVersion: 1,
+      }),
+    );
+    const internalDigest = yield* digest.sha256(internalBytes);
+    const publicDigest = yield* digest.sha256(publicBytes);
+    yield* Effect.all(
+      [
+        objectStore.put(`workspaces/${state.workspaceId}/catalog/internal.json`, internalBytes, {
+          digest: internalDigest,
+          mediaType: "application/json",
+        }),
+        objectStore.put(`workspaces/${state.workspaceId}/catalog/public.json`, publicBytes, {
+          digest: publicDigest,
+          mediaType: "application/json",
+        }),
+      ],
+      { concurrency: 2, discard: true },
+    );
+  });
 }
 
 function hydratePrivateDocumentState(
@@ -1791,6 +2046,70 @@ const allowedAttachmentTypes = new Set([
   "image/webp",
   "text/plain",
 ]);
+
+function imageDimensions(
+  mediaType: string,
+  bytes: Uint8Array,
+): { readonly height: number; readonly width: number } | undefined {
+  if (
+    mediaType === "image/png" &&
+    bytes.length >= 24 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47
+  ) {
+    return validDimensions(unsigned32(bytes, 16), unsigned32(bytes, 20));
+  }
+  if (
+    mediaType === "image/gif" &&
+    bytes.length >= 10 &&
+    bytes[0] === 0x47 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46
+  ) {
+    return validDimensions(
+      (bytes[6] ?? 0) | ((bytes[7] ?? 0) << 8),
+      (bytes[8] ?? 0) | ((bytes[9] ?? 0) << 8),
+    );
+  }
+  if (mediaType === "image/jpeg" && bytes[0] === 0xff && bytes[1] === 0xd8) {
+    let offset = 2;
+    while (offset + 8 < bytes.length) {
+      if (bytes[offset] !== 0xff) break;
+      const marker = bytes[offset + 1] ?? 0;
+      const length = ((bytes[offset + 2] ?? 0) << 8) | (bytes[offset + 3] ?? 0);
+      if (length < 2) break;
+      if (marker >= 0xc0 && marker <= 0xc3) {
+        return validDimensions(
+          ((bytes[offset + 7] ?? 0) << 8) | (bytes[offset + 8] ?? 0),
+          ((bytes[offset + 5] ?? 0) << 8) | (bytes[offset + 6] ?? 0),
+        );
+      }
+      offset += length + 2;
+    }
+  }
+  return undefined;
+}
+
+function validDimensions(
+  width: number,
+  height: number,
+): { readonly height: number; readonly width: number } | undefined {
+  return width > 0 && height > 0 && width <= 100_000 && height <= 100_000
+    ? { height, width }
+    : undefined;
+}
+
+function unsigned32(bytes: Uint8Array, offset: number): number {
+  return (
+    ((bytes[offset] ?? 0) * 0x1000000 +
+      ((bytes[offset + 1] ?? 0) << 16) +
+      ((bytes[offset + 2] ?? 0) << 8) +
+      (bytes[offset + 3] ?? 0)) >>>
+    0
+  );
+}
 
 function attachmentObjectKey(
   workspaceId: string,

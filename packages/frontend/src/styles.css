@@ -426,6 +426,62 @@
     gap: 1.25rem;
   }
 
+  .auth-divider {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--muted);
+    font: 0.65rem var(--mono);
+    text-transform: uppercase;
+  }
+
+  .auth-divider::before,
+  .auth-divider::after {
+    content: "";
+    flex: 1;
+    border-top: 1px solid var(--line);
+  }
+
+  .google-button {
+    display: block;
+    text-align: center;
+    text-decoration: none;
+  }
+
+  .settings-dialog {
+    width: min(38rem, calc(100vw - 2rem));
+  }
+
+  .api-key-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.8rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .api-key-row span {
+    display: grid;
+  }
+
+  .api-key-row small {
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+
+  .agent-instructions {
+    padding: 1rem;
+    border: 1px solid var(--signal);
+    background: color-mix(in srgb, var(--signal) 8%, transparent);
+  }
+
+  .agent-instructions pre {
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
   .form-error {
     min-height: 1.2em;
     color: var(--signal);
@@ -806,10 +862,43 @@
     text-align: left;
   }
 
+  .comment-anchor {
+    border-bottom: 2px solid var(--signal);
+    background: color-mix(in srgb, var(--signal) 20%, transparent);
+    color: inherit;
+  }
+
   .jot-mermaid {
-    overflow: auto;
+    position: relative;
+    min-height: 12rem;
+    overflow: hidden;
     padding: 1rem;
     background: white;
+  }
+
+  .mermaid-viewport {
+    cursor: grab;
+    transform-origin: center;
+    touch-action: none;
+  }
+
+  .mermaid-viewport:active {
+    cursor: grabbing;
+  }
+
+  .jot-mermaid__controls {
+    position: absolute;
+    right: 0.6rem;
+    bottom: 0.6rem;
+    display: flex;
+    gap: 0.25rem;
+  }
+
+  .jot-mermaid__controls button {
+    padding: 0.35rem 0.55rem;
+    border: 1px solid #777;
+    background: #fff;
+    color: #111;
   }
 }
 

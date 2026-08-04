@@ -10,6 +10,7 @@ import * as Y from "yjs";
 
 import { createCommentAnchor } from "@earendil-works/jot-collaboration";
 import type {
+  CommentStateDto,
   CommentThreadDto,
   DocumentMetadataDto,
   PresenceDto,
@@ -55,14 +56,19 @@ function route(): Effect.Effect<void, ApiError> {
         status.authenticated ? "Workspace connected" : "Authentication required",
       );
       if (status.needsSetup) {
-        return renderAuthentication("setup");
+        return renderAuthentication("setup", status.authenticationMethods);
       }
-      return status.authenticated ? renderWorkspace() : renderAuthentication("login");
+      return status.authenticated
+        ? renderWorkspace()
+        : renderAuthentication("login", status.authenticationMethods);
     }),
   );
 }
 
-function renderAuthentication(mode: "login" | "setup"): Effect.Effect<void> {
+function renderAuthentication(
+  mode: "login" | "setup",
+  methods: readonly ("password" | "google")[],
+): Effect.Effect<void> {
   return Effect.sync(() => {
     app.className = "auth-layout";
     app.innerHTML = `
@@ -75,17 +81,18 @@ function renderAuthentication(mode: "login" | "setup"): Effect.Effect<void> {
         <p class="folio">JOT / AUTHORITY</p>
         <h2 id="auth-title">${mode === "setup" ? "Set owner password" : "Owner sign in"}</h2>
         <form data-auth-form>
-          <label>Password <input name="password" type="password" minlength="12" autocomplete="${mode === "setup" ? "new-password" : "current-password"}" required /></label>
-          <button class="primary-button" type="submit">${mode === "setup" ? "Initialize workspace" : "Sign in"}</button>
+          ${methods.includes("password") ? `<label>Password <input name="password" type="password" minlength="12" autocomplete="${mode === "setup" ? "new-password" : "current-password"}" required /></label><button class="primary-button" type="submit">${mode === "setup" ? "Initialize workspace" : "Sign in"}</button>` : ""}
+          ${methods.includes("google") ? '<a class="primary-button google-button" href="/api/auth/google/start">Continue with Google</a>' : ""}
           <p class="form-error" data-form-error></p>
         </form>
       </section>`;
     const form = requireElement<HTMLFormElement>("[data-auth-form]");
-    const password = requireElement<HTMLInputElement>("input[name=password]");
+    const password = document.querySelector<HTMLInputElement>("input[name=password]");
     const error = requireElement<HTMLElement>("[data-form-error]");
     form.addEventListener("submit", (event) => {
       event.preventDefault();
       error.textContent = "";
+      if (password === null) return;
       const operation = mode === "setup" ? api.setup(password.value) : api.login(password.value);
       runUi(
         operation.pipe(
@@ -98,7 +105,7 @@ function renderAuthentication(mode: "login" | "setup"): Effect.Effect<void> {
         ),
       );
     });
-    password.focus();
+    password?.focus();
   });
 }
 
@@ -117,6 +124,7 @@ function renderWorkspace(): Effect.Effect<void, ApiError> {
           </section>
           <section class="catalog-tools" aria-label="Document tools">
             <label class="search-field"><span>Search</span><input type="search" data-search placeholder="Title, body, people, state…" /></label>
+            <button class="text-button" type="button" data-settings>API & agents</button>
             <button class="text-button" type="button" data-logout>Sign out</button>
           </section>
           <section class="catalog" data-catalog aria-live="polite"></section>
@@ -128,6 +136,16 @@ function renderWorkspace(): Effect.Effect<void, ApiError> {
               <label>Opening Markdown <textarea name="body" rows="9" placeholder="# Context\n\nStart with the decision…"></textarea></label>
               <button class="primary-button" value="default" type="submit">Create document</button>
               <p class="form-error" data-new-error></p>
+            </form>
+          </dialog>
+          <dialog class="settings-dialog" data-settings-dialog>
+            <form method="dialog" data-settings-form>
+              <div class="dialog-heading"><p class="eyebrow">API keys / agent access</p><button class="icon-button" value="cancel" aria-label="Close">×</button></div>
+              <div data-api-keys><p>Loading keys…</p></div>
+              <label>New key label <input name="api-key-label" maxlength="200" placeholder="Laptop agent" /></label>
+              <button class="primary-button" value="create" type="submit">Create API key</button>
+              <section class="agent-instructions" data-agent-instructions hidden><b>Copy this now — the key is shown once.</b><pre data-agent-command></pre><button class="text-button" type="button" data-copy-agent>Copy setup command</button></section>
+              <p class="form-error" data-settings-error></p>
             </form>
           </dialog>`;
         renderCatalog(catalog.documents);
@@ -176,6 +194,90 @@ function renderWorkspace(): Effect.Effect<void, ApiError> {
                   }),
                 ),
               ),
+          );
+        });
+        const settingsDialog = requireElement<HTMLDialogElement>("[data-settings-dialog]");
+        let knownApiKeys: readonly {
+          readonly id: string;
+          readonly label: string;
+          readonly revokedAt?: string | undefined;
+        }[] = [];
+        const renderApiKeys = (
+          keys: readonly {
+            readonly id: string;
+            readonly label: string;
+            readonly revokedAt?: string | undefined;
+          }[],
+        ): void => {
+          knownApiKeys = keys;
+          requireElement<HTMLElement>("[data-api-keys]").innerHTML =
+            keys.length === 0
+              ? "<p>No API keys created.</p>"
+              : keys
+                  .map(
+                    (key) =>
+                      `<div class="api-key-row"><span><b>${escapeHtml(key.label)}</b><small>${key.revokedAt === undefined ? "Active" : "Revoked"}</small></span>${key.revokedAt === undefined ? `<button class="text-button" type="button" data-revoke-key="${escapeHtml(key.id)}">Revoke</button>` : ""}</div>`,
+                  )
+                  .join("");
+          document.querySelectorAll<HTMLButtonElement>("[data-revoke-key]").forEach((button) => {
+            button.addEventListener("click", () => {
+              const keyId = button.dataset["revokeKey"];
+              if (keyId === undefined || !window.confirm("Revoke this API key?")) return;
+              runUi(
+                api.revokeApiKey(keyId).pipe(
+                  Effect.zipRight(api.listApiKeys),
+                  Effect.tap((next) => Effect.sync(() => renderApiKeys(next))),
+                  Effect.catchAll(showToastError),
+                ),
+              );
+            });
+          });
+        };
+        requireElement<HTMLButtonElement>("[data-settings]").addEventListener("click", () => {
+          settingsDialog.showModal();
+          runUi(
+            api.listApiKeys.pipe(
+              Effect.tap((keys) => Effect.sync(() => renderApiKeys(keys))),
+              Effect.catchAll((failure) =>
+                Effect.sync(() => {
+                  requireElement<HTMLElement>("[data-settings-error]").textContent =
+                    failure.message;
+                }),
+              ),
+            ),
+          );
+        });
+        requireElement<HTMLFormElement>("[data-settings-form]").addEventListener(
+          "submit",
+          (event) => {
+            const submitter = event.submitter;
+            if (!(submitter instanceof HTMLButtonElement) || submitter.value !== "create") return;
+            event.preventDefault();
+            const label = requireElement<HTMLInputElement>("input[name=api-key-label]").value;
+            if (label.trim() === "") return;
+            runUi(
+              api.createApiKey(label).pipe(
+                Effect.tap((created) =>
+                  Effect.sync(() => {
+                    const command = `jot instance add workspace ${location.origin} ${created.key}`;
+                    const instructions = requireElement<HTMLElement>("[data-agent-instructions]");
+                    instructions.hidden = false;
+                    requireElement<HTMLElement>("[data-agent-command]").textContent = command;
+                    renderApiKeys([created.metadata, ...knownApiKeys]);
+                  }),
+                ),
+                Effect.catchAll(showToastError),
+              ),
+            );
+          },
+        );
+        requireElement<HTMLButtonElement>("[data-copy-agent]").addEventListener("click", () => {
+          const command = requireElement<HTMLElement>("[data-agent-command]").textContent ?? "";
+          runUi(
+            Effect.tryPromise({
+              catch: () => undefined,
+              try: () => navigator.clipboard.writeText(command),
+            }).pipe(Effect.ignore),
           );
         });
         requireElement<HTMLButtonElement>("[data-logout]").addEventListener("click", () => {
@@ -284,7 +386,9 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
               Effect.tap((rendered) =>
                 Effect.sync(() => {
                   if (generation !== previewGeneration) return;
-                  requireElement<HTMLElement>("[data-preview]").innerHTML = rendered.html;
+                  const preview = requireElement<HTMLElement>("[data-preview]");
+                  preview.innerHTML = rendered.html;
+                  highlightCommentAnchors(preview, comments);
                 }),
               ),
               Effect.tap(() => renderMermaid()),
@@ -342,6 +446,7 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
                   .map((thread) => commentHtml(thread, permissions.includes("manage-comments")))
                   .join("");
           bindCommentActions();
+          highlightCommentAnchors(requireElement<HTMLElement>("[data-preview]"), comments);
         };
         const bindCommentActions = (): void => {
           document.querySelectorAll<HTMLButtonElement>("[data-reply-thread]").forEach((button) => {
@@ -724,6 +829,34 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
   );
 }
 
+function highlightCommentAnchors(preview: HTMLElement, state: CommentStateDto): void {
+  for (const existing of preview.querySelectorAll("mark.comment-anchor")) {
+    existing.replaceWith(document.createTextNode(existing.textContent ?? ""));
+  }
+  preview.normalize();
+  for (const thread of state.threads) {
+    if (thread.anchor.orphaned || thread.anchor.quote.length === 0) continue;
+    const walker = document.createTreeWalker(preview, NodeFilter.SHOW_TEXT);
+    let node = walker.nextNode();
+    while (node !== null) {
+      const value = node.textContent ?? "";
+      const offset = value.indexOf(thread.anchor.quote);
+      if (offset !== -1 && value.indexOf(thread.anchor.quote, offset + 1) === -1) {
+        const range = document.createRange();
+        range.setStart(node, offset);
+        range.setEnd(node, offset + thread.anchor.quote.length);
+        const mark = document.createElement("mark");
+        mark.className = "comment-anchor";
+        mark.dataset["threadId"] = thread.id;
+        mark.title = `Comment thread ${thread.id}`;
+        range.surroundContents(mark);
+        break;
+      }
+      node = walker.nextNode();
+    }
+  }
+}
+
 function commentHtml(thread: CommentThreadDto, canManage: boolean): string {
   const root = thread.messages[0];
   const replies = thread.messages.slice(1);
@@ -749,7 +882,44 @@ function renderMermaid(): Effect.Effect<void> {
         diagrams.map(async (diagram, index) => {
           const code = diagram.querySelector("code")?.textContent ?? "";
           const rendered = await mermaid.render(`jot-mermaid-${index}-${Date.now()}`, code);
-          diagram.innerHTML = rendered.svg;
+          diagram.innerHTML = `<div class="mermaid-viewport">${rendered.svg}</div><div class="jot-mermaid__controls"><button type="button" data-mermaid-zoom-in aria-label="Zoom in">+</button><button type="button" data-mermaid-zoom-out aria-label="Zoom out">−</button><button type="button" data-mermaid-reset>Reset</button></div>`;
+          const viewport = diagram.querySelector<HTMLElement>(".mermaid-viewport");
+          if (viewport === null) return;
+          let scale = 1;
+          let offsetX = 0;
+          let offsetY = 0;
+          let dragStart: { readonly x: number; readonly y: number } | undefined;
+          const applyTransform = (): void => {
+            viewport.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+          };
+          diagram.querySelector("[data-mermaid-zoom-in]")?.addEventListener("click", () => {
+            scale = Math.min(4, scale + 0.2);
+            applyTransform();
+          });
+          diagram.querySelector("[data-mermaid-zoom-out]")?.addEventListener("click", () => {
+            scale = Math.max(0.4, scale - 0.2);
+            applyTransform();
+          });
+          diagram.querySelector("[data-mermaid-reset]")?.addEventListener("click", () => {
+            scale = 1;
+            offsetX = 0;
+            offsetY = 0;
+            applyTransform();
+          });
+          viewport.addEventListener("pointerdown", (event) => {
+            dragStart = { x: event.clientX - offsetX, y: event.clientY - offsetY };
+            viewport.setPointerCapture(event.pointerId);
+          });
+          viewport.addEventListener("pointermove", (event) => {
+            if (dragStart === undefined) return;
+            offsetX = event.clientX - dragStart.x;
+            offsetY = event.clientY - dragStart.y;
+            applyTransform();
+          });
+          viewport.addEventListener("pointerup", (event) => {
+            dragStart = undefined;
+            viewport.releasePointerCapture(event.pointerId);
+          });
         }),
       );
     },

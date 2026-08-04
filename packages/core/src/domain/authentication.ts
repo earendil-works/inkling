@@ -4,13 +4,17 @@ import { SecretHasher, SecureToken } from "../application/ports.ts";
 import type { StorageError } from "../application/ports.ts";
 import { personId } from "./document.ts";
 import type { PersonId } from "./document.ts";
-import type { Principal } from "./authorization.ts";
+import type { Principal, WorkspaceRole } from "./authorization.ts";
 
 export interface SessionRecord {
   readonly id: string;
   readonly tokenHash: string;
   readonly createdAt: string;
   readonly expiresAt: string;
+  readonly displayName?: string | undefined;
+  readonly email?: string | undefined;
+  readonly personId?: PersonId | undefined;
+  readonly role?: WorkspaceRole | undefined;
 }
 
 export interface ApiKeyRecord {
@@ -32,6 +36,13 @@ export interface CreatedSession {
   readonly state: AuthenticationState;
   readonly token: string;
   readonly expiresAt: string;
+}
+
+export interface WorkspaceIdentity {
+  readonly displayName: string;
+  readonly email: string;
+  readonly personId: PersonId;
+  readonly role: WorkspaceRole;
 }
 
 export interface CreatedApiKey {
@@ -132,7 +143,54 @@ export function authenticateSession(
     if (!(yield* hasher.verify(secret, record.tokenHash))) {
       return yield* authenticationFailure("invalid_token", "The session token is invalid.");
     }
-    return ownerPrincipal(yield* localOwnerId());
+    return record.personId === undefined || record.role === undefined
+      ? ownerPrincipal(yield* localOwnerId())
+      : { kind: "workspace", personId: record.personId, role: record.role };
+  });
+}
+
+export function createWorkspaceSession(
+  state: AuthenticationState,
+  identity: WorkspaceIdentity,
+  now: string,
+  sessionLifetimeMilliseconds = 30 * 24 * 60 * 60 * 1000,
+): Effect.Effect<
+  CreatedSession,
+  AuthenticationError | StorageError,
+  typeof SecretHasher.Service | typeof SecureToken.Service
+> {
+  return Effect.gen(function* () {
+    const hasher = yield* SecretHasher;
+    const tokens = yield* SecureToken;
+    const id = yield* tokens.generate(12);
+    const secret = yield* tokens.generate(32);
+    const tokenHash = yield* hasher.hash(secret);
+    const expiresAt = new Date(Date.parse(now) + sessionLifetimeMilliseconds).toISOString();
+    const record: SessionRecord = {
+      createdAt: now,
+      displayName: identity.displayName,
+      email: identity.email,
+      expiresAt,
+      id,
+      personId: identity.personId,
+      role: identity.role,
+      tokenHash,
+    };
+    return {
+      expiresAt,
+      state: {
+        ...state,
+        sessions: [
+          ...state.sessions.filter(
+            (session) =>
+              session.personId !== identity.personId &&
+              Date.parse(session.expiresAt) > Date.parse(now),
+          ),
+          record,
+        ],
+      },
+      token: `${id}.${secret}`,
+    };
   });
 }
 

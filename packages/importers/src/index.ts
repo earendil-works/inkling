@@ -44,6 +44,7 @@ export interface ImportedMetadataInput extends Omit<CreateMetadataInput, "id"> {
 export interface ImportedDocument {
   readonly metadata: ImportedMetadataInput;
   readonly body: string;
+  readonly people: readonly PeopleDirectoryRecord[];
   readonly attachments: readonly ImportedAttachment[];
   readonly comments: readonly ImportedCommentThread[];
   readonly capabilityId?: string | undefined;
@@ -164,6 +165,7 @@ export function importEarendilRfc(
       body,
       comments: [],
       metadata,
+      people,
       relatedRfcNumbers,
       warnings,
     };
@@ -200,6 +202,7 @@ export function importExistingJot(
         title: decoded.title,
         updatedAt: normalizeDate(decoded.updatedAt) ?? context.now,
       },
+      people: context.people ?? [],
       relatedRfcNumbers: [],
       warnings: [],
     };

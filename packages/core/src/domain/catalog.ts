@@ -151,7 +151,7 @@ export function searchCatalog(
         options.publicOnly !== true ||
         (summary.visibility === "public" && summary.publishedRevision !== undefined),
     )
-    .map((summary) => ({ score: scoreSummary(summary, terms), summary }))
+    .map((summary) => ({ score: scoreSummary(summary, terms, state.people), summary }))
     .filter(({ score }) => terms.length === 0 || score > 0)
     .toSorted(
       (left, right) =>
@@ -199,12 +199,20 @@ export function normalizeSearchText(value: string): string {
     .trim();
 }
 
-function scoreSummary(summary: CatalogSummary, terms: readonly string[]): number {
+function scoreSummary(
+  summary: CatalogSummary,
+  terms: readonly string[],
+  directory: readonly PeopleDirectoryEntry[],
+): number {
   if (terms.length === 0) {
     return 1;
   }
   const people = [...summary.authors, ...summary.reviewers, ...summary.approvers]
-    .flatMap((person) => [person.displayName, person.email])
+    .flatMap((person) =>
+      [person.displayName, person.email].concat(
+        directory.find((entry) => entry.person.id === person.id)?.aliases ?? [],
+      ),
+    )
     .join(" ");
   const weighted = [
     [String(summary.rfcNumber ?? ""), 12],

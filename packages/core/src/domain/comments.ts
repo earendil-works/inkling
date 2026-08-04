@@ -83,6 +83,12 @@ export function createCommentThread(
 ): Effect.Effect<CommentState, DomainError> {
   return Effect.gen(function* () {
     yield* validateAnchor(input.anchor);
+    if (state.threads.length >= 500) {
+      return yield* fail(
+        "comment_thread_limit",
+        "A document may contain at most 500 comment threads.",
+      );
+    }
     if (state.threads.some((thread) => thread.id === input.id)) {
       return yield* fail("duplicate_comment_thread", "The comment thread already exists.");
     }
@@ -119,6 +125,12 @@ export function replyToCommentThread(
         return yield* fail(
           "comment_parent_not_found",
           "The parent comment message does not exist.",
+        );
+      }
+      if (thread.messages.length >= 1_000) {
+        return yield* fail(
+          "comment_message_limit",
+          "A comment thread may contain at most 1,000 messages.",
         );
       }
       if (thread.messages.some((message) => message.id === messageId)) {

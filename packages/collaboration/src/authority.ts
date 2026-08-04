@@ -7,6 +7,7 @@ import {
   deleteCommentMessage,
   deleteCommentThread,
   Digest,
+  DomainError,
   DurableDocumentJournal,
   editCommentMessage,
   emptyCommentState,
@@ -31,7 +32,6 @@ import type {
   DocumentId,
   DocumentMetadata,
   DocumentRevision,
-  DomainError,
   JournalEntry,
   JournalEntryKind,
   MetadataPatch,
@@ -418,8 +418,8 @@ export function makeDocumentAuthority(
             yield* authorizeDocument(principal, "edit-body", state.metadata, now);
             if (state.metadata.headRevision !== expectedRevision) {
               return yield* Effect.fail(
-                new CollaborationError({
-                  code: "invalid_update",
+                new DomainError({
+                  code: "revision_conflict",
                   message: `Expected revision ${expectedRevision}, current revision is ${state.metadata.headRevision}.`,
                 }),
               );
@@ -536,9 +536,11 @@ export function makeDocumentAuthority(
           Effect.gen(function* () {
             yield* authorizeDocument(principal, "edit-body", state.metadata, now);
             if (state.metadata.headRevision !== expectedRevision) {
-              return yield* collaborationFailure(
-                "invalid_update",
-                `Expected revision ${expectedRevision}, current revision is ${state.metadata.headRevision}.`,
+              return yield* Effect.fail(
+                new DomainError({
+                  code: "revision_conflict",
+                  message: `Expected revision ${expectedRevision}, current revision is ${state.metadata.headRevision}.`,
+                }),
               );
             }
             const update = yield* updateForReplacement(state.collaborative, body);

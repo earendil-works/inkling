@@ -2,8 +2,13 @@ import { DurableObject } from "cloudflare:workers";
 import { Effect, Layer, ManagedRuntime } from "effect";
 import type { ManagedRuntime as ManagedRuntimeType } from "effect";
 
-import { DurableDocumentJournal, ObjectStore, WorkspaceStateStore } from "@earendil-works/jot-core";
-import type { Principal } from "@earendil-works/jot-core";
+import {
+  DurableDocumentJournal,
+  ObjectStore,
+  personId,
+  WorkspaceStateStore,
+} from "@earendil-works/jot-core";
+import type { Principal, WorkspaceIdentity } from "@earendil-works/jot-core";
 import {
   ApplicationError,
   createBackendApp,
@@ -19,6 +24,7 @@ import type {
   JotApplicationService,
   LocalApplicationOptions,
   RequestCredentials,
+  SessionResult,
 } from "@earendil-works/jot-backend";
 import { decodeBase64 } from "@earendil-works/jot-collaboration";
 import {
@@ -42,6 +48,12 @@ import {
 
 export interface CloudflareEnvironment {
   readonly ASSETS: Fetcher;
+  readonly GOOGLE_ADMIN_EMAILS?: string | undefined;
+  readonly GOOGLE_ALLOWED_DOMAIN?: string | undefined;
+  readonly GOOGLE_CLIENT_ID?: string | undefined;
+  readonly GOOGLE_CLIENT_SECRET?: string | undefined;
+  readonly GOOGLE_REDIRECT_URI?: string | undefined;
+  readonly JOT_OAUTH_STATE_SECRET?: string | undefined;
   readonly JOT_DOCUMENTS: DurableObjectNamespace<DocumentDurableObject>;
   readonly JOT_OBJECTS: R2Bucket;
   readonly JOT_WORKSPACE: DurableObjectNamespace<WorkspaceDurableObject>;
@@ -52,6 +64,7 @@ interface SocketAttachment {
   readonly documentId: string;
   readonly initialized: boolean;
   readonly principal?: Principal | undefined;
+  readonly updateTimes: readonly number[];
 }
 
 interface RpcError {
@@ -74,7 +87,13 @@ export class WorkspaceDurableObject extends DurableObject<CloudflareEnvironment>
   constructor(state: DurableObjectState, environment: CloudflareEnvironment) {
     super(state, environment);
     this.#state = state;
+    const googleEnabled =
+      environment.GOOGLE_CLIENT_ID !== undefined &&
+      environment.GOOGLE_CLIENT_SECRET !== undefined &&
+      environment.GOOGLE_ALLOWED_DOMAIN !== undefined;
     this.#runtime = createApplicationRuntime(state, environment, {
+      allowOwnerSetup: !googleEnabled,
+      authenticationMethods: googleEnabled ? ["google"] : ["password"],
       ownsDocumentPrivateState: false,
       workspaceId: state.id.toString(),
     });
@@ -96,6 +115,13 @@ export class WorkspaceDurableObject extends DurableObject<CloudflareEnvironment>
     );
   }
 
+  async loginIdentity(identity: WorkspaceIdentity): Promise<RpcResult<SessionResult>> {
+    return runRpc(
+      this.#runtime,
+      Effect.flatMap(JotApplication, (application) => application.loginWorkspaceIdentity(identity)),
+    );
+  }
+
   async authorize(
     requestCredentials: RequestCredentials,
     documentId?: string,
@@ -108,13 +134,32 @@ export class WorkspaceDurableObject extends DurableObject<CloudflareEnvironment>
     );
   }
 
+  async configurations(): Promise<RpcResult<readonly DocumentRuntimeConfiguration[]>> {
+    return runRpc(
+      this.#runtime,
+      Effect.flatMap(JotApplication, (application) =>
+        Effect.gen(function* () {
+          yield* application.checkpointAll();
+          const configurations = yield* application.allDocumentRuntimeConfigurations();
+          yield* Effect.forEach(configurations, (configuration) =>
+            application.releaseDocumentRoom(configuration.documentId),
+          );
+          return configurations;
+        }),
+      ),
+    );
+  }
+
   async configuration(documentId: string): Promise<RpcResult<DocumentRuntimeConfiguration>> {
     return runRpc(
       this.#runtime,
       Effect.flatMap(JotApplication, (application) =>
-        application
-          .checkpointAll()
-          .pipe(Effect.zipRight(application.documentRuntimeConfiguration(documentId))),
+        Effect.gen(function* () {
+          yield* application.checkpointAll();
+          const configuration = yield* application.documentRuntimeConfiguration(documentId);
+          yield* application.releaseDocumentRoom(documentId);
+          return configuration;
+        }),
       ),
     );
   }
@@ -198,6 +243,23 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
     return { ok: true, value: true };
   }
 
+  async flush(): Promise<RpcResult<boolean>> {
+    try {
+      await this.alarm();
+      return { ok: true, value: true };
+    } catch {
+      return {
+        error: {
+          code: "checkpoint_failed",
+          message: "The document could not be checkpointed for backup.",
+          retryable: true,
+          status: 503,
+        },
+        ok: false,
+      };
+    }
+  }
+
   override async fetch(request: Request): Promise<Response> {
     const configuration = await this.#loadConfiguration();
     if (configuration === undefined) {
@@ -223,7 +285,7 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
     const url = new URL(request.url);
     const match = /^\/api\/documents\/([^/]+)\/ws$/u.exec(url.pathname);
     if (request.headers.get("Upgrade")?.toLowerCase() === "websocket" && match?.[1] !== undefined) {
-      return this.#upgrade(request, decodeURIComponent(match[1]));
+      return this.#upgrade(request, configuration.documentId);
     }
 
     const response = await app.fetch(request);
@@ -307,6 +369,14 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
     if (!isSameOrigin(request.headers.get("Origin"), request.url)) {
       return new Response("WebSocket origin rejected.", { status: 403 });
     }
+    if (this.#state.getWebSockets().length >= 64) {
+      return protocolErrorResponse({
+        code: "participant_limit",
+        message: "This document already has the maximum number of participants.",
+        retryable: true,
+        status: 429,
+      });
+    }
     const pair = new WebSocketPair();
     const client = pair[0];
     const server = pair[1];
@@ -314,6 +384,7 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
       credentials: credentials(request),
       documentId,
       initialized: false,
+      updateTimes: [],
     };
     server.serializeAttachment(attachment);
     this.#state.acceptWebSocket(server, [documentId]);
@@ -357,6 +428,20 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
             "The collaboration connection must be initialized again.",
           );
         }
+        const updateTimes = (attachment.updateTimes ?? []).filter(
+          (acceptedAt) => acceptedAt >= Date.now() - 10_000,
+        );
+        if (updateTimes.length >= 200) {
+          return yield* Effect.fail(
+            new ApplicationError({
+              code: "update_rate_limit",
+              message: "The collaboration update rate limit was exceeded.",
+              retryable: true,
+              status: 429,
+            }),
+          );
+        }
+        socket.serializeAttachment({ ...attachment, updateTimes: [...updateTimes, Date.now()] });
         const connection = yield* application.connectCollaboration(
           { internalPrincipal: attachment.principal },
           attachment.documentId,
@@ -454,6 +539,12 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
 const worker: ExportedHandler<CloudflareEnvironment> = {
   async fetch(request, environment) {
     const url = new URL(request.url);
+    if (url.pathname === "/api/auth/google/start") {
+      return startGoogleAuthentication(request, environment);
+    }
+    if (url.pathname === "/api/auth/google/callback") {
+      return finishGoogleAuthentication(request, environment);
+    }
     const documentId = documentIdFromPath(url.pathname);
     if (documentId !== undefined) {
       return dispatchDocument(request, environment, documentId);
@@ -465,6 +556,23 @@ const worker: ExportedHandler<CloudflareEnvironment> = {
       return dispatchDocument(request, environment, resolution.value.documentId, resolution.value);
     }
     if (isApplicationPath(url.pathname)) {
+      if (url.pathname === "/api/admin/backup") {
+        const authorized = await workspaceStub(environment).authorize(credentials(request));
+        if (!authorized.ok) return protocolErrorResponse(authorized.error);
+        if (
+          (authorized.value.kind !== "workspace" && authorized.value.kind !== "api-key") ||
+          (authorized.value.role !== "owner" && authorized.value.role !== "administrator")
+        ) {
+          return protocolErrorResponse({
+            code: "forbidden",
+            message: "Workspace administrator access is required.",
+            retryable: false,
+            status: 403,
+          });
+        }
+        const flushed = await flushDocumentsForBackup(environment);
+        if (!flushed.ok) return protocolErrorResponse(flushed.error);
+      }
       return workspaceStub(environment).fetch(request);
     }
     return environment.ASSETS.fetch(request);
@@ -472,6 +580,23 @@ const worker: ExportedHandler<CloudflareEnvironment> = {
 };
 
 export default worker;
+
+async function flushDocumentsForBackup(
+  environment: CloudflareEnvironment,
+): Promise<RpcResult<boolean>> {
+  const configurations = await workspaceStub(environment).configurations();
+  if (!configurations.ok) return configurations;
+  const results = await Promise.all(
+    configurations.value.map(async (configuration): Promise<RpcResult<boolean>> => {
+      const document = environment.JOT_DOCUMENTS.get(
+        environment.JOT_DOCUMENTS.idFromName(configuration.documentId),
+      );
+      const initialized = await document.initialize(configuration);
+      return initialized.ok ? document.flush() : initialized;
+    }),
+  );
+  return results.find((result) => !result.ok) ?? { ok: true, value: true };
+}
 
 async function dispatchDocument(
   request: Request,
@@ -594,6 +719,392 @@ function applicationStatus(value: number): ApplicationError["status"] {
     : 500;
 }
 
+interface OAuthStatePayload {
+  readonly expiresAt: number;
+  readonly nonce: string;
+  readonly redirectUri: string;
+  readonly state: string;
+  readonly verifier: string;
+}
+
+interface GoogleIdentityClaims {
+  readonly aud: string;
+  readonly email: string;
+  readonly email_verified: boolean;
+  readonly exp: number;
+  readonly hd?: string | undefined;
+  readonly iss: string;
+  readonly name?: string | undefined;
+  readonly nonce: string;
+  readonly sub: string;
+}
+
+async function startGoogleAuthentication(
+  request: Request,
+  environment: CloudflareEnvironment,
+): Promise<Response> {
+  const configuration = googleConfiguration(request, environment);
+  if (configuration === undefined) {
+    return protocolErrorResponse({
+      code: "oauth_unavailable",
+      message: "Google authentication is not configured.",
+      retryable: false,
+      status: 404,
+    });
+  }
+  const verifier = randomBase64Url(32);
+  const challenge = base64Url(
+    new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))),
+  );
+  const payload: OAuthStatePayload = {
+    expiresAt: Date.now() + 10 * 60 * 1_000,
+    nonce: randomBase64Url(24),
+    redirectUri: configuration.redirectUri,
+    state: randomBase64Url(24),
+    verifier,
+  };
+  const cookie = await signOAuthState(payload, configuration.stateSecret);
+  const authorization = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+  authorization.searchParams.set("client_id", configuration.clientId);
+  authorization.searchParams.set("redirect_uri", configuration.redirectUri);
+  authorization.searchParams.set("response_type", "code");
+  authorization.searchParams.set("scope", "openid email profile");
+  authorization.searchParams.set("state", payload.state);
+  authorization.searchParams.set("nonce", payload.nonce);
+  authorization.searchParams.set("code_challenge", challenge);
+  authorization.searchParams.set("code_challenge_method", "S256");
+  authorization.searchParams.set("hd", configuration.allowedDomain);
+  const headers = new Headers({ Location: authorization.href });
+  headers.append(
+    "Set-Cookie",
+    cookieHeader("jot_oauth", cookie, request, {
+      httpOnly: true,
+      maxAge: 600,
+      path: "/api/auth/google/callback",
+      sameSite: "Lax",
+    }),
+  );
+  return new Response(null, { headers, status: 302 });
+}
+
+async function finishGoogleAuthentication(
+  request: Request,
+  environment: CloudflareEnvironment,
+): Promise<Response> {
+  const configuration = googleConfiguration(request, environment);
+  if (configuration === undefined) {
+    return oauthFailure("Google authentication is not configured.");
+  }
+  try {
+    const url = new URL(request.url);
+    const stateCookie = parseCookies(request.headers.get("Cookie"))["jot_oauth"];
+    const payload =
+      stateCookie === undefined
+        ? undefined
+        : await verifyOAuthState(stateCookie, configuration.stateSecret);
+    const code = url.searchParams.get("code");
+    if (
+      payload === undefined ||
+      payload.expiresAt <= Date.now() ||
+      payload.state !== url.searchParams.get("state") ||
+      payload.redirectUri !== configuration.redirectUri ||
+      code === null
+    ) {
+      return oauthFailure("The OAuth state is invalid or expired.");
+    }
+    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+      body: new URLSearchParams({
+        client_id: configuration.clientId,
+        client_secret: configuration.clientSecret,
+        code,
+        code_verifier: payload.verifier,
+        grant_type: "authorization_code",
+        redirect_uri: configuration.redirectUri,
+      }),
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      method: "POST",
+    });
+    const tokenBody = (await tokenResponse.json()) as unknown;
+    const idToken =
+      isRecord(tokenBody) && typeof tokenBody["id_token"] === "string"
+        ? tokenBody["id_token"]
+        : undefined;
+    if (!tokenResponse.ok || idToken === undefined) {
+      return oauthFailure("Google rejected the authorization code.");
+    }
+    const claims = await verifyGoogleIdentityToken(idToken, configuration.clientId, payload.nonce);
+    if (
+      claims === undefined ||
+      !claims.email_verified ||
+      claims.hd?.toLocaleLowerCase("en") !== configuration.allowedDomain ||
+      !claims.email.toLocaleLowerCase("en").endsWith(`@${configuration.allowedDomain}`)
+    ) {
+      return oauthFailure("The Google identity is not a verified member of the allowed domain.");
+    }
+    const email = claims.email.toLocaleLowerCase("en");
+    const administrators = new Set(
+      (environment.GOOGLE_ADMIN_EMAILS ?? "")
+        .split(",")
+        .map((value) => value.trim().toLocaleLowerCase("en"))
+        .filter(Boolean),
+    );
+    const identity: WorkspaceIdentity = {
+      displayName: claims.name?.trim() || email,
+      email,
+      personId: await Effect.runPromise(personId(email)),
+      role: administrators.has(email) ? "administrator" : "member",
+    };
+    const session = await workspaceStub(environment).loginIdentity(identity);
+    if (!session.ok) return protocolErrorResponse(session.error);
+    const headers = new Headers({ Location: "/" });
+    headers.append(
+      "Set-Cookie",
+      cookieHeader("jot_session", session.value.sessionToken, request, {
+        expires: session.value.expiresAt,
+        httpOnly: true,
+        path: "/",
+        sameSite: "Strict",
+      }),
+    );
+    headers.append(
+      "Set-Cookie",
+      cookieHeader("jot_csrf", session.value.csrfToken, request, {
+        expires: session.value.expiresAt,
+        httpOnly: false,
+        path: "/",
+        sameSite: "Strict",
+      }),
+    );
+    headers.append(
+      "Set-Cookie",
+      cookieHeader("jot_oauth", "", request, {
+        httpOnly: true,
+        maxAge: 0,
+        path: "/api/auth/google/callback",
+        sameSite: "Lax",
+      }),
+    );
+    return new Response(null, { headers, status: 302 });
+  } catch {
+    return oauthFailure("Google authentication could not be completed.");
+  }
+}
+
+function googleConfiguration(request: Request, environment: CloudflareEnvironment) {
+  const clientId = environment.GOOGLE_CLIENT_ID;
+  const clientSecret = environment.GOOGLE_CLIENT_SECRET;
+  const allowedDomain = environment.GOOGLE_ALLOWED_DOMAIN?.trim().toLocaleLowerCase("en");
+  if (
+    clientId === undefined ||
+    clientSecret === undefined ||
+    allowedDomain === undefined ||
+    allowedDomain.length === 0
+  ) {
+    return undefined;
+  }
+  return {
+    allowedDomain,
+    clientId,
+    clientSecret,
+    redirectUri:
+      environment.GOOGLE_REDIRECT_URI ?? `${new URL(request.url).origin}/api/auth/google/callback`,
+    stateSecret: environment.JOT_OAUTH_STATE_SECRET ?? clientSecret,
+  };
+}
+
+async function verifyGoogleIdentityToken(
+  token: string,
+  audience: string,
+  nonce: string,
+): Promise<GoogleIdentityClaims | undefined> {
+  const [headerValue, claimsValue, signatureValue, extra] = token.split(".");
+  if (
+    headerValue === undefined ||
+    claimsValue === undefined ||
+    signatureValue === undefined ||
+    extra !== undefined
+  ) {
+    return undefined;
+  }
+  const header = parseBase64UrlJson(headerValue);
+  const claims = parseBase64UrlJson(claimsValue);
+  if (
+    !isRecord(header) ||
+    header["alg"] !== "RS256" ||
+    typeof header["kid"] !== "string" ||
+    !isGoogleClaims(claims)
+  ) {
+    return undefined;
+  }
+  const keysResponse = await fetch("https://www.googleapis.com/oauth2/v3/certs");
+  const keysBody = (await keysResponse.json()) as unknown;
+  const keys = isRecord(keysBody) && Array.isArray(keysBody["keys"]) ? keysBody["keys"] : [];
+  const jwk = keys.find((candidate) => isRecord(candidate) && candidate["kid"] === header["kid"]);
+  if (!isRecord(jwk)) return undefined;
+  const key = await crypto.subtle.importKey(
+    "jwk",
+    jwk,
+    { hash: "SHA-256", name: "RSASSA-PKCS1-v1_5" },
+    false,
+    ["verify"],
+  );
+  const valid = await crypto.subtle.verify(
+    "RSASSA-PKCS1-v1_5",
+    key,
+    ownedBytes(base64UrlBytes(signatureValue)),
+    ownedBytes(new TextEncoder().encode(`${headerValue}.${claimsValue}`)),
+  );
+  return valid &&
+    (claims.iss === "https://accounts.google.com" || claims.iss === "accounts.google.com") &&
+    claims.aud === audience &&
+    claims.nonce === nonce &&
+    claims.exp * 1_000 > Date.now()
+    ? claims
+    : undefined;
+}
+
+function isGoogleClaims(value: unknown): value is GoogleIdentityClaims {
+  return (
+    isRecord(value) &&
+    typeof value["aud"] === "string" &&
+    typeof value["email"] === "string" &&
+    typeof value["email_verified"] === "boolean" &&
+    typeof value["exp"] === "number" &&
+    (value["hd"] === undefined || typeof value["hd"] === "string") &&
+    typeof value["iss"] === "string" &&
+    (value["name"] === undefined || typeof value["name"] === "string") &&
+    typeof value["nonce"] === "string" &&
+    typeof value["sub"] === "string"
+  );
+}
+
+async function signOAuthState(payload: OAuthStatePayload, secret: string): Promise<string> {
+  const encoded = base64Url(new TextEncoder().encode(JSON.stringify(payload)));
+  const signature = await hmac("sign", secret, new TextEncoder().encode(encoded));
+  return `${encoded}.${base64Url(new Uint8Array(signature))}`;
+}
+
+async function verifyOAuthState(
+  value: string,
+  secret: string,
+): Promise<OAuthStatePayload | undefined> {
+  const [payloadValue, signatureValue, extra] = value.split(".");
+  if (payloadValue === undefined || signatureValue === undefined || extra !== undefined) {
+    return undefined;
+  }
+  const valid = await hmac(
+    "verify",
+    secret,
+    new TextEncoder().encode(payloadValue),
+    base64UrlBytes(signatureValue),
+  );
+  if (!valid) return undefined;
+  const parsed = parseBase64UrlJson(payloadValue);
+  return isRecord(parsed) &&
+    typeof parsed["expiresAt"] === "number" &&
+    typeof parsed["nonce"] === "string" &&
+    typeof parsed["redirectUri"] === "string" &&
+    typeof parsed["state"] === "string" &&
+    typeof parsed["verifier"] === "string"
+    ? (parsed as unknown as OAuthStatePayload)
+    : undefined;
+}
+
+async function hmac(operation: "sign", secret: string, data: Uint8Array): Promise<ArrayBuffer>;
+async function hmac(
+  operation: "verify",
+  secret: string,
+  data: Uint8Array,
+  signature: Uint8Array,
+): Promise<boolean>;
+async function hmac(
+  operation: "sign" | "verify",
+  secret: string,
+  data: Uint8Array,
+  signature?: Uint8Array,
+): Promise<ArrayBuffer | boolean> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { hash: "SHA-256", name: "HMAC" },
+    false,
+    ["sign", "verify"],
+  );
+  return operation === "sign"
+    ? crypto.subtle.sign("HMAC", key, ownedBytes(data))
+    : crypto.subtle.verify(
+        "HMAC",
+        key,
+        ownedBytes(signature ?? new Uint8Array()),
+        ownedBytes(data),
+      );
+}
+
+function cookieHeader(
+  name: string,
+  value: string,
+  request: Request,
+  options: {
+    readonly expires?: string | undefined;
+    readonly httpOnly: boolean;
+    readonly maxAge?: number | undefined;
+    readonly path: string;
+    readonly sameSite: "Lax" | "Strict";
+  },
+): string {
+  return [
+    `${name}=${value}`,
+    `Path=${options.path}`,
+    `SameSite=${options.sameSite}`,
+    ...(options.httpOnly ? ["HttpOnly"] : []),
+    ...(new URL(request.url).protocol === "https:" ? ["Secure"] : []),
+    ...(options.expires === undefined
+      ? []
+      : [`Expires=${new Date(options.expires).toUTCString()}`]),
+    ...(options.maxAge === undefined ? [] : [`Max-Age=${options.maxAge}`]),
+  ].join("; ");
+}
+
+function oauthFailure(message: string): Response {
+  return Response.json(
+    { code: "oauth_failed", message, retryable: false },
+    { headers: { "Cache-Control": "no-store" }, status: 401 },
+  );
+}
+
+function randomBase64Url(length: number): string {
+  return base64Url(crypto.getRandomValues(new Uint8Array(length)));
+}
+
+function ownedBytes(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
+  return new Uint8Array(bytes);
+}
+
+function base64Url(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
+}
+
+function base64UrlBytes(value: string): Uint8Array {
+  const standard = value.replaceAll("-", "+").replaceAll("_", "/");
+  const padded = standard.padEnd(Math.ceil(standard.length / 4) * 4, "=");
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+function parseBase64UrlJson(value: string): unknown {
+  try {
+    return JSON.parse(new TextDecoder().decode(base64UrlBytes(value))) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function decodeSocketMessage(
   message: string | ArrayBuffer,
 ): Effect.Effect<ClientCollaborationMessage, unknown> {
@@ -655,8 +1166,16 @@ function parseCookies(header: string | null): Readonly<Record<string, string>> {
 }
 
 function documentIdFromPath(pathname: string): string | undefined {
-  const match = /^\/api\/documents\/([^/]+)(?:\/|$)/u.exec(pathname);
-  return match?.[1] === undefined ? undefined : decodeURIComponent(match[1]);
+  const match =
+    /^\/(?:api\/documents|api\/public\/documents|public\/documents)\/([^/]+)(?:\/|$)/u.exec(
+      pathname,
+    );
+  if (match?.[1] === undefined) return undefined;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return undefined;
+  }
 }
 
 function rfcNumberFromPath(pathname: string): number | undefined {

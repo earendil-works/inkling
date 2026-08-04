@@ -8,10 +8,15 @@ import {
   authorizeDocument,
   createCommentThread,
   createDocumentMetadata,
+  createWorkspaceSession,
+  authenticateSession,
   documentId,
   emptyCommentState,
   personId,
   reserveDocument,
+  SecretHasher,
+  SecureToken,
+  emptyAuthenticationState,
   emptyWorkspaceCatalog,
   updateDocumentMetadata,
   updateSharingPolicy,
@@ -45,6 +50,33 @@ test("metadata revisions reject stale commands and confidential public transitio
     Either.isLeft(unsafePublic) && unsafePublic.left.code,
     "confidential_public_confirmation_required",
   );
+});
+
+test("workspace identity sessions retain their verified principal", async () => {
+  const id = await Effect.runPromise(personId("writer@example.com"));
+  const hasher = {
+    hash: (secret: string) => Effect.succeed(`hashed:${secret}`),
+    verify: (secret: string, hash: string) => Effect.succeed(hash === `hashed:${secret}`),
+  };
+  const tokens = { generate: () => Effect.succeed("session-secret") };
+  const created = await Effect.runPromise(
+    createWorkspaceSession(
+      emptyAuthenticationState(),
+      {
+        displayName: "Example Writer",
+        email: "writer@example.com",
+        personId: id,
+        role: "member",
+      },
+      now,
+    ).pipe(Effect.provideService(SecretHasher, hasher), Effect.provideService(SecureToken, tokens)),
+  );
+  const principal = await Effect.runPromise(
+    authenticateSession(created.state, created.token, now).pipe(
+      Effect.provideService(SecretHasher, hasher),
+    ),
+  );
+  assert.deepEqual(principal, { kind: "workspace", personId: id, role: "member" });
 });
 
 test("capability generations revoke existing principals", async () => {

@@ -75,12 +75,14 @@ export type {
   CreatedApiKey,
   CreatedSession,
   SessionRecord,
+  WorkspaceIdentity,
 } from "./domain/authentication.ts";
 export {
   authenticateApiKey,
   authenticateSession,
   AuthenticationError,
   createApiKey,
+  createWorkspaceSession,
   emptyAuthenticationState,
   loginOwner,
   logoutSession,

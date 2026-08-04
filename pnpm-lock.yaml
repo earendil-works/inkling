@@ -120,6 +120,9 @@ importers:
         specifier: 13.6.32
         version: 13.6.32
     devDependencies:
+      playwright-core:
+        specifier: 1.62.1
+        version: 1.62.1
       vite:
         specifier: 8.2.0
         version: 8.2.0(@types/node@25.0.3)(esbuild@0.28.1)(yaml@2.8.2)
@@ -221,6 +224,9 @@ importers:
       '@types/ws':
         specifier: 8.18.1
         version: 8.18.1
+      yjs:
+        specifier: 13.6.32
+        version: 13.6.32
 
 packages:
 
@@ -1929,6 +1935,11 @@ packages:
     resolution: {integrity: sha512-RvwwcruNjI1ncT5xRakeyS9Lf8lcItv34KD+aif+VH9kduAyfYBipGh12274xtenIPZ119/R9BdTBa8gAwSh0A==}
     engines: {node: '>=12'}
 
+  playwright-core@1.62.1:
+    resolution: {integrity: sha512-wPYSwEBJY9GHraISXqyqtx0na0LpO3XEX7jNDhntbex7tzUS7kLnZsOlFruFJB4Hi/rhDMjXGqHewDZ68nYZVw==}
+    engines: {node: '>=20'}
+    hasBin: true
+
   points-on-curve@0.2.0:
     resolution: {integrity: sha512-0mYKnYYe9ZcqMCWhUjItv/oHjvgEsfKvnUTg8sAtnHr3GVy7rGkXCb6d5cSyqrWqL4k81b9CPg3urd+T7aop3A==}
 
@@ -3557,6 +3568,8 @@ snapshots:
   picocolors@1.1.1: {}
 
   picomatch@4.0.5: {}
+
+  playwright-core@1.62.1: {}
 
   points-on-curve@0.2.0: {}
 

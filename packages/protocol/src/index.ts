@@ -172,6 +172,15 @@ export const ImportDocumentRequestSchema = Schema.Struct({
     updatedAt: Schema.optional(Schema.String),
     visibility: Schema.optional(Schema.Literal("public", "workspace")),
   }),
+  people: Schema.optional(
+    Schema.Array(
+      Schema.Struct({
+        aliases: Schema.optional(Schema.Array(Schema.String)),
+        displayName: NonEmptyString,
+        email: NonEmptyString,
+      }),
+    ),
+  ),
   publish: Schema.optional(Schema.Boolean),
 });
 export type ImportDocumentRequest = typeof ImportDocumentRequestSchema.Type;
@@ -293,6 +302,7 @@ export const ResolutionRequestSchema = Schema.Struct({ resolved: Schema.Boolean 
 export type ResolutionRequest = typeof ResolutionRequestSchema.Type;
 
 export const AuthenticationStatusSchema = Schema.Struct({
+  authenticationMethods: Schema.Array(Schema.Literal("password", "google")),
   authenticated: Schema.Boolean,
   needsSetup: Schema.Boolean,
   principal: Schema.optional(
@@ -322,9 +332,9 @@ export const ApiKeyCreatedSchema = Schema.Struct({ key: Schema.String, metadata:
 export type ApiKeyCreated = typeof ApiKeyCreatedSchema.Type;
 
 export const PresenceSchema = Schema.Struct({
-  color: Schema.String,
-  displayName: Schema.String,
-  participantId: Schema.String,
+  color: Schema.String.pipe(Schema.maxLength(32)),
+  displayName: NonEmptyString.pipe(Schema.maxLength(200)),
+  participantId: NonEmptyString.pipe(Schema.maxLength(128)),
   selectionEnd: Schema.optional(Revision),
   selectionStart: Schema.optional(Revision),
 });
@@ -333,13 +343,13 @@ export type PresenceDto = typeof PresenceSchema.Type;
 export const ClientCollaborationMessageSchema = Schema.Union(
   Schema.Struct({
     protocolVersion: Schema.Literal(protocolVersion),
-    stateVector: Schema.optional(Schema.String),
+    stateVector: Schema.optional(Schema.String.pipe(Schema.maxLength(1_600_000))),
     type: Schema.Literal("hello"),
   }),
   Schema.Struct({
-    clientUpdateId: NonEmptyString,
+    clientUpdateId: NonEmptyString.pipe(Schema.maxLength(200)),
     type: Schema.Literal("body-update"),
-    update: NonEmptyString,
+    update: NonEmptyString.pipe(Schema.maxLength(1_600_000)),
   }),
   Schema.Struct({ presence: PresenceSchema, type: Schema.Literal("presence") }),
 );
