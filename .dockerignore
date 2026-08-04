@@ -1,0 +1,6 @@
+.git
+.jot
+**/dist
+**/node_modules
+node_modules
+JOT_ARCHITECTURE.md

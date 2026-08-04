@@ -3,6 +3,7 @@ import { Context, Data, type Effect, type Stream } from "effect";
 import type {
   ApiKeyCreated,
   ApiKeyDto,
+  AttachmentMetadataDto,
   AuthenticationStatus,
   CatalogResponse,
   CommentStateDto,
@@ -12,6 +13,7 @@ import type {
   DocumentResponse,
   EditBodyRequest,
   EditMessageRequest,
+  ImportDocumentRequest,
   MetadataPatchRequest,
   PublicDocumentResponse,
   ReplaceBodyRequest,
@@ -38,6 +40,16 @@ export interface CollaborationConnection {
   ) => Effect.Effect<ServerCollaborationMessage, ApplicationError>;
 }
 
+export interface BackupVerification {
+  readonly checkedObjects: number;
+  readonly errors: readonly string[];
+}
+
+export interface AttachmentContent {
+  readonly bytes: Uint8Array;
+  readonly metadata: AttachmentMetadataDto;
+}
+
 export interface SessionResult {
   readonly csrfToken: string;
   readonly expiresAt: string;
@@ -56,6 +68,32 @@ export class ApplicationError extends Data.TaggedError("ApplicationError")<{
 export interface JotApplicationService {
   /** Flushes all active document rooms to immutable checkpoints. */
   readonly checkpointAll: () => Effect.Effect<void, ApplicationError>;
+  readonly exportWorkspace: (
+    credentials: RequestCredentials,
+  ) => Effect.Effect<Uint8Array, ApplicationError>;
+  readonly restoreWorkspace: (
+    credentials: RequestCredentials,
+    archive: Uint8Array,
+  ) => Effect.Effect<BackupVerification, ApplicationError>;
+  readonly verifyWorkspace: (
+    credentials: RequestCredentials,
+  ) => Effect.Effect<BackupVerification, ApplicationError>;
+  readonly uploadAttachment: (
+    credentials: RequestCredentials,
+    documentId: string,
+    filename: string,
+    mediaType: string,
+    bytes: Uint8Array,
+  ) => Effect.Effect<AttachmentMetadataDto, ApplicationError>;
+  readonly listAttachments: (
+    credentials: RequestCredentials,
+    documentId: string,
+  ) => Effect.Effect<readonly AttachmentMetadataDto[], ApplicationError>;
+  readonly readAttachment: (
+    credentials: RequestCredentials,
+    documentId: string,
+    attachmentId: string,
+  ) => Effect.Effect<AttachmentContent, ApplicationError>;
   readonly connectCollaboration: (
     credentials: RequestCredentials,
     documentId: string,
@@ -71,9 +109,18 @@ export interface JotApplicationService {
     credentials: RequestCredentials,
     query: string,
   ) => Effect.Effect<CatalogResponse, ApplicationError>;
+  readonly listPublicDocuments: (
+    query: string,
+    lifecycleState?: string,
+    label?: string,
+  ) => Effect.Effect<CatalogResponse, ApplicationError>;
   readonly createDocument: (
     credentials: RequestCredentials,
     request: CreateDocumentRequest,
+  ) => Effect.Effect<DocumentResponse, ApplicationError>;
+  readonly importDocument: (
+    credentials: RequestCredentials,
+    request: ImportDocumentRequest,
   ) => Effect.Effect<DocumentResponse, ApplicationError>;
   readonly readDocument: (
     credentials: RequestCredentials,

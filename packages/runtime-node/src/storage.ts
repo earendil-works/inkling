@@ -96,6 +96,17 @@ export function objectStoreLayer(
                   exists
                     ? fileSystem.readDirectory(root, { recursive: true }).pipe(
                         Effect.mapError((cause) => storageFailure("list objects", cause)),
+                        Effect.flatMap((entries) =>
+                          Effect.filter(
+                            entries,
+                            (entry) =>
+                              fileSystem.stat(path.join(root, entry)).pipe(
+                                Effect.mapError((cause) => storageFailure("inspect object", cause)),
+                                Effect.map((info) => info.type === "File"),
+                              ),
+                            { concurrency: 16 },
+                          ),
+                        ),
                         Effect.map((entries) =>
                           entries
                             .map((entry) => entry.split(path.sep).join("/"))

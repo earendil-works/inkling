@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@earendil-works/jot-importers": "workspace:*",
     "@earendil-works/jot-protocol": "workspace:*",
     "@earendil-works/jot-runtime-node": "workspace:*",
     "effect": "3.22.1"

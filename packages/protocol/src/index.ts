@@ -132,6 +132,50 @@ export const CreateDocumentRequestSchema = Schema.Struct({
 });
 export type CreateDocumentRequest = typeof CreateDocumentRequestSchema.Type;
 
+export const ImportedCommentMessageSchema = Schema.Struct({
+  authorDisplayName: NonEmptyString,
+  body: NonEmptyString,
+  createdAt: Schema.optional(Schema.String),
+  legacyId: Schema.optional(Schema.String),
+  parentLegacyId: Schema.optional(Schema.String),
+  updatedAt: Schema.optional(Schema.String),
+});
+
+export const ImportedCommentThreadSchema = Schema.Struct({
+  legacyId: Schema.optional(Schema.String),
+  messages: Schema.Array(ImportedCommentMessageSchema).pipe(Schema.minItems(1)),
+  originalEnd: Schema.optional(Revision),
+  originalStart: Schema.optional(Revision),
+  prefix: Schema.String,
+  quote: Schema.String,
+  resolved: Schema.Boolean,
+  suffix: Schema.String,
+});
+
+export const ImportDocumentRequestSchema = Schema.Struct({
+  body: Schema.String,
+  comments: Schema.optional(Schema.Array(ImportedCommentThreadSchema)),
+  metadata: Schema.Struct({
+    approvers: Schema.optional(Schema.Array(PersonSchema)),
+    authors: Schema.optional(Schema.Array(PersonSchema)),
+    createdAt: Schema.optional(Schema.String),
+    id: Schema.optional(NonEmptyString),
+    labels: Schema.optional(Schema.Array(Schema.String)),
+    legacySourceUrl: Schema.optional(Schema.String),
+    lifecycleState: Schema.optional(NonEmptyString),
+    relatedDocuments: Schema.optional(Schema.Array(RelatedDocumentSchema)),
+    reviewers: Schema.optional(Schema.Array(PersonSchema)),
+    rfcNumber: Schema.optional(PositiveInteger),
+    sensitivity: Schema.optional(Schema.Literal("normal", "confidential")),
+    targetDecisionDate: Schema.optional(Schema.String),
+    title: NonEmptyString,
+    updatedAt: Schema.optional(Schema.String),
+    visibility: Schema.optional(Schema.Literal("public", "workspace")),
+  }),
+  publish: Schema.optional(Schema.Boolean),
+});
+export type ImportDocumentRequest = typeof ImportDocumentRequestSchema.Type;
+
 export const MetadataPatchRequestSchema = Schema.Struct({
   approvers: Schema.optional(Schema.Array(PersonSchema)),
   authors: Schema.optional(Schema.Array(PersonSchema)),
@@ -195,6 +239,31 @@ export const PublicDocumentResponseSchema = Schema.Struct({
   metadata: DocumentMetadataSchema,
 });
 export type PublicDocumentResponse = typeof PublicDocumentResponseSchema.Type;
+
+export const AttachmentMetadataSchema = Schema.Struct({
+  createdAt: Schema.String,
+  digest: Schema.String,
+  filename: NonEmptyString,
+  height: Schema.optional(PositiveInteger),
+  id: NonEmptyString,
+  mediaType: NonEmptyString,
+  size: Revision,
+  uploaderId: NonEmptyString,
+  url: Schema.String,
+  width: Schema.optional(PositiveInteger),
+});
+export type AttachmentMetadataDto = typeof AttachmentMetadataSchema.Type;
+
+export const AttachmentListResponseSchema = Schema.Struct({
+  attachments: Schema.Array(AttachmentMetadataSchema),
+});
+export type AttachmentListResponse = typeof AttachmentListResponseSchema.Type;
+
+export const BackupVerificationSchema = Schema.Struct({
+  checkedObjects: Revision,
+  errors: Schema.Array(Schema.String),
+});
+export type BackupVerificationDto = typeof BackupVerificationSchema.Type;
 
 export const CreateThreadRequestSchema = Schema.Union(
   Schema.Struct({

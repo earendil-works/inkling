@@ -38,6 +38,7 @@ export interface ImportedCommentThread {
 
 export interface ImportedMetadataInput extends Omit<CreateMetadataInput, "id"> {
   readonly id?: string | undefined;
+  readonly updatedAt?: string | undefined;
 }
 
 export interface ImportedDocument {
@@ -155,6 +156,7 @@ export function importEarendilRfc(
       sensitivity,
       targetDecisionDate,
       title,
+      updatedAt: updatedAt ?? createdAt ?? context.now,
       visibility,
     };
     return {
@@ -196,6 +198,7 @@ export function importExistingJot(
         createdAt: normalizeDate(decoded.createdAt) ?? context.now,
         id: decoded.id,
         title: decoded.title,
+        updatedAt: normalizeDate(decoded.updatedAt) ?? context.now,
       },
       relatedRfcNumbers: [],
       warnings: [],

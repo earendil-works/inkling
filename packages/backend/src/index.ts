@@ -10,6 +10,7 @@ import {
   decodeUnknown,
   EditBodyRequestSchema,
   EditMessageRequestSchema,
+  ImportDocumentRequestSchema,
   MetadataPatchRequestSchema,
   PasswordRequestSchema,
   protocolVersion,
@@ -18,12 +19,14 @@ import {
   ResolutionRequestSchema,
   ShareUpdateRequestSchema,
 } from "@earendil-works/jot-protocol";
-import type { HealthResponse, ProtocolError } from "@earendil-works/jot-protocol";
+import type { CatalogResponse, HealthResponse, ProtocolError } from "@earendil-works/jot-protocol";
 
 import { ApplicationError, JotApplication } from "./application.ts";
 import type { JotApplicationService, RequestCredentials, SessionResult } from "./application.ts";
 
 export type {
+  AttachmentContent,
+  BackupVerification,
   CollaborationConnection,
   JotApplicationService,
   RequestCredentials,
@@ -42,6 +45,16 @@ export interface BackendOptions {
 export function createBackendApp(options: BackendOptions = {}): Hono {
   const app = new Hono();
   const version = options.version ?? "development";
+
+  app.use("*", async (context, next) => {
+    await next();
+    context.header("Referrer-Policy", "strict-origin-when-cross-origin");
+    context.header("X-Content-Type-Options", "nosniff");
+    context.header("X-Frame-Options", "DENY");
+    if (context.req.path.startsWith("/api/") && context.res.headers.get("Cache-Control") === null) {
+      context.header("Cache-Control", "no-store");
+    }
+  });
 
   app.get("/api/health", (context) => {
     const response: HealthResponse = {
@@ -125,6 +138,54 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
         ),
       );
     }),
+  );
+
+  app.get("/api/documents/:documentId/attachments", (context) =>
+    execute(context, options, (service) =>
+      service
+        .listAttachments(credentials(context), context.req.param("documentId"))
+        .pipe(Effect.map((attachments) => ({ attachments }))),
+    ),
+  );
+
+  app.post("/api/documents/:documentId/attachments", (context) =>
+    execute(context, options, (service) =>
+      mutation(context, readAttachmentUpload(context)).pipe(
+        Effect.flatMap((upload) =>
+          service.uploadAttachment(
+            credentials(context),
+            context.req.param("documentId"),
+            upload.filename,
+            upload.mediaType,
+            upload.bytes,
+          ),
+        ),
+      ),
+    ),
+  );
+
+  app.get("/api/documents/:documentId/attachments/:attachmentId", (context) =>
+    execute(
+      context,
+      options,
+      (service) =>
+        service.readAttachment(
+          credentials(context),
+          context.req.param("documentId"),
+          context.req.param("attachmentId"),
+        ),
+      ({ bytes, metadata }) => {
+        context.header("Cache-Control", "private, max-age=3600");
+        context.header("Content-Type", metadata.mediaType);
+        context.header("ETag", `"${metadata.digest}"`);
+        context.header(
+          "Content-Disposition",
+          `${inlineAttachmentTypes.has(metadata.mediaType) ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(metadata.filename)}`,
+        );
+        context.header("X-Content-Type-Options", "nosniff");
+        return context.body(new Uint8Array(bytes).buffer);
+      },
+    ),
   );
 
   app.patch("/api/documents/:documentId/metadata", (context) =>
@@ -287,6 +348,16 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
     ),
   );
 
+  app.get("/api/public/documents", (context) =>
+    execute(context, options, (service) =>
+      service.listPublicDocuments(
+        context.req.query("q") ?? "",
+        context.req.query("state"),
+        context.req.query("label"),
+      ),
+    ),
+  );
+
   app.get("/api/public/rfc/:number", (context) =>
     execute(context, options, (service) =>
       positiveInteger(context.req.param("number"), "RFC number").pipe(
@@ -311,12 +382,72 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
     ),
   );
 
+  app.get("/state/:state", (context) =>
+    execute(
+      context,
+      options,
+      (service) => service.listPublicDocuments("", context.req.param("state")),
+      (catalog) => {
+        context.header("Cache-Control", "public, max-age=300, stale-while-revalidate=3600");
+        context.header("Content-Security-Policy", contentSecurityPolicy);
+        return context.html(publicCatalogHtml(`State: ${context.req.param("state")}`, catalog));
+      },
+    ),
+  );
+
+  app.get("/keyword/:label", (context) =>
+    execute(
+      context,
+      options,
+      (service) => service.listPublicDocuments("", undefined, context.req.param("label")),
+      (catalog) => {
+        context.header("Cache-Control", "public, max-age=300, stale-while-revalidate=3600");
+        context.header("Content-Security-Policy", contentSecurityPolicy);
+        return context.html(publicCatalogHtml(`Keyword: ${context.req.param("label")}`, catalog));
+      },
+    ),
+  );
+
   app.get("/rfc/:number/:slug", (context) => {
     const number = Number(context.req.param("number"));
     return Number.isSafeInteger(number)
       ? context.redirect(`/rfc/${String(number).padStart(4, "0")}`, 308)
       : context.notFound();
   });
+
+  app.post("/api/admin/import", (context) =>
+    execute(context, options, (service) =>
+      mutation(context, readJson(context, ImportDocumentRequestSchema)).pipe(
+        Effect.flatMap((request) => service.importDocument(credentials(context), request)),
+      ),
+    ),
+  );
+
+  app.get("/api/admin/backup", (context) =>
+    execute(
+      context,
+      options,
+      (service) => service.exportWorkspace(credentials(context)),
+      (bytes) => {
+        context.header("Cache-Control", "no-store");
+        context.header("Content-Disposition", 'attachment; filename="jot-backup.json"');
+        context.header("Content-Type", "application/json; charset=utf-8");
+        return context.body(new Uint8Array(bytes).buffer);
+      },
+    ),
+  );
+
+  app.post("/api/admin/restore", (context) =>
+    execute(context, options, (service) =>
+      mutation(context, readBinaryBody(context, 250_000_000)).pipe(
+        Effect.flatMap((archive) => service.restoreWorkspace(credentials(context), archive)),
+      ),
+    ),
+  );
+
+  app.get("/api/admin/verify", (context) =>
+    execute(context, options, (service) => service.verifyWorkspace(credentials(context))),
+  );
 
   app.post("/api/api-keys", (context) =>
     execute(context, options, (service) =>
@@ -349,6 +480,8 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
 
   return app;
 }
+
+const inlineAttachmentTypes = new Set(["image/gif", "image/jpeg", "image/png", "image/webp"]);
 
 function execute<A>(
   context: HonoContext,
@@ -403,6 +536,89 @@ function readJson<A, I>(
           }),
     ),
   );
+}
+
+function readBinaryBody(
+  context: HonoContext,
+  maximumBytes: number,
+): Effect.Effect<Uint8Array, ApplicationError> {
+  const contentLength = Number(context.req.header("Content-Length") ?? "0");
+  if (Number.isFinite(contentLength) && contentLength > maximumBytes) {
+    return Effect.fail(
+      new ApplicationError({
+        code: "request_too_large",
+        message: `The request body may not exceed ${maximumBytes} bytes.`,
+        retryable: false,
+        status: 413,
+      }),
+    );
+  }
+  return Effect.tryPromise({
+    catch: (cause) =>
+      new ApplicationError({
+        cause,
+        code: "invalid_body",
+        message: "The request body could not be read.",
+        retryable: false,
+        status: 400,
+      }),
+    try: () => context.req.arrayBuffer(),
+  }).pipe(
+    Effect.flatMap((buffer) =>
+      buffer.byteLength <= maximumBytes
+        ? Effect.succeed(new Uint8Array(buffer))
+        : Effect.fail(
+            new ApplicationError({
+              code: "request_too_large",
+              message: `The request body may not exceed ${maximumBytes} bytes.`,
+              retryable: false,
+              status: 413,
+            }),
+          ),
+    ),
+  );
+}
+
+function readAttachmentUpload(
+  context: HonoContext,
+): Effect.Effect<
+  { readonly bytes: Uint8Array; readonly filename: string; readonly mediaType: string },
+  ApplicationError
+> {
+  const filename = context.req.header("X-Jot-Filename");
+  const mediaType = context.req.header("Content-Type");
+  if (filename === undefined || mediaType === undefined) {
+    return Effect.fail(
+      new ApplicationError({
+        code: "invalid_attachment",
+        message: "Attachment uploads require Content-Type and X-Jot-Filename headers.",
+        retryable: false,
+        status: 400,
+      }),
+    );
+  }
+  const contentLength = Number(context.req.header("Content-Length") ?? "0");
+  if (Number.isFinite(contentLength) && contentLength > 10_000_000) {
+    return Effect.fail(
+      new ApplicationError({
+        code: "attachment_size",
+        message: "Attachments may not exceed 10 MB.",
+        retryable: false,
+        status: 413,
+      }),
+    );
+  }
+  return Effect.tryPromise({
+    catch: (cause) =>
+      new ApplicationError({
+        cause,
+        code: "invalid_attachment",
+        message: "The attachment body could not be read.",
+        retryable: false,
+        status: 400,
+      }),
+    try: () => context.req.arrayBuffer(),
+  }).pipe(Effect.map((buffer) => ({ bytes: new Uint8Array(buffer), filename, mediaType })));
 }
 
 function credentials(context: HonoContext): RequestCredentials {
@@ -533,6 +749,23 @@ function positiveIntegerOrZero(
       );
 }
 
+function publicCatalogHtml(titleValue: string, catalog: CatalogResponse): string {
+  const title = escapeHtml(titleValue);
+  const rows = catalog.documents
+    .map(({ excerpt, metadata }) => {
+      const href =
+        metadata.rfcNumber === undefined
+          ? `/documents/${encodeURIComponent(metadata.id)}`
+          : `/rfc/${String(metadata.rfcNumber).padStart(4, "0")}`;
+      const labels = metadata.labels
+        .map((label) => `<a href="/keyword/${encodeURIComponent(label)}">${escapeHtml(label)}</a>`)
+        .join(" ");
+      return `<li><a class="title" href="${href}">${metadata.rfcNumber === undefined ? "Document" : `RFC ${String(metadata.rfcNumber).padStart(4, "0")}`} — ${escapeHtml(metadata.title)}</a><p>${escapeHtml(excerpt)}</p><small><a href="/state/${encodeURIComponent(metadata.lifecycleState)}">${escapeHtml(metadata.lifecycleState)}</a> · ${escapeHtml(metadata.updatedAt.slice(0, 10))} ${labels}</small></li>`;
+    })
+    .join("");
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Published Jot documents"><title>${title} — Jot</title><style>${publicStyles}${publicCatalogStyles}</style></head><body><header><a href="/">JOT</a><span>PUBLIC CATALOG</span></header><main><article><h1>${title}</h1><ol class="catalog">${rows || "<li>No published documents.</li>"}</ol></article></main></body></html>`;
+}
+
 function publicDocumentHtml(document: {
   readonly canonicalPath: string;
   readonly description: string;
@@ -566,5 +799,7 @@ function escapeHtml(value: string): string {
 
 const contentSecurityPolicy =
   "default-src 'none'; img-src 'self' https: data:; style-src 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self'; base-uri 'none'; frame-ancestors 'none'";
+
+const publicCatalogStyles = `.catalog{list-style:none;padding:0}.catalog li{padding:1.5rem 0;border-bottom:1px solid #888}.catalog .title{font-size:1.25rem;font-weight:700}.catalog p{margin:.4rem 0}.catalog small{font-family:ui-monospace,monospace}`;
 
 const publicStyles = `:root{color-scheme:light dark;font-family:ui-serif,Georgia,serif;line-height:1.65}body{margin:0}header{display:flex;justify-content:space-between;padding:1rem 3vw;border-bottom:1px solid #888;font:700 .75rem ui-monospace,monospace;letter-spacing:.08em}main{display:grid;grid-template-columns:minmax(12rem,18rem) minmax(0,48rem);gap:clamp(2rem,6vw,7rem);max-width:78rem;margin:0 auto;padding:clamp(3rem,8vw,8rem) 3vw}aside{font: .8rem ui-monospace,monospace}aside ol{padding-left:1.2rem}.depth-3{margin-left:1rem}article{min-width:0}article h1{font-size:clamp(2.8rem,7vw,5.5rem);line-height:.95}pre{overflow:auto;padding:1rem;background:#171916;color:#f4efe5}table{border-collapse:collapse}td,th{border:1px solid #888;padding:.4rem .7rem}img{max-width:100%}@media(max-width:50rem){main{grid-template-columns:1fr}aside{display:none}}`;

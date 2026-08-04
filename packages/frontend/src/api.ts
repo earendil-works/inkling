@@ -1,6 +1,7 @@
 import { Context, Data, Effect, Layer, Schema } from "effect";
 
 import {
+  AttachmentMetadataSchema,
   AuthenticationStatusSchema,
   CatalogResponseSchema,
   CommentStateSchema,
@@ -11,6 +12,7 @@ import {
   ShareResponseSchema,
 } from "@earendil-works/jot-protocol";
 import type {
+  AttachmentMetadataDto,
   AuthenticationStatus,
   CatalogResponse,
   CommentAnchorDto,
@@ -40,6 +42,10 @@ export interface ApiClientService {
     request: CreateDocumentRequest,
   ) => Effect.Effect<DocumentResponse, ApiError>;
   readonly readDocument: (documentId: string) => Effect.Effect<DocumentResponse, ApiError>;
+  readonly uploadAttachment: (
+    documentId: string,
+    file: File,
+  ) => Effect.Effect<AttachmentMetadataDto, ApiError>;
   readonly updateMetadata: (
     documentId: string,
     request: Readonly<Record<string, unknown>>,
@@ -49,6 +55,21 @@ export interface ApiClientService {
     anchor: CommentAnchorDto,
     body: string,
     authorDisplayName: string,
+  ) => Effect.Effect<CommentStateDto, ApiError>;
+  readonly editMessage: (
+    documentId: string,
+    threadId: string,
+    messageId: string,
+    body: string,
+  ) => Effect.Effect<CommentStateDto, ApiError>;
+  readonly deleteMessage: (
+    documentId: string,
+    threadId: string,
+    messageId: string,
+  ) => Effect.Effect<CommentStateDto, ApiError>;
+  readonly deleteThread: (
+    documentId: string,
+    threadId: string,
   ) => Effect.Effect<CommentStateDto, ApiError>;
   readonly reply: (
     documentId: string,
@@ -194,6 +215,25 @@ export function makeApiClient(capabilityToken?: string): ApiClientService {
           body,
         },
       ),
+    deleteMessage: (documentId, threadId, messageId) =>
+      mutation(
+        `/api/documents/${encodeURIComponent(documentId)}/comments/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(messageId)}`,
+        CommentStateSchema,
+        "DELETE",
+      ),
+    deleteThread: (documentId, threadId) =>
+      mutation(
+        `/api/documents/${encodeURIComponent(documentId)}/comments/${encodeURIComponent(threadId)}`,
+        CommentStateSchema,
+        "DELETE",
+      ),
+    editMessage: (documentId, threadId, messageId, body) =>
+      mutation(
+        `/api/documents/${encodeURIComponent(documentId)}/comments/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(messageId)}`,
+        CommentStateSchema,
+        "PATCH",
+        { body },
+      ),
     listDocuments: (query = "") =>
       request(`/api/documents?q=${encodeURIComponent(query)}`, CatalogResponseSchema),
     login: (password) =>
@@ -229,6 +269,16 @@ export function makeApiClient(capabilityToken?: string): ApiClientService {
         `/api/documents/${encodeURIComponent(documentId)}/unpublish`,
         DocumentMetadataSchema,
         "POST",
+      ),
+    uploadAttachment: (documentId, file) =>
+      request(
+        `/api/documents/${encodeURIComponent(documentId)}/attachments`,
+        AttachmentMetadataSchema,
+        {
+          body: file,
+          headers: { "Content-Type": file.type, "X-Jot-Filename": file.name },
+          method: "POST",
+        },
       ),
     updateMetadata: (documentId, body) =>
       mutation(

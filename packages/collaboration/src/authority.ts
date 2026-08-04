@@ -64,6 +64,7 @@ const maxUpdateBytes = 1_000_000;
 const maxDocumentBytes = 5_000_000;
 
 const checkpointWireSchema = Schema.Struct({
+  body: Schema.optional(Schema.String),
   bodyUpdate: Schema.String,
   capturedAt: Schema.String,
   comments: Schema.Unknown,
@@ -798,6 +799,7 @@ function checkpointState(
         });
       }),
     );
+    yield* writePortableProjections(options, capture, objectStore, digest).pipe(Effect.ignore);
   });
 }
 
@@ -808,6 +810,7 @@ function captureCheckpoint(
 ): Effect.Effect<CheckpointWire> {
   return encodeDocumentState(state.collaborative.document).pipe(
     Effect.map((bodyUpdate) => ({
+      body: state.collaborative.body.toString(),
       bodyUpdate: encodeBase64(bodyUpdate),
       capturedAt: now,
       comments: state.comments,
@@ -818,6 +821,38 @@ function captureCheckpoint(
       workspaceId: options.workspaceId,
     })),
   );
+}
+
+function writePortableProjections(
+  options: MakeDocumentAuthorityOptions,
+  capture: CheckpointWire,
+  objectStore: typeof ObjectStore.Service,
+  digest: typeof Digest.Service,
+): Effect.Effect<void, StorageError> {
+  return Effect.gen(function* () {
+    const body = capture.body ?? "";
+    const metadata = JSON.stringify(capture.metadata, undefined, 2);
+    const markdownBytes = textEncoder.encode(
+      `---\njot: ${JSON.stringify(capture.metadata)}\n---\n\n${body}`,
+    );
+    const metadataBytes = textEncoder.encode(metadata);
+    const markdownDigest = yield* digest.sha256(markdownBytes);
+    const metadataDigest = yield* digest.sha256(metadataBytes);
+    const prefix = `workspaces/${options.workspaceId}/documents/${options.documentId}/exports`;
+    yield* Effect.all(
+      [
+        objectStore.put(`${prefix}/document.md`, markdownBytes, {
+          digest: markdownDigest,
+          mediaType: "text/markdown; charset=utf-8",
+        }),
+        objectStore.put(`${prefix}/metadata.json`, metadataBytes, {
+          digest: metadataDigest,
+          mediaType: "application/json",
+        }),
+      ],
+      { concurrency: 2, discard: true },
+    );
+  });
 }
 
 function makeSnapshot(state: MutableState): Effect.Effect<DocumentSnapshot> {

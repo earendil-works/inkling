@@ -47,6 +47,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@earendil-works/jot-importers':
+        specifier: workspace:*
+        version: link:../importers
       '@earendil-works/jot-protocol':
         specifier: workspace:*
         version: link:../protocol

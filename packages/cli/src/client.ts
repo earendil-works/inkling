@@ -1,6 +1,9 @@
 import { Data, Effect, Schema } from "effect";
 
 import {
+  AttachmentListResponseSchema,
+  AttachmentMetadataSchema,
+  BackupVerificationSchema,
   CatalogResponseSchema,
   CommentStateSchema,
   DocumentMetadataSchema,
@@ -9,10 +12,13 @@ import {
   ShareResponseSchema,
 } from "@earendil-works/jot-protocol";
 import type {
+  AttachmentMetadataDto,
+  BackupVerificationDto,
   CatalogResponse,
   CommentStateDto,
   DocumentMetadataDto,
   DocumentResponse,
+  ImportDocumentRequest,
   ShareResponse,
 } from "@earendil-works/jot-protocol";
 
@@ -26,6 +32,27 @@ export class ClientError extends Data.TaggedError("ClientError")<{
 }> {}
 
 export interface CliClient {
+  readonly exportWorkspace: Effect.Effect<Uint8Array, ClientError>;
+  readonly restoreWorkspace: (
+    archive: Uint8Array,
+  ) => Effect.Effect<BackupVerificationDto, ClientError>;
+  readonly verifyWorkspace: Effect.Effect<BackupVerificationDto, ClientError>;
+  readonly uploadAttachment: (
+    documentId: string,
+    filename: string,
+    mediaType: string,
+    bytes: Uint8Array,
+  ) => Effect.Effect<AttachmentMetadataDto, ClientError>;
+  readonly listAttachments: (
+    documentId: string,
+  ) => Effect.Effect<readonly AttachmentMetadataDto[], ClientError>;
+  readonly downloadAttachment: (
+    documentId: string,
+    attachmentId: string,
+  ) => Effect.Effect<Uint8Array, ClientError>;
+  readonly importDocument: (
+    request: ImportDocumentRequest,
+  ) => Effect.Effect<DocumentResponse, ClientError>;
   readonly list: (query: string) => Effect.Effect<CatalogResponse, ClientError>;
   readonly read: (
     documentId: string,
@@ -35,6 +62,11 @@ export interface CliClient {
     title: string,
     body: string,
     allocateRfc: boolean,
+  ) => Effect.Effect<DocumentResponse, ClientError>;
+  readonly replaceBody: (
+    documentId: string,
+    body: string,
+    expectedRevision: number,
   ) => Effect.Effect<DocumentResponse, ClientError>;
   readonly edit: (
     documentId: string,
@@ -57,6 +89,21 @@ export interface CliClient {
     access: string,
     expectedRevision: number,
   ) => Effect.Effect<ShareResponse, ClientError>;
+  readonly editComment: (
+    documentId: string,
+    threadId: string,
+    messageId: string,
+    body: string,
+  ) => Effect.Effect<CommentStateDto, ClientError>;
+  readonly deleteComment: (
+    documentId: string,
+    threadId: string,
+    messageId: string,
+  ) => Effect.Effect<CommentStateDto, ClientError>;
+  readonly deleteThread: (
+    documentId: string,
+    threadId: string,
+  ) => Effect.Effect<CommentStateDto, ClientError>;
   readonly comment: (
     documentId: string,
     start: number,
@@ -169,6 +216,33 @@ export function makeCliClient(instance: Instance): CliClient {
       method,
     });
 
+  const binaryRequest = (resource: string): Effect.Effect<Uint8Array, ClientError> => {
+    const url = new URL(resource, withTrailingSlash(instance.baseUrl));
+    if (instance.capabilityToken !== undefined)
+      url.searchParams.set("cap", instance.capabilityToken);
+    return Effect.tryPromise({
+      catch: (cause) =>
+        new ClientError({
+          cause,
+          code: "network_error",
+          message: `Cannot download from ${url.origin}.`,
+          status: 0,
+        }),
+      try: async () => {
+        const response = await fetch(
+          url,
+          instance.apiKey === undefined
+            ? undefined
+            : { headers: { Authorization: `Bearer ${instance.apiKey}` } },
+        );
+        if (!response.ok) {
+          throw new Error(`Jot rejected the download (${response.status}).`);
+        }
+        return new Uint8Array(await response.arrayBuffer());
+      },
+    });
+  };
+
   const assertDocument = (documentId: string): Effect.Effect<void, ClientError> =>
     instance.documentId === undefined || instance.documentId === documentId
       ? Effect.void
@@ -181,6 +255,77 @@ export function makeCliClient(instance: Instance): CliClient {
         );
 
   return {
+    exportWorkspace: binaryRequest("/api/admin/backup"),
+    restoreWorkspace: (archive) =>
+      request("/api/admin/restore", BackupVerificationSchema, {
+        body: new Uint8Array(archive).buffer,
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      }),
+    verifyWorkspace: request("/api/admin/verify", BackupVerificationSchema),
+    downloadAttachment: (documentId, attachmentId) =>
+      assertDocument(documentId).pipe(
+        Effect.zipRight(
+          binaryRequest(
+            `/api/documents/${encodeURIComponent(documentId)}/attachments/${encodeURIComponent(attachmentId)}`,
+          ),
+        ),
+      ),
+    listAttachments: (documentId) =>
+      assertDocument(documentId).pipe(
+        Effect.zipRight(
+          request(
+            `/api/documents/${encodeURIComponent(documentId)}/attachments`,
+            AttachmentListResponseSchema,
+          ),
+        ),
+        Effect.map((response) => response.attachments),
+      ),
+    uploadAttachment: (documentId, filename, mediaType, bytes) =>
+      assertDocument(documentId).pipe(
+        Effect.zipRight(
+          request(
+            `/api/documents/${encodeURIComponent(documentId)}/attachments`,
+            AttachmentMetadataSchema,
+            {
+              body: new Uint8Array(bytes).buffer,
+              headers: { "Content-Type": mediaType, "X-Jot-Filename": filename },
+              method: "POST",
+            },
+          ),
+        ),
+      ),
+    deleteComment: (documentId, threadId, messageId) =>
+      assertDocument(documentId).pipe(
+        Effect.zipRight(
+          mutate(
+            `/api/documents/${encodeURIComponent(documentId)}/comments/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(messageId)}`,
+            CommentStateSchema,
+            "DELETE",
+          ),
+        ),
+      ),
+    deleteThread: (documentId, threadId) =>
+      assertDocument(documentId).pipe(
+        Effect.zipRight(
+          mutate(
+            `/api/documents/${encodeURIComponent(documentId)}/comments/${encodeURIComponent(threadId)}`,
+            CommentStateSchema,
+            "DELETE",
+          ),
+        ),
+      ),
+    editComment: (documentId, threadId, messageId, body) =>
+      assertDocument(documentId).pipe(
+        Effect.zipRight(
+          mutate(
+            `/api/documents/${encodeURIComponent(documentId)}/comments/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(messageId)}`,
+            CommentStateSchema,
+            "PATCH",
+            { body },
+          ),
+        ),
+      ),
     comment: (documentId, start, end, body) =>
       assertDocument(documentId).pipe(
         Effect.zipRight(
@@ -203,6 +348,17 @@ export function makeCliClient(instance: Instance): CliClient {
         creationKey: crypto.randomUUID(),
         title,
       }),
+    replaceBody: (documentId, body, expectedRevision) =>
+      assertDocument(documentId).pipe(
+        Effect.zipRight(
+          mutate(
+            `/api/documents/${encodeURIComponent(documentId)}/body`,
+            DocumentResponseSchema,
+            "PUT",
+            { body, expectedRevision },
+          ),
+        ),
+      ),
     edit: (documentId, oldText, newText, expectedRevision) =>
       assertDocument(documentId).pipe(
         Effect.zipRight(
@@ -214,6 +370,7 @@ export function makeCliClient(instance: Instance): CliClient {
           ),
         ),
       ),
+    importDocument: (input) => mutate("/api/admin/import", DocumentResponseSchema, "POST", input),
     list: (query) =>
       request(`/api/documents?q=${encodeURIComponent(query)}`, CatalogResponseSchema),
     metadata: (documentId, patch) =>

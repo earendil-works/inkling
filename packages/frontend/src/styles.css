@@ -334,6 +334,28 @@
     text-transform: uppercase;
   }
 
+  .attachment-button {
+    cursor: pointer;
+  }
+
+  .attachment-button input {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .attachment-button:has(input:focus-visible) {
+    outline: 2px solid var(--signal);
+    outline-offset: 2px;
+  }
+
+  .attachment-button:has(input:disabled) {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
   .primary-button {
     width: max-content;
     padding: 0.85rem 1.1rem;

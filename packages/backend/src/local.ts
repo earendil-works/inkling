@@ -4,6 +4,7 @@ import {
   activateDocument,
   applyCatalogSummary,
   authenticateApiKey,
+  authorizeDocument,
   authenticateSession,
   AuthenticationError,
   AuthorizationError,
@@ -21,6 +22,7 @@ import {
   isDocumentActionAllowed,
   ObjectStore,
   personId,
+  publicCatalog,
   readLineRange,
   reserveDocument,
   revokeApiKey,
@@ -50,6 +52,7 @@ import type {
 } from "@earendil-works/jot-core";
 import {
   CollaborationError,
+  decodeBase64,
   encodeBase64,
   loadDocumentRevision,
   makeDocumentAuthority,
@@ -65,16 +68,21 @@ import type {
 import type {
   ApiKeyCreated,
   ApiKeyDto,
+  AttachmentMetadataDto,
   CatalogResponse,
   CommentStateDto,
   DocumentMetadataDto,
   DocumentResponse,
+  ImportDocumentRequest,
   MetadataPatchRequest,
   PublicDocumentResponse,
   ServerCollaborationMessage,
   ShareResponse,
 } from "@earendil-works/jot-protocol";
 import { MarkdownRenderer } from "@earendil-works/jot-renderer";
+
+const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
 
 interface CapabilityRecord {
   readonly id: string;
@@ -90,11 +98,29 @@ interface LocalWorkspaceState {
   readonly workspaceId: string;
   readonly catalog: WorkspaceCatalogState;
   readonly authentication: AuthenticationState;
+  readonly attachments: Readonly<Record<string, readonly AttachmentMetadataDto[]>>;
   readonly capabilities: readonly CapabilityRecord[];
 }
 
+const backupArchiveSchema = Schema.Struct({
+  createdAt: Schema.String,
+  objects: Schema.Array(
+    Schema.Struct({
+      bytes: Schema.String,
+      digest: Schema.String,
+      key: Schema.String,
+      mediaType: Schema.optional(Schema.String),
+    }),
+  ),
+  schemaVersion: Schema.Literal(1),
+  workspaceState: Schema.Unknown,
+});
+
 const persistedStateSchema = Schema.Struct({
   authentication: Schema.Unknown,
+  attachments: Schema.optional(
+    Schema.Record({ key: Schema.String, value: Schema.Array(Schema.Unknown) }),
+  ),
   capabilities: Schema.Array(
     Schema.Struct({
       access: Schema.Literal("view", "comment", "edit"),
@@ -326,6 +352,289 @@ export function makeLocalJotApplication(
       });
 
     const service: JotApplicationService = {
+      exportWorkspace: (credentials) =>
+        Effect.gen(function* () {
+          const principal = yield* resolvePrincipal(credentials);
+          yield* requireOwner(principal);
+          yield* Effect.forEach(rooms.values(), (room) =>
+            room.checkpoint(new Date().toISOString()).pipe(Effect.mapError(toApplicationError)),
+          );
+          const keys = yield* objectStore.list("").pipe(Effect.mapError(toApplicationError));
+          const objects = yield* Effect.forEach(keys, (key) =>
+            objectStore.get(key).pipe(
+              Effect.mapError(toApplicationError),
+              Effect.flatMap((stored) =>
+                stored === undefined
+                  ? applicationFailure(
+                      "backup_race",
+                      `Object disappeared during backup: ${key}`,
+                      503,
+                      true,
+                    )
+                  : Effect.succeed({
+                      bytes: encodeBase64(stored.bytes),
+                      digest: stored.digest,
+                      key,
+                      mediaType: stored.mediaType,
+                    }),
+              ),
+            ),
+          );
+          const createdAt = new Date().toISOString();
+          const manifestBytes = textEncoder.encode(
+            JSON.stringify({
+              createdAt,
+              objects: objects.map((object) => ({
+                digest: object.digest,
+                key: object.key,
+                size: object.bytes.length,
+              })),
+              schemaVersion: 1,
+              workspaceId: state.workspaceId,
+            }),
+          );
+          const manifestDigest = yield* digest
+            .sha256(manifestBytes)
+            .pipe(Effect.mapError(toApplicationError));
+          yield* objectStore
+            .put(
+              `workspaces/${state.workspaceId}/backups/${createdAt.replaceAll(":", "-")}.manifest.json`,
+              manifestBytes,
+              { digest: manifestDigest, mediaType: "application/json" },
+            )
+            .pipe(Effect.mapError(toApplicationError));
+          return textEncoder.encode(
+            JSON.stringify({
+              createdAt,
+              objects,
+              schemaVersion: 1,
+              workspaceState: state,
+            }),
+          );
+        }),
+      restoreWorkspace: (credentials, archive) =>
+        Effect.gen(function* () {
+          const principal = yield* resolvePrincipal(credentials);
+          yield* requireOwner(principal);
+          if (archive.byteLength === 0 || archive.byteLength > 250_000_000) {
+            return yield* applicationFailure(
+              "backup_size",
+              "Backup archives must be between 1 byte and 250 MB.",
+              413,
+            );
+          }
+          const decoded = yield* Schema.decodeUnknown(Schema.parseJson(backupArchiveSchema))(
+            textDecoder.decode(archive),
+          ).pipe(
+            Effect.mapError(
+              (cause) =>
+                new ApplicationError({
+                  cause,
+                  code: "invalid_backup",
+                  message: "The backup archive is invalid or incompatible.",
+                  retryable: false,
+                  status: 400,
+                }),
+            ),
+          );
+          const decodedState = yield* Schema.decodeUnknown(persistedStateSchema)(
+            decoded.workspaceState,
+          ).pipe(
+            Effect.mapError(
+              (cause) =>
+                new ApplicationError({
+                  cause,
+                  code: "invalid_backup_state",
+                  message: "The backup workspace state is invalid.",
+                  retryable: false,
+                  status: 400,
+                }),
+            ),
+          );
+          const objects = yield* Effect.forEach(decoded.objects, (object) =>
+            Effect.gen(function* () {
+              if (!validBackupObjectKey(object.key)) {
+                return yield* applicationFailure(
+                  "invalid_backup_key",
+                  `Backup object key is unsafe: ${object.key}`,
+                  400,
+                );
+              }
+              const bytes = yield* decodeBase64(object.bytes).pipe(
+                Effect.mapError(
+                  (cause) =>
+                    new ApplicationError({
+                      cause,
+                      code: "invalid_backup_object",
+                      message: `Backup object ${object.key} is not valid base64.`,
+                      retryable: false,
+                      status: 400,
+                    }),
+                ),
+              );
+              const actual = yield* digest.sha256(bytes).pipe(Effect.mapError(toApplicationError));
+              if (actual !== object.digest) {
+                return yield* applicationFailure(
+                  "backup_digest_mismatch",
+                  `Backup object ${object.key} failed digest verification.`,
+                  400,
+                );
+              }
+              return { ...object, bytes };
+            }),
+          );
+          yield* Effect.forEach(objects, (object) =>
+            objectStore
+              .put(object.key, object.bytes, {
+                digest: object.digest,
+                mediaType: object.mediaType,
+              })
+              .pipe(Effect.mapError(toApplicationError)),
+          );
+          yield* Effect.forEach(rooms.values(), (room) => room.close);
+          rooms.clear();
+          const restored: LocalWorkspaceState = {
+            ...decodedState,
+            authentication: decodedState.authentication as AuthenticationState,
+            attachments: Object.fromEntries(
+              Object.entries(decodedState.attachments ?? {}).map(([documentKey, attachments]) => [
+                documentKey,
+                attachments as unknown as readonly AttachmentMetadataDto[],
+              ]),
+            ),
+            catalog: decodedState.catalog as WorkspaceCatalogState,
+          };
+          yield* saveState(restored).pipe(Effect.mapError(toApplicationError));
+          return { checkedObjects: objects.length, errors: [] };
+        }),
+      verifyWorkspace: (credentials) =>
+        Effect.gen(function* () {
+          const principal = yield* resolvePrincipal(credentials);
+          yield* requireOwner(principal);
+          const keys = yield* objectStore.list("").pipe(Effect.mapError(toApplicationError));
+          const errors = yield* Effect.forEach(keys, (key) =>
+            objectStore.get(key).pipe(
+              Effect.mapError(toApplicationError),
+              Effect.flatMap((stored) => {
+                if (stored === undefined) return Effect.succeed(`Missing object: ${key}`);
+                return digest.sha256(stored.bytes).pipe(
+                  Effect.mapError(toApplicationError),
+                  Effect.map((actual) =>
+                    actual === stored.digest ? undefined : `Digest mismatch: ${key}`,
+                  ),
+                );
+              }),
+            ),
+          );
+          return {
+            checkedObjects: keys.length,
+            errors: errors.filter((error): error is string => error !== undefined),
+          };
+        }),
+      uploadAttachment: (credentials, rawDocumentId, filename, mediaType, bytes) =>
+        Effect.gen(function* () {
+          if (bytes.byteLength === 0 || bytes.byteLength > 10_000_000) {
+            return yield* applicationFailure(
+              "attachment_size",
+              "Attachments must be between 1 byte and 10 MB.",
+              413,
+            );
+          }
+          if (!allowedAttachmentTypes.has(mediaType)) {
+            return yield* applicationFailure(
+              "attachment_type",
+              "This attachment media type is not allowed.",
+              400,
+            );
+          }
+          const normalizedFilename = filename.trim();
+          if (normalizedFilename.length === 0 || normalizedFilename.length > 240) {
+            return yield* applicationFailure(
+              "attachment_filename",
+              "Attachment filenames must be between 1 and 240 characters.",
+              400,
+            );
+          }
+          const room = yield* getRoom(rawDocumentId);
+          const principal = yield* resolvePrincipal(credentials, rawDocumentId);
+          const now = new Date().toISOString();
+          const snapshot = yield* room
+            .snapshot(principal, now)
+            .pipe(Effect.mapError(toApplicationError));
+          yield* authorizeDocument(principal, "edit-body", snapshot.metadata, now).pipe(
+            Effect.mapError(toApplicationError),
+          );
+          const attachmentId = yield* ids.generate("attachment");
+          const contentDigest = yield* digest
+            .sha256(bytes)
+            .pipe(Effect.mapError(toApplicationError));
+          const metadata: AttachmentMetadataDto = {
+            createdAt: now,
+            digest: contentDigest,
+            filename: normalizedFilename,
+            id: attachmentId,
+            mediaType,
+            size: bytes.byteLength,
+            uploaderId:
+              principal.kind === "workspace" || principal.kind === "api-key"
+                ? principal.personId
+                : principal.kind === "capability"
+                  ? (principal.guestId ?? ownerId)
+                  : ownerId,
+            url: `/api/documents/${encodeURIComponent(room.documentId)}/attachments/${encodeURIComponent(attachmentId)}`,
+          };
+          yield* objectStore
+            .put(attachmentObjectKey(state.workspaceId, room.documentId, attachmentId), bytes, {
+              digest: contentDigest,
+              mediaType,
+            })
+            .pipe(Effect.mapError(toApplicationError));
+          yield* withState(
+            saveState({
+              ...state,
+              attachments: {
+                ...state.attachments,
+                [room.documentId]: [...(state.attachments[room.documentId] ?? []), metadata],
+              },
+            }).pipe(Effect.mapError(toApplicationError)),
+          );
+          return metadata;
+        }),
+      listAttachments: (credentials, rawDocumentId) =>
+        Effect.gen(function* () {
+          const room = yield* getRoom(rawDocumentId);
+          const principal = yield* resolvePrincipal(credentials, rawDocumentId);
+          yield* room
+            .snapshot(principal, new Date().toISOString())
+            .pipe(Effect.mapError(toApplicationError), Effect.asVoid);
+          return state.attachments[room.documentId] ?? [];
+        }),
+      readAttachment: (credentials, rawDocumentId, attachmentId) =>
+        Effect.gen(function* () {
+          const room = yield* getRoom(rawDocumentId);
+          const principal = yield* resolvePrincipal(credentials, rawDocumentId);
+          yield* room
+            .snapshot(principal, new Date().toISOString())
+            .pipe(Effect.mapError(toApplicationError), Effect.asVoid);
+          const metadata = state.attachments[room.documentId]?.find(
+            (attachment) => attachment.id === attachmentId,
+          );
+          if (metadata === undefined) {
+            return yield* applicationFailure("not_found", "The attachment does not exist.", 404);
+          }
+          const stored = yield* objectStore
+            .get(attachmentObjectKey(state.workspaceId, room.documentId, attachmentId))
+            .pipe(Effect.mapError(toApplicationError));
+          if (stored === undefined || stored.digest !== metadata.digest) {
+            return yield* applicationFailure(
+              "attachment_unavailable",
+              "The attachment content is unavailable or corrupt.",
+              503,
+              true,
+            );
+          }
+          return { bytes: stored.bytes, metadata };
+        }),
       checkpointAll: () =>
         Effect.forEach(rooms.values(), (room) =>
           room.checkpoint(new Date().toISOString()).pipe(Effect.mapError(toApplicationError)),
@@ -494,6 +803,152 @@ export function makeLocalJotApplication(
           );
           return toDocumentResponse(snapshot);
         }),
+      importDocument: (credentials, request: ImportDocumentRequest) =>
+        Effect.gen(function* () {
+          const principal = yield* resolvePrincipal(credentials);
+          yield* requireOwner(principal);
+          const generatedId = yield* ids.generate("doc");
+          const importedId = request.metadata.id ?? generatedId;
+          const reservation = yield* withState(
+            reserveDocument(state.catalog, {
+              allocateRfc: false,
+              creationKey: `import:${importedId}`,
+              documentId: importedId,
+              requestedRfcNumber: request.metadata.rfcNumber,
+            }).pipe(
+              Effect.mapError(toApplicationError),
+              Effect.tap(({ state: catalog }) =>
+                saveState({ ...state, catalog }).pipe(Effect.mapError(toApplicationError)),
+              ),
+            ),
+          );
+          if (reservation.entry.status === "active") {
+            const existing = yield* getRoom(reservation.entry.documentId);
+            return yield* snapshotFor(existing, ownerPrincipal);
+          }
+          const importedAt = request.metadata.updatedAt ?? new Date().toISOString();
+          const metadata = yield* createDocumentMetadata(
+            {
+              approvers: yield* convertPeople(request.metadata.approvers),
+              authors: yield* convertPeople(request.metadata.authors),
+              createdAt: request.metadata.createdAt,
+              id: reservation.entry.documentId,
+              labels: request.metadata.labels,
+              legacySourceUrl: request.metadata.legacySourceUrl,
+              lifecycleState: request.metadata.lifecycleState,
+              relatedDocuments: yield* convertRelated(request.metadata.relatedDocuments),
+              reviewers: yield* convertPeople(request.metadata.reviewers),
+              rfcNumber: reservation.entry.rfcNumber,
+              sensitivity: request.metadata.sensitivity,
+              targetDecisionDate: request.metadata.targetDecisionDate,
+              title: request.metadata.title,
+              visibility: request.metadata.visibility,
+            },
+            importedAt,
+          ).pipe(Effect.mapError(toApplicationError));
+          const room = yield* provideAuthorityDependencies(
+            makeDocumentAuthority({
+              documentId: reservation.entry.documentId,
+              initialBody: request.body,
+              initialMetadata: metadata,
+              workspaceId: state.workspaceId,
+            }),
+          ).pipe(Effect.mapError(toApplicationError));
+          rooms.set(room.documentId, room);
+          for (const importedThread of request.comments ?? []) {
+            const range = importedCommentRange(request.body, importedThread);
+            if (range === undefined) continue;
+            const root = importedThread.messages[0];
+            if (root === undefined) continue;
+            const threadId = yield* ids.generate("thread");
+            const rootId = yield* ids.generate("message");
+            const actor: CommentActor = {
+              displayName: root.authorDisplayName,
+              id: ownerId,
+              manageAll: true,
+            };
+            yield* room
+              .createThreadAtOffsets(
+                ownerPrincipal,
+                {
+                  body: root.body,
+                  end: range.end,
+                  id: threadId,
+                  messageId: rootId,
+                  start: range.start,
+                },
+                actor,
+                root.createdAt ?? importedAt,
+              )
+              .pipe(Effect.mapError(toApplicationError));
+            const messageIds = new Map<string, string>();
+            if (root.legacyId !== undefined) messageIds.set(root.legacyId, rootId);
+            let lastMessageId = rootId;
+            for (const importedMessage of importedThread.messages.slice(1)) {
+              const messageId = yield* ids.generate("message");
+              const parentId =
+                (importedMessage.parentLegacyId === undefined
+                  ? undefined
+                  : messageIds.get(importedMessage.parentLegacyId)) ?? lastMessageId;
+              yield* room
+                .reply(
+                  ownerPrincipal,
+                  threadId,
+                  messageId,
+                  parentId,
+                  importedMessage.body,
+                  {
+                    displayName: importedMessage.authorDisplayName,
+                    id: ownerId,
+                    manageAll: true,
+                  },
+                  importedMessage.createdAt ?? importedAt,
+                )
+                .pipe(Effect.mapError(toApplicationError));
+              if (importedMessage.legacyId !== undefined) {
+                messageIds.set(importedMessage.legacyId, messageId);
+              }
+              lastMessageId = messageId;
+            }
+            if (importedThread.resolved) {
+              yield* room
+                .setThreadResolution(ownerPrincipal, threadId, true, importedAt)
+                .pipe(Effect.mapError(toApplicationError));
+            }
+          }
+          yield* room.checkpoint(importedAt).pipe(Effect.mapError(toApplicationError));
+          if (request.publish === true) {
+            yield* room
+              .publish(ownerPrincipal, importedAt)
+              .pipe(Effect.mapError(toApplicationError));
+            const published = yield* room
+              .snapshot(ownerPrincipal, importedAt)
+              .pipe(Effect.mapError(toApplicationError));
+            yield* writePublishedArtifact(
+              state.workspaceId,
+              published,
+              renderer,
+              objectStore,
+              digest,
+            ).pipe(Effect.ignore);
+            yield* room.checkpoint(importedAt).pipe(Effect.mapError(toApplicationError));
+          }
+          const snapshot = yield* room
+            .snapshot(ownerPrincipal, importedAt)
+            .pipe(Effect.mapError(toApplicationError));
+          yield* withState(
+            activateDocument(state.catalog, room.documentId).pipe(
+              Effect.flatMap((catalog) =>
+                applyCatalogSummary(catalog, summaryFromSnapshot(snapshot)),
+              ),
+              Effect.mapError(toApplicationError),
+              Effect.flatMap((catalog) =>
+                saveState({ ...state, catalog }).pipe(Effect.mapError(toApplicationError)),
+              ),
+            ),
+          );
+          return toDocumentResponse(snapshot);
+        }),
       createThread: (credentials, rawDocumentId, request) =>
         Effect.gen(function* () {
           const room = yield* getRoom(rawDocumentId);
@@ -607,6 +1062,40 @@ export function makeLocalJotApplication(
           yield* resolvePrincipal(credentials).pipe(Effect.flatMap(requireOwner));
           return state.authentication.apiKeys.map(apiKeyDto);
         }),
+      listPublicDocuments: (query, lifecycleState, label) =>
+        Effect.gen(function* () {
+          const normalizedQuery = normalizeSearchText(query);
+          const entries = publicCatalog(state.catalog).filter(
+            (summary) =>
+              (normalizedQuery.length === 0 ||
+                normalizeSearchText(
+                  `${summary.rfcNumber ?? ""} ${summary.title} ${summary.normalizedBody} ${summary.labels.join(" ")}`,
+                ).includes(normalizedQuery)) &&
+              (lifecycleState === undefined || summary.state === lifecycleState) &&
+              (label === undefined || summary.labels.includes(label)),
+          );
+          const documents = yield* Effect.forEach(entries, (summary) => {
+            const publishedRevision = summary.publishedRevision;
+            if (publishedRevision === undefined) return Effect.succeed(undefined);
+            return provideAuthorityDependencies(
+              loadDocumentRevision(
+                { documentId: summary.documentId, workspaceId: state.workspaceId },
+                publishedRevision,
+              ),
+            ).pipe(
+              Effect.mapError(toApplicationError),
+              Effect.map((snapshot) => ({
+                excerpt: excerpt(snapshot.body),
+                metadata: snapshot.metadata as DocumentMetadataDto,
+              })),
+            );
+          });
+          return {
+            documents: documents.filter(
+              (document): document is Exclude<typeof document, undefined> => document !== undefined,
+            ),
+          } satisfies CatalogResponse;
+        }),
       listDocuments: (credentials, query) =>
         Effect.gen(function* () {
           yield* resolvePrincipal(credentials).pipe(Effect.flatMap(requireOwner));
@@ -662,6 +1151,16 @@ export function makeLocalJotApplication(
           const metadata = yield* room
             .publish(principal, new Date().toISOString())
             .pipe(Effect.mapError(toApplicationError));
+          const published = yield* room
+            .snapshot(ownerPrincipal, new Date().toISOString())
+            .pipe(Effect.mapError(toApplicationError));
+          yield* writePublishedArtifact(
+            state.workspaceId,
+            published,
+            renderer,
+            objectStore,
+            digest,
+          ).pipe(Effect.ignore);
           yield* projectDocument(room);
           yield* scheduleCheckpoint(room);
           return metadata as DocumentMetadataDto;
@@ -906,6 +1405,7 @@ function loadWorkspaceState(
       if (stored === undefined) {
         return Effect.succeed({
           authentication: emptyAuthenticationState(),
+          attachments: {},
           capabilities: [],
           catalog: emptyWorkspaceCatalog(),
           schemaVersion: 1 as const,
@@ -925,6 +1425,12 @@ function loadWorkspaceState(
         Effect.map((decoded) => ({
           ...decoded,
           authentication: decoded.authentication as AuthenticationState,
+          attachments: Object.fromEntries(
+            Object.entries(decoded.attachments ?? {}).map(([documentKey, attachments]) => [
+              documentKey,
+              attachments as unknown as readonly AttachmentMetadataDto[],
+            ]),
+          ),
           catalog: decoded.catalog as WorkspaceCatalogState,
         })),
       );
@@ -1005,6 +1511,101 @@ function summaryFromSnapshot(snapshot: DocumentSnapshot): CatalogSummary {
     updatedAt: snapshot.metadata.updatedAt,
     visibility: snapshot.metadata.visibility,
   };
+}
+
+function importedCommentRange(
+  body: string,
+  thread: NonNullable<ImportDocumentRequest["comments"]>[number],
+): { readonly start: number; readonly end: number } | undefined {
+  const start = thread.originalStart;
+  const end = thread.originalEnd;
+  if (
+    start !== undefined &&
+    end !== undefined &&
+    start <= end &&
+    end <= body.length &&
+    (thread.quote.length === 0 || body.slice(start, end) === thread.quote)
+  ) {
+    return { end, start };
+  }
+  if (thread.quote.length === 0) return undefined;
+  const first = body.indexOf(thread.quote);
+  if (first === -1 || body.indexOf(thread.quote, first + 1) !== -1) return undefined;
+  return { end: first + thread.quote.length, start: first };
+}
+
+function writePublishedArtifact(
+  workspaceId: string,
+  snapshot: DocumentSnapshot,
+  renderer: typeof MarkdownRenderer.Service,
+  objectStore: typeof ObjectStore.Service,
+  digest: typeof Digest.Service,
+): Effect.Effect<void, StorageError> {
+  return Effect.gen(function* () {
+    const revision = snapshot.metadata.publishedRevision;
+    if (revision === undefined) return;
+    const rendered = yield* renderer.render(snapshot.body, { rewriteUrl: rewriteRfcUrl }).pipe(
+      Effect.mapError(
+        (cause) =>
+          new StorageError({
+            cause,
+            message: "The published Markdown could not be rendered.",
+            operation: "render published artifact",
+            retryable: true,
+          }),
+      ),
+    );
+    const title = escapeMarkup(snapshot.metadata.title);
+    const description = escapeMarkup(excerpt(snapshot.body));
+    const canonical =
+      snapshot.metadata.rfcNumber === undefined
+        ? `/documents/${snapshot.metadata.id}`
+        : `/rfc/${String(snapshot.metadata.rfcNumber).padStart(4, "0")}`;
+    const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><meta name="description" content="${description}"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><link rel="canonical" href="${canonical}"></head><body><main><h1>${title}</h1>${rendered.html}</main></body></html>`;
+    const bytes = new TextEncoder().encode(html);
+    const contentDigest = yield* digest.sha256(bytes);
+    yield* objectStore.put(
+      `workspaces/${workspaceId}/documents/${snapshot.metadata.id}/published/${revision}.html`,
+      bytes,
+      { digest: contentDigest, mediaType: "text/html; charset=utf-8" },
+    );
+  });
+}
+
+function validBackupObjectKey(key: string): boolean {
+  return (
+    key.length > 0 &&
+    key.length <= 1_024 &&
+    !key.startsWith("/") &&
+    !key.includes("\\") &&
+    key.split("/").every((segment) => segment.length > 0 && segment !== "." && segment !== "..")
+  );
+}
+
+function escapeMarkup(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+const allowedAttachmentTypes = new Set([
+  "application/pdf",
+  "image/gif",
+  "image/jpeg",
+  "image/png",
+  "image/svg+xml",
+  "image/webp",
+  "text/plain",
+]);
+
+function attachmentObjectKey(
+  workspaceId: string,
+  documentKey: string,
+  attachmentId: string,
+): string {
+  return `workspaces/${workspaceId}/documents/${documentKey}/attachments/${attachmentId}`;
 }
 
 function excerpt(body: string): string {
@@ -1181,6 +1782,7 @@ function applicationFailure(
   code: string,
   message: string,
   status: ApplicationError["status"],
+  retryable = false,
 ): Effect.Effect<never, ApplicationError> {
-  return Effect.fail(new ApplicationError({ code, message, retryable: false, status }));
+  return Effect.fail(new ApplicationError({ code, message, retryable, status }));
 }

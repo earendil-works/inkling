@@ -223,7 +223,11 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
             </div>
             <div class="document-actions">
               <select data-state aria-label="Lifecycle state"><option>${escapeHtml(initial.metadata.lifecycleState)}</option><option>draft</option><option>discussion</option><option>accepted</option><option>implemented</option><option>abandoned</option></select>
+              <select data-visibility aria-label="Visibility"><option value="workspace">Workspace</option><option value="public">Public</option></select>
+              <select data-sensitivity aria-label="Sensitivity"><option value="normal">Normal</option><option value="confidential">Confidential</option></select>
+              <input class="labels-input" data-labels value="${escapeHtml(initial.metadata.labels.join(", "))}" aria-label="Labels, comma separated" placeholder="labels" />
               <button class="text-button" type="button" data-preview-toggle>Preview</button>
+              <label class="text-button attachment-button">Attach<input type="file" data-attachment accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain" /></label>
               ${shared ? "" : '<button class="text-button" type="button" data-share>Share</button><button class="primary-button primary-button--small" type="button" data-publish>Publish</button>'}
             </div>
           </section>
@@ -295,6 +299,9 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
         const updateMetadataView = (next: DocumentMetadataDto): void => {
           metadata = next;
           requireElement<HTMLInputElement>("[data-title]").value = next.title;
+          requireElement<HTMLSelectElement>("[data-visibility]").value = next.visibility;
+          requireElement<HTMLSelectElement>("[data-sensitivity]").value = next.sensitivity;
+          requireElement<HTMLInputElement>("[data-labels]").value = next.labels.join(", ");
           const publishButton = document.querySelector<HTMLButtonElement>("[data-publish]");
           if (publishButton !== null) {
             publishButton.textContent =
@@ -307,6 +314,13 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
           editor.dispatch({ effects: editable.reconfigure(EditorView.editable.of(canEdit)) });
           requireElement<HTMLButtonElement>("[data-comment-new]").disabled =
             !actions.includes("comment");
+          requireElement<HTMLInputElement>("[data-attachment]").disabled = !canEdit;
+          const canEditMetadata = actions.includes("edit-metadata");
+          requireElement<HTMLInputElement>("[data-title]").disabled = !canEditMetadata;
+          requireElement<HTMLSelectElement>("[data-state]").disabled = !canEditMetadata;
+          requireElement<HTMLSelectElement>("[data-visibility]").disabled = !canEditMetadata;
+          requireElement<HTMLSelectElement>("[data-sensitivity]").disabled = !canEditMetadata;
+          requireElement<HTMLInputElement>("[data-labels]").disabled = !canEditMetadata;
         };
         const updateConnectionState = (state: ConnectionState): void => {
           const labels: Record<ConnectionState, string> = {
@@ -324,7 +338,9 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
           requireElement<HTMLElement>("[data-comments]").innerHTML =
             threads.length === 0
               ? '<p class="comments-empty">No open threads.</p>'
-              : threads.map(commentHtml).join("");
+              : threads
+                  .map((thread) => commentHtml(thread, permissions.includes("manage-comments")))
+                  .join("");
           bindCommentActions();
         };
         const bindCommentActions = (): void => {
@@ -354,6 +370,70 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
                     ),
                     Effect.catchAll(showToastError),
                   ),
+              );
+            });
+          });
+          document.querySelectorAll<HTMLButtonElement>("[data-edit-message]").forEach((button) => {
+            button.addEventListener("click", () => {
+              const [threadId, messageId] = (button.dataset["editMessage"] ?? "").split(":");
+              const message = comments.threads
+                .find((thread) => thread.id === threadId)
+                ?.messages.find((item) => item.id === messageId);
+              if (threadId === undefined || messageId === undefined || message === undefined)
+                return;
+              const body = window.prompt("Edit comment", message.body);
+              if (body === null || body.trim() === "") return;
+              runUi(
+                api.editMessage(documentId, threadId, messageId, body).pipe(
+                  Effect.tap((next) =>
+                    Effect.sync(() => {
+                      comments = next;
+                      renderComments();
+                    }),
+                  ),
+                  Effect.catchAll(showToastError),
+                ),
+              );
+            });
+          });
+          document
+            .querySelectorAll<HTMLButtonElement>("[data-delete-message]")
+            .forEach((button) => {
+              button.addEventListener("click", () => {
+                const [threadId, messageId] = (button.dataset["deleteMessage"] ?? "").split(":");
+                if (
+                  threadId === undefined ||
+                  messageId === undefined ||
+                  !window.confirm("Delete this comment message?")
+                )
+                  return;
+                runUi(
+                  api.deleteMessage(documentId, threadId, messageId).pipe(
+                    Effect.tap((next) =>
+                      Effect.sync(() => {
+                        comments = next;
+                        renderComments();
+                      }),
+                    ),
+                    Effect.catchAll(showToastError),
+                  ),
+                );
+              });
+            });
+          document.querySelectorAll<HTMLButtonElement>("[data-delete-thread]").forEach((button) => {
+            button.addEventListener("click", () => {
+              const threadId = button.dataset["deleteThread"];
+              if (threadId === undefined || !window.confirm("Delete this comment thread?")) return;
+              runUi(
+                api.deleteThread(documentId, threadId).pipe(
+                  Effect.tap((next) =>
+                    Effect.sync(() => {
+                      comments = next;
+                      renderComments();
+                    }),
+                  ),
+                  Effect.catchAll(showToastError),
+                ),
               );
             });
           });
@@ -410,6 +490,38 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
             ),
           );
         });
+        requireElement<HTMLInputElement>("[data-attachment]").addEventListener(
+          "change",
+          (event) => {
+            const input = event.currentTarget;
+            if (!(input instanceof HTMLInputElement) || input.files?.[0] === undefined) return;
+            const file = input.files[0];
+            runUi(
+              api.uploadAttachment(documentId, file).pipe(
+                Effect.tap((attachment) =>
+                  Effect.sync(() => {
+                    const selection = editor.state.selection.main;
+                    const label = attachment.filename.replaceAll("[", "").replaceAll("]", "");
+                    const insertedMarkdown = attachment.mediaType.startsWith("image/")
+                      ? `![${label}](${attachment.url})`
+                      : `[${label}](${attachment.url})`;
+                    editor.dispatch({
+                      changes: {
+                        from: selection.from,
+                        insert: insertedMarkdown,
+                        to: selection.to,
+                      },
+                      selection: { anchor: selection.from + insertedMarkdown.length },
+                    });
+                    input.value = "";
+                    showToast("Attachment uploaded and linked.", "success");
+                  }),
+                ),
+                Effect.catchAll(showToastError),
+              ),
+            );
+          },
+        );
         requireElement<HTMLInputElement>("[data-title]").addEventListener("change", (event) => {
           const input = event.currentTarget;
           if (!(input instanceof HTMLInputElement) || !permissions.includes("edit-metadata"))
@@ -434,6 +546,70 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
               .updateMetadata(documentId, {
                 expectedRevision: metadata.headRevision,
                 lifecycleState: select.value,
+              })
+              .pipe(
+                Effect.tap((next) => Effect.sync(() => updateMetadataView(next))),
+                Effect.catchAll(showToastError),
+              ),
+          );
+        });
+        requireElement<HTMLSelectElement>("[data-visibility]").addEventListener(
+          "change",
+          (event) => {
+            const select = event.currentTarget;
+            if (!(select instanceof HTMLSelectElement)) return;
+            const visibility = select.value === "public" ? "public" : "workspace";
+            const confirmed =
+              visibility !== "public" ||
+              metadata.sensitivity !== "confidential" ||
+              window.confirm("Publish confidential metadata as public?");
+            if (!confirmed) {
+              select.value = metadata.visibility;
+              return;
+            }
+            runUi(
+              api
+                .updateMetadata(documentId, {
+                  confirmConfidentialPublic: visibility === "public",
+                  expectedRevision: metadata.headRevision,
+                  visibility,
+                })
+                .pipe(
+                  Effect.tap((next) => Effect.sync(() => updateMetadataView(next))),
+                  Effect.catchAll(showToastError),
+                ),
+            );
+          },
+        );
+        requireElement<HTMLSelectElement>("[data-sensitivity]").addEventListener(
+          "change",
+          (event) => {
+            const select = event.currentTarget;
+            if (!(select instanceof HTMLSelectElement)) return;
+            runUi(
+              api
+                .updateMetadata(documentId, {
+                  expectedRevision: metadata.headRevision,
+                  sensitivity: select.value === "confidential" ? "confidential" : "normal",
+                })
+                .pipe(
+                  Effect.tap((next) => Effect.sync(() => updateMetadataView(next))),
+                  Effect.catchAll(showToastError),
+                ),
+            );
+          },
+        );
+        requireElement<HTMLInputElement>("[data-labels]").addEventListener("change", (event) => {
+          const input = event.currentTarget;
+          if (!(input instanceof HTMLInputElement)) return;
+          runUi(
+            api
+              .updateMetadata(documentId, {
+                expectedRevision: metadata.headRevision,
+                labels: input.value
+                  .split(",")
+                  .map((label) => label.trim())
+                  .filter(Boolean),
               })
               .pipe(
                 Effect.tap((next) => Effect.sync(() => updateMetadataView(next))),
@@ -548,19 +724,20 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
   );
 }
 
-function commentHtml(thread: CommentThreadDto): string {
+function commentHtml(thread: CommentThreadDto, canManage: boolean): string {
   const root = thread.messages[0];
   const replies = thread.messages.slice(1);
   return `<section class="comment-thread ${thread.resolved ? "is-resolved" : ""}">
     <blockquote>${escapeHtml(thread.anchor.quote || "Orphaned selection")}</blockquote>
-    ${root === undefined ? "" : messageHtml(root.authorDisplayName, root.body)}
-    ${replies.map((message) => messageHtml(message.authorDisplayName, message.body)).join("")}
-    <div class="comment-actions"><button type="button" data-reply-thread="${thread.id}">Reply</button><button type="button" data-resolve-thread="${thread.id}">${thread.resolved ? "Reopen" : "Resolve"}</button></div>
+    ${root === undefined ? "" : messageHtml(thread.id, root.id, root.authorDisplayName, root.body)}
+    ${replies.map((message) => messageHtml(thread.id, message.id, message.authorDisplayName, message.body)).join("")}
+    <div class="comment-actions"><button type="button" data-reply-thread="${thread.id}">Reply</button><button type="button" data-resolve-thread="${thread.id}">${thread.resolved ? "Reopen" : "Resolve"}</button>${canManage ? `<button type="button" data-delete-thread="${thread.id}">Delete thread</button>` : ""}</div>
   </section>`;
 }
 
-function messageHtml(author: string, body: string): string {
-  return `<div class="comment-message"><b>${escapeHtml(author)}</b><p>${escapeHtml(body)}</p></div>`;
+function messageHtml(threadId: string, messageId: string, author: string, body: string): string {
+  const key = `${threadId}:${messageId}`;
+  return `<div class="comment-message"><b>${escapeHtml(author)}</b><p>${escapeHtml(body)}</p><span><button type="button" data-edit-message="${key}">Edit</button><button type="button" data-delete-message="${key}">Delete</button></span></div>`;
 }
 
 function renderMermaid(): Effect.Effect<void> {
