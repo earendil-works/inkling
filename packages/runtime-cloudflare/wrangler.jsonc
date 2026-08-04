@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "jot",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-03-27",
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "JOT_WORKSPACE",
+        "class_name": "WorkspaceDurableObject",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["WorkspaceDurableObject"],
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "JOT_OBJECTS",
+      "bucket_name": "jot-objects",
+      "preview_bucket_name": "jot-objects-preview",
+    },
+  ],
+  "assets": {
+    "binding": "ASSETS",
+    "directory": "../frontend/dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/rfc/*"],
+  },
+}

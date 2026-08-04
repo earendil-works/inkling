@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm --parallel --filter @earendil-works/jot-runtime-node --filter @earendil-works/jot-frontend run dev",
-    "build": "pnpm --filter @earendil-works/jot-frontend run build",
+    "build": "pnpm --filter @earendil-works/jot-frontend run build && pnpm --filter @earendil-works/jot-runtime-cloudflare run build",
     "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",

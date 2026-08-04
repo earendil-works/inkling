@@ -11,7 +11,10 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@earendil-works/jot-collaboration": "workspace:*",
+    "@earendil-works/jot-core": "workspace:*",
     "@earendil-works/jot-protocol": "workspace:*",
+    "@earendil-works/jot-renderer": "workspace:*",
     "effect": "3.22.1",
     "hono": "4.13.0"
   }

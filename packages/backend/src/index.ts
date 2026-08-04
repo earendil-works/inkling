@@ -30,6 +30,9 @@ export type {
   SessionResult,
 } from "./application.ts";
 export { ApplicationError, JotApplication } from "./application.ts";
+export { localApplicationLayer, makeLocalJotApplication } from "./local.ts";
+export type { LocalApplicationOptions } from "./local.ts";
+export { DigestLive, IdGeneratorLive, SecretHasherLive, SecureTokenLive } from "./crypto.ts";
 
 export interface BackendOptions {
   readonly version?: string | undefined;

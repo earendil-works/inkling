@@ -35,7 +35,7 @@ export interface CollaborationConnection {
   readonly acceptUpdate: (
     update: Uint8Array,
     clientUpdateId: string,
-  ) => Effect.Effect<void, ApplicationError>;
+  ) => Effect.Effect<ServerCollaborationMessage, ApplicationError>;
 }
 
 export interface SessionResult {
@@ -54,6 +54,8 @@ export class ApplicationError extends Data.TaggedError("ApplicationError")<{
 }> {}
 
 export interface JotApplicationService {
+  /** Flushes all active document rooms to immutable checkpoints. */
+  readonly checkpointAll: () => Effect.Effect<void, ApplicationError>;
   readonly connectCollaboration: (
     credentials: RequestCredentials,
     documentId: string,
