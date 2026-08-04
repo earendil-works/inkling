@@ -1,0 +1,14 @@
+{
+  "name": "@earendil-works/jot-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./domain": "./src/domain/document.ts",
+    "./ports": "./src/application/ports.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

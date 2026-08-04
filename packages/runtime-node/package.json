@@ -1,0 +1,16 @@
+{
+  "name": "@earendil-works/jot-runtime-node",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/main.ts",
+    "start": "node src/main.ts",
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@earendil-works/jot-backend": "workspace:*",
+    "@hono/node-server": "2.1.0"
+  }
+}

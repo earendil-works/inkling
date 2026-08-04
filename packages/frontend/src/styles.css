@@ -1,0 +1,257 @@
+@layer reset, tokens, layout, components;
+
+@layer reset {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    color-scheme: light;
+  }
+
+  body,
+  h1,
+  h2,
+  p {
+    margin: 0;
+  }
+
+  body {
+    min-width: 20rem;
+    min-height: 100vh;
+  }
+
+  a {
+    color: inherit;
+  }
+}
+
+@layer tokens {
+  :root {
+    --paper: #eee9de;
+    --ink: #1f211d;
+    --muted: #69685f;
+    --rule: #b9b4a8;
+    --signal: #cc4a2f;
+    --ready: #307657;
+    --page-gutter: clamp(1.25rem, 4vw, 4.5rem);
+    --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+    --mono: "SFMono-Regular", "Cascadia Mono", "Liberation Mono", monospace;
+  }
+}
+
+@layer layout {
+  body {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    background:
+      linear-gradient(90deg, transparent 49.9%, rgb(31 33 29 / 5%) 50%, transparent 50.1%),
+      var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+  }
+
+  .masthead,
+  footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.1rem var(--page-gutter);
+    border-color: var(--rule);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .masthead {
+    border-bottom: 1px solid var(--rule);
+  }
+
+  footer {
+    border-top: 1px solid var(--rule);
+  }
+
+  main {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(18rem, 0.8fr);
+  }
+
+  .hero,
+  .foundation {
+    padding: clamp(4rem, 10vw, 9rem) var(--page-gutter);
+  }
+
+  .hero {
+    align-self: center;
+  }
+
+  .foundation {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 5rem;
+    border-left: 1px solid var(--rule);
+  }
+}
+
+@layer components {
+  .wordmark {
+    font-weight: 800;
+    text-decoration: none;
+  }
+
+  .wordmark span {
+    color: var(--signal);
+  }
+
+  .api-state {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+  }
+
+  .api-state__light {
+    width: 0.55rem;
+    height: 0.55rem;
+    border: 1px solid currentcolor;
+    border-radius: 50%;
+    background: var(--signal);
+  }
+
+  :root[data-api="ready"] .api-state__light {
+    background: var(--ready);
+  }
+
+  .eyebrow {
+    margin-bottom: 1.5rem;
+    color: var(--signal);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    max-width: 11ch;
+    font-size: clamp(3.6rem, 8vw, 8.5rem);
+    font-weight: 400;
+    letter-spacing: -0.06em;
+    line-height: 0.86;
+  }
+
+  h1 em {
+    color: var(--signal);
+    font-weight: 400;
+  }
+
+  .lede {
+    max-width: 35rem;
+    margin-top: clamp(2.5rem, 6vw, 5rem);
+    margin-left: clamp(0rem, 8vw, 10rem);
+    color: var(--muted);
+    font-size: clamp(1.05rem, 1.7vw, 1.35rem);
+    line-height: 1.55;
+  }
+
+  h2 {
+    max-width: 12ch;
+    font-size: clamp(2rem, 4vw, 4rem);
+    font-weight: 400;
+    letter-spacing: -0.045em;
+    line-height: 0.95;
+  }
+
+  .principles {
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--rule);
+    list-style: none;
+  }
+
+  .principles li {
+    display: grid;
+    grid-template-columns: 2rem minmax(8rem, 0.55fr) 1fr;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .principles span,
+  .principles strong {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .principles span {
+    color: var(--signal);
+  }
+
+  .principles p {
+    color: var(--muted);
+    font-size: 0.88rem;
+    line-height: 1.4;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--signal);
+    outline-offset: 4px;
+  }
+}
+
+@media (width <= 62rem) {
+  main {
+    grid-template-columns: 1fr;
+  }
+
+  .foundation {
+    border-top: 1px solid var(--rule);
+    border-left: 0;
+  }
+}
+
+@media (width <= 38rem) {
+  .api-state span:last-child {
+    max-width: 12rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .principles li {
+    grid-template-columns: 2rem 1fr;
+  }
+
+  .principles p {
+    grid-column: 2;
+  }
+
+  footer p:first-child {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero > * {
+    animation: reveal 500ms both;
+  }
+
+  .hero > :nth-child(2) {
+    animation-delay: 80ms;
+  }
+
+  .hero > :nth-child(3) {
+    animation-delay: 160ms;
+  }
+
+  @keyframes reveal {
+    from {
+      opacity: 0;
+      transform: translateY(0.75rem);
+    }
+  }
+}
