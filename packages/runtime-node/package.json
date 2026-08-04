@@ -11,6 +11,17 @@
   },
   "dependencies": {
     "@earendil-works/jot-backend": "workspace:*",
-    "@hono/node-server": "2.1.0"
+    "@earendil-works/jot-collaboration": "workspace:*",
+    "@earendil-works/jot-core": "workspace:*",
+    "@earendil-works/jot-protocol": "workspace:*",
+    "@earendil-works/jot-renderer": "workspace:*",
+    "@effect/platform": "0.97.1",
+    "@effect/platform-node": "0.108.1",
+    "@hono/node-server": "2.1.0",
+    "effect": "3.22.1",
+    "ws": "8.18.3"
+  },
+  "devDependencies": {
+    "@types/ws": "8.18.1"
   }
 }

@@ -1,0 +1,257 @@
+import type { IncomingMessage } from "node:http";
+import type { Duplex } from "node:stream";
+
+import { Effect, Fiber, Stream, type ManagedRuntime } from "effect";
+import { WebSocket, WebSocketServer } from "ws";
+import type { RawData } from "ws";
+
+import { ApplicationError, JotApplication } from "@earendil-works/jot-backend";
+import type {
+  CollaborationConnection,
+  JotApplicationService,
+  RequestCredentials,
+} from "@earendil-works/jot-backend";
+import {
+  ClientCollaborationMessageSchema,
+  decodeJson,
+  encodeJson,
+  ServerCollaborationMessageSchema,
+} from "@earendil-works/jot-protocol";
+import type {
+  ClientCollaborationMessage,
+  ServerCollaborationMessage,
+} from "@earendil-works/jot-protocol";
+import { decodeBase64 } from "@earendil-works/jot-collaboration";
+import type { ServerType } from "@hono/node-server";
+
+interface ConnectedClient {
+  readonly documentId: string;
+  readonly socket: WebSocket;
+}
+
+export function installWebSocketServer(
+  server: ServerType,
+  runtime: ManagedRuntime.ManagedRuntime<JotApplicationService, never>,
+): () => void {
+  const webSocketServer = new WebSocketServer({ maxPayload: 1_200_000, noServer: true });
+  const clients = new Set<ConnectedClient>();
+
+  const onUpgrade = (request: IncomingMessage, socket: Duplex, head: Buffer): void => {
+    const host = request.headers.host;
+    if (host === undefined || request.url === undefined || !isAllowedOrigin(request, host)) {
+      socket.destroy();
+      return;
+    }
+    const url = new URL(request.url, `http://${host}`);
+    const match = /^\/api\/documents\/([^/]+)\/ws$/u.exec(url.pathname);
+    if (match?.[1] === undefined) {
+      socket.destroy();
+      return;
+    }
+    const documentId = decodeURIComponent(match[1]);
+    const requestCredentials: RequestCredentials = {
+      capabilityToken: url.searchParams.get("cap") ?? undefined,
+      guestName: url.searchParams.get("guest") ?? undefined,
+      sessionToken: parseCookies(request.headers.cookie)["jot_session"],
+    };
+
+    webSocketServer.handleUpgrade(request, socket, head, (webSocket) => {
+      webSocketServer.emit("connection", webSocket, request, documentId, requestCredentials);
+    });
+  };
+
+  server.on("upgrade", onUpgrade);
+  webSocketServer.on(
+    "connection",
+    (
+      socket: WebSocket,
+      _request: IncomingMessage,
+      documentId: string,
+      credentials: RequestCredentials,
+    ) => {
+      let connection: CollaborationConnection | undefined;
+      let eventsFiber: Fiber.RuntimeFiber<void, never> | undefined;
+      let initialized = false;
+      const client: ConnectedClient = { documentId, socket };
+      clients.add(client);
+
+      const fail = (error: unknown): Effect.Effect<void> => {
+        const applicationError =
+          error instanceof ApplicationError
+            ? error
+            : new ApplicationError({
+                cause: error,
+                code: "websocket_error",
+                message: "The collaboration connection failed.",
+                retryable: false,
+                status: 400,
+              });
+        return send(socket, {
+          error: {
+            code: applicationError.code,
+            message: applicationError.message,
+            retryable: applicationError.retryable,
+          },
+          type: "error",
+        }).pipe(
+          Effect.ignore,
+          Effect.ensuring(Effect.sync(() => socket.close(4000, applicationError.code))),
+        );
+      };
+
+      const processMessage = (data: RawData): Effect.Effect<void, unknown, JotApplicationService> =>
+        decodeMessage(data).pipe(
+          Effect.flatMap((message) =>
+            Effect.gen(function* () {
+              if (!initialized) {
+                if (message.type !== "hello") {
+                  return yield* Effect.fail(
+                    new ApplicationError({
+                      code: "protocol_required",
+                      message: "The first collaboration message must negotiate the protocol.",
+                      retryable: false,
+                      status: 400,
+                    }),
+                  );
+                }
+                const stateVector =
+                  message.stateVector === undefined
+                    ? undefined
+                    : yield* decodeBase64(message.stateVector);
+                const service = yield* JotApplication;
+                const established = yield* service.connectCollaboration(
+                  credentials,
+                  documentId,
+                  stateVector,
+                );
+                connection = established;
+                initialized = true;
+                yield* send(socket, established.welcome);
+                eventsFiber = yield* Stream.runForEach(established.events, (event) =>
+                  send(socket, event).pipe(
+                    Effect.tap(() =>
+                      event.type === "permission-changed" && !event.actions.includes("read-working")
+                        ? Effect.sync(() => socket.close(4003, "access_revoked"))
+                        : Effect.void,
+                    ),
+                    Effect.catchAll(() => Effect.void),
+                  ),
+                ).pipe(Effect.forkDaemon);
+                return;
+              }
+
+              const currentConnection = connection;
+              if (currentConnection === undefined) {
+                return yield* Effect.fail(
+                  new ApplicationError({
+                    code: "connection_missing",
+                    message: "The collaboration session is not initialized.",
+                    retryable: true,
+                    status: 503,
+                  }),
+                );
+              }
+              if (message.type === "body-update") {
+                const update = yield* decodeBase64(message.update);
+                yield* currentConnection.acceptUpdate(update, message.clientUpdateId);
+                return;
+              }
+              if (message.type === "presence") {
+                const wire: ServerCollaborationMessage = {
+                  presence: message.presence,
+                  type: "presence",
+                };
+                yield* Effect.forEach(
+                  [...clients].filter(
+                    (other) => other !== client && other.documentId === documentId,
+                  ),
+                  (other) => send(other.socket, wire).pipe(Effect.ignore),
+                  { concurrency: "unbounded", discard: true },
+                );
+              }
+            }),
+          ),
+        );
+
+      socket.on("message", (data) => {
+        runtime.runFork(processMessage(data).pipe(Effect.catchAll(fail)));
+      });
+
+      socket.on("close", () => {
+        clients.delete(client);
+        if (eventsFiber !== undefined) {
+          runtime.runFork(Fiber.interrupt(eventsFiber));
+        }
+      });
+      socket.on("error", () => {
+        clients.delete(client);
+      });
+    },
+  );
+
+  return () => {
+    server.off("upgrade", onUpgrade);
+    for (const client of clients) {
+      client.socket.close(1001, "server_shutdown");
+    }
+    webSocketServer.close();
+  };
+}
+
+function decodeMessage(data: RawData): Effect.Effect<ClientCollaborationMessage, unknown> {
+  const text = typeof data === "string" ? data : data.toString();
+  return decodeJson(ClientCollaborationMessageSchema, text);
+}
+
+function send(
+  socket: WebSocket,
+  message: ServerCollaborationMessage,
+): Effect.Effect<void, unknown> {
+  if (socket.readyState !== WebSocket.OPEN) {
+    return Effect.void;
+  }
+  return encodeJson(ServerCollaborationMessageSchema, message).pipe(
+    Effect.flatMap((text) =>
+      Effect.try({
+        catch: (error) => error,
+        try: () => socket.send(text),
+      }),
+    ),
+  );
+}
+
+function isAllowedOrigin(request: IncomingMessage, host: string): boolean {
+  const origin = request.headers.origin;
+  if (origin === undefined) {
+    return false;
+  }
+  try {
+    const originUrl = new URL(origin);
+    return (
+      (originUrl.protocol === "http:" || originUrl.protocol === "https:") && originUrl.host === host
+    );
+  } catch {
+    return false;
+  }
+}
+
+function parseCookies(header: string | undefined): Readonly<Record<string, string>> {
+  if (header === undefined) {
+    return {};
+  }
+  return Object.fromEntries(
+    header.split(";").flatMap((part) => {
+      const separator = part.indexOf("=");
+      if (separator === -1) {
+        return [];
+      }
+      const key = part.slice(0, separator).trim();
+      const value = part.slice(separator + 1).trim();
+      try {
+        return [[key, decodeURIComponent(value)]];
+      } catch {
+        return [];
+      }
+    }),
+  );
+}

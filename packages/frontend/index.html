@@ -6,60 +6,27 @@
     <meta name="theme-color" content="#eee9de" />
     <meta
       name="description"
-      content="Jot is a local-first multiplayer Markdown workspace for people and agents."
+      content="Jot is a multiplayer Markdown workspace for people and agents."
     />
-    <title>Jot — clean-room workspace</title>
+    <title>Jot</title>
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
     <header class="masthead">
-      <a class="wordmark" href="/" aria-label="Jot home">JOT<span>/00</span></a>
-      <div class="api-state" role="status" aria-live="polite">
-        <span class="api-state__light" aria-hidden="true"></span>
-        <span data-api-status>Checking local authority…</span>
+      <a class="wordmark" href="/" data-link aria-label="Jot home">JOT<span>/</span></a>
+      <div class="masthead__right">
+        <div class="participants" data-participants aria-label="Connected participants"></div>
+        <div class="api-state" role="status" aria-live="polite">
+          <span class="api-state__light" aria-hidden="true"></span>
+          <span data-api-status>Starting Effect runtime…</span>
+        </div>
+        <button class="icon-button" type="button" data-theme aria-label="Change color theme">
+          ◐
+        </button>
       </div>
     </header>
-
-    <main>
-      <section class="hero" aria-labelledby="hero-title">
-        <p class="eyebrow">Multiplayer Markdown / clean-room build</p>
-        <h1 id="hero-title">Writing should feel local.<br /><em>Even when it isn’t.</em></h1>
-        <p class="lede">
-          One document, one authority, one durable history. Jot is being rebuilt for collaborative
-          RFCs shared by people and coding agents.
-        </p>
-      </section>
-
-      <section class="foundation" aria-labelledby="foundation-title">
-        <div class="foundation__heading">
-          <p class="eyebrow">Foundation checkpoint</p>
-          <h2 id="foundation-title">The boundaries are in place.</h2>
-        </div>
-        <ol class="principles">
-          <li>
-            <span>01</span>
-            <strong>Durable first</strong>
-            <p>An edit is accepted only after its journal append survives a restart.</p>
-          </li>
-          <li>
-            <span>02</span>
-            <strong>Portable core</strong>
-            <p>The same document model belongs in Node.js and Cloudflare.</p>
-          </li>
-          <li>
-            <span>03</span>
-            <strong>Derived views</strong>
-            <p>Markdown, HTML, search, and catalogs can always be rebuilt.</p>
-          </li>
-        </ol>
-      </section>
-    </main>
-
-    <footer>
-      <p>Jot architecture / phase 1</p>
-      <p data-protocol>Protocol —</p>
-    </footer>
-
+    <main id="app" tabindex="-1"></main>
+    <div class="toast-region" data-toasts role="status" aria-live="polite"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

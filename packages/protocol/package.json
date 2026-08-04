@@ -8,5 +8,8 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "effect": "3.22.1"
   }
 }

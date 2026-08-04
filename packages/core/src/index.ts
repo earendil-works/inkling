@@ -1,9 +1,14 @@
 export type {
+  AttachmentId,
+  AttachmentMetadata,
   CapabilityAccess,
+  CreateMetadataInput,
   DocumentId,
   DocumentMetadata,
   DocumentRevision,
   KnownLifecycleState,
+  LifecycleState,
+  MetadataPatch,
   PersonId,
   PersonReference,
   RelatedDocumentReference,
@@ -11,13 +16,121 @@ export type {
   SharingPolicy,
   Visibility,
 } from "./domain/document.ts";
-export { knownLifecycleStates } from "./domain/document.ts";
+export {
+  attachmentId,
+  createDocumentMetadata,
+  documentId,
+  documentRevision,
+  DomainError,
+  knownLifecycleStates,
+  markDeleted,
+  markPublished,
+  markUnpublished,
+  nextDocumentRevision,
+  personId,
+  requireRevision,
+  updateDocumentMetadata,
+  updateSharingPolicy,
+  validatePerson,
+} from "./domain/document.ts";
 export type {
-  DurableDocumentJournal,
+  CommentActor,
+  CommentAnchor,
+  CommentMessage,
+  CommentMessageId,
+  CommentState,
+  CommentThread,
+  CommentThreadId,
+  CreateThreadInput,
+} from "./domain/comments.ts";
+export {
+  commentMessageId,
+  commentThreadId,
+  createCommentThread,
+  deleteCommentMessage,
+  deleteCommentThread,
+  editCommentMessage,
+  emptyCommentState,
+  replaceCommentAnchor,
+  replyToCommentThread,
+  setCommentThreadResolution,
+} from "./domain/comments.ts";
+export type {
+  DocumentAction,
+  Principal,
+  WorkspaceAction,
+  WorkspaceRole,
+} from "./domain/authorization.ts";
+export {
+  authorizeDocument,
+  AuthorizationError,
+  authorizeWorkspace,
+  documentActions,
+  isAdministrator,
+  isDocumentActionAllowed,
+} from "./domain/authorization.ts";
+export type {
+  ApiKeyRecord,
+  AuthenticationState,
+  CreatedApiKey,
+  CreatedSession,
+  SessionRecord,
+} from "./domain/authentication.ts";
+export {
+  authenticateApiKey,
+  authenticateSession,
+  AuthenticationError,
+  createApiKey,
+  emptyAuthenticationState,
+  loginOwner,
+  logoutSession,
+  revokeApiKey,
+  setupOwner,
+} from "./domain/authentication.ts";
+export type { LineRange, TextReplacement } from "./domain/body.ts";
+export { applyUniqueTextReplacements, BodyEditError, readLineRange } from "./domain/body.ts";
+export type {
+  CatalogSearchOptions,
+  CatalogSummary,
+  DocumentReservation,
+  PeopleDirectoryEntry,
+  RegistryEntry,
+  RegistryStatus,
+  WorkspaceCatalogState,
+} from "./domain/catalog.ts";
+export {
+  activateDocument,
+  applyCatalogSummary,
+  emptyWorkspaceCatalog,
+  findPerson,
+  normalizeSearchText,
+  publicCatalog,
+  reserveDocument,
+  searchCatalog,
+  tombstoneDocument,
+  upsertPerson,
+} from "./domain/catalog.ts";
+export type {
+  DigestService,
+  DurableDocumentJournalService,
+  IdGeneratorService,
   JournalEntry,
   JournalEntryInput,
   JournalEntryKind,
-  ObjectStore,
+  ObjectStoreService,
   PutObjectOptions,
+  SecretHasherService,
+  SecureTokenService,
   StoredObject,
+  WorkspaceStateStoreService,
+} from "./application/ports.ts";
+export {
+  Digest,
+  DurableDocumentJournal,
+  IdGenerator,
+  ObjectStore,
+  SecretHasher,
+  SecureToken,
+  StorageError,
+  WorkspaceStateStore,
 } from "./application/ports.ts";

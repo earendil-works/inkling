@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@earendil-works/jot-protocol": "workspace:*",
+    "effect": "3.22.1",
     "hono": "4.13.0"
   }
 }

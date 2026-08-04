@@ -13,6 +13,10 @@ Do not create a root `README.md` until the project owner requests one.
 - Use `make format` to apply automated fixes.
 - **Before every commit, `make check` must pass.** The Husky pre-commit hook enforces this; do not bypass it or weaken checks to make a change pass.
 
+## Effect
+
+All domain, application, and runtime logic is built on the JavaScript `effect` ecosystem. Model expected failures as typed errors, dependencies as `Context` services supplied by `Layer`, resource lifetimes with `Scope`, and concurrent work with Effect primitives. Use `Schema` for validation and wire decoding. Raw promises, thrown expected errors, and ambient singletons belong only in thin platform boundaries and must be lifted into Effect immediately.
+
 ## Package boundaries
 
 - `core`: runtime-independent domain behavior and application/storage contracts.

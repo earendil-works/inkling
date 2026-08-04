@@ -11,6 +11,8 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@earendil-works/jot-core": "workspace:*",
+    "effect": "3.22.1",
     "yjs": "13.6.32"
   }
 }

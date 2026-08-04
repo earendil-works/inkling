@@ -8,5 +8,10 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "effect": "3.22.1",
+    "highlight.js": "11.11.1",
+    "markdown-it": "15.0.0"
   }
 }
