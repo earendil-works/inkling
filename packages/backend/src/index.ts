@@ -28,6 +28,7 @@ export type {
   AttachmentContent,
   BackupVerification,
   CollaborationConnection,
+  DocumentRuntimeConfiguration,
   JotApplicationService,
   RequestCredentials,
   SessionResult,

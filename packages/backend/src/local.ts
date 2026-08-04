@@ -44,6 +44,7 @@ import type {
   CatalogSummary,
   CommentActor,
   DocumentMetadata,
+  DocumentRevision,
   MetadataPatch,
   PersonReference,
   Principal,
@@ -102,6 +103,21 @@ interface LocalWorkspaceState {
   readonly capabilities: readonly CapabilityRecord[];
 }
 
+const privateDocumentStateSchema = Schema.Struct({
+  attachments: Schema.Array(Schema.Unknown),
+  capabilities: Schema.Array(
+    Schema.Struct({
+      access: Schema.Literal("view", "comment", "edit"),
+      documentId: Schema.String,
+      expiresAt: Schema.optional(Schema.String),
+      generation: Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
+      id: Schema.String,
+      tokenHash: Schema.String,
+    }),
+  ),
+  schemaVersion: Schema.Literal(1),
+});
+
 const backupArchiveSchema = Schema.Struct({
   createdAt: Schema.String,
   objects: Schema.Array(
@@ -138,6 +154,13 @@ const persistedStateSchema = Schema.Struct({
 
 export interface LocalApplicationOptions {
   readonly workspaceId?: string | undefined;
+  readonly ownsDocumentPrivateState?: boolean | undefined;
+  readonly principalResolver?:
+    | ((
+        credentials: RequestCredentials,
+        documentId?: string,
+      ) => Effect.Effect<Principal, ApplicationError>)
+    | undefined;
 }
 
 export function makeLocalJotApplication(
@@ -169,6 +192,7 @@ export function makeLocalJotApplication(
     const checkpointFibers = new Map<string, Fiber.RuntimeFiber<void, never>>();
     const dirtySince = new Map<string, number>();
     let state = yield* loadWorkspaceState(stateStore, options.workspaceId ?? "local");
+    state = yield* hydratePrivateDocumentState(state, objectStore);
     const ownerId = yield* personId("owner@local").pipe(Effect.mapError(toStorageError));
     const ownerPrincipal: Principal = { kind: "workspace", personId: ownerId, role: "owner" };
 
@@ -238,7 +262,7 @@ export function makeLocalJotApplication(
         checkpointFibers.set(room.documentId, fiber);
       });
 
-    const resolvePrincipal = (
+    const resolveStoredPrincipal = (
       credentials: RequestCredentials,
       targetDocumentId?: string,
     ): Effect.Effect<Principal, ApplicationError> =>
@@ -281,6 +305,19 @@ export function makeLocalJotApplication(
           return { kind: "anonymous" } as const;
         }),
       );
+
+    const resolvePrincipal = (
+      credentials: RequestCredentials,
+      targetDocumentId?: string,
+    ): Effect.Effect<Principal, ApplicationError> => {
+      if (credentials.internalPrincipal !== undefined) {
+        return Effect.succeed(credentials.internalPrincipal);
+      }
+      if (options.principalResolver === undefined || credentials.capabilityToken !== undefined) {
+        return resolveStoredPrincipal(credentials, targetDocumentId);
+      }
+      return options.principalResolver(credentials, targetDocumentId);
+    };
 
     const snapshotFor = (
       room: DocumentAuthorityService,
@@ -352,6 +389,47 @@ export function makeLocalJotApplication(
       });
 
     const service: JotApplicationService = {
+      authorizeRequest: resolvePrincipal,
+      documentRuntimeConfiguration: (rawDocumentId) =>
+        Effect.gen(function* () {
+          const id = yield* documentId(rawDocumentId).pipe(Effect.mapError(toApplicationError));
+          const entry = state.catalog.entries.find(
+            (candidate) => candidate.documentId === id && candidate.status === "active",
+          );
+          if (entry === undefined) {
+            return yield* applicationFailure("not_found", "The document does not exist.", 404);
+          }
+          return {
+            capabilities: state.capabilities.filter((capability) => capability.documentId === id),
+            documentId: id,
+            rfcNumber: entry.rfcNumber,
+            summary: entry.summary,
+            workspaceId: state.workspaceId,
+          };
+        }),
+      currentDocumentProjection: (rawDocumentId) =>
+        getRoom(rawDocumentId).pipe(Effect.flatMap((room) => snapshotFor(room, ownerPrincipal))),
+      applyDocumentProjection: (document) =>
+        withState(
+          applyCatalogSummary(state.catalog, summaryFromDocument(document)).pipe(
+            Effect.mapError(toApplicationError),
+            Effect.flatMap((catalog) =>
+              saveState({ ...state, catalog }).pipe(Effect.mapError(toApplicationError)),
+            ),
+          ),
+        ),
+      markCatalogDeleted: (rawDocumentId) =>
+        Effect.gen(function* () {
+          const id = yield* documentId(rawDocumentId).pipe(Effect.mapError(toApplicationError));
+          yield* withState(
+            tombstoneDocument(state.catalog, id).pipe(
+              Effect.mapError(toApplicationError),
+              Effect.flatMap((catalog) =>
+                saveState({ ...state, catalog }).pipe(Effect.mapError(toApplicationError)),
+              ),
+            ),
+          );
+        }),
       exportWorkspace: (credentials) =>
         Effect.gen(function* () {
           const principal = yield* resolvePrincipal(credentials);
@@ -359,6 +437,15 @@ export function makeLocalJotApplication(
           yield* Effect.forEach(rooms.values(), (room) =>
             room.checkpoint(new Date().toISOString()).pipe(Effect.mapError(toApplicationError)),
           );
+          if (options.ownsDocumentPrivateState !== false) {
+            yield* Effect.forEach(
+              state.catalog.entries.filter((entry) => entry.status === "active"),
+              (entry) =>
+                persistPrivateDocumentState(state, entry.documentId, objectStore, digest).pipe(
+                  Effect.mapError(toApplicationError),
+                ),
+            );
+          }
           const keys = yield* objectStore.list("").pipe(Effect.mapError(toApplicationError));
           const objects = yield* Effect.forEach(keys, (key) =>
             objectStore.get(key).pipe(
@@ -598,6 +685,9 @@ export function makeLocalJotApplication(
               },
             }).pipe(Effect.mapError(toApplicationError)),
           );
+          yield* persistPrivateDocumentState(state, room.documentId, objectStore, digest).pipe(
+            Effect.mapError(toApplicationError),
+          );
           return metadata;
         }),
       listAttachments: (credentials, rawDocumentId) =>
@@ -684,6 +774,7 @@ export function makeLocalJotApplication(
             }),
           );
           const connection: CollaborationConnection = {
+            principal,
             acceptUpdate: (update, clientUpdateId) =>
               room
                 .acceptBodyUpdate(principal, update, clientUpdateId, new Date().toISOString())
@@ -1375,6 +1466,9 @@ export function makeLocalJotApplication(
               yield* saveState({ ...state, capabilities }).pipe(
                 Effect.mapError(toApplicationError),
               );
+              yield* persistPrivateDocumentState(state, room.documentId, objectStore, digest).pipe(
+                Effect.mapError(toApplicationError),
+              );
               const response: ShareResponse = {
                 capabilityUrl,
                 policy: metadata.sharing,
@@ -1394,6 +1488,100 @@ export function makeLocalJotApplication(
 
 export function localApplicationLayer(options: LocalApplicationOptions = {}) {
   return Layer.effect(JotApplication, makeLocalJotApplication(options));
+}
+
+function hydratePrivateDocumentState(
+  initial: LocalWorkspaceState,
+  objectStore: typeof ObjectStore.Service,
+): Effect.Effect<LocalWorkspaceState, StorageError> {
+  return Effect.reduce(
+    initial.catalog.entries.filter((entry) => entry.status === "active"),
+    initial,
+    (current, entry) =>
+      objectStore.get(privateDocumentStateKey(current.workspaceId, entry.documentId)).pipe(
+        Effect.flatMap((stored) => {
+          if (stored === undefined) return Effect.succeed(current);
+          return Schema.decodeUnknown(Schema.parseJson(privateDocumentStateSchema))(
+            textDecoder.decode(stored.bytes),
+          ).pipe(
+            Effect.mapError(
+              (cause) =>
+                new StorageError({
+                  cause,
+                  message: `Private document state is corrupt for ${entry.documentId}.`,
+                  operation: "decode private document state",
+                  retryable: false,
+                }),
+            ),
+            Effect.map((decoded) => {
+              const localCapabilities = current.capabilities.filter(
+                (capability) => capability.documentId === entry.documentId,
+              );
+              const projectedCapabilities = decoded.capabilities as readonly CapabilityRecord[];
+              const localGeneration = Math.max(
+                -1,
+                ...localCapabilities.map((item) => item.generation),
+              );
+              const projectedGeneration = Math.max(
+                -1,
+                ...projectedCapabilities.map((item) => item.generation),
+              );
+              const capabilities =
+                projectedGeneration >= localGeneration
+                  ? [
+                      ...current.capabilities.filter(
+                        (capability) => capability.documentId !== entry.documentId,
+                      ),
+                      ...projectedCapabilities,
+                    ]
+                  : current.capabilities;
+              const projectedAttachments =
+                decoded.attachments as unknown as readonly AttachmentMetadataDto[];
+              const attachments = [
+                ...(current.attachments[entry.documentId] ?? []),
+                ...projectedAttachments,
+              ].filter(
+                (attachment, index, all) =>
+                  all.findIndex((candidate) => candidate.id === attachment.id) === index,
+              );
+              return {
+                ...current,
+                attachments: { ...current.attachments, [entry.documentId]: attachments },
+                capabilities,
+              };
+            }),
+          );
+        }),
+      ),
+  );
+}
+
+function persistPrivateDocumentState(
+  state: LocalWorkspaceState,
+  documentKey: string,
+  objectStore: typeof ObjectStore.Service,
+  digest: typeof Digest.Service,
+): Effect.Effect<void, StorageError> {
+  return Effect.gen(function* () {
+    const bytes = textEncoder.encode(
+      JSON.stringify({
+        attachments: state.attachments[documentKey] ?? [],
+        capabilities: state.capabilities.filter(
+          (capability) => capability.documentId === documentKey,
+        ),
+        schemaVersion: 1,
+      }),
+    );
+    const contentDigest = yield* digest.sha256(bytes);
+    yield* objectStore.put(privateDocumentStateKey(state.workspaceId, documentKey), bytes, {
+      digest: contentDigest,
+      mediaType: "application/json",
+    });
+  });
+}
+
+function privateDocumentStateKey(workspaceId: string, documentKey: string): string {
+  return `workspaces/${workspaceId}/documents/${documentKey}/private-state.json`;
 }
 
 function loadWorkspaceState(
@@ -1493,23 +1681,27 @@ function allowedActions(
 }
 
 function summaryFromSnapshot(snapshot: DocumentSnapshot): CatalogSummary {
-  const body = normalizeSearchText(snapshot.body);
+  return summaryFromDocument(toDocumentResponse(snapshot));
+}
+
+function summaryFromDocument(document: DocumentResponse): CatalogSummary {
+  const body = normalizeSearchText(document.body);
   return {
-    approvers: snapshot.metadata.approvers,
-    authors: snapshot.metadata.authors,
-    documentId: snapshot.metadata.id,
-    excerpt: excerpt(snapshot.body),
-    labels: snapshot.metadata.labels,
+    approvers: document.metadata.approvers as readonly PersonReference[],
+    authors: document.metadata.authors as readonly PersonReference[],
+    documentId: document.metadata.id as DocumentMetadata["id"],
+    excerpt: excerpt(document.body),
+    labels: document.metadata.labels,
     normalizedBody: body,
-    publishedRevision: snapshot.metadata.publishedRevision,
-    revision: snapshot.metadata.headRevision,
-    reviewers: snapshot.metadata.reviewers,
-    rfcNumber: snapshot.metadata.rfcNumber,
-    sensitivity: snapshot.metadata.sensitivity,
-    state: snapshot.metadata.lifecycleState,
-    title: snapshot.metadata.title,
-    updatedAt: snapshot.metadata.updatedAt,
-    visibility: snapshot.metadata.visibility,
+    publishedRevision: document.metadata.publishedRevision as DocumentRevision | undefined,
+    revision: document.metadata.headRevision as DocumentRevision,
+    reviewers: document.metadata.reviewers as readonly PersonReference[],
+    rfcNumber: document.metadata.rfcNumber,
+    sensitivity: document.metadata.sensitivity,
+    state: document.metadata.lifecycleState,
+    title: document.metadata.title,
+    updatedAt: document.metadata.updatedAt,
+    visibility: document.metadata.visibility,
   };
 }
 

@@ -1,5 +1,6 @@
 import { Context, Data, type Effect, type Stream } from "effect";
 
+import type { CatalogSummary, Principal } from "@earendil-works/jot-core";
 import type {
   ApiKeyCreated,
   ApiKeyDto,
@@ -25,6 +26,8 @@ import type {
 } from "@earendil-works/jot-protocol";
 
 export interface RequestCredentials {
+  /** Trusted principal supplied only by an internal runtime adapter. */
+  readonly internalPrincipal?: Principal | undefined;
   readonly bearerToken?: string | undefined;
   readonly sessionToken?: string | undefined;
   readonly capabilityToken?: string | undefined;
@@ -32,6 +35,7 @@ export interface RequestCredentials {
 }
 
 export interface CollaborationConnection {
+  readonly principal: Principal;
   readonly welcome: ServerCollaborationMessage;
   readonly events: Stream.Stream<ServerCollaborationMessage>;
   readonly acceptUpdate: (
@@ -65,7 +69,37 @@ export class ApplicationError extends Data.TaggedError("ApplicationError")<{
   readonly cause?: unknown;
 }> {}
 
+export interface DocumentRuntimeConfiguration {
+  readonly capabilities: readonly {
+    readonly access: "view" | "comment" | "edit";
+    readonly documentId: string;
+    readonly expiresAt?: string | undefined;
+    readonly generation: number;
+    readonly id: string;
+    readonly tokenHash: string;
+  }[];
+  readonly workspaceId: string;
+  readonly documentId: string;
+  readonly rfcNumber?: number | undefined;
+  readonly summary?: CatalogSummary | undefined;
+}
+
 export interface JotApplicationService {
+  /** Internal coordinator operations are exposed only through runtime bindings. */
+  readonly authorizeRequest: (
+    credentials: RequestCredentials,
+    documentId?: string,
+  ) => Effect.Effect<Principal, ApplicationError>;
+  readonly documentRuntimeConfiguration: (
+    documentId: string,
+  ) => Effect.Effect<DocumentRuntimeConfiguration, ApplicationError>;
+  readonly currentDocumentProjection: (
+    documentId: string,
+  ) => Effect.Effect<DocumentResponse, ApplicationError>;
+  readonly applyDocumentProjection: (
+    document: DocumentResponse,
+  ) => Effect.Effect<void, ApplicationError>;
+  readonly markCatalogDeleted: (documentId: string) => Effect.Effect<void, ApplicationError>;
   /** Flushes all active document rooms to immutable checkpoints. */
   readonly checkpointAll: () => Effect.Effect<void, ApplicationError>;
   readonly exportWorkspace: (

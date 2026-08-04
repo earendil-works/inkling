@@ -9,12 +9,20 @@
         "name": "JOT_WORKSPACE",
         "class_name": "WorkspaceDurableObject",
       },
+      {
+        "name": "JOT_DOCUMENTS",
+        "class_name": "DocumentDurableObject",
+      },
     ],
   },
   "migrations": [
     {
       "tag": "v1",
       "new_sqlite_classes": ["WorkspaceDurableObject"],
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["DocumentDurableObject"],
     },
   ],
   "r2_buckets": [
@@ -28,6 +36,6 @@
     "binding": "ASSETS",
     "directory": "../frontend/dist",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/rfc/*"],
+    "run_worker_first": ["/api/*", "/rfc/*", "/state/*", "/keyword/*"],
   },
 }
