@@ -325,8 +325,14 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
     rawMessage: string | ArrayBuffer,
   ): Promise<void> {
     const attachment = socket.deserializeAttachment() as SocketAttachment | null;
+    const configuration = await this.#loadConfiguration();
+    if (attachment === null || configuration === undefined) {
+      socket.close(4000, "missing_document_runtime");
+      return;
+    }
+    await this.#ensureRuntime(configuration);
     const runtime = this.#runtime;
-    if (attachment === null || runtime === undefined) {
+    if (runtime === undefined) {
       socket.close(4000, "missing_document_runtime");
       return;
     }
@@ -467,13 +473,25 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
   }
 
   async #queueProjection(projection: DocumentResponse): Promise<void> {
-    await this.#state.storage.put("catalog:projection", projection);
+    await this.#state.storage.transaction(async (transaction) => {
+      const deletion = await transaction.get<string>("catalog:deletion");
+      const pending = await transaction.get<DocumentResponse>("catalog:projection");
+      if (
+        deletion === undefined &&
+        (pending === undefined || pending.metadata.headRevision <= projection.metadata.headRevision)
+      ) {
+        await transaction.put("catalog:projection", projection);
+      }
+    });
     await this.#state.storage.setAlarm(Date.now() + 2_000);
     await this.#flushCatalogOutbox();
   }
 
   async #queueDeletion(documentId: string): Promise<void> {
-    await this.#state.storage.put("catalog:deletion", documentId);
+    await this.#state.storage.transaction(async (transaction) => {
+      await transaction.delete("catalog:projection");
+      await transaction.put("catalog:deletion", documentId);
+    });
     await this.#state.storage.setAlarm(Date.now() + 2_000);
     await this.#flushCatalogOutbox();
   }
@@ -485,13 +503,25 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
     let retry = false;
     if (deletion !== undefined) {
       const result = await workspace.markDeleted(deletion);
-      if (result.ok) await this.#state.storage.delete("catalog:deletion");
-      else retry = true;
-    }
-    if (projection !== undefined) {
+      if (result.ok) {
+        await this.#state.storage.transaction(async (transaction) => {
+          const pending = await transaction.get<string>("catalog:deletion");
+          if (pending === deletion) await transaction.delete("catalog:deletion");
+        });
+      } else retry = true;
+    } else if (projection !== undefined) {
       const result = await workspace.applyProjection(projection);
-      if (result.ok) await this.#state.storage.delete("catalog:projection");
-      else retry = true;
+      if (result.ok) {
+        await this.#state.storage.transaction(async (transaction) => {
+          const pending = await transaction.get<DocumentResponse>("catalog:projection");
+          if (
+            pending !== undefined &&
+            pending.metadata.headRevision <= projection.metadata.headRevision
+          ) {
+            await transaction.delete("catalog:projection");
+          }
+        });
+      } else retry = true;
     }
     if (retry) await this.#state.storage.setAlarm(Date.now() + 5_000);
   }

@@ -3,6 +3,7 @@ import { Effect } from "effect";
 import { DomainError, documentId } from "./document.ts";
 import type {
   DocumentId,
+  DocumentMetadata,
   DocumentRevision,
   LifecycleState,
   PersonReference,
@@ -26,6 +27,8 @@ export interface CatalogSummary {
   readonly approvers: readonly PersonReference[];
   readonly updatedAt: string;
   readonly excerpt: string;
+  /** Complete metadata projection for workspace reads without loading a document authority. */
+  readonly metadata?: DocumentMetadata | undefined;
   readonly normalizedBody: string;
   readonly publishedRevision?: DocumentRevision | undefined;
 }

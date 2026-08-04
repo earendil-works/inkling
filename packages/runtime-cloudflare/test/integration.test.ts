@@ -54,13 +54,32 @@ test(
         method: "POST",
       });
       assert.equal(edited.status, 200);
-      const changed = (await edited.json()) as DocumentWire;
+      let changed = (await edited.json()) as DocumentWire;
       assert.equal(changed.body, "durable first");
       assert.equal(
         (await readDocument(running.baseUrl, second.metadata.id, authorization)).body,
         "initial second",
       );
-      await waitForCatalog(running.baseUrl, authorization, first.metadata.id);
+      changed = await updateTitle(
+        running.baseUrl,
+        first.metadata.id,
+        changed.metadata.headRevision,
+        "Intermediate title",
+        authorization,
+      );
+      changed = await updateTitle(
+        running.baseUrl,
+        first.metadata.id,
+        changed.metadata.headRevision,
+        "Newest projected title",
+        authorization,
+      );
+      await waitForCatalog(
+        running.baseUrl,
+        authorization,
+        first.metadata.id,
+        "Newest projected title",
+      );
       const backup = await fetch(`${running.baseUrl}/api/admin/backup`, {
         headers: authorization,
       });
@@ -125,22 +144,47 @@ async function readDocument(
   return (await response.json()) as DocumentWire;
 }
 
+async function updateTitle(
+  baseUrl: string,
+  documentId: string,
+  expectedRevision: number,
+  title: string,
+  headers: Readonly<Record<string, string>>,
+): Promise<DocumentWire> {
+  const response = await fetch(`${baseUrl}/api/documents/${documentId}/metadata`, {
+    body: JSON.stringify({ expectedRevision, title }),
+    headers: { ...headers, "Content-Type": "application/json" },
+    method: "PATCH",
+  });
+  assert.equal(response.status, 200);
+  return readDocument(baseUrl, documentId, headers);
+}
+
 async function waitForCatalog(
   baseUrl: string,
   headers: Readonly<Record<string, string>>,
   documentId: string,
+  title: string,
   attempt = 0,
 ): Promise<void> {
   const response = await fetch(`${baseUrl}/api/documents`, { headers });
   const catalog = (await response.json()) as {
-    documents: readonly { metadata: { id: string } }[];
+    documents: readonly { metadata: { id: string; title: string } }[];
   };
-  if (catalog.documents.some((document) => document.metadata.id === documentId)) return;
+  if (
+    catalog.documents.some(
+      (document) => document.metadata.id === documentId && document.metadata.title === title,
+    )
+  ) {
+    return;
+  }
   if (attempt >= 99) {
-    assert.fail("The document projection did not reach the workspace authority.");
+    assert.fail(
+      `The latest document projection did not reach the workspace authority: ${JSON.stringify(catalog.documents)}`,
+    );
   }
   await delay(25);
-  return waitForCatalog(baseUrl, headers, documentId, attempt + 1);
+  return waitForCatalog(baseUrl, headers, documentId, title, attempt + 1);
 }
 
 async function startWrangler(directory: string): Promise<RunningWrangler> {

@@ -1400,14 +1400,19 @@ export function makeLocalJotApplication(
           );
           const summaries = searchCatalog(state.catalog, query);
           const documents = yield* Effect.forEach(summaries, (summary) =>
-            getRoom(summary.documentId).pipe(
-              Effect.flatMap((room) => room.snapshot(ownerPrincipal, new Date().toISOString())),
-              Effect.mapError(toApplicationError),
-              Effect.map((snapshot) => ({
-                excerpt: summary.excerpt,
-                metadata: snapshot.metadata as DocumentMetadataDto,
-              })),
-            ),
+            summary.metadata === undefined
+              ? getRoom(summary.documentId).pipe(
+                  Effect.flatMap((room) => room.snapshot(ownerPrincipal, new Date().toISOString())),
+                  Effect.mapError(toApplicationError),
+                  Effect.map((snapshot) => ({
+                    excerpt: summary.excerpt,
+                    metadata: snapshot.metadata as DocumentMetadataDto,
+                  })),
+                )
+              : Effect.succeed({
+                  excerpt: summary.excerpt,
+                  metadata: summary.metadata as DocumentMetadataDto,
+                }),
           );
           return { documents } satisfies CatalogResponse;
         }),
@@ -1947,6 +1952,7 @@ function summaryFromDocument(document: DocumentResponse): CatalogSummary {
     documentId: document.metadata.id as DocumentMetadata["id"],
     excerpt: excerpt(document.body),
     labels: document.metadata.labels,
+    metadata: document.metadata as DocumentMetadata,
     normalizedBody: body,
     publishedRevision: document.metadata.publishedRevision as DocumentRevision | undefined,
     revision: document.metadata.headRevision as DocumentRevision,
