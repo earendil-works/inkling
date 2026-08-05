@@ -45,7 +45,7 @@ test(
       await first.locator('input[name="title"]').fill("Browser collaboration");
       await first
         .locator('textarea[name="body"]')
-        .fill("Shared starting body\nSecond line\nThird line");
+        .fill("Shared starting body\n\nSecond line\n\nThird line");
       await first.locator('input[name="rfc"]').check();
       await first
         .locator("[data-new-form]")
@@ -94,7 +94,8 @@ test(
           body: JSON.stringify({
             authorDisplayName: "Browser owner",
             body: "Browser comment",
-            selection: { end: 6, start: 0 },
+            // Browser line selections commonly include the trailing newline.
+            selection: { end: "Shared starting body\n".length, start: 0 },
           }),
           headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf ?? "" },
           method: "POST",
@@ -104,7 +105,26 @@ test(
       await second.waitForSelector(
         '[data-preview] .segment-comment-bubble[data-comment-surface="preview"]',
       );
-      assert.equal(await second.locator(".cm-comment-anchor").textContent(), "Shared");
+      assert.ok(
+        (await second.locator(".cm-comment-anchor").first().textContent()).startsWith(
+          "Shared starting body",
+        ),
+      );
+      const sourceBubbleAlignment = await second
+        .locator('.segment-comment-bubble[data-comment-surface="source"]')
+        .evaluate((bubble) => {
+          const bubbleBounds = bubble.getBoundingClientRect();
+          const lineBounds = bubble.closest(".cm-line")?.getBoundingClientRect();
+          return {
+            bubbleCenter: bubbleBounds.top + bubbleBounds.height / 2,
+            lineCenter:
+              lineBounds === undefined ? undefined : lineBounds.top + lineBounds.height / 2,
+          };
+        });
+      assert.notEqual(sourceBubbleAlignment.lineCenter, undefined);
+      assert.ok(
+        Math.abs(sourceBubbleAlignment.bubbleCenter - (sourceBubbleAlignment.lineCenter ?? 0)) < 2,
+      );
       const editorGeometryAfterComment = await second.evaluate(() =>
         [...document.querySelectorAll<HTMLElement>(".cm-line")].slice(0, 2).map((line) => {
           const bounds = line.getBoundingClientRect();
@@ -137,7 +157,10 @@ test(
       await Promise.all(
         [first, second].map((page) =>
           page.waitForFunction(
-            () => document.querySelector(".cm-comment-anchor")?.textContent === "Shared",
+            () =>
+              document
+                .querySelector(".cm-comment-anchor")
+                ?.textContent?.startsWith("Shared starting body") === true,
           ),
         ),
       );

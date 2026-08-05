@@ -1,5 +1,5 @@
 import { StateEffect, StateField } from "@codemirror/state";
-import type { Extension } from "@codemirror/state";
+import type { Extension, Text } from "@codemirror/state";
 import { Decoration, EditorView, WidgetType } from "@codemirror/view";
 import type { DecorationSet } from "@codemirror/view";
 
@@ -59,10 +59,13 @@ const commentDecorationField = StateField.define<DecorationSet>({
         if (projection.orphaned) return [];
         const from = Math.max(0, Math.min(transaction.state.doc.length, projection.start));
         const to = Math.max(from, Math.min(transaction.state.doc.length, projection.end));
+        const widgetPosition = trailingVisiblePosition(transaction.state.doc, from, to);
         const widget = Decoration.widget({
-          side: 1,
+          // At a line boundary, stay before the newline so the bubble trails
+          // the selected Markdown line instead of occupying the next one.
+          side: -1,
           widget: new CommentBubbleWidget(projection.thread),
-        }).range(to);
+        }).range(widgetPosition);
         if (from === to) return [widget];
         const mark = Decoration.mark({
           attributes: {
@@ -80,6 +83,14 @@ const commentDecorationField = StateField.define<DecorationSet>({
 });
 
 export const commentDecorationsExtension: Extension = commentDecorationField;
+
+function trailingVisiblePosition(document: Text, from: number, to: number): number {
+  let position = to;
+  while (position > from && /\s/u.test(document.sliceString(position - 1, position))) {
+    position -= 1;
+  }
+  return position;
+}
 
 export function updateEditorCommentDecorations(
   editor: EditorView,
