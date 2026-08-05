@@ -20,6 +20,7 @@ import { makeMarkdownRenderer } from "@earendil-works/jot-renderer";
 import { makeApiClient } from "./api.ts";
 import type { ApiError } from "./api.ts";
 import { makeCollaborationClient } from "./collaboration.ts";
+import { composeComment } from "./comment-composer.ts";
 import type { CollaborationClient, ConnectionState } from "./collaboration.ts";
 import {
   commentDecorationsExtension,
@@ -700,26 +701,34 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
                 (item) => item.id === button.dataset["replyThread"],
               );
               const parent = thread?.messages.at(-1);
-              const body = window.prompt("Reply");
-              if (
-                thread === undefined ||
-                parent === undefined ||
-                body === null ||
-                body.trim() === ""
-              )
-                return;
+              if (thread === undefined || parent === undefined) return;
               runUi(
-                api
-                  .reply(documentId, thread.id, parent.id, body, shared ? guestName() : "Owner")
-                  .pipe(
-                    Effect.tap((next) =>
-                      Effect.sync(() => {
-                        comments = next;
-                        renderComments();
-                      }),
-                    ),
-                    Effect.catchAll(showToastError),
+                composeComment({
+                  quote: thread.anchor.quote,
+                  submitLabel: "Reply",
+                  title: "Reply to thread",
+                }).pipe(
+                  Effect.flatMap((body) =>
+                    body === undefined
+                      ? Effect.void
+                      : api.reply(
+                          documentId,
+                          thread.id,
+                          parent.id,
+                          body,
+                          shared ? guestName() : "Owner",
+                        ),
                   ),
+                  Effect.tap((next) =>
+                    Effect.sync(() => {
+                      if (next === undefined) return;
+                      comments = next;
+                      renderComments();
+                      renderActiveCommentCard();
+                    }),
+                  ),
+                  Effect.catchAll(showToastError),
+                ),
               );
             });
           });
@@ -731,14 +740,23 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
                 ?.messages.find((item) => item.id === messageId);
               if (threadId === undefined || messageId === undefined || message === undefined)
                 return;
-              const body = window.prompt("Edit comment", message.body);
-              if (body === null || body.trim() === "") return;
               runUi(
-                api.editMessage(documentId, threadId, messageId, body).pipe(
+                composeComment({
+                  initialBody: message.body,
+                  submitLabel: "Save",
+                  title: "Edit comment",
+                }).pipe(
+                  Effect.flatMap((body) =>
+                    body === undefined
+                      ? Effect.void
+                      : api.editMessage(documentId, threadId, messageId, body),
+                  ),
                   Effect.tap((next) =>
                     Effect.sync(() => {
+                      if (next === undefined) return;
                       comments = next;
                       renderComments();
+                      renderActiveCommentCard();
                     }),
                   ),
                   Effect.catchAll(showToastError),
@@ -826,15 +844,24 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
             showToast("Select a smaller section to comment on.", "error");
             return;
           }
-          const body = window.prompt("Comment on this selection");
-          if (body === null || body.trim() === "") return;
           runUi(
-            createCommentAnchor(yBody, range.start, range.end).pipe(
-              Effect.flatMap((anchor) =>
-                api.createThread(documentId, anchor, body, shared ? guestName() : "Owner"),
+            composeComment({
+              quote: yBody.toString().slice(range.start, range.end),
+              submitLabel: "Comment",
+              title: "Comment on selection",
+            }).pipe(
+              Effect.flatMap((body) =>
+                body === undefined
+                  ? Effect.void
+                  : createCommentAnchor(yBody, range.start, range.end).pipe(
+                      Effect.flatMap((anchor) =>
+                        api.createThread(documentId, anchor, body, shared ? guestName() : "Owner"),
+                      ),
+                    ),
               ),
               Effect.tap((next) =>
                 Effect.sync(() => {
+                  if (next === undefined) return;
                   comments = next;
                   previewSelection = undefined;
                   document.getSelection()?.removeAllRanges();

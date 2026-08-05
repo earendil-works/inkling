@@ -185,11 +185,27 @@ test(
         paragraph.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
       });
       await second.waitForSelector("[data-comment-composer]");
-      second.once("dialog", (dialog) => dialog.accept("Preview segment comment"));
       await second.locator("[data-comment-composer]").click();
+      await second
+        .locator("[data-comment-composer-dialog] [data-comment-body]")
+        .fill("Preview segment comment");
+      await second.locator("[data-comment-composer-dialog] [data-comment-submit]").click();
       await second.waitForFunction(
         () => document.querySelector("[data-comment-count]")?.textContent === "2",
       );
+      await second
+        .locator('[data-preview] [data-comment-bubble][data-comment-surface="preview"]')
+        .last()
+        .click();
+      await second.locator("[data-comment-card] [data-reply-thread]").click();
+      await second
+        .locator("[data-comment-composer-dialog] [data-comment-body]")
+        .fill("A composed reply");
+      await second.locator("[data-comment-composer-dialog] [data-comment-submit]").click();
+      await second.waitForFunction(() =>
+        document.querySelector("[data-comment-card]")?.textContent?.includes("A composed reply"),
+      );
+      await second.locator("[data-comment-close]").click();
 
       const layout = await first.evaluate(() => {
         const source = document.querySelector("[data-source-pane]")?.getBoundingClientRect();

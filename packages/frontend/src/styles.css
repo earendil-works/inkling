@@ -825,6 +825,90 @@ select:disabled {
   background: transparent;
 }
 
+.comment-composer-dialog {
+  width: min(34rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--text);
+}
+
+.comment-composer-dialog::backdrop {
+  background: rgb(10 15 12 / 32%);
+  backdrop-filter: blur(2px);
+}
+
+.comment-composer-form {
+  display: grid;
+  gap: 1rem;
+  padding: 1.2rem;
+}
+
+.comment-composer-heading,
+.comment-composer-footer,
+.comment-composer-footer > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.comment-composer-heading {
+  align-items: flex-start;
+}
+
+.comment-composer-heading h2 {
+  margin-top: 0.15rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.comment-composer-form blockquote {
+  max-height: 6rem;
+  padding: 0.75rem 0.9rem;
+  overflow: auto;
+  border-left: 2px solid var(--accent);
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.comment-composer-field {
+  color: var(--accent);
+}
+
+.comment-composer-field textarea {
+  min-height: 10rem;
+  padding: 0.9rem;
+  color: var(--text);
+  font: 0.95rem/1.55 var(--sans);
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.comment-composer-footer {
+  padding-top: 0.2rem;
+}
+
+.comment-composer-footer > span {
+  color: var(--muted);
+  font: 0.62rem/1.4 var(--mono);
+}
+
+.comment-composer-footer kbd {
+  padding: 0.1rem 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--surface-muted);
+}
+
 .comment-menu__heading {
   display: flex;
   align-items: flex-start;
@@ -1421,6 +1505,15 @@ select:disabled {
 
   .comment-card::backdrop {
     background: rgb(12 18 15 / 18%);
+  }
+
+  .comment-composer-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .comment-composer-footer > div {
+    justify-content: flex-end;
   }
 }
 
