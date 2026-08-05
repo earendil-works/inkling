@@ -347,7 +347,7 @@ function renderReader(documentId: string, shared: boolean): Effect.Effect<void, 
             </div>
             <div class="document-actions">
               <a class="toolbar-button document-mode-link" href="/">All documents</a>
-              ${canEdit ? `<a class="primary-button primary-button--small document-mode-link" data-open-editor href="${escapeHtml(documentHref(documentId, shared, "edit"))}">Edit split</a>` : ""}
+              ${canEdit ? `<a class="primary-button primary-button--small document-mode-link" data-open-editor href="${escapeHtml(documentHref(documentId, shared, "edit"))}">Edit</a>` : ""}
             </div>
           </nav>
           <main class="reader-document" data-reader>
