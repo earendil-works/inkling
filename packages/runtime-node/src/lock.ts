@@ -1,7 +1,7 @@
 import path from "node:path";
 
 import { FileSystem } from "@effect/platform";
-import { Data, Effect, type Scope } from "effect";
+import { Data, Effect, Predicate, type Scope } from "effect";
 
 export class DataDirectoryLockError extends Data.TaggedError("DataDirectoryLockError")<{
   readonly message: string;
@@ -106,7 +106,7 @@ function removeStaleLock(
 function parseLock(contents: string): { readonly pid?: unknown } | undefined {
   try {
     const value: unknown = JSON.parse(contents);
-    return isRecord(value) ? value : undefined;
+    return Predicate.isReadonlyRecord(value) ? value : undefined;
   } catch {
     return undefined;
   }
@@ -117,10 +117,6 @@ function isProcessAlive(pid: number): boolean {
     process.kill(pid, 0);
     return true;
   } catch (error) {
-    return isRecord(error) && error["code"] === "EPERM";
+    return Predicate.isReadonlyRecord(error) && error["code"] === "EPERM";
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }

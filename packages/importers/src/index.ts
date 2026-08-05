@@ -1,4 +1,4 @@
-import { Data, Effect, Schema } from "effect";
+import { Data, Effect, Predicate, Schema } from "effect";
 import YAML from "yaml";
 
 import { personId } from "@earendil-works/jot-core";
@@ -247,7 +247,7 @@ function parseFrontmatter(
     try: () => YAML.parse(yamlSource) as unknown,
   }).pipe(
     Effect.flatMap((value) =>
-      isRecord(value)
+      Predicate.isReadonlyRecord(value)
         ? Effect.succeed({ body: markdown.slice(match[0].length), frontmatter: value })
         : importFailure(
             "invalid_frontmatter",
@@ -292,12 +292,13 @@ function decodeLegacyComments(
   sourcePath: string,
 ): readonly ImportedCommentThread[] {
   return values.flatMap((value) => {
-    if (!isRecord(value) || typeof value["quote"] !== "string") {
+    if (!Predicate.isReadonlyRecord(value) || typeof value["quote"] !== "string") {
       return [];
     }
     const messages = Array.isArray(value["messages"])
       ? value["messages"].flatMap((message): ImportedCommentMessage[] => {
-          if (!isRecord(message) || typeof message["body"] !== "string") return [];
+          if (!Predicate.isReadonlyRecord(message) || typeof message["body"] !== "string")
+            return [];
           return [
             {
               author: typeof message["author"] === "string" ? message["author"] : "Imported user",
@@ -399,10 +400,6 @@ function slug(value: string): string {
       .replace(/[^a-z0-9]+/gu, "-")
       .replace(/^-|-$/gu, "") || "unknown"
   );
-}
-
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function importFailure(

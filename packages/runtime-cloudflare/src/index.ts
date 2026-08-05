@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { Effect, Layer, ManagedRuntime } from "effect";
+import { Effect, Layer, ManagedRuntime, Predicate } from "effect";
 import type { ManagedRuntime as ManagedRuntimeType } from "effect";
 
 import {
@@ -856,7 +856,7 @@ async function finishGoogleAuthentication(
     });
     const tokenBody = (await tokenResponse.json()) as unknown;
     const idToken =
-      isRecord(tokenBody) && typeof tokenBody["id_token"] === "string"
+      Predicate.isReadonlyRecord(tokenBody) && typeof tokenBody["id_token"] === "string"
         ? tokenBody["id_token"]
         : undefined;
     if (!tokenResponse.ok || idToken === undefined) {
@@ -959,7 +959,7 @@ async function verifyGoogleIdentityToken(
   const header = parseBase64UrlJson(headerValue);
   const claims = parseBase64UrlJson(claimsValue);
   if (
-    !isRecord(header) ||
+    !Predicate.isReadonlyRecord(header) ||
     header["alg"] !== "RS256" ||
     typeof header["kid"] !== "string" ||
     !isGoogleClaims(claims)
@@ -968,9 +968,12 @@ async function verifyGoogleIdentityToken(
   }
   const keysResponse = await fetch("https://www.googleapis.com/oauth2/v3/certs");
   const keysBody = (await keysResponse.json()) as unknown;
-  const keys = isRecord(keysBody) && Array.isArray(keysBody["keys"]) ? keysBody["keys"] : [];
-  const jwk = keys.find((candidate) => isRecord(candidate) && candidate["kid"] === header["kid"]);
-  if (!isRecord(jwk)) return undefined;
+  const keys =
+    Predicate.isReadonlyRecord(keysBody) && Array.isArray(keysBody["keys"]) ? keysBody["keys"] : [];
+  const jwk = keys.find(
+    (candidate) => Predicate.isReadonlyRecord(candidate) && candidate["kid"] === header["kid"],
+  );
+  if (!Predicate.isReadonlyRecord(jwk)) return undefined;
   const key = await crypto.subtle.importKey(
     "jwk",
     jwk,
@@ -995,7 +998,7 @@ async function verifyGoogleIdentityToken(
 
 function isGoogleClaims(value: unknown): value is GoogleIdentityClaims {
   return (
-    isRecord(value) &&
+    Predicate.isReadonlyRecord(value) &&
     typeof value["aud"] === "string" &&
     typeof value["email"] === "string" &&
     typeof value["email_verified"] === "boolean" &&
@@ -1030,7 +1033,7 @@ async function verifyOAuthState(
   );
   if (!valid) return undefined;
   const parsed = parseBase64UrlJson(payloadValue);
-  return isRecord(parsed) &&
+  return Predicate.isReadonlyRecord(parsed) &&
     typeof parsed["expiresAt"] === "number" &&
     typeof parsed["nonce"] === "string" &&
     typeof parsed["redirectUri"] === "string" &&
@@ -1129,10 +1132,6 @@ function parseBase64UrlJson(value: string): unknown {
   } catch {
     return undefined;
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function decodeSocketMessage(
