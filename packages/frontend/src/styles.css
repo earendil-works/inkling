@@ -36,6 +36,23 @@
   --shadow: 0 16px 50px rgb(0 0 0 / 34%);
 }
 
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --page: #151816;
+    --surface: #1b1f1c;
+    --surface-muted: #222724;
+    --text: #eff2ef;
+    --muted: #a4aaa6;
+    --border: #343a36;
+    --border-strong: #4b534e;
+    --accent: #63c7ad;
+    --accent-soft: #173c33;
+    --danger: #ef806c;
+    --shadow: 0 16px 50px rgb(0 0 0 / 34%);
+  }
+}
+
 html {
   min-width: 20rem;
   min-height: 100%;
@@ -139,6 +156,27 @@ select:disabled {
   padding: 0 var(--page-padding);
   border-bottom: 1px solid var(--border);
   background: var(--surface);
+}
+
+.masthead::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: var(--accent);
+  content: "";
+  opacity: 0;
+  transform: scaleX(0.2);
+  transform-origin: left;
+  transition:
+    opacity 120ms ease,
+    transform 500ms ease;
+}
+
+:root[data-navigating] .masthead::after {
+  opacity: 1;
+  transform: scaleX(0.82);
 }
 
 .masthead__right,

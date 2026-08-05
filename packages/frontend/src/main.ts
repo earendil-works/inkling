@@ -2,8 +2,8 @@ import { Compartment, EditorState } from "@codemirror/state";
 import { EditorView, basicSetup } from "codemirror";
 import { markdown } from "@codemirror/lang-markdown";
 import { oneDark } from "@codemirror/theme-one-dark";
-import { Effect } from "effect";
-import mermaid from "mermaid";
+import { Effect, Fiber } from "effect";
+import type { Mermaid } from "mermaid";
 import { Awareness } from "y-protocols/awareness";
 import { yCollab } from "y-codemirror.next";
 import * as Y from "yjs";
@@ -22,6 +22,7 @@ import type { ApiError } from "./api.ts";
 import { makeCollaborationClient } from "./collaboration.ts";
 import { composeComment } from "./comment-composer.ts";
 import type { CollaborationClient, ConnectionState } from "./collaboration.ts";
+import { installClientRouter } from "./navigation.ts";
 import {
   commentDecorationsExtension,
   renderPreviewCommentBubbles,
@@ -35,21 +36,21 @@ const app = requireElement<HTMLElement>("#app");
 const statusElement = requireElement<HTMLElement>("[data-api-status]");
 const participantsElement = requireElement<HTMLElement>("[data-participants]");
 const toastRegion = requireElement<HTMLElement>("[data-toasts]");
-const capabilityToken = new URL(location.href).searchParams.get("cap") ?? undefined;
-const api = makeApiClient(capabilityToken);
+let capabilityToken: string | undefined;
+let api = makeApiClient();
 const renderer = makeMarkdownRenderer();
 let cleanup: Effect.Effect<void> = Effect.void;
+let routeFiber: Fiber.RuntimeFiber<void, never> | undefined;
+let navigationGeneration = 0;
+let mermaidPromise: Promise<Mermaid> | undefined;
 
-mermaid.initialize({
-  securityLevel: "strict",
-  startOnLoad: false,
-  theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "neutral",
-});
-
+const router = installClientRouter(isApplicationUrl, startRoute);
 installThemeControl();
-Effect.runFork(route().pipe(Effect.catchAll(showFatal)));
+startRoute();
 
 function route(): Effect.Effect<void, ApiError> {
+  capabilityToken = new URL(location.href).searchParams.get("cap") ?? undefined;
+  api = makeApiClient(capabilityToken);
   const shared = /^\/share\/([^/]+)(?:\/(edit))?\/?$/u.exec(location.pathname);
   const documentRoute = /^\/documents\/([^/]+)(?:\/(edit))?\/?$/u.exec(location.pathname);
   if (shared?.[1] !== undefined) {
@@ -82,7 +83,7 @@ function renderAuthentication(
   mode: "login" | "setup",
   methods: readonly ("password" | "google")[],
 ): Effect.Effect<void> {
-  return Effect.sync(() => {
+  return commitView(() => {
     app.className = "auth-layout";
     app.innerHTML = `
       <section class="auth-copy">
@@ -109,7 +110,7 @@ function renderAuthentication(
       const operation = mode === "setup" ? api.setup(password.value) : api.login(password.value);
       runUi(
         operation.pipe(
-          Effect.tap(() => Effect.sync(() => location.assign("/"))),
+          Effect.tap(() => Effect.sync(() => router.navigate("/", { replace: true }))),
           Effect.catchAll((failure) =>
             Effect.sync(() => {
               error.textContent = failure.message;
@@ -125,7 +126,7 @@ function renderAuthentication(
 function renderWorkspace(): Effect.Effect<void, ApiError> {
   return api.listDocuments().pipe(
     Effect.tap((catalog) =>
-      Effect.sync(() => {
+      commitView(() => {
         app.className = "workspace-layout";
         app.innerHTML = `
           <section class="workspace-heading">
@@ -199,7 +200,9 @@ function renderWorkspace(): Effect.Effect<void, ApiError> {
               })
               .pipe(
                 Effect.tap((document) =>
-                  Effect.sync(() => location.assign(`/documents/${document.metadata.id}`)),
+                  Effect.sync(() =>
+                    router.navigate(`/documents/${encodeURIComponent(document.metadata.id)}`),
+                  ),
                 ),
                 Effect.catchAll((failure) =>
                   Effect.sync(() => {
@@ -294,7 +297,11 @@ function renderWorkspace(): Effect.Effect<void, ApiError> {
           );
         });
         requireElement<HTMLButtonElement>("[data-logout]").addEventListener("click", () => {
-          runUi(api.logout.pipe(Effect.tap(() => Effect.sync(() => location.reload()))));
+          runUi(
+            api.logout.pipe(
+              Effect.tap(() => Effect.sync(() => router.navigate("/", { replace: true }))),
+            ),
+          );
         });
       }),
     ),
@@ -337,7 +344,7 @@ function renderReader(documentId: string, shared: boolean): Effect.Effect<void, 
       const labels = initial.metadata.labels
         .map((label) => `<span class="reader-label">${escapeHtml(label)}</span>`)
         .join("");
-      return Effect.sync(() => {
+      return commitView(() => {
         app.className = "reader-layout";
         app.innerHTML = `
           <nav class="document-bar reader-toolbar" aria-label="Document navigation">
@@ -393,7 +400,7 @@ function documentHref(documentId: string, shared: boolean, mode: "edit" | "read"
 function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, ApiError> {
   return api.readDocument(documentId).pipe(
     Effect.flatMap((initial) =>
-      Effect.sync(() => {
+      commitView(() => {
         const initiallyEditable = !shared || initial.metadata.sharing.access === "edit";
         app.className = `editor-layout ${initiallyEditable ? "is-editable" : "is-reader"}`;
         app.innerHTML = `
@@ -1192,10 +1199,12 @@ function messageHtml(threadId: string, messageId: string, author: string, body: 
 }
 
 function renderMermaid(): Effect.Effect<void> {
+  const diagrams = [...document.querySelectorAll<HTMLElement>("[data-mermaid]")];
+  if (diagrams.length === 0) return Effect.void;
   return Effect.tryPromise({
     catch: () => undefined,
     try: async () => {
-      const diagrams = [...document.querySelectorAll<HTMLElement>("[data-mermaid]")];
+      const mermaid = await loadMermaid();
       await Promise.all(
         diagrams.map(async (diagram, index) => {
           const code = diagram.querySelector("code")?.textContent ?? "";
@@ -1244,6 +1253,18 @@ function renderMermaid(): Effect.Effect<void> {
   }).pipe(Effect.ignore);
 }
 
+function loadMermaid(): Promise<Mermaid> {
+  mermaidPromise ??= import("mermaid").then(({ default: mermaid }) => {
+    mermaid.initialize({
+      securityLevel: "strict",
+      startOnLoad: false,
+      theme: document.documentElement.dataset["theme"] === "dark" ? "dark" : "neutral",
+    });
+    return mermaid;
+  });
+  return mermaidPromise;
+}
+
 function renderParticipants(participants: ReadonlyMap<string, PresenceDto>): void {
   participantsElement.innerHTML = [...participants.values()]
     .slice(0, 6)
@@ -1266,6 +1287,9 @@ function installThemeControl(): void {
 
   const setTheme = (theme: "dark" | "light"): void => {
     document.documentElement.dataset["theme"] = theme;
+    document
+      .querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+      ?.setAttribute("content", theme === "dark" ? "#151816" : "#fbfbfa");
     button.setAttribute("aria-label", `Switch to ${theme === "dark" ? "light" : "dark"} theme`);
   };
 
@@ -1293,10 +1317,11 @@ function setApiStatus(state: string, label: string): void {
 }
 
 function showFatal(error: ApiError): Effect.Effect<void> {
-  return Effect.sync(() => {
+  return commitView(() => {
     setApiStatus("unavailable", "Authority unavailable");
     app.className = "fatal-layout";
-    app.innerHTML = `<section><p class="eyebrow">Runtime failure</p><h1>Jot could not open.</h1><p>${escapeHtml(error.message)}</p><button class="primary-button" onclick="location.reload()">Try again</button></section>`;
+    app.innerHTML = `<section><p class="eyebrow">Runtime failure</p><h1>Jot could not open.</h1><p>${escapeHtml(error.message)}</p><button class="primary-button" type="button" data-retry>Try again</button></section>`;
+    requireElement<HTMLButtonElement>("[data-retry]").addEventListener("click", router.refresh);
   });
 }
 
@@ -1310,6 +1335,40 @@ function showToast(message: string, kind: "error" | "success"): void {
   toast.textContent = message;
   toastRegion.append(toast);
   window.setTimeout(() => toast.remove(), 4_000);
+}
+
+function commitView(render: () => void): Effect.Effect<void> {
+  const previousCleanup = cleanup;
+  cleanup = Effect.void;
+  return Effect.uninterruptible(previousCleanup).pipe(Effect.zipRight(Effect.sync(render)));
+}
+
+function isApplicationUrl(url: URL): boolean {
+  return (
+    url.origin === location.origin &&
+    (url.pathname === "/" ||
+      url.pathname.startsWith("/documents/") ||
+      url.pathname.startsWith("/share/"))
+  );
+}
+
+function startRoute(): void {
+  const generation = ++navigationGeneration;
+  app.setAttribute("aria-busy", "true");
+  document.documentElement.dataset["navigating"] = "";
+  const interruptPrevious =
+    routeFiber === undefined ? Effect.void : Fiber.interrupt(routeFiber).pipe(Effect.asVoid);
+  const nextRoute = interruptPrevious.pipe(
+    Effect.zipRight(route().pipe(Effect.catchAll(showFatal))),
+    Effect.ensuring(
+      Effect.sync(() => {
+        if (generation !== navigationGeneration) return;
+        app.removeAttribute("aria-busy");
+        delete document.documentElement.dataset["navigating"];
+      }),
+    ),
+  );
+  routeFiber = Effect.runFork(nextRoute);
 }
 
 function runUi<A, E>(effect: Effect.Effect<A, E>): void {
@@ -1345,4 +1404,7 @@ function colorFor(value: string): string {
   return `hsl(${Math.abs(hash) % 360} 58% 46%)`;
 }
 
-window.addEventListener("beforeunload", () => Effect.runFork(cleanup));
+window.addEventListener("beforeunload", () => {
+  router.dispose();
+  Effect.runFork(cleanup);
+});

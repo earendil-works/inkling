@@ -9,6 +9,24 @@
       content="Jot is a multiplayer Markdown workspace for people and agents."
     />
     <title>Jot</title>
+    <script>
+      (() => {
+        try {
+          const stored = localStorage.getItem("jot-theme");
+          const theme =
+            stored === "light" || stored === "dark"
+              ? stored
+              : matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light";
+          document.documentElement.dataset.theme = theme;
+          document.querySelector('meta[name="theme-color"]').content =
+            theme === "dark" ? "#151816" : "#fbfbfa";
+        } catch {
+          // Theme initialization is best effort; the stylesheet has a system fallback.
+        }
+      })();
+    </script>
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>

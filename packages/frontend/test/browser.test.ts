@@ -58,8 +58,15 @@ test(
       await first.waitForSelector("[data-reader]");
       assert.equal(await first.locator(".cm-editor").count(), 0);
       assert.match(await first.locator("[data-preview]").innerText(), /Shared starting body/u);
+      await first.evaluate(() => {
+        document.documentElement.dataset["browserNavigation"] = "same-document";
+      });
       await first.locator("[data-open-editor]").click();
       await first.waitForURL(/\/documents\/[^/]+\/edit$/u);
+      assert.equal(
+        await first.locator("html").getAttribute("data-browser-navigation"),
+        "same-document",
+      );
       await first.waitForFunction(
         () => document.querySelector("[data-save-state]")?.textContent === "Saved",
       );
