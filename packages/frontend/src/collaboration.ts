@@ -3,6 +3,8 @@ import * as Y from "yjs";
 
 import { taggedId } from "@earendil-works/jot-core";
 
+import { browserRuntime } from "./effect-runtime.ts";
+
 import {
   ClientCollaborationMessageSchema,
   decodeJson,
@@ -59,7 +61,7 @@ export function makeCollaborationClient(
       if (current === undefined || current.readyState !== WebSocket.OPEN) {
         return;
       }
-      Effect.runFork(
+      browserRuntime.runFork(
         encodeJson(ClientCollaborationMessageSchema, message).pipe(
           Effect.tap((payload) =>
             Effect.sync(() => {
@@ -160,7 +162,7 @@ export function makeCollaborationClient(
       welcomed = false;
 
       socket.addEventListener("open", () => {
-        Effect.runFork(
+        browserRuntime.runFork(
           encodeStateVector(document).pipe(
             Effect.tap((stateVector) =>
               Effect.sync(() =>
@@ -179,7 +181,7 @@ export function makeCollaborationClient(
           callbacks.onError("Jot received an unsupported binary message.");
           return;
         }
-        Effect.runFork(
+        browserRuntime.runFork(
           decodeJson(ServerCollaborationMessageSchema, event.data).pipe(
             Effect.flatMap(handleServerMessage),
             Effect.catchAll((error) => Effect.sync(() => callbacks.onError(String(error)))),
