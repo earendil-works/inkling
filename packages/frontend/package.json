@@ -22,11 +22,16 @@
     "codemirror": "6.0.2",
     "effect": "3.22.1",
     "mermaid": "11.16.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "y-codemirror.next": "0.3.5",
     "y-protocols": "1.0.7",
     "yjs": "13.6.32"
   },
   "devDependencies": {
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "@vitejs/plugin-react": "6.0.5",
     "playwright-core": "1.62.1",
     "vite": "8.2.0"
   }
