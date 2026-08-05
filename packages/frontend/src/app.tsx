@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Effect } from "effect";
 
 import type {
@@ -8,17 +8,22 @@ import type {
   PresenceDto,
 } from "@earendil-works/jot-protocol";
 
-import { makeApiClient } from "./api.ts";
-import type { ApiClientService, ApiError } from "./api.ts";
+import { ApiError, makeApiClient } from "./api.ts";
+import type { ApiClientService } from "./api.ts";
 import { AppContext } from "./app-context.tsx";
 import type { AppContextValue, AppStatus, ToastKind } from "./app-context.tsx";
 import { AuthenticationScreen } from "./auth-screen.tsx";
-import { EditorScreen } from "./editor-screen.tsx";
 import { useEffectQuery } from "./effect-hooks.ts";
 import { installClientRouter } from "./navigation.ts";
 import type { ClientRouter, NavigateOptions } from "./navigation.ts";
-import { ReaderScreen } from "./reader-screen.tsx";
 import { WorkspaceScreen } from "./workspace-screen.tsx";
+
+const loadEditorScreen = () =>
+  import("./editor-screen.tsx").then(({ EditorScreen }) => ({ default: EditorScreen }));
+const loadReaderScreen = () =>
+  import("./reader-screen.tsx").then(({ ReaderScreen }) => ({ default: ReaderScreen }));
+const EditorScreen = lazy(loadEditorScreen);
+const ReaderScreen = lazy(loadReaderScreen);
 
 interface LocationState {
   readonly generation: number;
@@ -222,16 +227,22 @@ function RouteView({
     case "workspace":
       return <WorkspaceScreen api={model.api} initialCatalog={model.catalog} />;
     case "reader":
-      return <ReaderScreen document={model.document} shared={model.shared} />;
+      return (
+        <Suspense fallback={<main className="route-loading" id="app" />}>
+          <ReaderScreen document={model.document} shared={model.shared} />
+        </Suspense>
+      );
     case "editor":
       return (
-        <EditorScreen
-          api={model.api}
-          capabilityToken={model.capabilityToken}
-          document={model.document}
-          key={`${model.document.metadata.id}:${model.shared ? "shared" : "workspace"}`}
-          shared={model.shared}
-        />
+        <Suspense fallback={<main className="route-loading" id="app" />}>
+          <EditorScreen
+            api={model.api}
+            capabilityToken={model.capabilityToken}
+            document={model.document}
+            key={`${model.document.metadata.id}:${model.shared ? "shared" : "workspace"}`}
+            shared={model.shared}
+          />
+        </Suspense>
       );
   }
 }
@@ -242,27 +253,21 @@ function loadRoute(url: URL): Effect.Effect<RouteModel, ApiError> {
   const shared = /^\/share\/([^/]+)(?:\/(edit))?\/?$/u.exec(url.pathname);
   const documentRoute = /^\/documents\/([^/]+)(?:\/(edit))?\/?$/u.exec(url.pathname);
   if (shared?.[1] !== undefined) {
-    const documentId = decodeURIComponent(shared[1]);
-    return api.readDocument(documentId).pipe(
-      Effect.map((document): RouteModel => ({
-        api,
-        capabilityToken,
-        document,
-        screen: shared[2] === "edit" ? "editor" : "reader",
-        shared: true,
-      })),
+    return loadDocumentRoute(
+      api,
+      capabilityToken,
+      decodeURIComponent(shared[1]),
+      shared[2] === "edit" ? "editor" : "reader",
+      true,
     );
   }
   if (documentRoute?.[1] !== undefined) {
-    const documentId = decodeURIComponent(documentRoute[1]);
-    return api.readDocument(documentId).pipe(
-      Effect.map((document): RouteModel => ({
-        api,
-        capabilityToken,
-        document,
-        screen: documentRoute[2] === "edit" ? "editor" : "reader",
-        shared: false,
-      })),
+    return loadDocumentRoute(
+      api,
+      capabilityToken,
+      decodeURIComponent(documentRoute[1]),
+      documentRoute[2] === "edit" ? "editor" : "reader",
+      false,
     );
   }
   return api.authenticationStatus.pipe(
@@ -296,6 +301,35 @@ function loadRoute(url: URL): Effect.Effect<RouteModel, ApiError> {
         })),
       );
     }),
+  );
+}
+
+function loadDocumentRoute(
+  api: ApiClientService,
+  capabilityToken: string | undefined,
+  documentId: string,
+  screen: "editor" | "reader",
+  shared: boolean,
+): Effect.Effect<RouteModel, ApiError> {
+  const preload = Effect.tryPromise({
+    catch: (cause) =>
+      new ApiError({
+        cause,
+        code: "chunk_load_failed",
+        message: "Jot could not load this view.",
+        retryable: true,
+        status: 0,
+      }),
+    try: screen === "editor" ? loadEditorScreen : loadReaderScreen,
+  });
+  return Effect.all([api.readDocument(documentId), preload], { concurrency: "unbounded" }).pipe(
+    Effect.map(([document]): RouteModel => ({
+      api,
+      capabilityToken,
+      document,
+      screen,
+      shared,
+    })),
   );
 }
 
