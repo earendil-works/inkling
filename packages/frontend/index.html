@@ -30,21 +30,7 @@
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <header class="masthead">
-      <a class="wordmark" href="/" data-link aria-label="Jot home">JOT<span>/</span></a>
-      <div class="masthead__right">
-        <div class="participants" data-participants aria-label="Connected participants"></div>
-        <div class="api-state" role="status" aria-live="polite">
-          <span class="api-state__light" aria-hidden="true"></span>
-          <span data-api-status>Starting Effect runtime…</span>
-        </div>
-        <button class="icon-button" type="button" data-theme-toggle aria-label="Change color theme">
-          ◐
-        </button>
-      </div>
-    </header>
-    <main id="app" tabindex="-1"></main>
-    <div class="toast-region" data-toasts role="status" aria-live="polite"></div>
-    <script type="module" src="/src/main.ts"></script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

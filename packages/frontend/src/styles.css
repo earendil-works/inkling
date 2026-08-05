@@ -229,6 +229,10 @@ select:disabled {
   min-height: calc(100vh - var(--masthead-height));
 }
 
+.route-loading {
+  background: var(--page);
+}
+
 .icon-button,
 .text-button,
 .toolbar-button,
