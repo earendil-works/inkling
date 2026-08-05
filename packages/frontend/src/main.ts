@@ -316,28 +316,46 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
   return api.readDocument(documentId).pipe(
     Effect.flatMap((initial) =>
       Effect.sync(() => {
-        app.className = "editor-layout";
+        const initiallyEditable = !shared || initial.metadata.sharing.access === "edit";
+        app.className = `editor-layout ${initiallyEditable ? "is-editable" : "is-reader"}`;
         app.innerHTML = `
           <section class="document-bar">
             <div class="document-identity">
-              <span>${initial.metadata.rfcNumber === undefined ? "DOC" : `RFC ${String(initial.metadata.rfcNumber).padStart(4, "0")}`}</span>
+              <span>${initial.metadata.rfcNumber === undefined ? "Document" : `RFC ${String(initial.metadata.rfcNumber).padStart(4, "0")}`}</span>
               <input class="title-input" data-title value="${escapeHtml(initial.metadata.title)}" aria-label="Document title" />
             </div>
             <div class="document-actions">
-              <select data-state aria-label="Lifecycle state"><option>${escapeHtml(initial.metadata.lifecycleState)}</option><option>draft</option><option>discussion</option><option>accepted</option><option>implemented</option><option>abandoned</option></select>
-              <select data-visibility aria-label="Visibility"><option value="workspace">Workspace</option><option value="public">Public</option></select>
-              <select data-sensitivity aria-label="Sensitivity"><option value="normal">Normal</option><option value="confidential">Confidential</option></select>
-              <input class="labels-input" data-labels value="${escapeHtml(initial.metadata.labels.join(", "))}" aria-label="Labels, comma separated" placeholder="labels" />
-              <button class="text-button" type="button" data-preview-toggle>Preview</button>
-              <label class="text-button attachment-button">Attach<input type="file" data-attachment accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain" /></label>
-              ${shared ? "" : '<button class="text-button" type="button" data-share>Share</button><button class="primary-button primary-button--small" type="button" data-publish>Publish</button>'}
+              <button class="toolbar-button preview-toggle" type="button" data-preview-toggle aria-pressed="false">Preview</button>
+              <label class="toolbar-button attachment-button">Attach<input type="file" data-attachment accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain" /></label>
+              <button class="toolbar-button" type="button" popovertarget="comment-drawer">Comments <span class="comment-count" data-comment-count>0</span></button>
+              <details class="document-details" data-document-details>
+                <summary class="toolbar-button">Details</summary>
+                <div class="document-details__menu">
+                  <label>State<select data-state><option>${escapeHtml(initial.metadata.lifecycleState)}</option><option>draft</option><option>discussion</option><option>accepted</option><option>implemented</option><option>abandoned</option></select></label>
+                  <label>Visibility<select data-visibility><option value="workspace">Workspace</option><option value="public">Public</option></select></label>
+                  <label>Sensitivity<select data-sensitivity><option value="normal">Normal</option><option value="confidential">Confidential</option></select></label>
+                  <label>Labels<input data-labels value="${escapeHtml(initial.metadata.labels.join(", "))}" placeholder="Comma separated" /></label>
+                </div>
+              </details>
+              ${shared ? "" : '<button class="toolbar-button" type="button" data-share>Share</button><button class="primary-button primary-button--small" type="button" data-publish>Publish</button>'}
             </div>
           </section>
           <section class="workbench">
-            <div class="source-pane" data-source-pane><div class="pane-label"><span>Markdown source</span><span data-save-state>Connecting</span></div><div class="editor-host" data-editor></div></div>
-            <div class="preview-pane" data-preview-pane><div class="pane-label"><span>Rendered preview</span><button class="icon-button" type="button" data-preview-close aria-label="Close preview">×</button></div><article class="markdown-body" data-preview></article></div>
-            <aside class="comment-rail" data-comment-rail><div class="comment-rail__heading"><span>Comments</span><label><input type="checkbox" data-show-resolved /> Resolved</label></div><div data-comments></div><button class="text-button comment-new" type="button" data-comment-new>Comment on selection</button></aside>
-          </section>`;
+            <div class="source-pane" data-source-pane>
+              <div class="pane-label"><span>Markdown</span><span data-save-state>Connecting</span></div>
+              <div class="editor-host" data-editor></div>
+            </div>
+            <div class="preview-pane" data-preview-pane>
+              <div class="pane-label"><span>Preview</span><button class="icon-button" type="button" data-preview-close aria-label="Close preview">×</button></div>
+              <article class="markdown-body" data-preview></article>
+            </div>
+          </section>
+          <aside class="comment-rail" id="comment-drawer" data-comment-rail popover aria-label="Document comments">
+            <div class="comment-rail__heading"><span>Comments</span><button class="icon-button" type="button" popovertarget="comment-drawer" popovertargetaction="hide" aria-label="Close comments">×</button></div>
+            <label class="resolved-toggle"><input type="checkbox" data-show-resolved /> Show resolved</label>
+            <div data-comments></div>
+            <button class="text-button comment-new" type="button" data-comment-new>Comment on selection</button>
+          </aside>`;
 
         let metadata = initial.metadata;
         let comments = initial.comments;
@@ -403,6 +421,7 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
         const updateMetadataView = (next: DocumentMetadataDto): void => {
           metadata = next;
           requireElement<HTMLInputElement>("[data-title]").value = next.title;
+          requireElement<HTMLSelectElement>("[data-state]").value = next.lifecycleState;
           requireElement<HTMLSelectElement>("[data-visibility]").value = next.visibility;
           requireElement<HTMLSelectElement>("[data-sensitivity]").value = next.sensitivity;
           requireElement<HTMLInputElement>("[data-labels]").value = next.labels.join(", ");
@@ -415,6 +434,9 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
         const updatePermissions = (actions: readonly string[]): void => {
           permissions = actions;
           const canEdit = actions.includes("edit-body");
+          app.classList.toggle("is-editable", canEdit);
+          app.classList.toggle("is-reader", !canEdit);
+          if (!canEdit) app.classList.remove("preview-open");
           editor.dispatch({ effects: editable.reconfigure(EditorView.editable.of(canEdit)) });
           requireElement<HTMLButtonElement>("[data-comment-new]").disabled =
             !actions.includes("comment");
@@ -439,6 +461,8 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
         const renderComments = (): void => {
           const showResolved = requireElement<HTMLInputElement>("[data-show-resolved]").checked;
           const threads = comments.threads.filter((thread) => showResolved || !thread.resolved);
+          const openCount = comments.threads.filter((thread) => !thread.resolved).length;
+          requireElement<HTMLElement>("[data-comment-count]").textContent = String(openCount);
           requireElement<HTMLElement>("[data-comments]").innerHTML =
             threads.length === 0
               ? '<p class="comments-empty">No open threads.</p>'
@@ -774,16 +798,16 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
               ),
             );
           });
-        const togglePreview = (): void => {
-          app.classList.toggle("preview-open");
+        const previewToggle = requireElement<HTMLButtonElement>("[data-preview-toggle]");
+        const setPreviewOpen = (open: boolean): void => {
+          app.classList.toggle("preview-open", open);
+          previewToggle.setAttribute("aria-pressed", String(open));
         };
-        requireElement<HTMLButtonElement>("[data-preview-toggle]").addEventListener(
-          "click",
-          togglePreview,
+        previewToggle.addEventListener("click", () =>
+          setPreviewOpen(!app.classList.contains("preview-open")),
         );
-        requireElement<HTMLButtonElement>("[data-preview-close]").addEventListener(
-          "click",
-          togglePreview,
+        requireElement<HTMLButtonElement>("[data-preview-close]").addEventListener("click", () =>
+          setPreviewOpen(false),
         );
 
         runUi(

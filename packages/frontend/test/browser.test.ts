@@ -96,6 +96,26 @@ test(
         document.querySelector("[data-comments]")?.textContent?.includes("Browser comment"),
       );
 
+      const layout = await first.evaluate(() => {
+        const source = document.querySelector("[data-source-pane]")?.getBoundingClientRect();
+        const preview = document.querySelector("[data-preview-pane]")?.getBoundingClientRect();
+        return {
+          hasHorizontalOverflow: document.documentElement.scrollWidth > window.innerWidth,
+          previewWidth: preview?.width ?? 0,
+          sourceWidth: source?.width ?? 0,
+        };
+      });
+      assert.equal(layout.hasHorizontalOverflow, false);
+      assert.ok(Math.abs(layout.sourceWidth - layout.previewWidth) < 2);
+      await first.locator('.document-actions > [popovertarget="comment-drawer"]').click();
+      assert.equal(
+        await first
+          .locator("[data-comment-rail]")
+          .evaluate((rail) => rail.matches(":popover-open")),
+        true,
+      );
+      await first.locator('[popovertargetaction="hide"]').click();
+
       const capabilityUrl = await first.evaluate(async (id) => {
         const csrf = document.cookie
           .split(";")
@@ -135,6 +155,18 @@ test(
       }, documentId);
       await shared.waitForFunction(
         () => document.querySelector(".cm-content")?.getAttribute("contenteditable") === "false",
+      );
+      assert.equal(
+        await shared
+          .locator("[data-source-pane]")
+          .evaluate((pane) => getComputedStyle(pane).display),
+        "none",
+      );
+      assert.equal(
+        await shared
+          .locator("[data-preview-pane]")
+          .evaluate((pane) => getComputedStyle(pane).display),
+        "block",
       );
 
       await first.setViewportSize({ height: 844, width: 390 });
