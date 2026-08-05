@@ -937,21 +937,28 @@ function renderParticipants(participants: ReadonlyMap<string, PresenceDto>): voi
 }
 
 function installThemeControl(): void {
+  const button = requireElement<HTMLButtonElement>("[data-theme-toggle]");
   const stored = localStorage.getItem("jot-theme");
-  const theme = stored === "light" || stored === "dark" ? stored : "system";
-  applyTheme(theme);
-  requireElement<HTMLButtonElement>("[data-theme]").addEventListener("click", () => {
-    const current = localStorage.getItem("jot-theme") ?? "system";
-    const next = current === "system" ? "dark" : current === "dark" ? "light" : "system";
-    localStorage.setItem("jot-theme", next);
-    applyTheme(next);
-  });
-}
+  const initial =
+    stored === "light" || stored === "dark"
+      ? stored
+      : matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light";
 
-function applyTheme(theme: string): void {
-  const dark =
-    theme === "dark" || (theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
-  document.documentElement.dataset["theme"] = dark ? "dark" : "light";
+  const setTheme = (theme: "dark" | "light"): void => {
+    document.documentElement.dataset["theme"] = theme;
+    button.setAttribute("aria-label", `Switch to ${theme === "dark" ? "light" : "dark"} theme`);
+  };
+
+  setTheme(initial);
+  button.addEventListener("click", (event) => {
+    // A double-click emits two click events. Ignore the duplicate instead of toggling twice.
+    if (event.detail > 1) return;
+    const next = document.documentElement.dataset["theme"] === "dark" ? "light" : "dark";
+    localStorage.setItem("jot-theme", next);
+    setTheme(next);
+  });
 }
 
 function guestName(): string {

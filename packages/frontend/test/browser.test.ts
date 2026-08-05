@@ -38,6 +38,9 @@ test(
         .locator("[data-auth-form]")
         .evaluate((form: HTMLFormElement) => form.requestSubmit());
       await first.waitForSelector("[data-new-document]");
+      const initialTheme = await first.locator("html").getAttribute("data-theme");
+      await first.locator("[data-theme-toggle]").dblclick();
+      assert.notEqual(await first.locator("html").getAttribute("data-theme"), initialTheme);
       await first.locator("[data-new-document]").click();
       await first.locator('input[name="title"]').fill("Browser collaboration");
       await first.locator('textarea[name="body"]').fill("Shared starting body");
