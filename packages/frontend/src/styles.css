@@ -526,6 +526,86 @@ select:disabled {
   word-break: break-all;
 }
 
+/* Reader */
+.reader-layout {
+  min-height: calc(100dvh - var(--masthead-height));
+  background: var(--surface);
+}
+
+.reader-toolbar {
+  position: sticky;
+  top: 0;
+}
+
+.reader-toolbar__title {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-mode-link {
+  justify-content: center;
+  text-decoration: none;
+}
+
+.reader-document {
+  width: min(68rem, 100%);
+  margin: 0 auto;
+  padding: 0 var(--page-padding);
+}
+
+.reader-heading {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: clamp(3.5rem, 8vw, 7rem) 0 clamp(2.5rem, 5vw, 4rem);
+  border-bottom: 1px solid var(--border);
+}
+
+.reader-heading h1 {
+  max-width: 18ch;
+  margin-top: 0.65rem;
+  font-size: clamp(2.8rem, 7vw, 6rem);
+  font-weight: 500;
+  letter-spacing: -0.055em;
+  line-height: 0.98;
+}
+
+.reader-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 1.75rem;
+  color: var(--muted);
+  flex-wrap: wrap;
+  font: 0.65rem/1.4 var(--mono);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.reader-meta > * + *::before {
+  margin-right: 0.55rem;
+  color: var(--border-strong);
+  content: "/";
+}
+
+.reader-label,
+.reader-confidential {
+  color: var(--accent);
+}
+
+.reader-confidential {
+  color: var(--danger);
+}
+
+.reader-body.markdown-body {
+  max-width: 52rem;
+  min-height: 40vh;
+  padding: clamp(2.5rem, 5vw, 4rem) 0 clamp(5rem, 10vw, 9rem);
+  overflow: visible;
+}
+
 /* Editor */
 .editor-layout {
   position: relative;
@@ -1366,6 +1446,27 @@ select:disabled {
     align-items: flex-start;
     flex-direction: column;
     gap: 0.25rem;
+  }
+
+  .reader-toolbar__title {
+    width: 100%;
+  }
+
+  .reader-heading {
+    padding-top: 3rem;
+  }
+
+  .reader-heading h1 {
+    font-size: clamp(2.5rem, 15vw, 4rem);
+  }
+
+  .reader-meta {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .reader-meta > * + *::before {
+    content: none;
   }
 
   .title-input {

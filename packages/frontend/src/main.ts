@@ -49,13 +49,17 @@ installThemeControl();
 Effect.runFork(route().pipe(Effect.catchAll(showFatal)));
 
 function route(): Effect.Effect<void, ApiError> {
-  const shared = /^\/share\/([^/]+)$/u.exec(location.pathname);
-  const documentRoute = /^\/documents\/([^/]+)$/u.exec(location.pathname);
+  const shared = /^\/share\/([^/]+)(?:\/(edit))?\/?$/u.exec(location.pathname);
+  const documentRoute = /^\/documents\/([^/]+)(?:\/(edit))?\/?$/u.exec(location.pathname);
   if (shared?.[1] !== undefined) {
-    return renderEditor(decodeURIComponent(shared[1]), true);
+    const documentId = decodeURIComponent(shared[1]);
+    return shared[2] === "edit" ? renderEditor(documentId, true) : renderReader(documentId, true);
   }
   if (documentRoute?.[1] !== undefined) {
-    return renderEditor(decodeURIComponent(documentRoute[1]), false);
+    const documentId = decodeURIComponent(documentRoute[1]);
+    return documentRoute[2] === "edit"
+      ? renderEditor(documentId, false)
+      : renderReader(documentId, false);
   }
   return api.authenticationStatus.pipe(
     Effect.flatMap((status) => {
@@ -324,6 +328,67 @@ function renderCatalog(
     .join("");
 }
 
+function renderReader(documentId: string, shared: boolean): Effect.Effect<void, ApiError> {
+  return api.readDocument(documentId).pipe(
+    Effect.flatMap((initial) => {
+      const openComments = initial.comments.threads.filter((thread) => !thread.resolved).length;
+      const canEdit = !shared || initial.metadata.sharing.access === "edit";
+      const labels = initial.metadata.labels
+        .map((label) => `<span class="reader-label">${escapeHtml(label)}</span>`)
+        .join("");
+      return Effect.sync(() => {
+        app.className = "reader-layout";
+        app.innerHTML = `
+          <nav class="document-bar reader-toolbar" aria-label="Document navigation">
+            <div class="document-identity">
+              <span>${initial.metadata.rfcNumber === undefined ? "Document" : `RFC ${String(initial.metadata.rfcNumber).padStart(4, "0")}`}</span>
+              <strong class="reader-toolbar__title">${escapeHtml(initial.metadata.title)}</strong>
+            </div>
+            <div class="document-actions">
+              <a class="toolbar-button document-mode-link" href="/">All documents</a>
+              ${canEdit ? `<a class="primary-button primary-button--small document-mode-link" data-open-editor href="${escapeHtml(documentHref(documentId, shared, "edit"))}">Edit split</a>` : ""}
+            </div>
+          </nav>
+          <main class="reader-document" data-reader>
+            <header class="reader-heading">
+              <p class="eyebrow">${escapeHtml(initial.metadata.lifecycleState)} · ${escapeHtml(initial.metadata.visibility)}</p>
+              <h1>${escapeHtml(initial.metadata.title)}</h1>
+              <div class="reader-meta">
+                <span>Updated ${escapeHtml(formatDate(initial.metadata.updatedAt))}</span>
+                <span>${openComments} open ${openComments === 1 ? "comment" : "comments"}</span>
+                ${initial.metadata.sensitivity === "confidential" ? '<strong class="reader-confidential">Confidential</strong>' : ""}
+                ${labels}
+              </div>
+            </header>
+            <article class="markdown-body reader-body" data-preview></article>
+          </main>`;
+        participantsElement.replaceChildren();
+        setApiStatus("ready", "Document loaded");
+      }).pipe(
+        Effect.zipRight(
+          renderer.render(initial.body, { sourcePositions: true }).pipe(
+            Effect.tap((rendered) =>
+              Effect.sync(() => {
+                requireElement<HTMLElement>("[data-preview]").innerHTML = rendered.html;
+              }),
+            ),
+            Effect.tap(() => renderMermaid()),
+            Effect.catchAll((failure) =>
+              Effect.sync(() => showToast(`Preview failed: ${failure.message}`, "error")),
+            ),
+          ),
+        ),
+      );
+    }),
+    Effect.asVoid,
+  );
+}
+
+function documentHref(documentId: string, shared: boolean, mode: "edit" | "read"): string {
+  const base = `${shared ? "/share" : "/documents"}/${encodeURIComponent(documentId)}`;
+  return `${base}${mode === "edit" ? "/edit" : ""}${location.search}`;
+}
+
 function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, ApiError> {
   return api.readDocument(documentId).pipe(
     Effect.flatMap((initial) =>
@@ -337,6 +402,7 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
               <input class="title-input" data-title value="${escapeHtml(initial.metadata.title)}" aria-label="Document title" />
             </div>
             <div class="document-actions">
+              <a class="toolbar-button document-mode-link" href="${escapeHtml(documentHref(documentId, shared, "read"))}">Read</a>
               <button class="toolbar-button preview-toggle" type="button" data-preview-toggle aria-pressed="false">Preview</button>
               <label class="toolbar-button attachment-button">Attach<input type="file" data-attachment accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain" /></label>
               <button class="toolbar-button" type="button" popovertarget="comment-menu">Comments <span class="comment-count" data-comment-count>0</span></button>

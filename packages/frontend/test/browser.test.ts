@@ -11,7 +11,7 @@ import { chromium } from "playwright-core";
 const browserExecutable = await findBrowser();
 
 test(
-  "browser pages collaborate, comment, preview, and honor a live share downgrade",
+  "browser pages read, collaborate, comment, preview, and honor a live share downgrade",
   { skip: browserExecutable === undefined, timeout: 60_000 },
   async () => {
     assert.ok(browserExecutable);
@@ -53,14 +53,19 @@ test(
           form.requestSubmit(form.querySelector('button[type="submit"]')),
         );
       await first.waitForURL(/\/documents\//u);
+      const documentId = first.url().split("/").at(-1);
+      assert.ok(documentId);
+      await first.waitForSelector("[data-reader]");
+      assert.equal(await first.locator(".cm-editor").count(), 0);
+      assert.match(await first.locator("[data-preview]").innerText(), /Shared starting body/u);
+      await first.locator("[data-open-editor]").click();
+      await first.waitForURL(/\/documents\/[^/]+\/edit$/u);
       await first.waitForFunction(
         () => document.querySelector("[data-save-state]")?.textContent === "Saved",
       );
-      const documentId = first.url().split("/").at(-1);
-      assert.ok(documentId);
 
       const second = await context.newPage();
-      await second.goto(`${baseUrl}/documents/${documentId}`);
+      await second.goto(`${baseUrl}/documents/${documentId}/edit`);
       await second.waitForSelector(".cm-content");
       await first.locator(".cm-content").click();
       await first.keyboard.press("ControlOrMeta+End");
@@ -217,6 +222,9 @@ test(
       const sharedContext = await browser.newContext();
       const shared = await sharedContext.newPage();
       await shared.goto(capabilityUrl);
+      await shared.waitForSelector("[data-reader]");
+      assert.equal(await shared.locator(".cm-editor").count(), 0);
+      await shared.locator("[data-open-editor]").click();
       await shared.waitForFunction(
         () => document.querySelector(".cm-content")?.getAttribute("contenteditable") === "true",
       );
