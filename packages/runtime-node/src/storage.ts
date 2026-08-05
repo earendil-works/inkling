@@ -8,6 +8,7 @@ import {
   DurableDocumentJournal,
   ObjectStore,
   StorageError,
+  taggedId,
   WorkspaceStateStore,
 } from "@earendil-works/jot-core";
 import type {
@@ -424,7 +425,10 @@ function atomicWrite(
     yield* fileSystem
       .makeDirectory(path.dirname(filePath), { recursive: true })
       .pipe(Effect.mapError((cause) => storageFailure("create storage directory", cause)));
-    const temporary = `${filePath}.tmp-${crypto.randomUUID()}`;
+    const temporary = `${filePath}.tmp-${taggedId(
+      "write",
+      crypto.getRandomValues(new Uint8Array(16)),
+    )}`;
     yield* Effect.scoped(
       fileSystem.open(temporary, { flag: "wx" }).pipe(
         Effect.mapError((cause) => storageFailure("open temporary file", cause)),

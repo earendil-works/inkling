@@ -9,6 +9,7 @@ import { yCollab } from "y-codemirror.next";
 import * as Y from "yjs";
 
 import { createCommentAnchor, resolveCommentAnchor } from "@earendil-works/jot-collaboration";
+import { taggedId } from "@earendil-works/jot-core";
 import type {
   CommentThreadDto,
   DocumentMetadataDto,
@@ -188,7 +189,7 @@ function renderWorkspace(): Effect.Effect<void, ApiError> {
               .createDocument({
                 allocateRfc: allocateRfc.checked,
                 body: body.value,
-                creationKey: crypto.randomUUID(),
+                creationKey: randomId("request"),
                 title: title.value,
               })
               .pipe(
@@ -296,6 +297,10 @@ function renderWorkspace(): Effect.Effect<void, ApiError> {
   );
 }
 
+function randomId(tag: string): string {
+  return taggedId(tag, crypto.getRandomValues(new Uint8Array(16)));
+}
+
 function renderCatalog(
   documents: readonly { readonly excerpt: string; readonly metadata: DocumentMetadataDto }[],
 ): void {
@@ -383,7 +388,7 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
         const awareness = new Awareness(yDocument);
         const editable = new Compartment();
         const theme = new Compartment();
-        const participantId = crypto.randomUUID();
+        const participantId = randomId("participant");
         const participantColor = colorFor(participantId);
         const editor = new EditorView({
           parent: requireElement<HTMLElement>("[data-editor]"),

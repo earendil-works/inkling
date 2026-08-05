@@ -1014,6 +1014,7 @@ export function makeLocalJotApplication(
           yield* requireOwner(principal);
           return yield* withState(
             createApiKey(state.authentication, label, new Date().toISOString()).pipe(
+              Effect.provideService(IdGenerator, ids),
               Effect.provideService(SecretHasher, hasher),
               Effect.provideService(SecureToken, tokens),
               Effect.mapError(toApplicationError),
@@ -1419,6 +1420,7 @@ export function makeLocalJotApplication(
       login: (password) =>
         withState(
           loginOwner(state.authentication, password, new Date().toISOString()).pipe(
+            Effect.provideService(IdGenerator, ids),
             Effect.provideService(SecretHasher, hasher),
             Effect.provideService(SecureToken, tokens),
             Effect.mapError(toApplicationError),
@@ -1442,6 +1444,7 @@ export function makeLocalJotApplication(
       loginWorkspaceIdentity: (identity) =>
         withState(
           createWorkspaceSession(state.authentication, identity, new Date().toISOString()).pipe(
+            Effect.provideService(IdGenerator, ids),
             Effect.provideService(SecretHasher, hasher),
             Effect.provideService(SecureToken, tokens),
             Effect.mapError(toApplicationError),
@@ -1588,6 +1591,7 @@ export function makeLocalJotApplication(
                 Effect.mapError(toApplicationError),
                 Effect.flatMap((authentication) =>
                   loginOwner(authentication, password, new Date().toISOString()).pipe(
+                    Effect.provideService(IdGenerator, ids),
                     Effect.provideService(SecretHasher, hasher),
                     Effect.provideService(SecureToken, tokens),
                     Effect.mapError(toApplicationError),

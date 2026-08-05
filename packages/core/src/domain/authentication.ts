@@ -1,6 +1,6 @@
 import { Data, Effect } from "effect";
 
-import { SecretHasher, SecureToken } from "../application/ports.ts";
+import { IdGenerator, SecretHasher, SecureToken } from "../application/ports.ts";
 import type { StorageError } from "../application/ports.ts";
 import { personId } from "./document.ts";
 import type { PersonId } from "./document.ts";
@@ -94,7 +94,7 @@ export function loginOwner(
 ): Effect.Effect<
   CreatedSession,
   AuthenticationError | StorageError,
-  typeof SecretHasher.Service | typeof SecureToken.Service
+  typeof IdGenerator.Service | typeof SecretHasher.Service | typeof SecureToken.Service
 > {
   return Effect.gen(function* () {
     if (state.ownerPasswordHash === undefined) {
@@ -108,8 +108,9 @@ export function loginOwner(
     if (!valid) {
       return yield* authenticationFailure("invalid_credentials", "The password is incorrect.");
     }
+    const ids = yield* IdGenerator;
     const tokens = yield* SecureToken;
-    const id = yield* tokens.generate(12);
+    const id = yield* ids.generate("session");
     const secret = yield* tokens.generate(32);
     const tokenHash = yield* hasher.hash(secret);
     const expiresAt = new Date(Date.parse(now) + sessionLifetimeMilliseconds).toISOString();
@@ -157,12 +158,13 @@ export function createWorkspaceSession(
 ): Effect.Effect<
   CreatedSession,
   AuthenticationError | StorageError,
-  typeof SecretHasher.Service | typeof SecureToken.Service
+  typeof IdGenerator.Service | typeof SecretHasher.Service | typeof SecureToken.Service
 > {
   return Effect.gen(function* () {
     const hasher = yield* SecretHasher;
+    const ids = yield* IdGenerator;
     const tokens = yield* SecureToken;
-    const id = yield* tokens.generate(12);
+    const id = yield* ids.generate("session");
     const secret = yield* tokens.generate(32);
     const tokenHash = yield* hasher.hash(secret);
     const expiresAt = new Date(Date.parse(now) + sessionLifetimeMilliseconds).toISOString();
@@ -206,7 +208,7 @@ export function createApiKey(
 ): Effect.Effect<
   CreatedApiKey,
   AuthenticationError | StorageError,
-  typeof SecretHasher.Service | typeof SecureToken.Service
+  typeof IdGenerator.Service | typeof SecretHasher.Service | typeof SecureToken.Service
 > {
   return Effect.gen(function* () {
     const normalizedLabel = label.trim();
@@ -214,8 +216,9 @@ export function createApiKey(
       return yield* authenticationFailure("invalid_token", "API key labels must be non-empty.");
     }
     const hasher = yield* SecretHasher;
+    const ids = yield* IdGenerator;
     const tokens = yield* SecureToken;
-    const id = yield* tokens.generate(10);
+    const id = yield* ids.generate("key");
     const secret = yield* tokens.generate(32);
     const record: ApiKeyRecord = {
       createdAt: now,

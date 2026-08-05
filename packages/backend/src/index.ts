@@ -19,6 +19,7 @@ import {
   ResolutionRequestSchema,
   ShareUpdateRequestSchema,
 } from "@earendil-works/jot-protocol";
+import { taggedId } from "@earendil-works/jot-core";
 import type { CatalogResponse, HealthResponse, ProtocolError } from "@earendil-works/jot-protocol";
 
 import { ApplicationError, JotApplication } from "./application.ts";
@@ -50,7 +51,7 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
 
   app.use("*", async (context, next) => {
     const startedAt = Date.now();
-    const requestId = crypto.randomUUID();
+    const requestId = taggedId("request", crypto.getRandomValues(new Uint8Array(16)));
     await next();
     context.header("X-Request-Id", requestId);
     console.log(

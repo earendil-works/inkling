@@ -104,8 +104,7 @@ function createRuntime(
     journalLayer(dataDirectory),
     workspaceStateStoreLayer(dataDirectory),
   ).pipe(Layer.provide(base));
-  const identifiers = IdGeneratorLive.pipe(Layer.provide(SecureTokenLive));
-  const dependencies = Layer.mergeAll(base, storage, identifiers);
+  const dependencies = Layer.mergeAll(base, storage, IdGeneratorLive);
   const application = localApplicationLayer().pipe(Layer.provide(dependencies), Layer.orDie);
   return ManagedRuntime.make(application);
 }

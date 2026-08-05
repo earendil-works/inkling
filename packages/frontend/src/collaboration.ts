@@ -1,6 +1,8 @@
 import { Data, Effect } from "effect";
 import * as Y from "yjs";
 
+import { taggedId } from "@earendil-works/jot-core";
+
 import {
   ClientCollaborationMessageSchema,
   decodeJson,
@@ -202,7 +204,7 @@ export function makeCollaborationClient(
       if (origin === remoteOrigin) {
         return;
       }
-      const clientUpdateId = crypto.randomUUID();
+      const clientUpdateId = taggedId("update", crypto.getRandomValues(new Uint8Array(16)));
       unacknowledged.set(clientUpdateId, update);
       callbacks.onState(socket?.readyState === WebSocket.OPEN ? "saving" : "disconnected");
       sendMessage({ clientUpdateId, type: "body-update", update: encodeBase64(update) });

@@ -654,13 +654,12 @@ function createApplicationRuntime(
     Layer.succeed(ObjectStore, makeR2ObjectStore(environment.JOT_OBJECTS)),
     Layer.succeed(DurableDocumentJournal, makeDurableObjectJournal(state.storage)),
   );
-  const identifiers = IdGeneratorLive.pipe(Layer.provide(SecureTokenLive));
   const dependencies = Layer.mergeAll(
     storage,
     DigestLive,
     SecureTokenLive,
     SecretHasherLive,
-    identifiers,
+    IdGeneratorLive,
     MarkdownRendererLive,
   );
   const application = localApplicationLayer(options).pipe(Layer.provide(dependencies), Layer.orDie);

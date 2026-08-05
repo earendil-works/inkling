@@ -12,18 +12,28 @@ import {
   authenticateSession,
   documentId,
   emptyCommentState,
+  encodeBase62,
+  IdGenerator,
   personId,
   reserveDocument,
   SecretHasher,
   SecureToken,
   emptyAuthenticationState,
   emptyWorkspaceCatalog,
+  taggedId,
   updateDocumentMetadata,
   updateSharingPolicy,
 } from "../src/index.ts";
 import type { CommentActor, Principal } from "../src/index.ts";
 
 const now = "2026-01-02T03:04:05.000Z";
+
+test("identifiers use the canonical base62 alphabet", () => {
+  assert.equal(encodeBase62(Uint8Array.of(0)), "0");
+  assert.equal(encodeBase62(Uint8Array.of(61)), "Z");
+  assert.equal(encodeBase62(Uint8Array.of(62)), "10");
+  assert.equal(taggedId("doc", Uint8Array.of(62)), "doc_10");
+});
 
 test("metadata revisions reject stale commands and confidential public transitions", async () => {
   const metadata = await Effect.runPromise(
@@ -58,6 +68,7 @@ test("workspace identity sessions retain their verified principal", async () => 
     hash: (secret: string) => Effect.succeed(`hashed:${secret}`),
     verify: (secret: string, hash: string) => Effect.succeed(hash === `hashed:${secret}`),
   };
+  const ids = { generate: (purpose: string) => Effect.succeed(`${purpose}_12345678`) };
   const tokens = { generate: () => Effect.succeed("session-secret") };
   const created = await Effect.runPromise(
     createWorkspaceSession(
@@ -69,7 +80,11 @@ test("workspace identity sessions retain their verified principal", async () => 
         role: "member",
       },
       now,
-    ).pipe(Effect.provideService(SecretHasher, hasher), Effect.provideService(SecureToken, tokens)),
+    ).pipe(
+      Effect.provideService(IdGenerator, ids),
+      Effect.provideService(SecretHasher, hasher),
+      Effect.provideService(SecureToken, tokens),
+    ),
   );
   const principal = await Effect.runPromise(
     authenticateSession(created.state, created.token, now).pipe(

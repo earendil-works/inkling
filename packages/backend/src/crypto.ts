@@ -6,6 +6,7 @@ import {
   SecretHasher,
   SecureToken,
   StorageError,
+  taggedId,
 } from "@earendil-works/jot-core";
 import type {
   DigestService,
@@ -33,20 +34,10 @@ export const SecureTokenLive = Layer.succeed(SecureToken, {
       : Effect.fail(cryptoFailure("generate a secure token", "Invalid token size")),
 } satisfies SecureTokenService);
 
-export const IdGeneratorLive = Layer.effect(
-  IdGenerator,
-  Effect.gen(function* () {
-    const tokens = yield* SecureToken;
-    const service: IdGeneratorService = {
-      generate: (purpose) =>
-        tokens.generate(18).pipe(
-          Effect.orDie,
-          Effect.map((token) => `${purpose.slice(0, 4).replace(/[^a-z]/giu, "x")}_${token}`),
-        ),
-    };
-    return service;
-  }),
-);
+export const IdGeneratorLive = Layer.succeed(IdGenerator, {
+  generate: (purpose) =>
+    Effect.sync(() => taggedId(purpose, crypto.getRandomValues(new Uint8Array(16)))),
+} satisfies IdGeneratorService);
 
 export const SecretHasherLive = Layer.succeed(SecretHasher, makeSecretHasher());
 
