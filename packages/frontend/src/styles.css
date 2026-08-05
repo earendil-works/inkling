@@ -895,15 +895,26 @@ select:disabled {
 }
 
 .segment-comment-slot {
-  display: flex;
-  min-height: 1.8rem;
+  display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  margin: -0.55rem 0 0.7rem;
+  margin-left: 0.45rem;
+  vertical-align: middle;
+  white-space: nowrap;
 }
 
-li > .segment-comment-slot {
-  margin: 0.25rem 0 0.4rem;
+.jot-code,
+.jot-mermaid {
+  position: relative;
+}
+
+.jot-code > .segment-comment-slot,
+.jot-mermaid > .segment-comment-slot {
+  position: absolute;
+  z-index: 3;
+  top: 0.55rem;
+  right: 0.55rem;
+  margin: 0;
 }
 
 .segment-comment-bubble,
@@ -977,8 +988,34 @@ li > .segment-comment-slot {
   text-transform: uppercase;
 }
 
+.cm-comment-bubble-anchor {
+  position: relative;
+  display: inline;
+  width: 0;
+  height: 0;
+  line-height: 0;
+}
+
 .cm-content .segment-comment-bubble {
-  margin-left: 0.45rem;
+  position: absolute;
+  z-index: 3;
+  bottom: -0.2rem;
+  left: 0.35rem;
+  min-width: 2.35rem;
+  height: 1.35rem;
+  margin: 0;
+  opacity: 0.88;
+}
+
+.cm-content .segment-comment-bubble:hover,
+.cm-content .segment-comment-bubble.is-active {
+  opacity: 1;
+}
+
+.cm-content .segment-comment-bubble__avatar {
+  width: 0.9rem;
+  height: 0.9rem;
+  font-size: 0.42rem;
 }
 
 .participants {

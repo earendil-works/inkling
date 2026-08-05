@@ -37,7 +37,10 @@ class CommentBubbleWidget extends WidgetType {
   }
 
   toDOM(): HTMLElement {
-    return makeCommentBubble(this.thread, "source");
+    const anchor = document.createElement("span");
+    anchor.className = "cm-comment-bubble-anchor";
+    anchor.append(makeCommentBubble(this.thread, "source"));
+    return anchor;
   }
 
   override ignoreEvent(): boolean {
@@ -177,17 +180,16 @@ function makeCommentBubble(thread: CommentThreadDto, surface: "preview" | "sourc
 }
 
 function makeCommentSlot(target: HTMLElement): HTMLElement {
-  const slot = document.createElement("div");
+  const slot = document.createElement("span");
   slot.className = "segment-comment-slot";
   slot.dataset["commentSlot"] = "";
   slot.setAttribute("aria-label", "Comments attached to this text");
-  if (target.tagName === "LI") target.append(slot);
-  else target.insertAdjacentElement("afterend", slot);
+  target.append(slot);
   return slot;
 }
 
 function existingCommentSlot(target: HTMLElement): HTMLElement | undefined {
-  const candidate = target.tagName === "LI" ? target.lastElementChild : target.nextElementSibling;
+  const candidate = target.lastElementChild;
   return candidate instanceof HTMLElement && candidate.matches("[data-comment-slot]")
     ? candidate
     : undefined;
@@ -247,10 +249,11 @@ function segmentPriority(element: HTMLElement): number {
 }
 
 function attachmentTarget(segment: HTMLElement): HTMLElement {
-  if (segment.tagName === "TR" || segment.tagName === "THEAD" || segment.tagName === "TBODY") {
-    return segment.closest<HTMLElement>("table") ?? segment;
-  }
-  return segment;
+  if (segment.matches("p, h1, h2, h3, h4, h5, h6, li, td, th, pre")) return segment;
+  const inlineDescendants = segment.querySelectorAll<HTMLElement>(
+    "p, h1, h2, h3, h4, h5, h6, li, td, th, pre",
+  );
+  return inlineDescendants.item(inlineDescendants.length - 1) || segment;
 }
 
 function sourceElements(preview: HTMLElement): readonly HTMLElement[] {

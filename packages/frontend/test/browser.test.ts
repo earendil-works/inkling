@@ -43,7 +43,9 @@ test(
       assert.notEqual(await first.locator("html").getAttribute("data-theme"), initialTheme);
       await first.locator("[data-new-document]").click();
       await first.locator('input[name="title"]').fill("Browser collaboration");
-      await first.locator('textarea[name="body"]').fill("Shared starting body");
+      await first
+        .locator('textarea[name="body"]')
+        .fill("Shared starting body\nSecond line\nThird line");
       await first.locator('input[name="rfc"]').check();
       await first
         .locator("[data-new-form]")
@@ -75,6 +77,12 @@ test(
           ),
         ),
       );
+      const editorGeometryBeforeComment = await second.evaluate(() =>
+        [...document.querySelectorAll<HTMLElement>(".cm-line")].slice(0, 2).map((line) => {
+          const bounds = line.getBoundingClientRect();
+          return { height: bounds.height, top: bounds.top };
+        }),
+      );
 
       await first.evaluate(async (id) => {
         const csrf = document.cookie
@@ -97,6 +105,20 @@ test(
         '[data-preview] .segment-comment-bubble[data-comment-surface="preview"]',
       );
       assert.equal(await second.locator(".cm-comment-anchor").textContent(), "Shared");
+      const editorGeometryAfterComment = await second.evaluate(() =>
+        [...document.querySelectorAll<HTMLElement>(".cm-line")].slice(0, 2).map((line) => {
+          const bounds = line.getBoundingClientRect();
+          return { height: bounds.height, top: bounds.top };
+        }),
+      );
+      assert.deepEqual(editorGeometryAfterComment, editorGeometryBeforeComment);
+      const previewPlacement = await second
+        .locator('[data-preview] .segment-comment-bubble[data-comment-surface="preview"]')
+        .evaluate((bubble) => ({
+          display: getComputedStyle(bubble.parentElement as HTMLElement).display,
+          parentTag: bubble.parentElement?.parentElement?.tagName,
+        }));
+      assert.deepEqual(previewPlacement, { display: "inline-flex", parentTag: "P" });
       await second
         .locator('[data-preview] .segment-comment-bubble[data-comment-surface="preview"]')
         .click();
