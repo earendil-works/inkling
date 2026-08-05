@@ -17,6 +17,8 @@ export interface RenderedMarkdown {
 export interface RenderOptions {
   readonly rewriteUrl?: ((url: string) => string | undefined) | undefined;
   readonly gateExternalLinks?: boolean | undefined;
+  /** Add Markdown source ranges to rendered block elements for interactive previews. */
+  readonly sourcePositions?: boolean | undefined;
 }
 
 export class RenderError extends Data.TaggedError("RenderError")<{
@@ -53,6 +55,7 @@ export function makeMarkdownRenderer(): MarkdownRendererService {
 function renderMarkdown(markdown: string, options: RenderOptions): RenderedMarkdown {
   const headings: RenderHeading[] = [];
   const usedHeadingIds = new Map<string, number>();
+  const lineOffsets = sourceLineOffsets(markdown);
   const parser = new MarkdownIt({
     breaks: true,
     html: false,
@@ -60,9 +63,12 @@ function renderMarkdown(markdown: string, options: RenderOptions): RenderedMarkd
     typographer: false,
   });
 
-  parser.core.ruler.after("inline", "jot-links-and-tasks", (state) => {
+  parser.core.ruler.after("inline", "jot-links-tasks-and-source-positions", (state) => {
     for (const token of state.tokens) {
       rewriteTokenUrls(token, parser, options);
+      if (options.sourcePositions === true) {
+        annotateSourcePosition(token, lineOffsets, markdown.length);
+      }
       if (token.type === "inline" && token.children !== null) {
         for (const child of token.children) {
           rewriteTokenUrls(child, parser, options);
@@ -85,7 +91,7 @@ function renderMarkdown(markdown: string, options: RenderOptions): RenderedMarkd
     usedHeadingIds.set(base, count + 1);
     const id = count === 0 ? base : `${base}-${count + 1}`;
     headings.push({ depth, id, text });
-    return `<${token.tag} id="${parser.utils.escapeHtml(id)}">`;
+    return `<${token.tag} id="${parser.utils.escapeHtml(id)}"${parser.renderer.renderAttrs(token)}>`;
   };
 
   parser.renderer.rules["fence"] = (tokens, index) => {
@@ -95,11 +101,12 @@ function renderMarkdown(markdown: string, options: RenderOptions): RenderedMarkd
     }
     const language = token.info.trim().split(/\s+/u)[0]?.toLocaleLowerCase("en") ?? "";
     const source = token.content;
+    const sourceAttributes = parser.renderer.renderAttrs(token);
     if (language === "mermaid") {
       if (source.length > 100_000) {
-        return `<pre class="jot-code jot-code--rejected"><code>Mermaid diagram exceeds the 100 KB render limit.</code></pre>\n`;
+        return `<pre class="jot-code jot-code--rejected"${sourceAttributes}><code>Mermaid diagram exceeds the 100 KB render limit.</code></pre>\n`;
       }
-      return `<div class="jot-mermaid" data-mermaid><pre><code>${parser.utils.escapeHtml(source)}</code></pre><div class="jot-mermaid__controls"><button type="button" data-mermaid-zoom-in aria-label="Zoom in">+</button><button type="button" data-mermaid-zoom-out aria-label="Zoom out">−</button><button type="button" data-mermaid-reset>Reset</button></div></div>\n`;
+      return `<div class="jot-mermaid" data-mermaid${sourceAttributes}><pre><code>${parser.utils.escapeHtml(source)}</code></pre><div class="jot-mermaid__controls"><button type="button" data-mermaid-zoom-in aria-label="Zoom in">+</button><button type="button" data-mermaid-zoom-out aria-label="Zoom out">−</button><button type="button" data-mermaid-reset>Reset</button></div></div>\n`;
     }
     const highlighted =
       language.length > 0 && hljs.getLanguage(language) !== undefined
@@ -107,10 +114,44 @@ function renderMarkdown(markdown: string, options: RenderOptions): RenderedMarkd
         : parser.utils.escapeHtml(source);
     const className =
       language.length === 0 ? "" : ` class="language-${parser.utils.escapeHtml(language)}"`;
-    return `<pre class="jot-code"><code${className}>${highlighted}</code></pre>\n`;
+    return `<pre class="jot-code"${sourceAttributes}><code${className}>${highlighted}</code></pre>\n`;
   };
 
   return { headings, html: parser.render(markdown) };
+}
+
+const sourcePositionTokenTypes = new Set([
+  "blockquote_open",
+  "bullet_list_open",
+  "code_block",
+  "fence",
+  "heading_open",
+  "list_item_open",
+  "ordered_list_open",
+  "paragraph_open",
+  "table_open",
+  "tr_open",
+]);
+
+function sourceLineOffsets(markdown: string): readonly number[] {
+  const offsets = [0];
+  for (let index = 0; index < markdown.length; index += 1) {
+    if (markdown[index] === "\n") offsets.push(index + 1);
+  }
+  return offsets;
+}
+
+function annotateSourcePosition(
+  token: Token,
+  lineOffsets: readonly number[],
+  markdownLength: number,
+): void {
+  if (!sourcePositionTokenTypes.has(token.type) || token.map === null) return;
+  const start = lineOffsets[token.map[0]] ?? markdownLength;
+  const end = lineOffsets[token.map[1]] ?? markdownLength;
+  token.attrSet("data-jot-source-start", String(start));
+  token.attrSet("data-jot-source-end", String(end));
+  token.attrSet("data-jot-source-kind", token.type.replace(/_(?:open|block)$/u, ""));
 }
 
 function rewriteTokenUrls(token: Token, parser: MarkdownItType, options: RenderOptions): void {

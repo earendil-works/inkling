@@ -28,6 +28,30 @@ test("headings are deterministic and duplicate-safe", async () => {
   assert.match(rendered.html, /id="same-2"/u);
 });
 
+test("interactive rendering annotates block elements with Markdown source ranges", async () => {
+  const markdown = "# Heading\n\nParagraph with **strong text**.\n\n- list item\n";
+  const rendered = await Effect.runPromise(renderer.render(markdown, { sourcePositions: true }));
+  assert.match(
+    rendered.html,
+    /<h1 id="heading" data-jot-source-start="0" data-jot-source-end="10"/u,
+  );
+  assert.match(rendered.html, /<p data-jot-source-start="11" data-jot-source-end="43"/u);
+  assert.match(rendered.html, /data-jot-source-kind="list_item"/u);
+
+  const published = await Effect.runPromise(renderer.render(markdown));
+  assert.doesNotMatch(published.html, /data-jot-source/u);
+});
+
+test("source ranges survive custom fenced-code rendering", async () => {
+  const rendered = await Effect.runPromise(
+    renderer.render("```ts\nconst value = 1;\n```", { sourcePositions: true }),
+  );
+  assert.match(
+    rendered.html,
+    /<pre class="jot-code" data-jot-source-start="0" data-jot-source-end="26"/u,
+  );
+});
+
 test("oversized Mermaid input is rejected without an interactive placeholder", async () => {
   const rendered = await Effect.runPromise(
     renderer.render(`\`\`\`mermaid\n${"x".repeat(100_001)}\n\`\`\``),

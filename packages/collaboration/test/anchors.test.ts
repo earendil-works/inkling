@@ -32,6 +32,42 @@ test("relative comment anchors survive surrounding collaborative edits", async (
   );
 });
 
+test("comment range boundaries exclude insertions made at either edge", async () => {
+  await Effect.runPromise(
+    Effect.gen(function* () {
+      const collaborative = yield* createCollaborativeDocument();
+      collaborative.body.insert(0, "hello world");
+      const anchor = yield* createCommentAnchor(collaborative.body, 6, 11);
+      collaborative.body.insert(6, "new ");
+      collaborative.body.insert(collaborative.body.length, "!");
+      const resolved = yield* resolveCommentAnchor(
+        collaborative.document,
+        collaborative.body,
+        anchor,
+      );
+      assert.equal(collaborative.body.toString().slice(resolved.start, resolved.end), "world");
+    }),
+  );
+});
+
+test("deleting an entire selected range orphans its comment", async () => {
+  await Effect.runPromise(
+    Effect.gen(function* () {
+      const collaborative = yield* createCollaborativeDocument();
+      collaborative.body.insert(0, "hello world");
+      const anchor = yield* createCommentAnchor(collaborative.body, 6, 11);
+      collaborative.body.delete(6, 5);
+      const resolved = yield* resolveCommentAnchor(
+        collaborative.document,
+        collaborative.body,
+        anchor,
+      );
+      assert.equal(resolved.orphaned, true);
+      assert.equal(resolved.start, resolved.end);
+    }),
+  );
+});
+
 test("destructive replacement orphans an ambiguous textual anchor", async () => {
   await Effect.runPromise(
     Effect.gen(function* () {

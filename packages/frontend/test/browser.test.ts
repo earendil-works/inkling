@@ -92,8 +92,53 @@ test(
           method: "POST",
         });
       }, documentId);
-      await second.waitForFunction(() =>
-        document.querySelector("[data-comments]")?.textContent?.includes("Browser comment"),
+      await second.waitForSelector('.segment-comment-bubble[data-comment-surface="source"]');
+      await second.waitForSelector(
+        '[data-preview] .segment-comment-bubble[data-comment-surface="preview"]',
+      );
+      assert.equal(await second.locator(".cm-comment-anchor").textContent(), "Shared");
+      await second
+        .locator('[data-preview] .segment-comment-bubble[data-comment-surface="preview"]')
+        .click();
+      await second.waitForFunction(
+        () =>
+          document.querySelector("[data-comment-card]")?.matches(":popover-open") === true &&
+          document
+            .querySelector("[data-comment-card]")
+            ?.textContent?.includes("Browser comment") === true,
+      );
+      await second.locator("[data-comment-close]").click();
+
+      await first.locator(".cm-content").click();
+      await first.keyboard.press("ControlOrMeta+Home");
+      await first.keyboard.insertText("Before ");
+      await Promise.all(
+        [first, second].map((page) =>
+          page.waitForFunction(
+            () => document.querySelector(".cm-comment-anchor")?.textContent === "Shared",
+          ),
+        ),
+      );
+
+      await second.evaluate(() => {
+        const paragraph = document.querySelector<HTMLElement>("[data-preview] p");
+        const text = paragraph?.firstChild;
+        if (paragraph === null || paragraph === undefined || text === null || text === undefined) {
+          throw new Error("Rendered paragraph is missing.");
+        }
+        const range = document.createRange();
+        range.setStart(text, 0);
+        range.setEnd(text, Math.min(6, text.textContent?.length ?? 0));
+        const selection = document.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        paragraph.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+      });
+      await second.waitForSelector("[data-comment-composer]");
+      second.once("dialog", (dialog) => dialog.accept("Preview segment comment"));
+      await second.locator("[data-comment-composer]").click();
+      await second.waitForFunction(
+        () => document.querySelector("[data-comment-count]")?.textContent === "2",
       );
 
       const layout = await first.evaluate(() => {
@@ -107,14 +152,6 @@ test(
       });
       assert.equal(layout.hasHorizontalOverflow, false);
       assert.ok(Math.abs(layout.sourceWidth - layout.previewWidth) < 2);
-      await first.locator('.document-actions > [popovertarget="comment-drawer"]').click();
-      assert.equal(
-        await first
-          .locator("[data-comment-rail]")
-          .evaluate((rail) => rail.matches(":popover-open")),
-        true,
-      );
-      await first.locator('[popovertargetaction="hide"]').click();
 
       const capabilityUrl = await first.evaluate(async (id) => {
         const csrf = document.cookie

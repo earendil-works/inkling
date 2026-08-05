@@ -8,9 +8,8 @@ import { Awareness } from "y-protocols/awareness";
 import { yCollab } from "y-codemirror.next";
 import * as Y from "yjs";
 
-import { createCommentAnchor } from "@earendil-works/jot-collaboration";
+import { createCommentAnchor, resolveCommentAnchor } from "@earendil-works/jot-collaboration";
 import type {
-  CommentStateDto,
   CommentThreadDto,
   DocumentMetadataDto,
   PresenceDto,
@@ -21,6 +20,14 @@ import { makeApiClient } from "./api.ts";
 import type { ApiError } from "./api.ts";
 import { makeCollaborationClient } from "./collaboration.ts";
 import type { CollaborationClient, ConnectionState } from "./collaboration.ts";
+import {
+  commentDecorationsExtension,
+  renderPreviewCommentBubbles,
+  renderPreviewCommentComposer,
+  selectedPreviewSourceRange,
+  updateEditorCommentDecorations,
+} from "./comments.ts";
+import type { PreviewSourceRange, ProjectedCommentThread } from "./comments.ts";
 
 const app = requireElement<HTMLElement>("#app");
 const statusElement = requireElement<HTMLElement>("[data-api-status]");
@@ -327,7 +334,7 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
             <div class="document-actions">
               <button class="toolbar-button preview-toggle" type="button" data-preview-toggle aria-pressed="false">Preview</button>
               <label class="toolbar-button attachment-button">Attach<input type="file" data-attachment accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain" /></label>
-              <button class="toolbar-button" type="button" popovertarget="comment-drawer">Comments <span class="comment-count" data-comment-count>0</span></button>
+              <button class="toolbar-button" type="button" popovertarget="comment-menu">Comments <span class="comment-count" data-comment-count>0</span></button>
               <details class="document-details" data-document-details>
                 <summary class="toolbar-button">Details</summary>
                 <div class="document-details__menu">
@@ -350,18 +357,26 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
               <article class="markdown-body" data-preview></article>
             </div>
           </section>
-          <aside class="comment-rail" id="comment-drawer" data-comment-rail popover aria-label="Document comments">
-            <div class="comment-rail__heading"><span>Comments</span><button class="icon-button" type="button" popovertarget="comment-drawer" popovertargetaction="hide" aria-label="Close comments">×</button></div>
-            <label class="resolved-toggle"><input type="checkbox" data-show-resolved /> Show resolved</label>
-            <div data-comments></div>
-            <button class="text-button comment-new" type="button" data-comment-new>Comment on selection</button>
-          </aside>`;
+          <div class="comment-menu" id="comment-menu" popover aria-label="Comment controls">
+            <div class="comment-menu__heading"><div><p class="eyebrow">Anchored discussion</p><b>Comments in context</b></div><button class="icon-button" type="button" popovertarget="comment-menu" popovertargetaction="hide" aria-label="Close comment controls">×</button></div>
+            <p>Select Markdown or rendered text. Comments stay attached as the document changes.</p>
+            <button class="primary-button" type="button" data-comment-new>Comment on selection</button>
+            <label class="resolved-toggle"><input type="checkbox" data-show-resolved /> Show resolved threads</label>
+            <div class="orphaned-comments" data-orphaned-comments hidden></div>
+          </div>
+          <aside class="comment-card" data-comment-card popover="auto" aria-label="Comment thread"></aside>`;
 
         let metadata = initial.metadata;
         let comments = initial.comments;
         let permissions: readonly string[] = [];
         let client: CollaborationClient | undefined;
         let previewGeneration = 0;
+        let commentProjectionGeneration = 0;
+        let projectedComments: readonly ProjectedCommentThread[] = [];
+        let activeThreadId: string | undefined;
+        let activeCommentSurface: "preview" | "source" = "preview";
+        let activeCommentAnchor: HTMLElement | undefined;
+        let previewSelection: PreviewSourceRange | undefined;
         const remoteParticipants = new Map<string, PresenceDto>();
         const yDocument = new Y.Doc();
         const yBody = yDocument.getText("body");
@@ -377,6 +392,7 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
               basicSetup,
               markdown(),
               yCollab(yBody, awareness),
+              commentDecorationsExtension,
               editable.of(EditorView.editable.of(false)),
               theme.of(document.documentElement.dataset["theme"] === "dark" ? oneDark : []),
               EditorView.lineWrapping,
@@ -398,18 +414,24 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
         });
 
         const updatePreview = (): void => {
+          refreshCommentProjections();
           const generation = ++previewGeneration;
           runUi(
-            renderer.render(yBody.toString()).pipe(
+            renderer.render(yBody.toString(), { sourcePositions: true }).pipe(
               Effect.tap((rendered) =>
                 Effect.sync(() => {
                   if (generation !== previewGeneration) return;
                   const preview = requireElement<HTMLElement>("[data-preview]");
                   preview.innerHTML = rendered.html;
-                  highlightCommentAnchors(preview, comments);
                 }),
               ),
               Effect.tap(() => renderMermaid()),
+              Effect.tap(() =>
+                Effect.sync(() => {
+                  if (generation !== previewGeneration) return;
+                  renderCommentProjections();
+                }),
+              ),
               Effect.catchAll((failure) =>
                 Effect.sync(() => showToast(`Preview failed: ${failure.message}`, "error")),
               ),
@@ -458,21 +480,149 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
           requireElement<HTMLElement>("[data-save-state]").textContent = labels[state];
           setApiStatus(state === "ready" ? "ready" : state, labels[state]);
         };
-        const renderComments = (): void => {
+        const commentCard = requireElement<HTMLElement>("[data-comment-card]");
+        const visibleCommentProjections = (): readonly ProjectedCommentThread[] => {
           const showResolved = requireElement<HTMLInputElement>("[data-show-resolved]").checked;
-          const threads = comments.threads.filter((thread) => showResolved || !thread.resolved);
+          return projectedComments.filter(
+            (projection) => showResolved || !projection.thread.resolved,
+          );
+        };
+        const findActiveCommentAnchor = (): HTMLElement | undefined =>
+          [...document.querySelectorAll<HTMLElement>("[data-comment-bubble]")].find(
+            (element) =>
+              element.dataset["commentBubble"] === activeThreadId &&
+              element.dataset["commentSurface"] === activeCommentSurface,
+          );
+        const positionCommentCard = (): void => {
+          if (!commentCard.matches(":popover-open")) return;
+          if (matchMedia("(width <= 52rem)").matches) {
+            commentCard.style.removeProperty("--comment-card-left");
+            commentCard.style.removeProperty("--comment-card-top");
+            return;
+          }
+          const anchor = activeCommentAnchor;
+          if (anchor === undefined || !anchor.isConnected) return;
+          const anchorRect = anchor.getBoundingClientRect();
+          const cardRect = commentCard.getBoundingClientRect();
+          const gap = 12;
+          const left = Math.max(
+            gap,
+            Math.min(
+              innerWidth - cardRect.width - gap,
+              anchorRect.right + gap + cardRect.width <= innerWidth
+                ? anchorRect.right + gap
+                : anchorRect.left - cardRect.width - gap,
+            ),
+          );
+          const top = Math.max(
+            gap,
+            Math.min(innerHeight - cardRect.height - gap, anchorRect.top - 18),
+          );
+          commentCard.style.setProperty("--comment-card-left", `${left}px`);
+          commentCard.style.setProperty("--comment-card-top", `${top}px`);
+        };
+        const renderActiveCommentCard = (anchor?: HTMLElement): void => {
+          if (activeThreadId === undefined) return;
+          const thread = comments.threads.find((item) => item.id === activeThreadId);
+          if (thread === undefined) {
+            if (commentCard.matches(":popover-open")) commentCard.hidePopover();
+            activeThreadId = undefined;
+            return;
+          }
+          activeCommentAnchor = anchor ?? findActiveCommentAnchor() ?? activeCommentAnchor;
+          commentCard.innerHTML = commentHtml(thread, permissions.includes("manage-comments"));
+          bindCommentActions();
+          if (!commentCard.matches(":popover-open")) commentCard.showPopover();
+          document.querySelectorAll<HTMLElement>("[data-comment-bubble]").forEach((bubble) => {
+            bubble.classList.toggle(
+              "is-active",
+              bubble.dataset["commentBubble"] === activeThreadId,
+            );
+          });
+          requestAnimationFrame(positionCommentCard);
+        };
+        const renderCommentProjections = (): void => {
+          const visible = visibleCommentProjections();
+          updateEditorCommentDecorations(editor, visible);
+          const preview = requireElement<HTMLElement>("[data-preview]");
+          renderPreviewCommentBubbles(preview, visible);
+          renderPreviewCommentComposer(preview, previewSelection);
+          activeCommentAnchor = findActiveCommentAnchor() ?? activeCommentAnchor;
+          if (commentCard.matches(":popover-open")) renderActiveCommentCard();
+        };
+        const renderOrphanedComments = (): void => {
+          const orphaned = projectedComments.filter(
+            (projection) =>
+              projection.orphaned &&
+              (!projection.thread.resolved ||
+                requireElement<HTMLInputElement>("[data-show-resolved]").checked),
+          );
+          const container = requireElement<HTMLElement>("[data-orphaned-comments]");
+          container.hidden = orphaned.length === 0;
+          container.innerHTML =
+            orphaned.length === 0
+              ? ""
+              : `<p><b>${orphaned.length} orphaned ${orphaned.length === 1 ? "thread" : "threads"}</b><br>Its original text was removed.</p>${orphaned
+                  .map((projection) => {
+                    const message = projection.thread.messages[0];
+                    return `<button type="button" data-comment-bubble="${projection.thread.id}" data-comment-surface="preview"><span>${escapeHtml(message?.authorDisplayName ?? "Unknown author")}</span>${escapeHtml(message?.body ?? "Open comment")}</button>`;
+                  })
+                  .join("")}`;
+        };
+        const refreshCommentProjections = (): void => {
+          const generation = ++commentProjectionGeneration;
+          runUi(
+            Effect.forEach(comments.threads, (thread) =>
+              thread.anchor.orphaned
+                ? Effect.succeed({
+                    end: thread.anchor.originalEnd,
+                    orphaned: true,
+                    start: thread.anchor.originalStart,
+                    thread,
+                  } satisfies ProjectedCommentThread)
+                : resolveCommentAnchor(yDocument, yBody, thread.anchor).pipe(
+                    Effect.map(
+                      (resolved) => ({ ...resolved, thread }) satisfies ProjectedCommentThread,
+                    ),
+                    Effect.catchAll(() =>
+                      Effect.succeed({
+                        end: thread.anchor.originalEnd,
+                        orphaned: true,
+                        start: thread.anchor.originalStart,
+                        thread,
+                      } satisfies ProjectedCommentThread),
+                    ),
+                  ),
+            ).pipe(
+              Effect.tap((next) =>
+                Effect.sync(() => {
+                  if (generation !== commentProjectionGeneration) return;
+                  projectedComments = next;
+                  renderOrphanedComments();
+                  renderCommentProjections();
+                }),
+              ),
+            ),
+          );
+        };
+        const renderComments = (): void => {
           const openCount = comments.threads.filter((thread) => !thread.resolved).length;
           requireElement<HTMLElement>("[data-comment-count]").textContent = String(openCount);
-          requireElement<HTMLElement>("[data-comments]").innerHTML =
-            threads.length === 0
-              ? '<p class="comments-empty">No open threads.</p>'
-              : threads
-                  .map((thread) => commentHtml(thread, permissions.includes("manage-comments")))
-                  .join("");
-          bindCommentActions();
-          highlightCommentAnchors(requireElement<HTMLElement>("[data-preview]"), comments);
+          requireElement<HTMLButtonElement>("[data-comment-new]").disabled =
+            !permissions.includes("comment");
+          refreshCommentProjections();
         };
         const bindCommentActions = (): void => {
+          document.querySelectorAll<HTMLButtonElement>("[data-comment-close]").forEach((button) => {
+            button.addEventListener("click", () => {
+              if (commentCard.matches(":popover-open")) commentCard.hidePopover();
+              activeThreadId = undefined;
+              activeCommentAnchor = undefined;
+              document
+                .querySelectorAll(".segment-comment-bubble.is-active")
+                .forEach((bubble) => bubble.classList.remove("is-active"));
+            });
+          });
           document.querySelectorAll<HTMLButtonElement>("[data-reply-thread]").forEach((button) => {
             button.addEventListener("click", () => {
               const thread = comments.threads.find(
@@ -595,30 +745,97 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
           "change",
           renderComments,
         );
-        requireElement<HTMLButtonElement>("[data-comment-new]").addEventListener("click", () => {
+        const createCommentOnRange = (range: PreviewSourceRange): void => {
           if (!permissions.includes("comment")) return;
-          const selection = editor.state.selection.main;
-          if (selection.empty) {
+          if (range.start < 0 || range.end > yBody.length || range.end <= range.start) {
             showToast("Select text before opening a comment.", "error");
+            return;
+          }
+          if (range.end - range.start > 20_000) {
+            showToast("Select a smaller section to comment on.", "error");
             return;
           }
           const body = window.prompt("Comment on this selection");
           if (body === null || body.trim() === "") return;
           runUi(
-            createCommentAnchor(yBody, selection.from, selection.to).pipe(
+            createCommentAnchor(yBody, range.start, range.end).pipe(
               Effect.flatMap((anchor) =>
                 api.createThread(documentId, anchor, body, shared ? guestName() : "Owner"),
               ),
               Effect.tap((next) =>
                 Effect.sync(() => {
                   comments = next;
+                  previewSelection = undefined;
+                  document.getSelection()?.removeAllRanges();
                   renderComments();
+                  const menu = requireElement<HTMLElement>("#comment-menu");
+                  if (menu.matches(":popover-open")) menu.hidePopover();
                 }),
               ),
               Effect.catchAll((failure) => Effect.sync(() => showToast(String(failure), "error"))),
             ),
           );
-        });
+        };
+        const commentOnSelection = (): void => {
+          const previewRange = selectedPreviewSourceRange(
+            requireElement<HTMLElement>("[data-preview]"),
+          );
+          const selection = editor.state.selection.main;
+          const sourceRange = selection.empty
+            ? undefined
+            : { end: selection.to, start: selection.from };
+          const range = previewRange ?? previewSelection ?? sourceRange;
+          if (range === undefined) {
+            showToast("Select Markdown or rendered text before commenting.", "error");
+            return;
+          }
+          createCommentOnRange(range);
+        };
+        requireElement<HTMLButtonElement>("[data-comment-new]").addEventListener(
+          "click",
+          commentOnSelection,
+        );
+        const previewElement = requireElement<HTMLElement>("[data-preview]");
+        const updatePreviewSelection = (): void => {
+          window.setTimeout(() => {
+            previewSelection = selectedPreviewSourceRange(previewElement);
+            renderPreviewCommentComposer(previewElement, previewSelection);
+          });
+        };
+        previewElement.addEventListener("pointerup", updatePreviewSelection);
+        previewElement.addEventListener("keyup", updatePreviewSelection);
+        const handleCommentBubbleClick = (event: Event): void => {
+          const target = event.target;
+          if (!(target instanceof Element)) return;
+          const composer = target.closest<HTMLElement>("[data-comment-composer]");
+          if (composer !== null) {
+            const start = Number(composer.dataset["sourceStart"]);
+            const end = Number(composer.dataset["sourceEnd"]);
+            if (Number.isSafeInteger(start) && Number.isSafeInteger(end)) {
+              createCommentOnRange({ end, start });
+            }
+            return;
+          }
+          const bubble = target.closest<HTMLElement>("[data-comment-bubble]");
+          const threadId = bubble?.dataset["commentBubble"];
+          if (bubble === null || threadId === undefined) return;
+          activeThreadId = threadId;
+          activeCommentSurface =
+            bubble.dataset["commentSurface"] === "source" ? "source" : "preview";
+          activeCommentAnchor = bubble;
+          renderActiveCommentCard(bubble);
+        };
+        const handleCommentCardToggle = (): void => {
+          if (commentCard.matches(":popover-open")) return;
+          activeCommentAnchor = undefined;
+          document
+            .querySelectorAll(".segment-comment-bubble.is-active")
+            .forEach((bubble) => bubble.classList.remove("is-active"));
+        };
+        app.addEventListener("click", handleCommentBubbleClick);
+        commentCard.addEventListener("toggle", handleCommentCardToggle);
+        document.addEventListener("scroll", positionCommentCard, true);
+        window.addEventListener("resize", positionCommentCard);
         requireElement<HTMLInputElement>("[data-attachment]").addEventListener(
           "change",
           (event) => {
@@ -843,6 +1060,12 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
           if (client !== undefined) yield* client.close;
           yield* Effect.sync(() => {
             yBody.unobserve(updatePreview);
+            previewElement.removeEventListener("pointerup", updatePreviewSelection);
+            previewElement.removeEventListener("keyup", updatePreviewSelection);
+            app.removeEventListener("click", handleCommentBubbleClick);
+            commentCard.removeEventListener("toggle", handleCommentCardToggle);
+            document.removeEventListener("scroll", positionCommentCard, true);
+            window.removeEventListener("resize", positionCommentCard);
             editor.destroy();
             awareness.destroy();
             yDocument.destroy();
@@ -853,38 +1076,11 @@ function renderEditor(documentId: string, shared: boolean): Effect.Effect<void, 
   );
 }
 
-function highlightCommentAnchors(preview: HTMLElement, state: CommentStateDto): void {
-  for (const existing of preview.querySelectorAll("mark.comment-anchor")) {
-    existing.replaceWith(document.createTextNode(existing.textContent ?? ""));
-  }
-  preview.normalize();
-  for (const thread of state.threads) {
-    if (thread.anchor.orphaned || thread.anchor.quote.length === 0) continue;
-    const walker = document.createTreeWalker(preview, NodeFilter.SHOW_TEXT);
-    let node = walker.nextNode();
-    while (node !== null) {
-      const value = node.textContent ?? "";
-      const offset = value.indexOf(thread.anchor.quote);
-      if (offset !== -1 && value.indexOf(thread.anchor.quote, offset + 1) === -1) {
-        const range = document.createRange();
-        range.setStart(node, offset);
-        range.setEnd(node, offset + thread.anchor.quote.length);
-        const mark = document.createElement("mark");
-        mark.className = "comment-anchor";
-        mark.dataset["threadId"] = thread.id;
-        mark.title = `Comment thread ${thread.id}`;
-        range.surroundContents(mark);
-        break;
-      }
-      node = walker.nextNode();
-    }
-  }
-}
-
 function commentHtml(thread: CommentThreadDto, canManage: boolean): string {
   const root = thread.messages[0];
   const replies = thread.messages.slice(1);
   return `<section class="comment-thread ${thread.resolved ? "is-resolved" : ""}">
+    <div class="comment-thread__heading"><span>Thread</span><button class="icon-button" type="button" data-comment-close aria-label="Close comment thread">×</button></div>
     <blockquote>${escapeHtml(thread.anchor.quote || "Orphaned selection")}</blockquote>
     ${root === undefined ? "" : messageHtml(thread.id, root.id, root.authorDisplayName, root.body)}
     ${replies.map((message) => messageHtml(thread.id, message.id, message.authorDisplayName, message.body)).join("")}

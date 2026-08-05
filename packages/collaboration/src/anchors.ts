@@ -23,7 +23,8 @@ export function createCommentAnchor(
   return Effect.sync(() => {
     const text = body.toString();
     const relativeStart = Y.createRelativePositionFromTypeIndex(body, start);
-    const relativeEnd = Y.createRelativePositionFromTypeIndex(body, end);
+    // Keep insertions made exactly after the selected text outside the anchor.
+    const relativeEnd = Y.createRelativePositionFromTypeIndex(body, end, -1);
     return {
       end: encodeBase64(Y.encodeRelativePosition(relativeEnd)),
       orphaned: false,
@@ -81,7 +82,15 @@ export function resolveCommentAnchor(
     ) {
       return { end: anchor.originalEnd, orphaned: true, start: anchor.originalStart };
     }
-    return { end: positions.end.index, orphaned: false, start: positions.start.index };
+    const resolvedStart = positions.start.index;
+    const resolvedEnd = positions.end.index;
+    const selectedTextWasDeleted =
+      anchor.originalEnd > anchor.originalStart && resolvedStart === resolvedEnd;
+    return {
+      end: resolvedEnd,
+      orphaned: anchor.orphaned || selectedTextWasDeleted,
+      start: resolvedStart,
+    };
   });
 }
 
