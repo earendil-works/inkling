@@ -27,7 +27,7 @@ import {
 import type { PreviewSourceRange, ProjectedCommentThread } from "./comments.ts";
 import { useEffectAction } from "./effect-hooks.ts";
 import { browserRuntime } from "./effect-runtime.ts";
-import { renderMermaid, useRenderedMarkdown } from "./markdown.tsx";
+import { useRenderedMarkdown } from "./markdown.tsx";
 import { guestName } from "./ui.ts";
 import { useEditorSession } from "./use-editor-session.ts";
 
@@ -109,20 +109,6 @@ export function EditorScreen({
   const canComment = permissions?.includes("comment") ?? false;
   const canEditMetadata = permissions?.includes("edit-metadata") ?? !shared;
   const rendered = useRenderedMarkdown(body, true);
-
-  useEffect(() => {
-    const preview = previewRef.current;
-    if (preview === null || rendered.html === "") return;
-    preview.innerHTML = rendered.html;
-    const fiber = browserRuntime.runFork(
-      renderMermaid(preview).pipe(
-        Effect.ensuring(Effect.sync(() => setPreviewRevision((revision) => revision + 1))),
-      ),
-    );
-    return () => {
-      browserRuntime.runFork(Fiber.interrupt(fiber));
-    };
-  }, [rendered.html]);
 
   useEffect(() => {
     if (rendered.error !== undefined) showToast(`Preview failed: ${rendered.error}`, "error");
@@ -356,7 +342,9 @@ export function EditorScreen({
         connectionState={connectionState}
         editorHostRef={editorHostRef}
         onClosePreview={() => setPreviewOpen(false)}
+        onPreviewRendered={() => setPreviewRevision((revision) => revision + 1)}
         onPreviewSelection={setPreviewSelection}
+        previewHtml={rendered.html}
         previewRef={previewRef}
       />
       <CommentControls
