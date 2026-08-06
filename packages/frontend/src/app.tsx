@@ -27,10 +27,7 @@ export function App(): React.JSX.Element {
     url: new URL(location.href),
   }));
   const routerRef = useRef<ClientRouter | undefined>(undefined);
-  const [status, setStatus] = useState<AppStatus>({
-    label: "Starting Effect runtime…",
-    state: "connecting",
-  });
+  const [status, setStatus] = useState<AppStatus>();
   const [participants, setParticipants] = useState<readonly PresenceDto[]>([]);
   const toastRef = useRef<ToastController>(null);
 
@@ -70,8 +67,12 @@ export function App(): React.JSX.Element {
   const navigating = route.state.status === "loading";
 
   useEffect(() => {
-    document.documentElement.dataset["api"] = status.state;
-  }, [status.state]);
+    if (status === undefined) {
+      delete document.documentElement.dataset["api"];
+    } else {
+      document.documentElement.dataset["api"] = status.state;
+    }
+  }, [status]);
   useEffect(() => {
     if (navigating) {
       document.documentElement.dataset["navigating"] = "";
@@ -92,7 +93,12 @@ export function App(): React.JSX.Element {
 
   return (
     <AppContext.Provider value={context}>
-      <AppHeader participants={participants} status={status} />
+      <AppHeader
+        account={route.state.data?.account}
+        api={route.state.data?.api}
+        participants={participants}
+        status={status}
+      />
       <RouteView refresh={route.refresh} state={route.state} />
       <ToastRegion ref={toastRef} />
     </AppContext.Provider>
@@ -146,6 +152,7 @@ function loadRoute(url: URL): Effect.Effect<RouteModel, ApiError> {
       }
       return api.listDocuments().pipe(
         Effect.map((catalog): RouteModel => ({
+          account: authentication.principal,
           api,
           capabilityToken,
           catalog,
@@ -174,8 +181,11 @@ function loadDocumentRoute(
       }),
     try: () => preloadDocumentScreen(screen),
   });
-  return Effect.all([api.readDocument(documentId), preload], { concurrency: "unbounded" }).pipe(
-    Effect.map(([document]): RouteModel => ({
+  return Effect.all([api.readDocument(documentId), api.authenticationStatus, preload], {
+    concurrency: "unbounded",
+  }).pipe(
+    Effect.map(([document, authentication]): RouteModel => ({
+      account: authentication.authenticated ? authentication.principal : undefined,
       api,
       capabilityToken,
       document,

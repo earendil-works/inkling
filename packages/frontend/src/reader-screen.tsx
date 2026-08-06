@@ -12,11 +12,10 @@ export interface ReaderScreenProps {
 }
 
 export function ReaderScreen({ document, shared }: ReaderScreenProps): React.JSX.Element {
-  const { setParticipants, setStatus } = useAppContext();
+  const { setParticipants } = useAppContext();
   useEffect(() => {
     setParticipants([]);
-    setStatus({ label: "Document loaded", state: "ready" });
-  }, [setParticipants, setStatus]);
+  }, [setParticipants]);
 
   return (
     <main className="reader-layout" id="app" tabIndex={-1}>

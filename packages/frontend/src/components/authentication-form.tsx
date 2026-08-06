@@ -21,7 +21,7 @@ export function AuthenticationForm({
   methods,
   mode,
 }: AuthenticationFormProps): React.JSX.Element {
-  const { navigate, setStatus } = useAppContext();
+  const { navigate } = useAppContext();
   const [password, setPassword] = useState("");
   const authentication = useEffectAction<string, void, ApiError>((value) =>
     mode === "setup" ? api.setup(value) : api.login(value),
@@ -36,10 +36,7 @@ export function AuthenticationForm({
         onSubmit={(event) => {
           event.preventDefault();
           authentication.execute(password, {
-            onSuccess: () => {
-              setStatus({ label: "Workspace connected", state: "ready" });
-              navigate("/", { replace: true });
-            },
+            onSuccess: () => navigate("/", { replace: true }),
           });
         }}
       >

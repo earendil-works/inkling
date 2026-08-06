@@ -188,6 +188,7 @@ select:disabled {
 }
 
 .masthead__right,
+.account-control,
 .api-state,
 .participants {
   display: flex;
@@ -231,6 +232,37 @@ select:disabled {
 :root[data-api="saving"] .api-state__light,
 :root[data-api="connecting"] .api-state__light {
   animation: pulse 0.9s infinite alternate;
+}
+
+.account-control {
+  min-width: 0;
+  gap: 0.65rem;
+  padding-left: 0.9rem;
+  border-left: 1px solid var(--border);
+}
+
+.account-control__identity {
+  display: flex;
+  max-width: min(16rem, 24vw);
+  min-width: 0;
+  flex-direction: column;
+  font: 0.62rem/1.25 var(--mono);
+}
+
+.account-control__identity strong,
+.account-control__identity span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-control__identity strong {
+  font-weight: 650;
+}
+
+.account-control__identity span {
+  color: var(--muted);
+  font-size: 0.56rem;
 }
 
 #app {
@@ -1644,8 +1676,18 @@ select:disabled {
 }
 
 @media (width <= 34rem) {
-  .masthead .api-state span:last-child {
+  .masthead .api-state span:last-child,
+  .account-control__identity span {
     display: none;
+  }
+
+  .masthead__right {
+    gap: 0.55rem;
+  }
+
+  .account-control {
+    gap: 0.45rem;
+    padding-left: 0.55rem;
   }
 
   .workspace-heading {

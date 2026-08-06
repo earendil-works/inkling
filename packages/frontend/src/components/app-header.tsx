@@ -3,15 +3,25 @@ import type { CSSProperties } from "react";
 
 import type { PresenceDto } from "@earendil-works/jot-protocol";
 
+import type { ApiClientService } from "../api.ts";
 import type { AppStatus } from "../app-context.tsx";
+import { AccountControl } from "./account-control.tsx";
+import type { AccountControlProps } from "./account-control.tsx";
 import { Button } from "./button.tsx";
 
 export interface AppHeaderProps {
+  readonly account: AccountControlProps["account"] | undefined;
+  readonly api: ApiClientService | undefined;
   readonly participants: readonly PresenceDto[];
-  readonly status: AppStatus;
+  readonly status: AppStatus | undefined;
 }
 
-export function AppHeader({ participants, status }: AppHeaderProps): React.JSX.Element {
+export function AppHeader({
+  account,
+  api,
+  participants,
+  status,
+}: AppHeaderProps): React.JSX.Element {
   const [theme, setTheme] = useState<"dark" | "light">(() =>
     document.documentElement.dataset["theme"] === "dark" ? "dark" : "light",
   );
@@ -49,10 +59,12 @@ export function AppHeader({ participants, status }: AppHeaderProps): React.JSX.E
             </span>
           ))}
         </div>
-        <div className="api-state" role="status" aria-live="polite">
-          <span className="api-state__light" aria-hidden="true" />
-          <span data-api-status="">{status.label}</span>
-        </div>
+        {status === undefined ? null : (
+          <div className="api-state" role="status" aria-live="polite">
+            <span className="api-state__light" aria-hidden="true" />
+            <span data-api-status="">{status.label}</span>
+          </div>
+        )}
         <Button
           aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
           data-theme-toggle=""
@@ -63,6 +75,9 @@ export function AppHeader({ participants, status }: AppHeaderProps): React.JSX.E
         >
           ◐
         </Button>
+        {account === undefined || api === undefined ? null : (
+          <AccountControl account={account} api={api} />
+        )}
       </div>
     </header>
   );

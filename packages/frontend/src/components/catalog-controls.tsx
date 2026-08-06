@@ -2,7 +2,6 @@ import { useState } from "react";
 
 import type { ApiClientService } from "../api.ts";
 import { Button } from "./button.tsx";
-import { LogoutButton } from "./logout-button.tsx";
 import { SettingsDialog } from "./settings-dialog.tsx";
 import { TextField } from "./text-field.tsx";
 
@@ -34,7 +33,6 @@ export function CatalogControls({
         <Button variant="text" data-settings="" onClick={() => setSettingsOpen(true)}>
           API &amp; agents
         </Button>
-        <LogoutButton api={api} />
       </section>
       {settingsOpen ? <SettingsDialog api={api} onClose={() => setSettingsOpen(false)} /> : null}
     </>

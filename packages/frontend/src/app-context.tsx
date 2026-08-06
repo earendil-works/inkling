@@ -3,11 +3,12 @@ import type { Dispatch, SetStateAction } from "react";
 
 import type { PresenceDto } from "@earendil-works/jot-protocol";
 
+import type { ConnectionState } from "./collaboration.ts";
 import type { NavigateOptions } from "./navigation.ts";
 
 export interface AppStatus {
   readonly label: string;
-  readonly state: string;
+  readonly state: ConnectionState;
 }
 
 export type ToastKind = "error" | "success";
@@ -16,7 +17,7 @@ export interface AppContextValue {
   readonly navigate: (destination: string | URL, options?: NavigateOptions) => void;
   readonly refreshRoute: () => void;
   readonly setParticipants: Dispatch<SetStateAction<readonly PresenceDto[]>>;
-  readonly setStatus: Dispatch<SetStateAction<AppStatus>>;
+  readonly setStatus: Dispatch<SetStateAction<AppStatus | undefined>>;
   readonly showToast: (message: string, kind: ToastKind) => void;
 }
 

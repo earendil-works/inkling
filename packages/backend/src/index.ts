@@ -112,16 +112,20 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
   );
 
   app.post("/api/auth/logout", (context) =>
-    execute(context, options, (service) =>
-      requireMutationProtection(context).pipe(
-        Effect.zipRight(service.logout(credentials(context))),
-        Effect.tap(() =>
-          Effect.sync(() => {
-            deleteCookie(context, "jot_session", { path: "/" });
-            deleteCookie(context, "jot_csrf", { path: "/" });
-          }),
+    execute(
+      context,
+      options,
+      (service) =>
+        requireMutationProtection(context).pipe(
+          Effect.zipRight(service.logout(credentials(context))),
+          Effect.tap(() =>
+            Effect.sync(() => {
+              deleteCookie(context, "jot_session", { path: "/" });
+              deleteCookie(context, "jot_csrf", { path: "/" });
+            }),
+          ),
         ),
-      ),
+      () => context.json({}),
     ),
   );
 

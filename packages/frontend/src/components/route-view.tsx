@@ -20,6 +20,7 @@ const EditorScreen = lazy(loadEditorScreen);
 const ReaderScreen = lazy(loadReaderScreen);
 
 interface RouteBase {
+  readonly account?: NonNullable<AuthenticationStatus["principal"]> | undefined;
   readonly api: ApiClientService;
   readonly capabilityToken: string | undefined;
 }

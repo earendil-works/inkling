@@ -38,6 +38,9 @@ test(
         .locator("[data-auth-form]")
         .evaluate((form: HTMLFormElement) => form.requestSubmit());
       await first.waitForSelector("[data-new-document]");
+      assert.equal(await first.locator("[data-account-name]").textContent(), "Owner");
+      assert.equal(await first.locator("[data-api-status]").count(), 0);
+      assert.equal(await first.locator(".catalog-tools [data-logout]").count(), 0);
       const initialTheme = await first.locator("html").getAttribute("data-theme");
       await first.locator("[data-theme-toggle]").dblclick();
       assert.notEqual(await first.locator("html").getAttribute("data-theme"), initialTheme);
@@ -58,6 +61,7 @@ test(
       const documentId = first.url().split("/").at(-1);
       assert.ok(documentId);
       await first.waitForSelector("[data-reader]");
+      assert.equal(await first.locator("[data-api-status]").count(), 0);
       assert.equal(await first.locator(".cm-editor").count(), 0);
       assert.match(await first.locator("[data-preview]").innerText(), /Shared starting body/u);
       await first.waitForSelector("[data-preview] .tok-keyword");
@@ -76,6 +80,7 @@ test(
       await first.waitForFunction(
         () => document.querySelector("[data-save-state]")?.textContent === "Saved",
       );
+      assert.equal(await first.locator("[data-api-status]").textContent(), "Saved");
       await first.waitForSelector(".cm-content .tok-keyword");
       const editorKeyword = first.locator(".cm-content .tok-keyword").last();
       assert.equal(await editorKeyword.textContent(), "const");
@@ -304,6 +309,7 @@ test(
       const shared = await sharedContext.newPage();
       await shared.goto(capabilityUrl);
       await shared.waitForSelector("[data-reader]");
+      assert.equal(await shared.locator("[data-account]").count(), 0);
       assert.equal(await shared.locator(".cm-editor").count(), 0);
       await shared.locator("[data-open-editor]").click();
       await shared.getByLabel("Display name").fill("Browser reviewer");
@@ -351,6 +357,14 @@ test(
         true,
       );
       await sharedContext.close();
+      const logoutResponse = first.waitForResponse((response) =>
+        response.url().endsWith("/api/auth/logout"),
+      );
+      await first.locator("[data-logout]").click();
+      assert.equal((await logoutResponse).status(), 200);
+      await first.waitForSelector("[data-auth-form]");
+      assert.equal(await first.locator("[data-account]").count(), 0);
+      assert.equal(await first.locator("[data-api-status]").count(), 0);
       await context.close();
     } finally {
       await browser.close();

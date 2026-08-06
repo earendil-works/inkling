@@ -306,7 +306,12 @@ export const AuthenticationStatusSchema = Schema.Struct({
   authenticated: Schema.Boolean,
   needsSetup: Schema.Boolean,
   principal: Schema.optional(
-    Schema.Struct({ displayName: Schema.String, id: Schema.String, role: Schema.String }),
+    Schema.Struct({
+      displayName: Schema.String,
+      email: Schema.optional(Schema.String),
+      id: Schema.String,
+      role: Schema.String,
+    }),
   ),
 });
 export type AuthenticationStatus = typeof AuthenticationStatusSchema.Type;

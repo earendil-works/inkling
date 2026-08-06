@@ -988,25 +988,27 @@ export function makeLocalJotApplication(
           const principal = yield* resolvePrincipal(credentials).pipe(
             Effect.catchAll(() => Effect.succeed({ kind: "anonymous" } as const)),
           );
-          return principal.kind === "workspace" || principal.kind === "api-key"
-            ? {
-                authenticated: true,
-                authenticationMethods: options.authenticationMethods ?? ["password"],
-                needsSetup: false,
-                principal: {
-                  displayName:
-                    state.authentication.sessions.find(
-                      (session) => session.personId === principal.personId,
-                    )?.displayName ?? "Owner",
-                  id: principal.personId,
-                  role: principal.role,
-                },
-              }
-            : {
-                authenticated: false,
-                authenticationMethods: options.authenticationMethods ?? ["password"],
-                needsSetup: false,
-              };
+          if (principal.kind === "workspace" || principal.kind === "api-key") {
+            const session = state.authentication.sessions.find(
+              (candidate) => candidate.personId === principal.personId,
+            );
+            return {
+              authenticated: true,
+              authenticationMethods: options.authenticationMethods ?? ["password"],
+              needsSetup: false,
+              principal: {
+                displayName: session?.displayName ?? "Owner",
+                email: session?.email,
+                id: principal.personId,
+                role: principal.role,
+              },
+            };
+          }
+          return {
+            authenticated: false,
+            authenticationMethods: options.authenticationMethods ?? ["password"],
+            needsSetup: false,
+          };
         }),
       createApiKey: (credentials, label) =>
         Effect.gen(function* () {

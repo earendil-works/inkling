@@ -1,9 +1,8 @@
-import { useDeferredValue, useEffect, useState } from "react";
+import { useDeferredValue, useState } from "react";
 
 import type { CatalogResponse } from "@earendil-works/jot-protocol";
 
 import type { ApiClientService } from "./api.ts";
-import { useAppContext } from "./app-context.tsx";
 import { CatalogControls } from "./components/catalog-controls.tsx";
 import { DocumentCatalog } from "./components/document-catalog.tsx";
 import { NewDocumentControl } from "./components/new-document-control.tsx";
@@ -15,7 +14,6 @@ export interface WorkspaceScreenProps {
 }
 
 export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): React.JSX.Element {
-  const { setStatus } = useAppContext();
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
   const catalogQuery = useEffectQuery(
@@ -23,10 +21,6 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
     `catalog:${deferredSearch}`,
   );
   const catalog = catalogQuery.state.data ?? initialCatalog;
-
-  useEffect(() => {
-    setStatus({ label: "Workspace connected", state: "ready" });
-  }, [setStatus]);
 
   return (
     <main className="workspace-layout" id="app" tabIndex={-1}>

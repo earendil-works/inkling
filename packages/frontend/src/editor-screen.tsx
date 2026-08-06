@@ -57,10 +57,15 @@ export function EditorScreen({
     },
     onState: (state) => {
       setConnectionState(state);
-      setStatus({ label: connectionLabel(state), state: state === "ready" ? "ready" : state });
+      setStatus({ label: connectionLabel(state), state });
     },
     shared,
   });
+  useEffect(() => {
+    setStatus({ label: connectionLabel("connecting"), state: "connecting" });
+    return () => setStatus(undefined);
+  }, [setStatus]);
+
   const canEdit = permissions?.includes("edit-body") ?? initiallyEditable;
   const canComment = permissions?.includes("comment") ?? false;
   const canEditMetadata = permissions?.includes("edit-metadata") ?? !shared;
