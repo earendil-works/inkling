@@ -4,6 +4,7 @@ import { Effect } from "effect";
 
 import { makeMarkdownRenderer } from "@earendil-works/jot-renderer";
 
+import { mountMermaidDiagramControls } from "./components/mermaid-diagram-controls.ts";
 import { useEffectQuery } from "./effect-hooks.ts";
 
 const renderer = makeMarkdownRenderer();
@@ -41,8 +42,7 @@ export function renderMermaid(root: ParentNode): Effect.Effect<void> {
           const code = diagram.querySelector("code")?.textContent ?? "";
           const rendered = await mermaid.render(`jot-mermaid-${++diagramGeneration}`, code);
           if (!diagram.isConnected) return;
-          diagram.innerHTML = `<div class="mermaid-viewport">${rendered.svg}</div><div class="jot-mermaid__controls"><button type="button" data-mermaid-zoom-in aria-label="Zoom in">+</button><button type="button" data-mermaid-zoom-out aria-label="Zoom out">−</button><button type="button" data-mermaid-reset>Reset</button></div>`;
-          bindMermaidControls(diagram);
+          mountMermaidDiagramControls(diagram, rendered.svg);
         }),
       );
     },
@@ -59,44 +59,4 @@ function loadMermaid(): Promise<Mermaid> {
     return mermaid;
   });
   return mermaidPromise;
-}
-
-function bindMermaidControls(diagram: HTMLElement): void {
-  const viewport = diagram.querySelector<HTMLElement>(".mermaid-viewport");
-  if (viewport === null) return;
-  let scale = 1;
-  let offsetX = 0;
-  let offsetY = 0;
-  let dragStart: { readonly x: number; readonly y: number } | undefined;
-  const applyTransform = (): void => {
-    viewport.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
-  };
-  diagram.querySelector("[data-mermaid-zoom-in]")?.addEventListener("click", () => {
-    scale = Math.min(4, scale + 0.2);
-    applyTransform();
-  });
-  diagram.querySelector("[data-mermaid-zoom-out]")?.addEventListener("click", () => {
-    scale = Math.max(0.4, scale - 0.2);
-    applyTransform();
-  });
-  diagram.querySelector("[data-mermaid-reset]")?.addEventListener("click", () => {
-    scale = 1;
-    offsetX = 0;
-    offsetY = 0;
-    applyTransform();
-  });
-  viewport.addEventListener("pointerdown", (event) => {
-    dragStart = { x: event.clientX - offsetX, y: event.clientY - offsetY };
-    viewport.setPointerCapture(event.pointerId);
-  });
-  viewport.addEventListener("pointermove", (event) => {
-    if (dragStart === undefined) return;
-    offsetX = event.clientX - dragStart.x;
-    offsetY = event.clientY - dragStart.y;
-    applyTransform();
-  });
-  viewport.addEventListener("pointerup", (event) => {
-    dragStart = undefined;
-    viewport.releasePointerCapture(event.pointerId);
-  });
 }
