@@ -12,7 +12,7 @@ import type {
 import type { ApiClientService, ApiError } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
 import { Button } from "./components/button.tsx";
-import { Input } from "./components/input.tsx";
+import { TextField } from "./components/text-field.tsx";
 import { Textarea } from "./components/textarea.tsx";
 import { useEffectAction, useEffectQuery } from "./effect-hooks.ts";
 import { formatDate, randomId } from "./ui.ts";
@@ -79,16 +79,15 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
         </Button>
       </section>
       <section className="catalog-tools" aria-label="Document tools">
-        <label className="search-field">
-          <span>Search</span>
-          <Input
-            data-search=""
-            onChange={(event) => setSearch(event.currentTarget.value)}
-            placeholder="Title, body, people, state…"
-            type="search"
-            value={search}
-          />
-        </label>
+        <TextField
+          className="search-field"
+          data-search=""
+          label="Search"
+          onChange={(event) => setSearch(event.currentTarget.value)}
+          placeholder="Title, body, people, state…"
+          type="search"
+          value={search}
+        />
         <Button variant="text" data-settings="" onClick={() => setSettingsOpen(true)} type="button">
           API &amp; agents
         </Button>
@@ -108,19 +107,17 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
               ×
             </Button>
           </div>
-          <label>
-            Title
-            <Input
-              autoFocus
-              maxLength={300}
-              name="title"
-              onChange={(event) => setTitle(event.currentTarget.value)}
-              required
-              value={title}
-            />
-          </label>
+          <TextField
+            autoFocus
+            label="Title"
+            maxLength={300}
+            name="title"
+            onChange={(event) => setTitle(event.currentTarget.value)}
+            required
+            value={title}
+          />
           <label className="checkbox">
-            <Input
+            <input
               checked={allocateRfc}
               name="rfc"
               onChange={(event) => setAllocateRfc(event.currentTarget.checked)}
@@ -301,16 +298,14 @@ function SettingsDialog({ api, onClose }: SettingsDialogProps): React.JSX.Elemen
             </div>
           ))}
         </div>
-        <label>
-          New key label
-          <Input
-            maxLength={200}
-            name="api-key-label"
-            onChange={(event) => setLabel(event.currentTarget.value)}
-            placeholder="Laptop agent"
-            value={label}
-          />
-        </label>
+        <TextField
+          label="New key label"
+          maxLength={200}
+          name="api-key-label"
+          onChange={(event) => setLabel(event.currentTarget.value)}
+          placeholder="Laptop agent"
+          value={label}
+        />
         <Button variant="primary" disabled={createKey.state.pending} type="submit">
           Create API key
         </Button>

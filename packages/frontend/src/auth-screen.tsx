@@ -6,7 +6,7 @@ import type { ApiClientService, ApiError } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
 import { ButtonLink } from "./components/button-link.tsx";
 import { Button } from "./components/button.tsx";
-import { Input } from "./components/input.tsx";
+import { TextField } from "./components/text-field.tsx";
 import { useEffectAction } from "./effect-hooks.ts";
 
 export interface AuthenticationScreenProps {
@@ -53,19 +53,17 @@ export function AuthenticationScreen({
         <form data-auth-form="" onSubmit={submit}>
           {methods.includes("password") ? (
             <>
-              <label>
-                Password
-                <Input
-                  autoComplete={mode === "setup" ? "new-password" : "current-password"}
-                  autoFocus
-                  minLength={12}
-                  name="password"
-                  onChange={(event) => setPassword(event.currentTarget.value)}
-                  required
-                  type="password"
-                  value={password}
-                />
-              </label>
+              <TextField
+                autoComplete={mode === "setup" ? "new-password" : "current-password"}
+                autoFocus
+                label="Password"
+                minLength={12}
+                name="password"
+                onChange={(event) => setPassword(event.currentTarget.value)}
+                required
+                type="password"
+                value={password}
+              />
               <Button variant="primary" disabled={authentication.state.pending} type="submit">
                 {authentication.state.pending
                   ? "Connecting…"

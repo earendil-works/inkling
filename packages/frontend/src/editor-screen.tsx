@@ -26,7 +26,7 @@ import { makeCollaborationClient } from "./collaboration.ts";
 import type { CollaborationClient, ConnectionState } from "./collaboration.ts";
 import { ButtonLink } from "./components/button-link.tsx";
 import { Button } from "./components/button.tsx";
-import { Input } from "./components/input.tsx";
+import { TextField } from "./components/text-field.tsx";
 import { CommentComposer } from "./comment-composer.tsx";
 import {
   commentDecorationsExtension,
@@ -464,7 +464,7 @@ export function EditorScreen({
               ? "Document"
               : `RFC ${String(metadata.rfcNumber).padStart(4, "0")}`}
           </span>
-          <Input
+          <input
             aria-label="Document title"
             className="title-input"
             data-title=""
@@ -496,7 +496,7 @@ export function EditorScreen({
           </Button>
           <label className="toolbar-button attachment-button">
             Attach
-            <Input
+            <input
               accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain"
               data-attachment=""
               disabled={!canEdit}
@@ -602,24 +602,22 @@ export function EditorScreen({
                   <option value="confidential">Confidential</option>
                 </select>
               </label>
-              <label>
-                Labels
-                <Input
-                  data-labels=""
-                  disabled={!canEditMetadata}
-                  onBlur={() =>
-                    updateMetadata({
-                      labels: labelsDraft
-                        .split(",")
-                        .map((label) => label.trim())
-                        .filter(Boolean),
-                    })
-                  }
-                  onChange={(event) => setLabelsDraft(event.currentTarget.value)}
-                  placeholder="Comma separated"
-                  value={labelsDraft}
-                />
-              </label>
+              <TextField
+                data-labels=""
+                disabled={!canEditMetadata}
+                label="Labels"
+                onBlur={() =>
+                  updateMetadata({
+                    labels: labelsDraft
+                      .split(",")
+                      .map((label) => label.trim())
+                      .filter(Boolean),
+                  })
+                }
+                onChange={(event) => setLabelsDraft(event.currentTarget.value)}
+                placeholder="Comma separated"
+                value={labelsDraft}
+              />
             </div>
           </details>
           {shared ? null : (
@@ -749,7 +747,7 @@ export function EditorScreen({
           Comment on selection
         </Button>
         <label className="resolved-toggle">
-          <Input
+          <input
             checked={showResolved}
             data-show-resolved=""
             onChange={(event) => setShowResolved(event.currentTarget.checked)}
