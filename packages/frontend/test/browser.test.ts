@@ -146,20 +146,27 @@ test(
           "Shared starting body",
         ),
       );
-      const sourceBubbleAlignment = await second
+      const sourceBubbleLayout = await second
         .locator('.segment-comment-bubble[data-comment-surface="source"]')
         .evaluate((bubble) => {
+          const anchor = bubble.parentElement;
           const bubbleBounds = bubble.getBoundingClientRect();
           const lineBounds = bubble.closest(".cm-line")?.getBoundingClientRect();
           return {
+            anchorDisplay: anchor === null ? undefined : getComputedStyle(anchor).display,
+            anchorWidth: anchor?.getBoundingClientRect().width ?? 0,
             bubbleCenter: bubbleBounds.top + bubbleBounds.height / 2,
+            bubblePosition: getComputedStyle(bubble).position,
             lineCenter:
               lineBounds === undefined ? undefined : lineBounds.top + lineBounds.height / 2,
           };
         });
-      assert.notEqual(sourceBubbleAlignment.lineCenter, undefined);
+      assert.equal(sourceBubbleLayout.anchorDisplay, "inline-flex");
+      assert.ok(sourceBubbleLayout.anchorWidth > 0);
+      assert.equal(sourceBubbleLayout.bubblePosition, "relative");
+      assert.notEqual(sourceBubbleLayout.lineCenter, undefined);
       assert.ok(
-        Math.abs(sourceBubbleAlignment.bubbleCenter - (sourceBubbleAlignment.lineCenter ?? 0)) < 2,
+        Math.abs(sourceBubbleLayout.bubbleCenter - (sourceBubbleLayout.lineCenter ?? 0)) < 2,
       );
       const editorGeometryAfterComment = await second.evaluate(() =>
         [...document.querySelectorAll<HTMLElement>(".cm-line")].slice(0, 2).map((line) => {

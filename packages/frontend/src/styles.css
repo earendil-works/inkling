@@ -1234,18 +1234,16 @@ select:disabled {
 }
 
 .cm-comment-bubble-anchor {
-  position: relative;
-  display: inline;
-  width: 0;
-  height: 0;
-  line-height: 0;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.35rem;
+  line-height: 1;
+  vertical-align: top;
+  white-space: nowrap;
 }
 
 .cm-content .segment-comment-bubble {
-  position: absolute;
   z-index: 3;
-  bottom: -0.2rem;
-  left: 0.35rem;
   min-width: 2.35rem;
   height: 1.35rem;
   margin: 0;
