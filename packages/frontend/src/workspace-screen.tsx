@@ -1,26 +1,18 @@
 import { useDeferredValue, useEffect, useState } from "react";
 import { Effect } from "effect";
 
-import type {
-  ApiKeyCreated,
-  ApiKeyDto,
-  CatalogResponse,
-  CreateDocumentRequest,
-  DocumentResponse,
-} from "@earendil-works/jot-protocol";
+import type { ApiKeyCreated, ApiKeyDto, CatalogResponse } from "@earendil-works/jot-protocol";
 
 import type { ApiClientService, ApiError } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
 import { Button } from "./components/button.tsx";
-import { CheckboxField } from "./components/checkbox-field.tsx";
 import { DocumentCatalog } from "./components/document-catalog.tsx";
 import { FormError } from "./components/form-error.tsx";
 import { LogoutButton } from "./components/logout-button.tsx";
 import { ModalDialog } from "./components/modal-dialog.tsx";
-import { TextareaField } from "./components/textarea-field.tsx";
+import { NewDocumentDialog } from "./components/new-document-dialog.tsx";
 import { TextField } from "./components/text-field.tsx";
 import { useEffectAction, useEffectQuery } from "./effect-hooks.ts";
-import { randomId } from "./ui.ts";
 
 export interface WorkspaceScreenProps {
   readonly api: ApiClientService;
@@ -28,7 +20,7 @@ export interface WorkspaceScreenProps {
 }
 
 export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): React.JSX.Element {
-  const { navigate, setStatus } = useAppContext();
+  const { setStatus } = useAppContext();
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
   const catalogQuery = useEffectQuery(
@@ -36,36 +28,12 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
     `catalog:${deferredSearch}`,
   );
   const [newDocumentOpen, setNewDocumentOpen] = useState(false);
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [allocateRfc, setAllocateRfc] = useState(false);
-  const createDocument = useEffectAction<CreateDocumentRequest, DocumentResponse, ApiError>(
-    (input) => api.createDocument(input),
-  );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const catalog = catalogQuery.state.data ?? initialCatalog;
 
   useEffect(() => {
     setStatus({ label: "Workspace connected", state: "ready" });
   }, [setStatus]);
-
-  const submitDocument = (event: React.FormEvent<HTMLFormElement>): void => {
-    event.preventDefault();
-    createDocument.execute(
-      {
-        allocateRfc,
-        body,
-        creationKey: randomId("request"),
-        title,
-      },
-      {
-        onSuccess: (document) => {
-          setNewDocumentOpen(false);
-          navigate(`/documents/${encodeURIComponent(document.metadata.id)}`);
-        },
-      },
-    );
-  };
 
   return (
     <main className="workspace-layout" id="app" tabIndex={-1}>
@@ -99,53 +67,11 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
         <LogoutButton api={api} />
       </section>
       <DocumentCatalog catalog={catalog} />
-      <ModalDialog
-        className="new-document"
-        data-new-dialog=""
+      <NewDocumentDialog
+        api={api}
         onDismiss={() => setNewDocumentOpen(false)}
         open={newDocumentOpen}
-      >
-        <form data-new-form="" onSubmit={submitDocument}>
-          <div className="dialog-heading">
-            <p className="eyebrow">Begin a working head</p>
-            <Button
-              aria-label="Close"
-              variant="icon"
-              onClick={() => setNewDocumentOpen(false)}
-              type="button"
-            >
-              ×
-            </Button>
-          </div>
-          <TextField
-            autoFocus
-            label="Title"
-            maxLength={300}
-            name="title"
-            onChange={(event) => setTitle(event.currentTarget.value)}
-            required
-            value={title}
-          />
-          <CheckboxField
-            checked={allocateRfc}
-            label="Allocate an RFC number"
-            name="rfc"
-            onChange={(event) => setAllocateRfc(event.currentTarget.checked)}
-          />
-          <TextareaField
-            label="Opening Markdown"
-            name="body"
-            onChange={(event) => setBody(event.currentTarget.value)}
-            placeholder={"# Context\n\nStart with the decision…"}
-            rows={9}
-            value={body}
-          />
-          <Button variant="primary" disabled={createDocument.state.pending} type="submit">
-            {createDocument.state.pending ? "Creating…" : "Create document"}
-          </Button>
-          <FormError data-new-error="">{createDocument.state.error?.message}</FormError>
-        </form>
-      </ModalDialog>
+      />
       {settingsOpen ? <SettingsDialog api={api} onClose={() => setSettingsOpen(false)} /> : null}
     </main>
   );
