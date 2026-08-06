@@ -50,9 +50,9 @@ test("fenced code is syntax highlighted with language metadata", async () => {
     rendered.html,
     /<pre class="jot-code" data-jot-source-start="0" data-jot-source-end="34"/u,
   );
-  assert.match(rendered.html, /<code class="hljs language-ts">/u);
-  assert.match(rendered.html, /<span class="hljs-keyword">const<\/span>/u);
-  assert.match(rendered.html, /<span class="hljs-built_in">number<\/span>/u);
+  assert.match(rendered.html, /<code class="jot-syntax language-ts">/u);
+  assert.match(rendered.html, /<span class="tok-keyword">const<\/span>/u);
+  assert.match(rendered.html, /<span class="tok-typeName">number<\/span>/u);
 });
 
 test("unknown fenced languages remain escaped", async () => {

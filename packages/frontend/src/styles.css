@@ -1386,79 +1386,66 @@ select:disabled {
   font: 0.8rem/1.55 var(--mono);
 }
 
-.markdown-body .hljs-doctag,
-.markdown-body .hljs-keyword,
-.markdown-body .hljs-meta .hljs-keyword,
-.markdown-body .hljs-template-tag,
-.markdown-body .hljs-template-variable,
-.markdown-body .hljs-type,
-.markdown-body .hljs-variable.language_ {
+:is(.markdown-body, .cm-content) .tok-keyword,
+:is(.markdown-body, .cm-content) .tok-atom,
+:is(.markdown-body, .cm-content) .tok-bool {
   color: var(--code-keyword);
 }
 
-.markdown-body .hljs-title,
-.markdown-body .hljs-title.class_,
-.markdown-body .hljs-title.class_.inherited__,
-.markdown-body .hljs-title.function {
+:is(.markdown-body, .cm-content) .tok-typeName,
+:is(.markdown-body, .cm-content) .tok-className,
+:is(.markdown-body, .cm-content) .tok-namespace,
+:is(.markdown-body, .cm-content) .tok-heading {
   color: var(--code-title);
 }
 
-.markdown-body .hljs-attr,
-.markdown-body .hljs-attribute,
-.markdown-body .hljs-literal,
-.markdown-body .hljs-meta,
-.markdown-body .hljs-number,
-.markdown-body .hljs-operator,
-.markdown-body .hljs-selector-attr,
-.markdown-body .hljs-selector-class,
-.markdown-body .hljs-selector-id,
-.markdown-body .hljs-variable {
+:is(.markdown-body, .cm-content) .tok-variableName,
+:is(.markdown-body, .cm-content) .tok-propertyName,
+:is(.markdown-body, .cm-content) .tok-labelName,
+:is(.markdown-body, .cm-content) .tok-literal,
+:is(.markdown-body, .cm-content) .tok-number,
+:is(.markdown-body, .cm-content) .tok-operator,
+:is(.markdown-body, .cm-content) .tok-link {
   color: var(--code-attribute);
 }
 
-.markdown-body .hljs-meta .hljs-string,
-.markdown-body .hljs-regexp,
-.markdown-body .hljs-string,
-.markdown-body .hljs-name,
-.markdown-body .hljs-selector-pseudo,
-.markdown-body .hljs-selector-tag {
+:is(.markdown-body, .cm-content) .tok-string,
+:is(.markdown-body, .cm-content) .tok-string2,
+:is(.markdown-body, .cm-content) .tok-url {
   color: var(--code-string);
 }
 
-.markdown-body .hljs-built_in,
-.markdown-body .hljs-bullet,
-.markdown-body .hljs-symbol {
+:is(.markdown-body, .cm-content) .tok-macroName,
+:is(.markdown-body, .cm-content) .tok-variableName2 {
   color: var(--code-symbol);
 }
 
-.markdown-body .hljs-code,
-.markdown-body .hljs-comment,
-.markdown-body .hljs-formula,
-.markdown-body .hljs-quote {
+:is(.markdown-body, .cm-content) .tok-comment,
+:is(.markdown-body, .cm-content) .tok-meta {
   color: var(--code-comment);
 }
 
-.markdown-body .hljs-section {
-  color: var(--code-attribute);
-  font-weight: 700;
-}
-
-.markdown-body .hljs-emphasis {
+:is(.markdown-body, .cm-content) .tok-emphasis {
   font-style: italic;
 }
 
-.markdown-body .hljs-strong {
+:is(.markdown-body, .cm-content) .tok-strong {
   font-weight: 700;
 }
 
-.markdown-body .hljs-addition {
+:is(.markdown-body, .cm-content) .tok-inserted {
   background: var(--code-addition);
   color: var(--code-string);
 }
 
-.markdown-body .hljs-deletion {
+:is(.markdown-body, .cm-content) .tok-deleted {
   background: var(--code-deletion);
   color: var(--code-keyword);
+}
+
+:is(.markdown-body, .cm-content) .tok-invalid {
+  color: var(--danger);
+  text-decoration: underline wavy;
 }
 
 .markdown-body :not(pre) > code {

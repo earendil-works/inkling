@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { markdown } from "@codemirror/lang-markdown";
-import { languages } from "@codemirror/language-data";
+import { syntaxHighlighting } from "@codemirror/language";
 import { Compartment, EditorState } from "@codemirror/state";
-import { oneDark } from "@codemirror/theme-one-dark";
+import { oneDarkTheme } from "@codemirror/theme-one-dark";
 import { EditorView, basicSetup } from "codemirror";
 import { Effect, Fiber } from "effect";
 import { Awareness } from "y-protocols/awareness";
@@ -14,6 +14,7 @@ import type {
   DocumentMetadataDto,
   PresenceDto,
 } from "@earendil-works/jot-protocol";
+import { findJotCodeLanguage, jotSyntaxHighlighter } from "@earendil-works/jot-renderer";
 
 import { makeCollaborationClient } from "./collaboration.ts";
 import type { CollaborationClient, ConnectionState } from "./collaboration.ts";
@@ -90,11 +91,12 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
       state: EditorState.create({
         extensions: [
           basicSetup,
-          markdown({ codeLanguages: languages }),
+          syntaxHighlighting(jotSyntaxHighlighter),
+          markdown({ codeLanguages: findJotCodeLanguage }),
           yCollab(yBody, awareness),
           commentDecorationsExtension,
           editable.of(EditorView.editable.of(initiallyEditable)),
-          theme.of(document.documentElement.dataset["theme"] === "dark" ? oneDark : []),
+          theme.of(document.documentElement.dataset["theme"] === "dark" ? oneDarkTheme : []),
           EditorView.lineWrapping,
           EditorView.updateListener.of((update) => {
             if (!update.selectionSet || client === undefined) return;
@@ -115,7 +117,7 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
     const themeObserver = new MutationObserver(() => {
       editor.dispatch({
         effects: theme.reconfigure(
-          document.documentElement.dataset["theme"] === "dark" ? oneDark : [],
+          document.documentElement.dataset["theme"] === "dark" ? oneDarkTheme : [],
         ),
       });
     });

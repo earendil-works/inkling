@@ -161,7 +161,7 @@ test(
         assert.equal(published.status, 200);
         const publishedHtml = await published.text();
         assert.match(publishedHtml, /Integrated RFC/u);
-        assert.match(publishedHtml, /class="hljs-keyword">const<\/span>/u);
+        assert.match(publishedHtml, /class="tok-keyword">const<\/span>/u);
         assert.match(publishedHtml, /--code-keyword:#a13f59/u);
         document = await readDocument(baseUrl, document.metadata.id, authorization);
         const workingTitle = await fetch(

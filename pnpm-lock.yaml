@@ -86,9 +86,9 @@ importers:
       '@codemirror/lang-markdown':
         specifier: 6.5.1
         version: 6.5.1
-      '@codemirror/language-data':
-        specifier: 6.5.2
-        version: 6.5.2
+      '@codemirror/language':
+        specifier: 6.12.4
+        version: 6.12.4
       '@codemirror/state':
         specifier: 6.7.1
         version: 6.7.1
@@ -171,12 +171,18 @@ importers:
 
   packages/renderer:
     dependencies:
+      '@codemirror/language':
+        specifier: 6.12.4
+        version: 6.12.4
+      '@codemirror/language-data':
+        specifier: 6.5.2
+        version: 6.5.2
+      '@lezer/highlight':
+        specifier: 1.2.3
+        version: 1.2.3
       effect:
         specifier: 3.22.1
         version: 3.22.1
-      highlight.js:
-        specifier: 11.11.1
-        version: 11.11.1
       markdown-it:
         specifier: 15.0.0
         version: 15.0.0
@@ -1835,10 +1841,6 @@ packages:
 
   hachure-fill@0.5.2:
     resolution: {integrity: sha512-3GKBOn+m2LX9iq+JC1064cSFprJY4jL1jCXTcpnfER5HYE2l/4EfWSGzkPa/ZDBmYI0ZOEj5VHV/eKnPGkHuOg==}
-
-  highlight.js@11.11.1:
-    resolution: {integrity: sha512-Xwwo44whKBVCYoliBQwaPvtd/2tYFkRQtXDWj1nackaV2JPXx3L0+Jvd8/qCJ2p+ML0/XVkJ2q+Mr+UVdpJK5w==}
-    engines: {node: '>=12.0.0'}
 
   hono@4.13.0:
     resolution: {integrity: sha512-jhunvfHWxd7J5EFfSgH4xsYJzSe/lfqbUCxiyyeaQasUsXeEHXtzVid+7EOGByc5JnFa23SSFL3Y2RV/z1T+eQ==}
@@ -3722,8 +3724,6 @@ snapshots:
     optional: true
 
   hachure-fill@0.5.2: {}
-
-  highlight.js@11.11.1: {}
 
   hono@4.13.0: {}
 

@@ -1,7 +1,12 @@
+import { LanguageDescription } from "@codemirror/language";
+import { languages } from "@codemirror/language-data";
+import { classHighlighter, highlightCode } from "@lezer/highlight";
 import { Context, Data, Effect, Layer } from "effect";
-import hljs from "highlight.js";
 import MarkdownIt from "markdown-it";
 import type { MarkdownIt as MarkdownItType, Token } from "markdown-it";
+
+const jotCodeLanguages = languages;
+export const jotSyntaxHighlighter = classHighlighter;
 
 export interface RenderHeading {
   readonly depth: number;
@@ -45,14 +50,14 @@ export function makeMarkdownRenderer(): MarkdownRendererService {
     render: (markdown, options = {}) =>
       markdown.length > 5_000_000
         ? Effect.fail(new RenderError({ message: "Markdown exceeds the 5 MB render limit." }))
-        : Effect.try({
+        : Effect.tryPromise({
             catch: (cause) => new RenderError({ cause, message: "Markdown rendering failed." }),
             try: () => renderMarkdown(markdown, options),
           }),
   };
 }
 
-function renderMarkdown(markdown: string, options: RenderOptions): RenderedMarkdown {
+async function renderMarkdown(markdown: string, options: RenderOptions): Promise<RenderedMarkdown> {
   const headings: RenderHeading[] = [];
   const usedHeadingIds = new Map<string, number>();
   const lineOffsets = sourceLineOffsets(markdown);
@@ -108,12 +113,13 @@ function renderMarkdown(markdown: string, options: RenderOptions): RenderedMarkd
       }
       return `<div class="jot-mermaid" data-mermaid${sourceAttributes}><pre><code>${parser.utils.escapeHtml(source)}</code></pre><div class="jot-mermaid__controls"><button type="button" data-mermaid-zoom-in aria-label="Zoom in">+</button><button type="button" data-mermaid-zoom-out aria-label="Zoom out">−</button><button type="button" data-mermaid-reset>Reset</button></div></div>\n`;
     }
-    const canHighlight = language.length > 0 && hljs.getLanguage(language) !== undefined;
-    const highlighted = canHighlight
-      ? hljs.highlight(source, { language }).value
-      : parser.utils.escapeHtml(source);
+    const description = findJotCodeLanguage(token.info);
+    const highlighted =
+      description?.support === undefined
+        ? parser.utils.escapeHtml(source)
+        : highlightCodeAsHtml(source, description.support.language.parser, parser.utils.escapeHtml);
     const classes = [
-      canHighlight ? "hljs" : undefined,
+      description?.support === undefined ? undefined : "jot-syntax",
       language ? `language-${language}` : undefined,
     ]
       .filter((value): value is string => value !== undefined)
@@ -122,7 +128,50 @@ function renderMarkdown(markdown: string, options: RenderOptions): RenderedMarkd
     return `<pre class="jot-code"${sourceAttributes}><code${className}>${highlighted}</code></pre>\n`;
   };
 
-  return { headings, html: parser.render(markdown) };
+  const environment = {};
+  const tokens = parser.parse(markdown, environment);
+  const languagesToLoad = new Set<LanguageDescription>();
+  for (const token of tokens) {
+    if (token.type !== "fence") continue;
+    const description = findJotCodeLanguage(token.info);
+    if (description !== null) languagesToLoad.add(description);
+  }
+  await Promise.all(
+    [...languagesToLoad].map((description) => description.load().catch(() => undefined)),
+  );
+  return {
+    headings,
+    html: parser.renderer.render(tokens, parser.options, environment),
+  };
+}
+
+export function findJotCodeLanguage(info: string): LanguageDescription | null {
+  const language = info.trim().split(/\s+/u)[0]?.toLocaleLowerCase("en") ?? "";
+  return language === "" || language === "mermaid"
+    ? null
+    : LanguageDescription.matchLanguageName(jotCodeLanguages, language, true);
+}
+
+function highlightCodeAsHtml(
+  source: string,
+  parser: { readonly parse: (source: string) => Parameters<typeof highlightCode>[1] },
+  escapeHtml: (value: string) => string,
+): string {
+  let html = "";
+  highlightCode(
+    source,
+    parser.parse(source),
+    jotSyntaxHighlighter,
+    (text, classes) => {
+      const escapedText = escapeHtml(text);
+      html +=
+        classes === "" ? escapedText : `<span class="${escapeHtml(classes)}">${escapedText}</span>`;
+    },
+    () => {
+      html += "\n";
+    },
+  );
+  return html;
 }
 
 const sourcePositionTokenTypes = new Set([

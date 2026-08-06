@@ -60,8 +60,10 @@ test(
       await first.waitForSelector("[data-reader]");
       assert.equal(await first.locator(".cm-editor").count(), 0);
       assert.match(await first.locator("[data-preview]").innerText(), /Shared starting body/u);
-      await first.waitForSelector("[data-preview] .hljs-keyword");
-      assert.equal(await first.locator("[data-preview] .hljs-keyword").textContent(), "const");
+      await first.waitForSelector("[data-preview] .tok-keyword");
+      const renderedKeyword = first.locator("[data-preview] .tok-keyword");
+      assert.equal(await renderedKeyword.textContent(), "const");
+      const renderedKeywordClass = await renderedKeyword.getAttribute("class");
       await first.evaluate(() => {
         document.documentElement.dataset["browserNavigation"] = "same-document";
       });
@@ -74,11 +76,10 @@ test(
       await first.waitForFunction(
         () => document.querySelector("[data-save-state]")?.textContent === "Saved",
       );
-      await first.waitForFunction(() =>
-        [...document.querySelectorAll(".cm-content .cm-line span")].some(
-          (token) => token.textContent === "const" && token.className !== "",
-        ),
-      );
+      await first.waitForSelector(".cm-content .tok-keyword");
+      const editorKeyword = first.locator(".cm-content .tok-keyword").last();
+      assert.equal(await editorKeyword.textContent(), "const");
+      assert.equal(await editorKeyword.getAttribute("class"), renderedKeywordClass);
 
       const second = await context.newPage();
       await second.goto(`${baseUrl}/documents/${documentId}/edit`);
