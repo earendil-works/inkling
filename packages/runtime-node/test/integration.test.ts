@@ -171,7 +171,16 @@ test(
         document = await readDocument(baseUrl, document.metadata.id, authorization);
         const metadata = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/metadata`, {
           body: JSON.stringify({
+            authors: [
+              {
+                displayName: "Ada Lovelace",
+                email: "ada@example.com",
+                id: "ada@example.com",
+              },
+            ],
             expectedRevision: document.metadata.headRevision,
+            labels: ["architecture", "platform"],
+            targetDecisionDate: "2026-09-01",
             visibility: "public",
           }),
           headers: { ...authorization, "Content-Type": "application/json" },
@@ -192,6 +201,12 @@ test(
         assert.doesNotMatch(publishedCsp, /style-src 'unsafe-inline'/u);
         const publishedHtml = await published.text();
         assert.match(publishedHtml, /Integrated RFC/u);
+        assert.match(publishedHtml, /class="public-hero"/u);
+        assert.match(publishedHtml, /class="public-metadata"/u);
+        assert.match(publishedHtml, /mailto:ada@example\.com/u);
+        assert.match(publishedHtml, />Ada Lovelace<\/a>/u);
+        assert.match(publishedHtml, /href="\/keyword\/architecture"/u);
+        assert.match(publishedHtml, /Target decision/u);
         assert.match(publishedHtml, /class="tok-keyword">const<\/span>/u);
         assert.match(publishedHtml, /<link rel="stylesheet" href="\/fonts\.css">/u);
         assert.match(publishedHtml, /<link rel="stylesheet" href="\/public\.css">/u);
@@ -203,7 +218,10 @@ test(
         assert.match(fontStyles, /family=Newsreader/u);
         const publicStylesheet = await fetch(`${baseUrl}/public.css`);
         assert.equal(publicStylesheet.status, 200);
-        assert.match(await publicStylesheet.text(), /@import url\("\/syntax-theme\.css"\)/u);
+        const publicStyles = await publicStylesheet.text();
+        assert.match(publicStyles, /@import url\("\/syntax-theme\.css"\)/u);
+        assert.match(publicStyles, /\.public-metadata/u);
+        assert.match(publicStyles, /\.public-content-grid/u);
         const syntaxTheme = await fetch(`${baseUrl}/syntax-theme.css`);
         assert.equal(syntaxTheme.status, 200);
         assert.match(await syntaxTheme.text(), /\.tok-keyword/u);

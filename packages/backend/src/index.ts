@@ -20,7 +20,12 @@ import {
   ShareUpdateRequestSchema,
 } from "@earendil-works/jot-protocol";
 import { taggedId } from "@earendil-works/jot-core";
-import type { CatalogResponse, HealthResponse, ProtocolError } from "@earendil-works/jot-protocol";
+import type {
+  CatalogResponse,
+  DocumentMetadataDto,
+  HealthResponse,
+  ProtocolError,
+} from "@earendil-works/jot-protocol";
 
 import { ApplicationError, JotApplication } from "./application.ts";
 import type { JotApplicationService, RequestCredentials, SessionResult } from "./application.ts";
@@ -464,7 +469,7 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
       (catalog) => {
         context.header("Cache-Control", "public, max-age=300, stale-while-revalidate=3600");
         context.header("Content-Security-Policy", contentSecurityPolicy);
-        return context.html(publicCatalogHtml(`Keyword: ${context.req.param("label")}`, catalog));
+        return context.html(publicCatalogHtml(`Label: ${context.req.param("label")}`, catalog));
       },
     ),
   );
@@ -842,10 +847,10 @@ function publicCatalogHtml(titleValue: string, catalog: CatalogResponse): string
       const labels = metadata.labels
         .map((label) => `<a href="/keyword/${encodeURIComponent(label)}">${escapeHtml(label)}</a>`)
         .join(" ");
-      return `<li><a class="title" href="${href}">${metadata.rfcNumber === undefined ? "Document" : `RFC ${String(metadata.rfcNumber).padStart(4, "0")}`} — ${escapeHtml(metadata.title)}</a><p>${escapeHtml(excerpt)}</p><small><a href="/state/${encodeURIComponent(metadata.lifecycleState)}">${escapeHtml(metadata.lifecycleState)}</a> · ${escapeHtml(metadata.updatedAt.slice(0, 10))} ${labels}</small></li>`;
+      return `<li><a class="title" href="${href}">${metadata.rfcNumber === undefined ? "Note" : `RFC ${String(metadata.rfcNumber).padStart(4, "0")}`} — ${escapeHtml(metadata.title)}</a><p>${escapeHtml(excerpt)}</p><small><a href="/state/${encodeURIComponent(metadata.lifecycleState)}">${escapeHtml(metadata.lifecycleState)}</a> · ${escapeHtml(metadata.updatedAt.slice(0, 10))} ${labels}</small></li>`;
     })
     .join("");
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Published Jot documents"><title>${title} — Jot</title><link rel="stylesheet" href="/fonts.css"><link rel="stylesheet" href="/public.css"></head><body><header><a href="/">JOT</a><span>PUBLIC CATALOG</span></header><main><article><h1>${title}</h1><ol class="catalog">${rows || "<li>No published documents.</li>"}</ol></article></main></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Published notes and RFCs"><title>${title} — Jot</title><link rel="stylesheet" href="/fonts.css"><link rel="stylesheet" href="/public.css"></head><body><header class="public-masthead"><a href="/">JOT</a><span>NOTES AND RFCS</span></header><main class="public-catalog-shell"><article class="public-paper public-catalog-paper"><h1>${title}</h1><ol class="catalog">${rows || "<li>No published notes or RFCs.</li>"}</ol></article></main></body></html>`;
 }
 
 function publicDocumentHtml(document: {
@@ -857,17 +862,83 @@ function publicDocumentHtml(document: {
     readonly text: string;
   }[];
   readonly html: string;
-  readonly metadata: { readonly rfcNumber?: number | undefined; readonly title: string };
+  readonly metadata: DocumentMetadataDto;
 }): string {
-  const title = escapeHtml(document.metadata.title);
+  const { metadata } = document;
+  const title = escapeHtml(metadata.title);
   const description = escapeHtml(document.description);
+  const folio =
+    metadata.rfcNumber === undefined
+      ? "Note"
+      : `RFC ${String(metadata.rfcNumber).padStart(4, "0")}`;
   const toc = document.headings
     .map(
       (heading) =>
         `<li class="depth-${heading.depth}"><a href="#${escapeHtml(heading.id)}">${escapeHtml(heading.text)}</a></li>`,
     )
     .join("");
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${description}"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><link rel="canonical" href="${escapeHtml(document.canonicalPath)}"><title>${title} — Jot</title><link rel="stylesheet" href="/fonts.css"><link rel="stylesheet" href="/public.css"></head><body><header><a href="/">JOT</a><span>RFC ${String(document.metadata.rfcNumber ?? "—").padStart(4, "0")}</span></header><main><aside><p>Contents</p><ol>${toc}</ol></aside><article>${document.html}</article></main></body></html>`;
+  const labels = metadata.labels
+    .map((label) => `<a href="/keyword/${encodeURIComponent(label)}">${escapeHtml(label)}</a>`)
+    .join("");
+  const tocHtml =
+    toc === ""
+      ? ""
+      : `<aside class="public-toc" aria-label="On this page"><p>On this page</p><ol>${toc}</ol></aside>`;
+  const sensitivityClass = metadata.sensitivity === "confidential" ? " is-confidential" : "";
+  const sensitivityLabel = metadata.sensitivity === "confidential" ? "Confidential" : "Visibility";
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${description}"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><link rel="canonical" href="${escapeHtml(document.canonicalPath)}"><title>${title} — Jot</title><link rel="stylesheet" href="/fonts.css"><link rel="stylesheet" href="/public.css"></head><body><header class="public-masthead"><a href="/">JOT</a><span>${folio}</span></header><main class="public-page-shell"><article class="public-paper public-document"><div class="public-topline"><a href="/">All notes and RFCs</a></div><header class="public-hero"><p class="public-folio">${folio}</p><div class="public-hero-main"><a class="public-state" href="/state/${encodeURIComponent(metadata.lifecycleState)}">${escapeHtml(metadata.lifecycleState)}</a><h1>${title}</h1><div class="public-visibility${sensitivityClass}"><strong>${sensitivityLabel}</strong><span>${escapeHtml(metadata.visibility)}</span></div>${labels === "" ? "" : `<div class="public-labels" aria-label="Labels">${labels}</div>`}</div></header>${publicMetadataHtml(metadata)}<div class="public-content-grid"><div class="public-prose">${document.html}</div>${tocHtml}</div></article></main></body></html>`;
+}
+
+function publicMetadataHtml(metadata: DocumentMetadataDto): string {
+  const rows: readonly [string, string][] = [
+    [
+      "Authors",
+      metadata.authors.length === 0
+        ? '<span class="public-metadata-empty">Not specified</span>'
+        : publicPeopleHtml(metadata.authors),
+    ],
+    [
+      "Created",
+      `<time datetime="${escapeHtml(metadata.createdAt)}">${formatPublicDate(metadata.createdAt)}</time>`,
+    ],
+    [
+      "Updated",
+      `<time datetime="${escapeHtml(metadata.updatedAt)}">${formatPublicDate(metadata.updatedAt)}</time>`,
+    ],
+    ...(metadata.reviewers.length === 0
+      ? []
+      : [["Reviewers", publicPeopleHtml(metadata.reviewers)] as [string, string]]),
+    ...(metadata.approvers.length === 0
+      ? []
+      : [["Approvers", publicPeopleHtml(metadata.approvers)] as [string, string]]),
+    ...(metadata.targetDecisionDate === undefined
+      ? []
+      : [
+          [
+            "Target decision",
+            `<time datetime="${escapeHtml(metadata.targetDecisionDate)}">${formatPublicDate(metadata.targetDecisionDate)}</time>`,
+          ] as [string, string],
+        ]),
+  ];
+  return `<dl class="public-metadata">${rows.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join("")}</dl>`;
+}
+
+function publicPeopleHtml(people: DocumentMetadataDto["authors"]): string {
+  return people
+    .map(
+      (person) =>
+        `<a href="mailto:${escapeHtml(person.email)}" title="${escapeHtml(person.email)}">${escapeHtml(person.displayName)}</a>`,
+    )
+    .join(", ");
+}
+
+function formatPublicDate(value: string): string {
+  return new Intl.DateTimeFormat("en", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+    year: "numeric",
+  }).format(new Date(value));
 }
 
 function escapeHtml(value: string): string {
