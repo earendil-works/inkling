@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Button } from "./components/button.tsx";
-import { ModalDialog } from "./components/modal-dialog.tsx";
-import { TextareaField } from "./components/textarea-field.tsx";
+import { Button } from "./button.tsx";
+import { ModalDialog } from "./modal-dialog.tsx";
+import { TextareaField } from "./textarea-field.tsx";
 
 export interface CommentComposerProps {
   readonly initialBody?: string | undefined;

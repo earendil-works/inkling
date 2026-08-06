@@ -23,10 +23,10 @@ import { makeCollaborationClient } from "./collaboration.ts";
 import type { CollaborationClient, ConnectionState } from "./collaboration.ts";
 import { CommentControls } from "./components/comment-controls.tsx";
 import type { CommentControlsHandle } from "./components/comment-controls.tsx";
+import { CommentComposer } from "./components/comment-composer.tsx";
 import { CommentThreadCard } from "./components/comment-thread-card.tsx";
 import { EditorToolbar } from "./components/editor-toolbar.tsx";
 import { connectionLabel, EditorWorkbench } from "./components/editor-workbench.tsx";
-import { CommentComposer } from "./comment-composer.tsx";
 import {
   commentDecorationsExtension,
   renderPreviewCommentBubbles,
