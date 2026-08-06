@@ -505,7 +505,8 @@ function matchingExcerpt(summary: CatalogSummary, query: CatalogSearchQuery): st
     .map((term) => summary.normalizedBody.indexOf(term.value))
     .filter((position) => position >= 0)
     .toSorted((left, right) => left - right)[0];
-  if (first === undefined || summary.normalizedBody.length <= 240) return summary.excerpt;
+  if (first === undefined) return summary.excerpt;
+  if (summary.normalizedBody.length <= 240) return summary.normalizedBody;
 
   let start = Math.max(0, first - 80);
   let end = Math.min(summary.normalizedBody.length, start + 240);
