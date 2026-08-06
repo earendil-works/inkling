@@ -13,6 +13,7 @@ import type { ApiClientService, ApiError } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
 import { Button } from "./components/button.tsx";
 import { CheckboxField } from "./components/checkbox-field.tsx";
+import { FormError } from "./components/form-error.tsx";
 import { TextareaField } from "./components/textarea-field.tsx";
 import { TextField } from "./components/text-field.tsx";
 import { useEffectAction, useEffectQuery } from "./effect-hooks.ts";
@@ -134,9 +135,7 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
           <Button variant="primary" disabled={createDocument.state.pending} type="submit">
             {createDocument.state.pending ? "Creating…" : "Create document"}
           </Button>
-          <p className="form-error" data-new-error="">
-            {createDocument.state.error?.message}
-          </p>
+          <FormError data-new-error="">{createDocument.state.error?.message}</FormError>
         </form>
       </dialog>
       {settingsOpen ? <SettingsDialog api={api} onClose={() => setSettingsOpen(false)} /> : null}
@@ -319,11 +318,11 @@ function SettingsDialog({ api, onClose }: SettingsDialogProps): React.JSX.Elemen
             </Button>
           </section>
         )}
-        <p className="form-error" data-settings-error="">
+        <FormError data-settings-error="">
           {keyQuery.state.status === "failure" ? keyQuery.state.error.message : null}
           {createKey.state.error?.message}
           {revokeKey.state.error?.message}
-        </p>
+        </FormError>
       </form>
     </dialog>
   );

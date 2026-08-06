@@ -6,6 +6,7 @@ import type { ApiClientService, ApiError } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
 import { ButtonLink } from "./components/button-link.tsx";
 import { Button } from "./components/button.tsx";
+import { FormError } from "./components/form-error.tsx";
 import { TextField } from "./components/text-field.tsx";
 import { useEffectAction } from "./effect-hooks.ts";
 
@@ -78,9 +79,7 @@ export function AuthenticationScreen({
               Continue with Google
             </ButtonLink>
           ) : null}
-          <p className="form-error" data-form-error="">
-            {authentication.state.error?.message}
-          </p>
+          <FormError data-form-error="">{authentication.state.error?.message}</FormError>
         </form>
       </section>
     </main>
