@@ -27,6 +27,7 @@ import { Button } from "./components/button.tsx";
 import { CheckboxField } from "./components/checkbox-field.tsx";
 import { CommentThreadCard } from "./components/comment-thread-card.tsx";
 import { DocumentDetails } from "./components/document-details.tsx";
+import { EditableDocumentTitle } from "./components/editable-document-title.tsx";
 import { PublishButton } from "./components/publish-button.tsx";
 import { SharingControl } from "./components/sharing-control.tsx";
 import { CommentComposer } from "./comment-composer.tsx";
@@ -111,16 +112,11 @@ export function EditorScreen({
   const [composer, setComposer] = useState<ComposerRequest>();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
-  const [titleDraft, setTitleDraft] = useState(metadata.title);
   const initiallyEditable = !shared || initial.metadata.sharing.access === "edit";
   const canEdit = permissions?.includes("edit-body") ?? initiallyEditable;
   const canComment = permissions?.includes("comment") ?? false;
   const canEditMetadata = permissions?.includes("edit-metadata") ?? !shared;
   const rendered = useRenderedMarkdown(body, true);
-
-  useEffect(() => {
-    setTitleDraft(metadata.title);
-  }, [metadata.title]);
 
   useEffect(() => {
     const parent = editorHostRef.current;
@@ -441,24 +437,12 @@ export function EditorScreen({
   return (
     <main className={layoutClass} id="app" onClick={handleWorkbenchClick} tabIndex={-1}>
       <section className="document-bar">
-        <div className="document-identity">
-          <span>
-            {metadata.rfcNumber === undefined
-              ? "Document"
-              : `RFC ${String(metadata.rfcNumber).padStart(4, "0")}`}
-          </span>
-          <input
-            aria-label="Document title"
-            className="title-input"
-            data-title=""
-            disabled={!canEditMetadata}
-            onBlur={() => {
-              if (titleDraft !== metadata.title) updateMetadata({ title: titleDraft });
-            }}
-            onChange={(event) => setTitleDraft(event.currentTarget.value)}
-            value={titleDraft}
-          />
-        </div>
+        <EditableDocumentTitle
+          canEdit={canEditMetadata}
+          onCommit={(title) => updateMetadata({ title })}
+          rfcNumber={metadata.rfcNumber}
+          title={metadata.title}
+        />
         <div className="document-actions">
           <ButtonLink
             className="document-mode-link"
