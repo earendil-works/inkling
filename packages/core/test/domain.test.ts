@@ -91,7 +91,12 @@ test("workspace identity sessions retain their verified principal", async () => 
       Effect.provideService(SecretHasher, hasher),
     ),
   );
-  assert.deepEqual(principal, { kind: "workspace", personId: id, role: "member" });
+  assert.deepEqual(principal, {
+    displayName: "Example Writer",
+    kind: "workspace",
+    personId: id,
+    role: "member",
+  });
 });
 
 test("capability generations revoke existing principals", async () => {

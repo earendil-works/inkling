@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 
-import type { DocumentMetadataDto, DocumentResponse } from "@earendil-works/jot-protocol";
+import type {
+  AuthenticationStatus,
+  DocumentMetadataDto,
+  DocumentResponse,
+} from "@earendil-works/jot-protocol";
 
 import type { ApiClientService, ApiError } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
@@ -16,6 +20,7 @@ import { documentHref, storedGuestName, storeGuestName } from "./ui.ts";
 import { useEditorSession } from "./use-editor-session.ts";
 
 export interface EditorScreenProps {
+  readonly account?: NonNullable<AuthenticationStatus["principal"]> | undefined;
   readonly api: ApiClientService;
   readonly capabilityToken: string | undefined;
   readonly document: DocumentResponse;
@@ -23,6 +28,7 @@ export interface EditorScreenProps {
 }
 
 export function EditorScreen({
+  account,
   api,
   capabilityToken,
   document: initial,
@@ -34,7 +40,7 @@ export function EditorScreen({
   const [metadata, setMetadata] = useState(initial.metadata);
   const [comments, setComments] = useState(initial.comments);
   const [displayName, setDisplayName] = useState<string | undefined>(() =>
-    shared ? storedGuestName() : "Owner",
+    shared ? storedGuestName() : (account?.displayName ?? "Workspace member"),
   );
   const [permissions, setPermissions] = useState<readonly string[]>();
   const [previewRevision, setPreviewRevision] = useState(0);

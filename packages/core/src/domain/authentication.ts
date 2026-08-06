@@ -146,7 +146,12 @@ export function authenticateSession(
     }
     return record.personId === undefined || record.role === undefined
       ? ownerPrincipal(yield* localOwnerId())
-      : { kind: "workspace", personId: record.personId, role: record.role };
+      : {
+          displayName: record.displayName,
+          kind: "workspace",
+          personId: record.personId,
+          role: record.role,
+        };
   });
 }
 

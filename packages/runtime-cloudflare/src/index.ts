@@ -55,6 +55,9 @@ export interface CloudflareEnvironment {
   readonly GOOGLE_CLIENT_ID?: string | undefined;
   readonly GOOGLE_CLIENT_SECRET?: string | undefined;
   readonly GOOGLE_REDIRECT_URI?: string | undefined;
+  readonly JOT_GOOGLE_AUTHORIZATION_ENDPOINT?: string | undefined;
+  readonly JOT_GOOGLE_CERTIFICATES_ENDPOINT?: string | undefined;
+  readonly JOT_GOOGLE_TOKEN_ENDPOINT?: string | undefined;
   readonly JOT_OAUTH_STATE_SECRET?: string | undefined;
   readonly JOT_DOCUMENTS: DurableObjectNamespace<DocumentDurableObject>;
   readonly JOT_OBJECTS: R2Bucket;
@@ -89,13 +92,9 @@ export class WorkspaceDurableObject extends DurableObject<CloudflareEnvironment>
   constructor(state: DurableObjectState, environment: CloudflareEnvironment) {
     super(state, environment);
     this.#state = state;
-    const googleEnabled =
-      environment.GOOGLE_CLIENT_ID !== undefined &&
-      environment.GOOGLE_CLIENT_SECRET !== undefined &&
-      configuredGoogleDomains(environment).length > 0;
     this.#runtime = createApplicationRuntime(state, environment, {
-      allowOwnerSetup: !googleEnabled,
-      authenticationMethods: googleEnabled ? ["google"] : ["password"],
+      allowOwnerSetup: false,
+      authenticationMethods: ["google"],
       ownsDocumentPrivateState: false,
       workspaceId: state.id.toString(),
     });
@@ -795,7 +794,7 @@ async function startGoogleAuthentication(
     verifier,
   };
   const cookie = await signOAuthState(payload, configuration.stateSecret);
-  const authorization = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+  const authorization = new URL(configuration.authorizationEndpoint);
   authorization.searchParams.set("client_id", configuration.clientId);
   authorization.searchParams.set("redirect_uri", configuration.redirectUri);
   authorization.searchParams.set("response_type", "code");
@@ -845,7 +844,7 @@ async function finishGoogleAuthentication(
     ) {
       return oauthFailure("The OAuth state is invalid or expired.");
     }
-    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+    const tokenResponse = await fetch(configuration.tokenEndpoint, {
       body: new URLSearchParams({
         client_id: configuration.clientId,
         client_secret: configuration.clientSecret,
@@ -865,7 +864,12 @@ async function finishGoogleAuthentication(
     if (!tokenResponse.ok || idToken === undefined) {
       return oauthFailure("Google rejected the authorization code.");
     }
-    const claims = await verifyGoogleIdentityToken(idToken, configuration.clientId, payload.nonce);
+    const claims = await verifyGoogleIdentityToken(
+      idToken,
+      configuration.clientId,
+      payload.nonce,
+      configuration.certificatesEndpoint,
+    );
     if (
       claims === undefined ||
       !claims.email_verified ||
@@ -937,11 +941,17 @@ function googleConfiguration(request: Request, environment: CloudflareEnvironmen
   }
   return {
     allowedDomains,
+    authorizationEndpoint:
+      environment.JOT_GOOGLE_AUTHORIZATION_ENDPOINT ??
+      "https://accounts.google.com/o/oauth2/v2/auth",
+    certificatesEndpoint:
+      environment.JOT_GOOGLE_CERTIFICATES_ENDPOINT ?? "https://www.googleapis.com/oauth2/v3/certs",
     clientId,
     clientSecret,
     redirectUri:
       environment.GOOGLE_REDIRECT_URI ?? `${new URL(request.url).origin}/api/auth/google/callback`,
     stateSecret: environment.JOT_OAUTH_STATE_SECRET ?? clientSecret,
+    tokenEndpoint: environment.JOT_GOOGLE_TOKEN_ENDPOINT ?? "https://oauth2.googleapis.com/token",
   };
 }
 
@@ -949,6 +959,7 @@ async function verifyGoogleIdentityToken(
   token: string,
   audience: string,
   nonce: string,
+  certificatesEndpoint: string,
 ): Promise<GoogleIdentityClaims | undefined> {
   const [headerValue, claimsValue, signatureValue, extra] = token.split(".");
   if (
@@ -969,7 +980,7 @@ async function verifyGoogleIdentityToken(
   ) {
     return undefined;
   }
-  const keysResponse = await fetch("https://www.googleapis.com/oauth2/v3/certs");
+  const keysResponse = await fetch(certificatesEndpoint);
   const keysBody = (await keysResponse.json()) as unknown;
   const keys =
     Predicate.isReadonlyRecord(keysBody) && Array.isArray(keysBody["keys"]) ? keysBody["keys"] : [];

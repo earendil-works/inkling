@@ -30,7 +30,13 @@ export function AuthenticationForm({
   return (
     <section className="auth-panel" aria-labelledby="auth-title">
       <p className="folio">JOT / AUTHORITY</p>
-      <h2 id="auth-title">{mode === "setup" ? "Set owner password" : "Owner sign in"}</h2>
+      <h2 id="auth-title">
+        {mode === "setup"
+          ? "Set owner password"
+          : methods.includes("google")
+            ? "Sign in to Jot"
+            : "Owner sign in"}
+      </h2>
       <form
         data-auth-form=""
         onSubmit={(event) => {

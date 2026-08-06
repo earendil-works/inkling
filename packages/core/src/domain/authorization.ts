@@ -6,7 +6,12 @@ export type WorkspaceRole = "member" | "administrator" | "owner";
 
 export type Principal =
   | { readonly kind: "anonymous" }
-  | { readonly kind: "workspace"; readonly personId: PersonId; readonly role: WorkspaceRole }
+  | {
+      readonly displayName?: string | undefined;
+      readonly kind: "workspace";
+      readonly personId: PersonId;
+      readonly role: WorkspaceRole;
+    }
   | {
       readonly kind: "api-key";
       readonly keyId: string;

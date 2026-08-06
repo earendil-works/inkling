@@ -201,6 +201,8 @@ export function makeLocalJotApplication(
     state = yield* hydratePrivateDocumentState(state, objectStore);
     const ownerId = yield* personId("owner@local").pipe(Effect.mapError(toStorageError));
     const ownerPrincipal: Principal = { kind: "workspace", personId: ownerId, role: "owner" };
+    const authenticationMethods = options.authenticationMethods ?? ["password"];
+    const passwordAuthenticationEnabled = authenticationMethods.includes("password");
 
     const saveState = (next: LocalWorkspaceState): Effect.Effect<void, StorageError> =>
       stateStore.save(next).pipe(
@@ -293,6 +295,17 @@ export function makeLocalJotApplication(
             return authenticated.principal;
           }
           if (credentials.sessionToken !== undefined) {
+            const sessionId = credentials.sessionToken.split(".")[0];
+            const session = state.authentication.sessions.find(
+              (candidate) => candidate.id === sessionId,
+            );
+            if (!passwordAuthenticationEnabled && session?.personId === undefined) {
+              return yield* applicationFailure(
+                "invalid_token",
+                "The session token is invalid or expired.",
+                401,
+              );
+            }
             return yield* authenticateSession(
               state.authentication,
               credentials.sessionToken,
@@ -380,8 +393,15 @@ export function makeLocalJotApplication(
       guestName: string | undefined,
     ): Effect.Effect<CommentActor, ApplicationError> =>
       Effect.gen(function* () {
-        if (principal.kind === "workspace" || principal.kind === "api-key") {
-          return { displayName: "Owner", id: principal.personId, manageAll: true };
+        if (principal.kind === "workspace") {
+          return {
+            displayName: principal.displayName ?? "Owner",
+            id: principal.personId,
+            manageAll: true,
+          };
+        }
+        if (principal.kind === "api-key") {
+          return { displayName: "API key", id: principal.personId, manageAll: true };
         }
         if (principal.kind === "capability" && principal.guestId !== undefined) {
           const displayName = guestName?.trim();
@@ -981,7 +1001,7 @@ export function makeLocalJotApplication(
           if (needsSetup) {
             return {
               authenticated: false,
-              authenticationMethods: options.authenticationMethods ?? ["password"],
+              authenticationMethods,
               needsSetup: true,
             };
           }
@@ -994,10 +1014,13 @@ export function makeLocalJotApplication(
             );
             return {
               authenticated: true,
-              authenticationMethods: options.authenticationMethods ?? ["password"],
+              authenticationMethods,
               needsSetup: false,
               principal: {
-                displayName: session?.displayName ?? "Owner",
+                displayName:
+                  principal.kind === "workspace"
+                    ? (principal.displayName ?? session?.displayName ?? "Owner")
+                    : "API key",
                 email: session?.email,
                 id: principal.personId,
                 role: principal.role,
@@ -1006,7 +1029,7 @@ export function makeLocalJotApplication(
           }
           return {
             authenticated: false,
-            authenticationMethods: options.authenticationMethods ?? ["password"],
+            authenticationMethods,
             needsSetup: false,
           };
         }),
@@ -1420,29 +1443,35 @@ export function makeLocalJotApplication(
           return { documents } satisfies CatalogResponse;
         }),
       login: (password) =>
-        withState(
-          loginOwner(state.authentication, password, new Date().toISOString()).pipe(
-            Effect.provideService(IdGenerator, ids),
-            Effect.provideService(SecretHasher, hasher),
-            Effect.provideService(SecureToken, tokens),
-            Effect.mapError(toApplicationError),
-            Effect.flatMap((created) =>
-              tokens.generate(24).pipe(
+        passwordAuthenticationEnabled
+          ? withState(
+              loginOwner(state.authentication, password, new Date().toISOString()).pipe(
+                Effect.provideService(IdGenerator, ids),
+                Effect.provideService(SecretHasher, hasher),
+                Effect.provideService(SecureToken, tokens),
                 Effect.mapError(toApplicationError),
-                Effect.flatMap((csrfToken) =>
-                  saveState({ ...state, authentication: created.state }).pipe(
+                Effect.flatMap((created) =>
+                  tokens.generate(24).pipe(
                     Effect.mapError(toApplicationError),
-                    Effect.as({
-                      csrfToken,
-                      expiresAt: created.expiresAt,
-                      sessionToken: created.token,
-                    }),
+                    Effect.flatMap((csrfToken) =>
+                      saveState({ ...state, authentication: created.state }).pipe(
+                        Effect.mapError(toApplicationError),
+                        Effect.as({
+                          csrfToken,
+                          expiresAt: created.expiresAt,
+                          sessionToken: created.token,
+                        }),
+                      ),
+                    ),
                   ),
                 ),
               ),
+            )
+          : applicationFailure(
+              "password_authentication_disabled",
+              "Password authentication is disabled for this deployment.",
+              403,
             ),
-          ),
-        ),
       loginWorkspaceIdentity: (identity) =>
         withState(
           createWorkspaceSession(state.authentication, identity, new Date().toISOString()).pipe(

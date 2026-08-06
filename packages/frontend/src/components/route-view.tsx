@@ -78,6 +78,7 @@ export function RouteView({ refresh, state }: RouteViewProps): React.JSX.Element
       return (
         <Suspense fallback={<main aria-busy="true" className="route-loading" id="app" />}>
           <EditorScreen
+            account={model.account}
             api={model.api}
             capabilityToken={model.capabilityToken}
             document={model.document}

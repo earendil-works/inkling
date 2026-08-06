@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { generateKeyPairSync, sign } from "node:crypto";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createServer as createHttpServer } from "node:http";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -11,24 +13,34 @@ interface RunningWrangler {
   readonly stop: () => Promise<void>;
 }
 
+interface RunningGoogleOAuthMock {
+  readonly origin: string;
+  readonly stop: () => Promise<void>;
+}
+
 test(
   "Cloudflare development runtime persists isolated document authorities in R2 and DO storage",
   { timeout: 60_000 },
   async () => {
     const directory = await mkdtemp(path.join(tmpdir(), "jot-cloudflare-test-"));
+    let google: RunningGoogleOAuthMock | undefined;
     let running: RunningWrangler | undefined;
     try {
-      running = await startWrangler(directory);
+      google = await startGoogleOAuthMock();
+      running = await startWrangler(directory, google.origin);
       const setup = await fetch(`${running.baseUrl}/api/auth/setup`, {
         body: JSON.stringify({ password: "correct horse battery staple" }),
         headers: { "Content-Type": "application/json" },
         method: "POST",
       });
-      assert.equal(setup.status, 200);
-      const cookie = setup.headers
-        .getSetCookie()
-        .map((value) => value.split(";")[0])
-        .join("; ");
+      assert.equal(setup.status, 403);
+      const passwordLogin = await fetch(`${running.baseUrl}/api/auth/login`, {
+        body: JSON.stringify({ password: "correct horse battery staple" }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      assert.equal(passwordLogin.status, 403);
+      const cookie = await loginWithGoogle(running.baseUrl);
       const csrf = cookieValue(cookie, "jot_csrf");
       assert.ok(csrf);
       const keyResponse = await fetch(`${running.baseUrl}/api/api-keys`, {
@@ -88,7 +100,7 @@ test(
       await running.stop();
       running = undefined;
 
-      running = await startWrangler(directory);
+      running = await startWrangler(directory, google.origin);
       try {
         assert.equal(
           (await readDocument(running.baseUrl, first.metadata.id, authorization)).body,
@@ -104,6 +116,7 @@ test(
       }
     } finally {
       await running?.stop();
+      await google?.stop();
       await rm(directory, { force: true, recursive: true });
     }
   },
@@ -187,14 +200,150 @@ async function waitForCatalog(
   return waitForCatalog(baseUrl, headers, documentId, title, attempt + 1);
 }
 
-async function startWrangler(directory: string): Promise<RunningWrangler> {
+async function loginWithGoogle(baseUrl: string): Promise<string> {
+  const status = await fetch(`${baseUrl}/api/auth/status`);
+  assert.deepEqual(await status.json(), {
+    authenticated: false,
+    authenticationMethods: ["google"],
+    needsSetup: false,
+  });
+
+  const start = await fetch(`${baseUrl}/api/auth/google/start`, { redirect: "manual" });
+  assert.equal(start.status, 302);
+  const oauthCookie = start.headers
+    .getSetCookie()
+    .map((value) => value.split(";")[0])
+    .join("; ");
+  const authorizationLocation = start.headers.get("Location");
+  assert.ok(authorizationLocation);
+
+  const authorization = await fetch(authorizationLocation, { redirect: "manual" });
+  assert.equal(authorization.status, 302);
+  const callbackLocation = authorization.headers.get("Location");
+  assert.ok(callbackLocation);
+
+  const callback = await fetch(callbackLocation, {
+    headers: { Cookie: oauthCookie },
+    redirect: "manual",
+  });
+  assert.equal(callback.status, 302);
+  const cookie = callback.headers
+    .getSetCookie()
+    .map((value) => value.split(";")[0])
+    .join("; ");
+  assert.ok(cookieValue(cookie, "jot_session"));
+  assert.ok(cookieValue(cookie, "jot_csrf"));
+
+  const authenticated = await fetch(`${baseUrl}/api/auth/status`, { headers: { Cookie: cookie } });
+  const authenticatedBody = (await authenticated.json()) as {
+    readonly authenticated: boolean;
+    readonly principal?: { readonly displayName: string; readonly email?: string | undefined };
+  };
+  assert.equal(authenticatedBody.authenticated, true);
+  assert.equal(authenticatedBody.principal?.displayName, "Cloudflare Tester");
+  assert.equal(authenticatedBody.principal?.email, "admin@example.com");
+  return cookie;
+}
+
+async function startGoogleOAuthMock(): Promise<RunningGoogleOAuthMock> {
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const verificationKey = {
+    ...publicKey.export({ format: "jwk" }),
+    alg: "RS256",
+    kid: "jot-test-key",
+    use: "sig",
+  };
+  let nonce: string | undefined;
+  const server = createHttpServer((request, response) => {
+    const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "127.0.0.1"}`);
+    if (url.pathname === "/authorize") {
+      nonce = url.searchParams.get("nonce") ?? undefined;
+      const redirectUri = url.searchParams.get("redirect_uri");
+      const state = url.searchParams.get("state");
+      assert.ok(nonce);
+      assert.ok(redirectUri);
+      assert.ok(state);
+      const callback = new URL(redirectUri);
+      callback.searchParams.set("code", "test-authorization-code");
+      callback.searchParams.set("state", state);
+      response.writeHead(302, { Location: callback.href }).end();
+      return;
+    }
+    if (url.pathname === "/token") {
+      assert.ok(nonce);
+      const header = base64UrlJson({ alg: "RS256", kid: "jot-test-key", typ: "JWT" });
+      const claims = base64UrlJson({
+        aud: "jot-test-client",
+        email: "admin@example.com",
+        email_verified: true,
+        exp: Math.floor(Date.now() / 1_000) + 300,
+        hd: "example.com",
+        iss: "https://accounts.google.com",
+        name: "Cloudflare Tester",
+        nonce,
+        sub: "google-test-user",
+      });
+      const unsigned = `${header}.${claims}`;
+      const signature = sign("RSA-SHA256", Buffer.from(unsigned), privateKey).toString("base64url");
+      response
+        .writeHead(200, { "Content-Type": "application/json" })
+        .end(JSON.stringify({ id_token: `${unsigned}.${signature}` }));
+      return;
+    }
+    if (url.pathname === "/certificates") {
+      response
+        .writeHead(200, { "Content-Type": "application/json" })
+        .end(JSON.stringify({ keys: [verificationKey] }));
+      return;
+    }
+    response.writeHead(404).end();
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    server.close();
+    throw new Error("Could not start the Google OAuth test server.");
+  }
+  return {
+    origin: `http://127.0.0.1:${address.port}`,
+    stop: () =>
+      new Promise((resolve, reject) => {
+        server.close((error) => (error === undefined ? resolve() : reject(error)));
+      }),
+  };
+}
+
+function base64UrlJson(value: unknown): string {
+  return Buffer.from(JSON.stringify(value)).toString("base64url");
+}
+
+async function startWrangler(directory: string, googleOrigin: string): Promise<RunningWrangler> {
   const port = await availablePort();
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const environmentFile = path.join(directory, "oauth.env");
+  await writeFile(
+    environmentFile,
+    [
+      "GOOGLE_ADMIN_EMAILS=admin@example.com",
+      "GOOGLE_ALLOWED_DOMAINS=example.com",
+      "GOOGLE_CLIENT_ID=jot-test-client",
+      "GOOGLE_CLIENT_SECRET=jot-test-secret",
+      `GOOGLE_REDIRECT_URI=${baseUrl}/api/auth/google/callback`,
+      `JOT_GOOGLE_AUTHORIZATION_ENDPOINT=${googleOrigin}/authorize`,
+      `JOT_GOOGLE_CERTIFICATES_ENDPOINT=${googleOrigin}/certificates`,
+      `JOT_GOOGLE_TOKEN_ENDPOINT=${googleOrigin}/token`,
+      "JOT_OAUTH_STATE_SECRET=jot-test-state-secret",
+      "",
+    ].join("\n"),
+  );
   const child = spawn(
     path.resolve(import.meta.dirname, "../node_modules/.bin/wrangler"),
-    ["dev", "--port", String(port), "--persist-to", directory],
+    ["dev", "--port", String(port), "--persist-to", directory, "--env-file", environmentFile],
     { cwd: path.resolve(import.meta.dirname, ".."), stdio: "ignore" },
   );
-  const baseUrl = `http://127.0.0.1:${port}`;
   await waitForWrangler(baseUrl, child);
   return {
     baseUrl,
