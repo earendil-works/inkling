@@ -1058,9 +1058,12 @@ select:disabled {
   text-transform: uppercase;
 }
 
-.comment-card {
+.anchored-popover {
   position: fixed;
-  inset: var(--comment-card-top, 6rem) auto auto var(--comment-card-left, 50%);
+  inset: var(--anchored-popover-top, 6rem) auto auto var(--anchored-popover-left, 50%);
+}
+
+.comment-card {
   width: min(23rem, calc(100vw - 2rem));
   max-height: min(36rem, calc(100dvh - 2rem));
   padding: 0;

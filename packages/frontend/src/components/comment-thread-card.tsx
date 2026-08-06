@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 import type { CommentThreadDto } from "@earendil-works/jot-protocol";
 
+import { AnchoredPopover } from "./anchored-popover.tsx";
 import { Button } from "./button.tsx";
 
 export interface CommentThreadCardProps {
@@ -29,63 +30,28 @@ export function CommentThreadCard({
   onResolve,
   thread,
 }: CommentThreadCardProps): React.JSX.Element {
-  const cardRef = useRef<HTMLElement>(null);
-
   useEffect(() => {
-    const card = cardRef.current;
-    if (card === null) return;
-    if (thread === undefined) {
-      if (card.matches(":popover-open")) card.hidePopover();
+    document.querySelectorAll<HTMLElement>("[data-comment-bubble]").forEach((bubble) => {
+      bubble.classList.toggle(
+        "is-active",
+        thread !== undefined && bubble.dataset["commentBubble"] === thread.id,
+      );
+    });
+    return () => {
       document
         .querySelectorAll(".segment-comment-bubble.is-active")
         .forEach((bubble) => bubble.classList.remove("is-active"));
-      return;
-    }
-    if (!card.matches(":popover-open")) card.showPopover();
-    document.querySelectorAll<HTMLElement>("[data-comment-bubble]").forEach((bubble) => {
-      bubble.classList.toggle("is-active", bubble.dataset["commentBubble"] === thread.id);
-    });
-    const position = (): void => {
-      if (!card.matches(":popover-open")) return;
-      if (matchMedia("(width <= 52rem)").matches) {
-        card.style.removeProperty("--comment-card-left");
-        card.style.removeProperty("--comment-card-top");
-        return;
-      }
-      const anchor = anchorRef.current;
-      if (anchor === undefined || !anchor.isConnected) return;
-      const anchorRect = anchor.getBoundingClientRect();
-      const cardRect = card.getBoundingClientRect();
-      const gap = 12;
-      const left = Math.max(
-        gap,
-        Math.min(
-          innerWidth - cardRect.width - gap,
-          anchorRect.right + gap + cardRect.width <= innerWidth
-            ? anchorRect.right + gap
-            : anchorRect.left - cardRect.width - gap,
-        ),
-      );
-      const top = Math.max(gap, Math.min(innerHeight - cardRect.height - gap, anchorRect.top - 18));
-      card.style.setProperty("--comment-card-left", `${left}px`);
-      card.style.setProperty("--comment-card-top", `${top}px`);
     };
-    requestAnimationFrame(position);
-    document.addEventListener("scroll", position, true);
-    window.addEventListener("resize", position);
-    return () => {
-      document.removeEventListener("scroll", position, true);
-      window.removeEventListener("resize", position);
-    };
-  }, [anchorRef, anchorRevision, thread]);
+  }, [thread]);
 
   return (
-    <aside
+    <AnchoredPopover
+      anchorRef={anchorRef}
+      anchorRevision={anchorRevision}
       aria-label="Comment thread"
       className="comment-card"
       data-comment-card=""
-      popover="auto"
-      ref={cardRef}
+      open={thread !== undefined}
     >
       {thread === undefined ? null : (
         <section className={`comment-thread ${thread.resolved ? "is-resolved" : ""}`}>
@@ -136,6 +102,6 @@ export function CommentThreadCard({
           </div>
         </section>
       )}
-    </aside>
+    </AnchoredPopover>
   );
 }
