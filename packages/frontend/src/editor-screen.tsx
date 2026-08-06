@@ -12,7 +12,6 @@ import { createCommentAnchor, resolveCommentAnchor } from "@earendil-works/jot-c
 import type {
   AttachmentMetadataDto,
   CommentStateDto,
-  CommentThreadDto,
   DocumentMetadataDto,
   DocumentResponse,
   PresenceDto,
@@ -27,6 +26,7 @@ import type { CollaborationClient, ConnectionState } from "./collaboration.ts";
 import { ButtonLink } from "./components/button-link.tsx";
 import { Button } from "./components/button.tsx";
 import { CheckboxField } from "./components/checkbox-field.tsx";
+import { CommentThreadCard } from "./components/comment-thread-card.tsx";
 import { SelectField } from "./components/select-field.tsx";
 import { TextField } from "./components/text-field.tsx";
 import { CommentComposer } from "./comment-composer.tsx";
@@ -92,7 +92,6 @@ export function EditorScreen({
   const editorHostRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLElement>(null);
   const commentMenuRef = useRef<HTMLDivElement>(null);
-  const commentCardRef = useRef<HTMLElement>(null);
   const sessionRef = useRef<EditorSession | undefined>(undefined);
   const participantMapRef = useRef(new Map<string, PresenceDto>());
   const [metadata, setMetadata] = useState(initial.metadata);
@@ -425,7 +424,6 @@ export function EditorScreen({
   >((access) => api.updateShare(metadata.id, access, metadata.headRevision));
 
   const activeThread = comments.threads.find((thread) => thread.id === activeThreadId);
-  useCommentCardPosition(commentCardRef, activeThread, activeAnchorRef, activeAnchorRevision);
 
   const handleWorkbenchClick = (event: React.MouseEvent<HTMLElement>): void => {
     const target = event.target;
@@ -446,9 +444,6 @@ export function EditorScreen({
     setActiveSurface(bubble.dataset["commentSurface"] === "source" ? "source" : "preview");
     activeAnchorRef.current = bubble;
     setActiveAnchorRevision((revision) => revision + 1);
-    if (commentCardRef.current?.matches(":popover-open") === false) {
-      commentCardRef.current.showPopover();
-    }
   };
 
   const openCount = comments.threads.filter((thread) => !thread.resolved).length;
@@ -770,67 +765,62 @@ export function EditorScreen({
           ))}
         </div>
       </div>
-      <aside
-        aria-label="Comment thread"
-        className="comment-card"
-        data-comment-card=""
-        popover="auto"
-        ref={commentCardRef}
-      >
-        {activeThread === undefined ? null : (
-          <CommentThread
-            canManage={permissions?.includes("manage-comments") ?? false}
-            onClose={() => setActiveThreadId(undefined)}
-            onDeleteMessage={(messageId) => {
-              if (!window.confirm("Delete this comment message?")) return;
-              commentAction.execute(
-                { request: { kind: "delete-message", messageId, threadId: activeThread.id } },
-                { onFailure: (error) => showToast(error.message, "error"), onSuccess: setComments },
-              );
-            }}
-            onDeleteThread={() => {
-              if (!window.confirm("Delete this comment thread?")) return;
-              commentAction.execute(
-                { request: { kind: "delete-thread", threadId: activeThread.id } },
-                {
-                  onFailure: (error) => showToast(error.message, "error"),
-                  onSuccess: (next) => {
-                    setComments(next);
-                    setActiveThreadId(undefined);
-                  },
-                },
-              );
-            }}
-            onEdit={(messageId, initialBody) =>
-              setComposer({ kind: "edit", initialBody, messageId, threadId: activeThread.id })
-            }
-            onReply={() => {
-              const parent = activeThread.messages.at(-1);
-              if (parent !== undefined) {
-                setComposer({
-                  kind: "reply",
-                  parentId: parent.id,
-                  quote: activeThread.anchor.quote,
-                  threadId: activeThread.id,
-                });
-              }
-            }}
-            onResolve={() =>
-              commentAction.execute(
-                {
-                  request: {
-                    kind: "resolve",
-                    resolved: !activeThread.resolved,
-                    threadId: activeThread.id,
-                  },
-                },
-                { onFailure: (error) => showToast(error.message, "error"), onSuccess: setComments },
-              )
-            }
-            thread={activeThread}
-          />
-        )}
-      </aside>
+      <CommentThreadCard
+        anchorRef={activeAnchorRef}
+        anchorRevision={activeAnchorRevision}
+        canManage={permissions?.includes("manage-comments") ?? false}
+        onClose={() => setActiveThreadId(undefined)}
+        onDeleteMessage={(messageId) => {
+          if (activeThread === undefined || !window.confirm("Delete this comment message?")) return;
+          commentAction.execute(
+            { request: { kind: "delete-message", messageId, threadId: activeThread.id } },
+            { onFailure: (error) => showToast(error.message, "error"), onSuccess: setComments },
+          );
+        }}
+        onDeleteThread={() => {
+          if (activeThread === undefined || !window.confirm("Delete this comment thread?")) return;
+          commentAction.execute(
+            { request: { kind: "delete-thread", threadId: activeThread.id } },
+            {
+              onFailure: (error) => showToast(error.message, "error"),
+              onSuccess: (next) => {
+                setComments(next);
+                setActiveThreadId(undefined);
+              },
+            },
+          );
+        }}
+        onEdit={(messageId, initialBody) => {
+          if (activeThread !== undefined) {
+            setComposer({ kind: "edit", initialBody, messageId, threadId: activeThread.id });
+          }
+        }}
+        onReply={() => {
+          const parent = activeThread?.messages.at(-1);
+          if (activeThread !== undefined && parent !== undefined) {
+            setComposer({
+              kind: "reply",
+              parentId: parent.id,
+              quote: activeThread.anchor.quote,
+              threadId: activeThread.id,
+            });
+          }
+        }}
+        onResolve={() => {
+          if (activeThread === undefined) return;
+          commentAction.execute(
+            {
+              request: {
+                kind: "resolve",
+                resolved: !activeThread.resolved,
+                threadId: activeThread.id,
+              },
+            },
+            { onFailure: (error) => showToast(error.message, "error"), onSuccess: setComments },
+          );
+        }}
+        thread={activeThread}
+      />
       {composer === undefined ? null : (
         <CommentComposer
           initialBody={composer.kind === "edit" ? composer.initialBody : undefined}
@@ -856,81 +846,6 @@ export function EditorScreen({
   );
 }
 
-interface CommentThreadProps {
-  readonly canManage: boolean;
-  readonly onClose: () => void;
-  readonly onDeleteMessage: (messageId: string) => void;
-  readonly onDeleteThread: () => void;
-  readonly onEdit: (messageId: string, body: string) => void;
-  readonly onReply: () => void;
-  readonly onResolve: () => void;
-  readonly thread: CommentThreadDto;
-}
-
-function CommentThread({
-  canManage,
-  onClose,
-  onDeleteMessage,
-  onDeleteThread,
-  onEdit,
-  onReply,
-  onResolve,
-  thread,
-}: CommentThreadProps): React.JSX.Element {
-  return (
-    <section className={`comment-thread ${thread.resolved ? "is-resolved" : ""}`}>
-      <div className="comment-thread__heading">
-        <span>Thread</span>
-        <Button
-          aria-label="Close comment thread"
-          variant="icon"
-          data-comment-close=""
-          onClick={onClose}
-          type="button"
-        >
-          ×
-        </Button>
-      </div>
-      <blockquote>{thread.anchor.quote || "Orphaned selection"}</blockquote>
-      {thread.messages.map((message) => (
-        <div className="comment-message" key={message.id}>
-          <b>{message.authorDisplayName}</b>
-          <p>{message.body}</p>
-          <span>
-            <Button
-              data-edit-message={`${thread.id}:${message.id}`}
-              onClick={() => onEdit(message.id, message.body)}
-              type="button"
-            >
-              Edit
-            </Button>
-            <Button
-              data-delete-message={`${thread.id}:${message.id}`}
-              onClick={() => onDeleteMessage(message.id)}
-              type="button"
-            >
-              Delete
-            </Button>
-          </span>
-        </div>
-      ))}
-      <div className="comment-actions">
-        <Button data-reply-thread={thread.id} onClick={onReply} type="button">
-          Reply
-        </Button>
-        <Button data-resolve-thread={thread.id} onClick={onResolve} type="button">
-          {thread.resolved ? "Reopen" : "Resolve"}
-        </Button>
-        {canManage ? (
-          <Button data-delete-thread={thread.id} onClick={onDeleteThread} type="button">
-            Delete thread
-          </Button>
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
 function connectionLabel(state: ConnectionState): string {
   const labels: Record<ConnectionState, string> = {
     connecting: "Connecting",
@@ -951,59 +866,4 @@ function updatePreviewSelection(
 
 function uiError(message: string): ApiError {
   return new ApiError({ code: "ui_error", message, retryable: false, status: 0 });
-}
-
-function useCommentCardPosition(
-  cardRef: React.RefObject<HTMLElement | null>,
-  thread: CommentThreadDto | undefined,
-  anchorRef: React.MutableRefObject<HTMLElement | undefined>,
-  anchorRevision: number,
-): void {
-  useEffect(() => {
-    const card = cardRef.current;
-    if (card === null) return;
-    if (thread === undefined) {
-      if (card.matches(":popover-open")) card.hidePopover();
-      document
-        .querySelectorAll(".segment-comment-bubble.is-active")
-        .forEach((bubble) => bubble.classList.remove("is-active"));
-      return;
-    }
-    if (!card.matches(":popover-open")) card.showPopover();
-    document.querySelectorAll<HTMLElement>("[data-comment-bubble]").forEach((bubble) => {
-      bubble.classList.toggle("is-active", bubble.dataset["commentBubble"] === thread.id);
-    });
-    const position = (): void => {
-      if (!card.matches(":popover-open")) return;
-      if (matchMedia("(width <= 52rem)").matches) {
-        card.style.removeProperty("--comment-card-left");
-        card.style.removeProperty("--comment-card-top");
-        return;
-      }
-      const anchor = anchorRef.current;
-      if (anchor === undefined || !anchor.isConnected) return;
-      const anchorRect = anchor.getBoundingClientRect();
-      const cardRect = card.getBoundingClientRect();
-      const gap = 12;
-      const left = Math.max(
-        gap,
-        Math.min(
-          innerWidth - cardRect.width - gap,
-          anchorRect.right + gap + cardRect.width <= innerWidth
-            ? anchorRect.right + gap
-            : anchorRect.left - cardRect.width - gap,
-        ),
-      );
-      const top = Math.max(gap, Math.min(innerHeight - cardRect.height - gap, anchorRect.top - 18));
-      card.style.setProperty("--comment-card-left", `${left}px`);
-      card.style.setProperty("--comment-card-top", `${top}px`);
-    };
-    requestAnimationFrame(position);
-    document.addEventListener("scroll", position, true);
-    window.addEventListener("resize", position);
-    return () => {
-      document.removeEventListener("scroll", position, true);
-      window.removeEventListener("resize", position);
-    };
-  }, [anchorRef, anchorRevision, cardRef, thread]);
 }
