@@ -891,7 +891,8 @@ select:disabled {
 
 /* Comments remain part of the reading rhythm instead of occupying a rail. */
 .comment-menu,
-.comment-card {
+.comment-card,
+.comment-composer-popover {
   margin: 0;
   border: 1px solid var(--border-strong);
   border-radius: 4px;
@@ -913,8 +914,16 @@ select:disabled {
 }
 
 .comment-menu::backdrop,
-.comment-card::backdrop {
+.comment-card::backdrop,
+.comment-composer-popover::backdrop {
   background: transparent;
+}
+
+.comment-composer-popover {
+  width: min(24rem, calc(100vw - 2rem));
+  max-height: min(32rem, calc(100dvh - 2rem));
+  padding: 0;
+  overflow: auto;
 }
 
 .comment-composer-dialog {
@@ -930,13 +939,20 @@ select:disabled {
   backdrop-filter: blur(2px);
 }
 
-.comment-composer-form {
+.comment-composer-form,
+.comment-inline-composer {
   display: grid;
   gap: 1rem;
   padding: 1.2rem;
 }
 
+.comment-inline-composer {
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
 .comment-composer-heading,
+.comment-inline-composer__heading,
 .comment-composer-footer,
 .comment-composer-footer > div {
   display: flex;
@@ -945,18 +961,21 @@ select:disabled {
   gap: 0.65rem;
 }
 
-.comment-composer-heading {
+.comment-composer-heading,
+.comment-inline-composer__heading {
   align-items: flex-start;
 }
 
-.comment-composer-heading h2 {
+.comment-composer-heading h2,
+.comment-inline-composer__heading h3 {
   margin-top: 0.15rem;
   font-size: 1.2rem;
   font-weight: 600;
   letter-spacing: -0.025em;
 }
 
-.comment-composer-form blockquote {
+.comment-composer-form blockquote,
+.comment-inline-composer blockquote {
   max-height: 6rem;
   padding: 0.75rem 0.9rem;
   overflow: auto;
@@ -979,6 +998,10 @@ select:disabled {
   font: 0.95rem/1.55 var(--serif);
   letter-spacing: normal;
   text-transform: none;
+}
+
+.comment-inline-composer .comment-composer-field textarea {
+  min-height: 6rem;
 }
 
 .comment-composer-footer {
@@ -1137,6 +1160,12 @@ select:disabled {
   margin-top: 0.55rem;
 }
 
+.comment-thread > .comment-inline-composer {
+  margin-top: 0.75rem;
+  padding: 0.85rem 0 0;
+  border-top: 1px solid var(--border);
+}
+
 .cm-comment-anchor {
   border-bottom: 2px solid var(--accent);
   background: var(--accent-soft);
@@ -1229,11 +1258,20 @@ select:disabled {
 }
 
 .comment-composer-bubble {
-  padding-inline: 0.65rem;
   border-color: var(--accent);
+  border-style: dashed;
   color: var(--accent);
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  opacity: 0.48;
+}
+
+.comment-composer-bubble:hover {
+  opacity: 1;
+}
+
+.comment-composer-bubble .segment-comment-bubble__avatar {
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
 }
 
 .cm-comment-bubble-anchor {
@@ -1251,6 +1289,10 @@ select:disabled {
   height: 1.35rem;
   margin: 0;
   opacity: 0.88;
+}
+
+.cm-content .comment-composer-bubble {
+  opacity: 0.48;
 }
 
 .cm-content .segment-comment-bubble:hover,
@@ -1578,7 +1620,8 @@ select:disabled {
   }
 
   .comment-menu,
-  .comment-card {
+  .comment-card,
+  .comment-composer-popover {
     position: fixed;
     inset: auto 0.5rem 0.5rem;
     width: auto;

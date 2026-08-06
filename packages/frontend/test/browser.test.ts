@@ -95,6 +95,27 @@ test(
       assert.match(typography.editor, /JetBrains Mono/u);
       assert.equal(typography.code, typography.editor);
 
+      await first.locator(".cm-content").click();
+      await first.keyboard.press("ControlOrMeta+Home");
+      await first.keyboard.press("Shift+End");
+      const sourceCommentComposer = first.locator(
+        '[data-comment-composer][data-comment-surface="source"]',
+      );
+      await sourceCommentComposer.waitFor();
+      assert.equal(
+        await sourceCommentComposer.evaluate((bubble) => getComputedStyle(bubble).opacity),
+        "0.48",
+      );
+      await sourceCommentComposer.click();
+      await first.waitForFunction(
+        () =>
+          document.querySelector("[data-comment-composer-popover]")?.matches(":popover-open") ===
+          true,
+      );
+      assert.equal(await first.locator("[data-comment-composer-dialog]").count(), 0);
+      await first.locator("[data-comment-composer-popover] [data-comment-cancel]").click();
+      await first.keyboard.press("ArrowRight");
+
       const second = await context.newPage();
       await second.goto(`${baseUrl}/documents/${documentId}/edit`);
       await second.waitForSelector(".cm-content");
@@ -225,9 +246,10 @@ test(
       await second.waitForSelector("[data-comment-composer]");
       await second.locator("[data-comment-composer]").click();
       await second
-        .locator("[data-comment-composer-dialog] [data-comment-body]")
+        .locator("[data-comment-composer-popover] [data-comment-body]")
         .fill("Preview segment comment");
-      await second.locator("[data-comment-composer-dialog] [data-comment-submit]").click();
+      assert.equal(await second.locator("[data-comment-composer-dialog]").count(), 0);
+      await second.locator("[data-comment-composer-popover] [data-comment-submit]").click();
       await second.waitForFunction(
         () => document.querySelector("[data-comment-count]")?.textContent === "2",
       );
@@ -237,9 +259,12 @@ test(
         .click();
       await second.locator("[data-comment-card] [data-reply-thread]").click();
       await second
-        .locator("[data-comment-composer-dialog] [data-comment-body]")
+        .locator("[data-comment-card] [data-comment-composer-inline] [data-comment-body]")
         .fill("A composed reply");
-      await second.locator("[data-comment-composer-dialog] [data-comment-submit]").click();
+      assert.equal(await second.locator("[data-comment-composer-dialog]").count(), 0);
+      await second
+        .locator("[data-comment-card] [data-comment-composer-inline] [data-comment-submit]")
+        .click();
       await second.waitForFunction(() =>
         document.querySelector("[data-comment-card]")?.textContent?.includes("A composed reply"),
       );

@@ -4,17 +4,26 @@ import type { CommentThreadDto } from "@earendil-works/jot-protocol";
 
 import { AnchoredPopover } from "./anchored-popover.tsx";
 import { Button } from "./button.tsx";
+import { CommentComposer } from "./comment-composer.tsx";
 
 export interface CommentThreadCardProps {
   readonly anchorRef: React.RefObject<HTMLElement | undefined>;
   readonly anchorRevision: number;
   readonly canManage: boolean;
+  readonly canReply: boolean;
   readonly onClose: () => void;
   readonly onDeleteMessage: (messageId: string) => void;
   readonly onDeleteThread: () => void;
   readonly onEdit: (messageId: string, body: string) => void;
   readonly onReply: () => void;
   readonly onResolve: () => void;
+  readonly replyComposer:
+    | {
+        readonly onCancel: () => void;
+        readonly onSubmit: (body: string) => void;
+        readonly pending: boolean;
+      }
+    | undefined;
   readonly thread: CommentThreadDto | undefined;
 }
 
@@ -22,12 +31,14 @@ export function CommentThreadCard({
   anchorRef,
   anchorRevision,
   canManage,
+  canReply,
   onClose,
   onDeleteMessage,
   onDeleteThread,
   onEdit,
   onReply,
   onResolve,
+  replyComposer,
   thread,
 }: CommentThreadCardProps): React.JSX.Element {
   useEffect(() => {
@@ -87,10 +98,22 @@ export function CommentThreadCard({
               </span>
             </div>
           ))}
+          {replyComposer === undefined ? null : (
+            <CommentComposer
+              onCancel={replyComposer.onCancel}
+              onSubmit={replyComposer.onSubmit}
+              pending={replyComposer.pending}
+              presentation="inline"
+              submitLabel="Reply"
+              title="Reply to thread"
+            />
+          )}
           <div className="comment-actions">
-            <Button data-reply-thread={thread.id} onClick={onReply}>
-              Reply
-            </Button>
+            {canReply && replyComposer === undefined ? (
+              <Button data-reply-thread={thread.id} onClick={onReply}>
+                Reply
+              </Button>
+            ) : null}
             <Button data-resolve-thread={thread.id} onClick={onResolve}>
               {thread.resolved ? "Reopen" : "Resolve"}
             </Button>

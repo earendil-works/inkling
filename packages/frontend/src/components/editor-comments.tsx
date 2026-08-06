@@ -10,13 +10,13 @@ import { useAppContext } from "../app-context.tsx";
 import {
   renderPreviewCommentBubbles,
   renderPreviewCommentComposer,
-  selectedPreviewSourceRange,
   updateEditorCommentDecorations,
 } from "../comments.ts";
 import type { PreviewSourceRange, ProjectedCommentThread } from "../comments.ts";
 import { useEffectAction } from "../effect-hooks.ts";
 import { browserRuntime } from "../effect-runtime.ts";
 import type { EditorSession } from "../use-editor-session.ts";
+import { AnchoredPopover } from "./anchored-popover.tsx";
 import { CommentComposer } from "./comment-composer.tsx";
 import { CommentControls } from "./comment-controls.tsx";
 import type { CommentControlsHandle } from "./comment-controls.tsx";
@@ -147,9 +147,9 @@ export function EditorComments({
     const session = sessionRef.current;
     const preview = previewRef.current;
     if (session === undefined || preview === null) return;
-    updateEditorCommentDecorations(session.editor, visibleProjections);
+    updateEditorCommentDecorations(session.editor, visibleProjections, canComment);
     renderPreviewCommentBubbles(preview, visibleProjections);
-    renderPreviewCommentComposer(preview, previewSelection);
+    renderPreviewCommentComposer(preview, canComment ? previewSelection : undefined);
     if (activeThreadId !== undefined) {
       activeAnchorRef.current = [
         ...document.querySelectorAll<HTMLElement>("[data-comment-bubble]"),
@@ -163,6 +163,7 @@ export function EditorComments({
   }, [
     activeSurface,
     activeThreadId,
+    canComment,
     previewRef,
     previewRevision,
     previewSelection,
@@ -207,6 +208,12 @@ export function EditorComments({
   );
 
   const finishComment = (next: CommentStateDto): void => {
+    if (composer?.kind === "create") {
+      const selection = sessionRef.current?.editor.state.selection.main;
+      if (selection !== undefined && !selection.empty) {
+        sessionRef.current?.editor.dispatch({ selection: { anchor: selection.to } });
+      }
+    }
     onCommentsChange(next);
     setComposer(undefined);
     setPreviewSelection(undefined);
@@ -230,20 +237,6 @@ export function EditorComments({
       range,
     });
   };
-  const commentOnSelection = (): void => {
-    const preview = previewRef.current;
-    const session = sessionRef.current;
-    if (preview === null || session === undefined) return;
-    const previewRange = selectedPreviewSourceRange(preview);
-    const selection = session.editor.state.selection.main;
-    const sourceRange = selection.empty ? undefined : { end: selection.to, start: selection.from };
-    const range = previewRange ?? previewSelection ?? sourceRange;
-    if (range === undefined) {
-      showToast("Select Markdown or rendered text before commenting.", "error");
-      return;
-    }
-    openCommentOnRange(range);
-  };
   const handleWorkbenchClick = (target: EventTarget): void => {
     if (!(target instanceof Element)) return;
     const inlineComposer = target.closest<HTMLElement>("[data-comment-composer]");
@@ -251,6 +244,9 @@ export function EditorComments({
       const start = Number(inlineComposer.dataset["sourceStart"]);
       const end = Number(inlineComposer.dataset["sourceEnd"]);
       if (Number.isSafeInteger(start) && Number.isSafeInteger(end)) {
+        activeAnchorRef.current = inlineComposer;
+        setActiveAnchorRevision((revision) => revision + 1);
+        setActiveThreadId(undefined);
         openCommentOnRange({ end, start });
       }
       return;
@@ -258,6 +254,7 @@ export function EditorComments({
     const bubble = target.closest<HTMLElement>("[data-comment-bubble]");
     const threadId = bubble?.dataset["commentBubble"];
     if (bubble === null || threadId === undefined) return;
+    setComposer(undefined);
     setActiveThreadId(threadId);
     setActiveSurface(bubble.dataset["commentSurface"] === "source" ? "source" : "preview");
     activeAnchorRef.current = bubble;
@@ -274,22 +271,54 @@ export function EditorComments({
   const orphaned = projectedComments.filter(
     (projection) => projection.orphaned && (showResolved || !projection.thread.resolved),
   );
+  const createRequest = composer?.kind === "create" ? composer : undefined;
+  const editRequest = composer?.kind === "edit" ? composer : undefined;
+  const replyRequest = composer?.kind === "reply" ? composer : undefined;
+  const submitComment = (request: ComposerRequest, body: string): void => {
+    commentAction.execute(
+      { body, request },
+      { onFailure: (error) => showToast(error.message, "error"), onSuccess: finishComment },
+    );
+  };
 
   return (
     <>
       <CommentControls
-        canComment={canComment}
-        onCommentOnSelection={commentOnSelection}
         onShowResolvedChange={setShowResolved}
         orphaned={orphaned}
         ref={controlsRef}
         showResolved={showResolved}
       />
+      <AnchoredPopover
+        anchorRef={activeAnchorRef}
+        anchorRevision={activeAnchorRevision}
+        aria-label="New comment"
+        className="comment-composer-popover"
+        data-comment-composer-popover=""
+        open={createRequest !== undefined}
+      >
+        {createRequest === undefined ? null : (
+          <CommentComposer
+            key={`${createRequest.range.start}:${createRequest.range.end}`}
+            onCancel={() => setComposer(undefined)}
+            onSubmit={(body) => submitComment(createRequest, body)}
+            pending={commentAction.state.pending}
+            presentation="inline"
+            quote={createRequest.quote}
+            submitLabel="Comment"
+            title="Comment on selection"
+          />
+        )}
+      </AnchoredPopover>
       <CommentThreadCard
         anchorRef={activeAnchorRef}
         anchorRevision={activeAnchorRevision}
         canManage={canManage}
-        onClose={() => setActiveThreadId(undefined)}
+        canReply={canComment}
+        onClose={() => {
+          setActiveThreadId(undefined);
+          setComposer((current) => (current?.kind === "reply" ? undefined : current));
+        }}
         onDeleteMessage={(messageId) => {
           if (activeThread !== undefined) {
             setPendingDeletion({ kind: "delete-message", messageId, threadId: activeThread.id });
@@ -332,32 +361,26 @@ export function EditorComments({
             },
           );
         }}
+        replyComposer={
+          replyRequest === undefined || replyRequest.threadId !== activeThread?.id
+            ? undefined
+            : {
+                onCancel: () => setComposer(undefined),
+                onSubmit: (body) => submitComment(replyRequest, body),
+                pending: commentAction.state.pending,
+              }
+        }
         thread={activeThread}
       />
-      {composer === undefined ? null : (
+      {editRequest === undefined ? null : (
         <CommentComposer
-          initialBody={composer.kind === "edit" ? composer.initialBody : undefined}
+          initialBody={editRequest.initialBody}
+          key={`${editRequest.threadId}:${editRequest.messageId}`}
           onCancel={() => setComposer(undefined)}
-          onSubmit={(body) =>
-            commentAction.execute(
-              { body, request: composer },
-              { onFailure: (error) => showToast(error.message, "error"), onSuccess: finishComment },
-            )
-          }
+          onSubmit={(body) => submitComment(editRequest, body)}
           pending={commentAction.state.pending}
-          quote={
-            composer.kind === "create" || composer.kind === "reply" ? composer.quote : undefined
-          }
-          submitLabel={
-            composer.kind === "edit" ? "Save" : composer.kind === "reply" ? "Reply" : "Comment"
-          }
-          title={
-            composer.kind === "edit"
-              ? "Edit comment"
-              : composer.kind === "reply"
-                ? "Reply to thread"
-                : "Comment on selection"
-          }
+          submitLabel="Save"
+          title="Edit comment"
         />
       )}
       <ConfirmationDialog

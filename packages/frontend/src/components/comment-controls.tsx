@@ -10,8 +10,6 @@ export interface CommentControlsHandle {
 }
 
 export interface CommentControlsProps {
-  readonly canComment: boolean;
-  readonly onCommentOnSelection: () => void;
   readonly onShowResolvedChange: (show: boolean) => void;
   readonly orphaned: readonly ProjectedCommentThread[];
   readonly ref?: React.Ref<CommentControlsHandle> | undefined;
@@ -19,8 +17,6 @@ export interface CommentControlsProps {
 }
 
 export function CommentControls({
-  canComment,
-  onCommentOnSelection,
   onShowResolvedChange,
   orphaned,
   ref,
@@ -58,15 +54,7 @@ export function CommentControls({
           ×
         </Button>
       </div>
-      <p>Select Markdown or rendered text. Comments stay attached as the document changes.</p>
-      <Button
-        variant="primary"
-        data-comment-new=""
-        disabled={!canComment}
-        onClick={onCommentOnSelection}
-      >
-        Comment on selection
-      </Button>
+      <p>Select Markdown or rendered text to reveal its inline comment control.</p>
       <CheckboxField
         checked={showResolved}
         className="resolved-toggle"

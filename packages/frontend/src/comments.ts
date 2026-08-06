@@ -1,5 +1,5 @@
 import { StateEffect, StateField } from "@codemirror/state";
-import type { Extension, Text } from "@codemirror/state";
+import type { EditorState, Extension, Text } from "@codemirror/state";
 import { Decoration, EditorView, WidgetType } from "@codemirror/view";
 import type { DecorationSet } from "@codemirror/view";
 
@@ -18,6 +18,7 @@ export interface PreviewSourceRange {
 }
 
 const replaceCommentDecorations = StateEffect.define<readonly ProjectedCommentThread[]>();
+const setCommentComposerEnabled = StateEffect.define<boolean>();
 
 class CommentBubbleWidget extends WidgetType {
   readonly thread: CommentThreadDto;
@@ -40,6 +41,32 @@ class CommentBubbleWidget extends WidgetType {
     const anchor = document.createElement("span");
     anchor.className = "cm-comment-bubble-anchor";
     anchor.append(makeCommentBubble(this.thread, "source"));
+    return anchor;
+  }
+
+  override ignoreEvent(): boolean {
+    return true;
+  }
+}
+
+class CommentComposerBubbleWidget extends WidgetType {
+  readonly end: number;
+  readonly start: number;
+
+  constructor(start: number, end: number) {
+    super();
+    this.start = start;
+    this.end = end;
+  }
+
+  override eq(other: CommentComposerBubbleWidget): boolean {
+    return other.start === this.start && other.end === this.end;
+  }
+
+  toDOM(): HTMLElement {
+    const anchor = document.createElement("span");
+    anchor.className = "cm-comment-bubble-anchor";
+    anchor.append(makeCommentComposerBubble(this.start, this.end, "source"));
     return anchor;
   }
 
@@ -82,7 +109,42 @@ const commentDecorationField = StateField.define<DecorationSet>({
   },
 });
 
-export const commentDecorationsExtension: Extension = commentDecorationField;
+interface CommentComposerDecorationState {
+  readonly decorations: DecorationSet;
+  readonly enabled: boolean;
+}
+
+const commentComposerDecorationField = StateField.define<CommentComposerDecorationState>({
+  create: (state) => ({ decorations: selectionComposerDecorations(state, false), enabled: false }),
+  provide: (field) => EditorView.decorations.from(field, (value) => value.decorations),
+  update: (value, transaction) => {
+    const enabled = transaction.effects.reduce(
+      (current, effect) => (effect.is(setCommentComposerEnabled) ? effect.value : current),
+      value.enabled,
+    );
+    return {
+      decorations: selectionComposerDecorations(transaction.state, enabled),
+      enabled,
+    };
+  },
+});
+
+export const commentDecorationsExtension: Extension = [
+  commentDecorationField,
+  commentComposerDecorationField,
+];
+
+function selectionComposerDecorations(state: EditorState, enabled: boolean): DecorationSet {
+  const selection = state.selection.main;
+  if (!enabled || selection.empty) return Decoration.none;
+  const position = trailingVisiblePosition(state.doc, selection.from, selection.to);
+  return Decoration.set([
+    Decoration.widget({
+      side: -1,
+      widget: new CommentComposerBubbleWidget(selection.from, selection.to),
+    }).range(position),
+  ]);
+}
 
 function trailingVisiblePosition(document: Text, from: number, to: number): number {
   let position = to;
@@ -95,8 +157,14 @@ function trailingVisiblePosition(document: Text, from: number, to: number): numb
 export function updateEditorCommentDecorations(
   editor: EditorView,
   projections: readonly ProjectedCommentThread[],
+  composerEnabled: boolean,
 ): void {
-  editor.dispatch({ effects: replaceCommentDecorations.of(projections) });
+  editor.dispatch({
+    effects: [
+      replaceCommentDecorations.of(projections),
+      setCommentComposerEnabled.of(composerEnabled),
+    ],
+  });
 }
 
 export function renderPreviewCommentBubbles(
@@ -158,14 +226,32 @@ export function renderPreviewCommentComposer(
   if (segment === undefined) return;
   const target = attachmentTarget(segment);
   const slot = existingCommentSlot(target) ?? makeCommentSlot(target);
+  slot.append(makeCommentComposerBubble(source.start, source.end, "preview"));
+}
+
+function makeCommentComposerBubble(
+  start: number,
+  end: number,
+  surface: "preview" | "source",
+): HTMLElement {
   const button = document.createElement("button");
-  button.className = "comment-composer-bubble";
+  button.className = "segment-comment-bubble comment-composer-bubble";
   button.dataset["commentComposer"] = "";
-  button.dataset["sourceEnd"] = String(source.end);
-  button.dataset["sourceStart"] = String(source.start);
+  button.dataset["commentSurface"] = surface;
+  button.dataset["sourceEnd"] = String(end);
+  button.dataset["sourceStart"] = String(start);
   button.type = "button";
-  button.textContent = "+ Comment here";
-  slot.append(button);
+  button.setAttribute("aria-label", "Comment on selection");
+  button.title = "Comment on selection";
+
+  const avatar = document.createElement("span");
+  avatar.className = "segment-comment-bubble__avatar";
+  avatar.textContent = "+";
+  const label = document.createElement("span");
+  label.className = "segment-comment-bubble__count";
+  label.textContent = "New";
+  button.append(avatar, label);
+  return button;
 }
 
 function makeCommentBubble(thread: CommentThreadDto, surface: "preview" | "source"): HTMLElement {
