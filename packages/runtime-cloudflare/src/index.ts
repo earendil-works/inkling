@@ -40,6 +40,7 @@ import type {
 } from "@earendil-works/jot-protocol";
 import { MarkdownRendererLive } from "@earendil-works/jot-renderer";
 
+import { isGoogleEmailAllowed, parseAllowedGoogleDomains } from "./google-auth.ts";
 import {
   makeDurableObjectJournal,
   makeDurableWorkspaceStateStore,
@@ -50,6 +51,7 @@ export interface CloudflareEnvironment {
   readonly ASSETS: Fetcher;
   readonly GOOGLE_ADMIN_EMAILS?: string | undefined;
   readonly GOOGLE_ALLOWED_DOMAIN?: string | undefined;
+  readonly GOOGLE_ALLOWED_DOMAINS?: string | undefined;
   readonly GOOGLE_CLIENT_ID?: string | undefined;
   readonly GOOGLE_CLIENT_SECRET?: string | undefined;
   readonly GOOGLE_REDIRECT_URI?: string | undefined;
@@ -90,7 +92,7 @@ export class WorkspaceDurableObject extends DurableObject<CloudflareEnvironment>
     const googleEnabled =
       environment.GOOGLE_CLIENT_ID !== undefined &&
       environment.GOOGLE_CLIENT_SECRET !== undefined &&
-      environment.GOOGLE_ALLOWED_DOMAIN !== undefined;
+      configuredGoogleDomains(environment).length > 0;
     this.#runtime = createApplicationRuntime(state, environment, {
       allowOwnerSetup: !googleEnabled,
       authenticationMethods: googleEnabled ? ["google"] : ["password"],
@@ -802,7 +804,9 @@ async function startGoogleAuthentication(
   authorization.searchParams.set("nonce", payload.nonce);
   authorization.searchParams.set("code_challenge", challenge);
   authorization.searchParams.set("code_challenge_method", "S256");
-  authorization.searchParams.set("hd", configuration.allowedDomain);
+  if (configuration.allowedDomains.length === 1) {
+    authorization.searchParams.set("hd", configuration.allowedDomains[0] ?? "");
+  }
   const headers = new Headers({ Location: authorization.href });
   headers.append(
     "Set-Cookie",
@@ -865,10 +869,9 @@ async function finishGoogleAuthentication(
     if (
       claims === undefined ||
       !claims.email_verified ||
-      claims.hd?.toLocaleLowerCase("en") !== configuration.allowedDomain ||
-      !claims.email.toLocaleLowerCase("en").endsWith(`@${configuration.allowedDomain}`)
+      !isGoogleEmailAllowed(claims.email, configuration.allowedDomains)
     ) {
-      return oauthFailure("The Google identity is not a verified member of the allowed domain.");
+      return oauthFailure("The Google identity is not a verified member of an allowed domain.");
     }
     const email = claims.email.toLocaleLowerCase("en");
     const administrators = new Set(
@@ -919,20 +922,21 @@ async function finishGoogleAuthentication(
   }
 }
 
+function configuredGoogleDomains(environment: CloudflareEnvironment): readonly string[] {
+  return parseAllowedGoogleDomains(
+    environment.GOOGLE_ALLOWED_DOMAINS ?? environment.GOOGLE_ALLOWED_DOMAIN,
+  );
+}
+
 function googleConfiguration(request: Request, environment: CloudflareEnvironment) {
   const clientId = environment.GOOGLE_CLIENT_ID;
   const clientSecret = environment.GOOGLE_CLIENT_SECRET;
-  const allowedDomain = environment.GOOGLE_ALLOWED_DOMAIN?.trim().toLocaleLowerCase("en");
-  if (
-    clientId === undefined ||
-    clientSecret === undefined ||
-    allowedDomain === undefined ||
-    allowedDomain.length === 0
-  ) {
+  const allowedDomains = configuredGoogleDomains(environment);
+  if (clientId === undefined || clientSecret === undefined || allowedDomains.length === 0) {
     return undefined;
   }
   return {
-    allowedDomain,
+    allowedDomains,
     clientId,
     clientSecret,
     redirectUri:

@@ -1,7 +1,7 @@
 # Copy to .dev.vars for local OAuth testing. Never commit real values.
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
-GOOGLE_ALLOWED_DOMAIN=example.com
+GOOGLE_ALLOWED_DOMAINS=example.com,example.org
 GOOGLE_ADMIN_EMAILS=admin@example.com
 # Optional when the inferred callback URL is not registered with Google.
 GOOGLE_REDIRECT_URI=http://localhost:8787/api/auth/google/callback
