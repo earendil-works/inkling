@@ -35,6 +35,7 @@ import {
 } from "@earendil-works/jot-protocol";
 import type {
   ClientCollaborationMessage,
+  DocumentMetadataDto,
   DocumentResponse,
   ServerCollaborationMessage,
 } from "@earendil-works/jot-protocol";
@@ -165,6 +166,18 @@ export class WorkspaceDurableObject extends DurableObject<CloudflareEnvironment>
     );
   }
 
+  async reserveRfcNumber(
+    requestCredentials: RequestCredentials,
+    documentId: string,
+  ): Promise<RpcResult<number>> {
+    return runRpc(
+      this.#runtime,
+      Effect.flatMap(JotApplication, (application) =>
+        application.reserveRfcNumber(requestCredentials, documentId),
+      ),
+    );
+  }
+
   async applyProjection(document: DocumentResponse): Promise<RpcResult<boolean>> {
     return runRpc(
       this.#runtime,
@@ -259,6 +272,54 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
         ok: false,
       };
     }
+  }
+
+  async assignRfcNumber(
+    requestCredentials: RequestCredentials,
+    documentId: string,
+    rfcNumber: number,
+  ): Promise<RpcResult<DocumentMetadataDto>> {
+    const configuration = await this.#loadConfiguration();
+    if (configuration === undefined || configuration.documentId !== documentId) {
+      return {
+        error: {
+          code: "document_not_initialized",
+          message: "The document authority has not been initialized.",
+          retryable: true,
+          status: 503,
+        },
+        ok: false,
+      };
+    }
+    await this.#ensureRuntime(configuration);
+    const runtime = this.#runtime;
+    if (runtime === undefined) {
+      return {
+        error: {
+          code: "document_runtime_unavailable",
+          message: "The document authority is unavailable.",
+          retryable: true,
+          status: 503,
+        },
+        ok: false,
+      };
+    }
+    const result = await runRpc(
+      runtime,
+      Effect.flatMap(JotApplication, (application) =>
+        application.assignRfcNumber(requestCredentials, documentId, rfcNumber),
+      ),
+    );
+    if (result.ok) {
+      const projection = await runtime.runPromise(
+        Effect.flatMap(JotApplication, (application) =>
+          application.currentDocumentProjection(documentId),
+        ),
+      );
+      await this.#queueProjection(projection);
+      await this.#requestResynchronization();
+    }
+    return result;
   }
 
   override async fetch(request: Request): Promise<Response> {
@@ -576,6 +637,10 @@ const worker: ExportedHandler<CloudflareEnvironment> = {
     if (url.pathname === "/api/auth/google/callback") {
       return finishGoogleAuthentication(request, environment);
     }
+    const rfcAllocationDocumentId = documentIdFromRfcAllocation(url.pathname);
+    if (request.method === "POST" && rfcAllocationDocumentId !== undefined) {
+      return allocateRfcNumber(request, environment, rfcAllocationDocumentId);
+    }
     const documentId = documentIdFromPath(url.pathname);
     if (documentId !== undefined) {
       return dispatchDocument(request, environment, documentId);
@@ -643,6 +708,29 @@ async function dispatchDocument(
   const document = environment.JOT_DOCUMENTS.get(environment.JOT_DOCUMENTS.idFromName(documentId));
   const initialized = await document.initialize(configurationResult.value);
   return initialized.ok ? document.fetch(request) : protocolErrorResponse(initialized.error);
+}
+
+async function allocateRfcNumber(
+  request: Request,
+  environment: CloudflareEnvironment,
+  documentId: string,
+): Promise<Response> {
+  const protectionError = mutationProtectionError(request);
+  if (protectionError !== undefined) return protocolErrorResponse(protectionError);
+
+  const workspace = workspaceStub(environment);
+  const requestCredentials = credentials(request);
+  const allocation = await workspace.reserveRfcNumber(requestCredentials, documentId);
+  if (!allocation.ok) return protocolErrorResponse(allocation.error);
+  const configuration = await workspace.configuration(documentId);
+  if (!configuration.ok) return protocolErrorResponse(configuration.error);
+
+  const document = environment.JOT_DOCUMENTS.get(environment.JOT_DOCUMENTS.idFromName(documentId));
+  const initialized = await document.initialize(configuration.value);
+  if (!initialized.ok) return protocolErrorResponse(initialized.error);
+  const assigned = await document.assignRfcNumber(requestCredentials, documentId, allocation.value);
+  if (!assigned.ok) return protocolErrorResponse(assigned.error);
+  return Response.json(assigned.value, { headers: { "Cache-Control": "no-store" } });
 }
 
 function createApplicationRuntime(
@@ -1221,6 +1309,16 @@ function documentIdFromPath(pathname: string): string | undefined {
   }
 }
 
+function documentIdFromRfcAllocation(pathname: string): string | undefined {
+  const match = /^\/api\/documents\/([^/]+)\/rfc$/u.exec(pathname);
+  if (match?.[1] === undefined) return undefined;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return undefined;
+  }
+}
+
 function rfcNumberFromPath(pathname: string): number | undefined {
   const match = /^\/(?:api\/public\/)?rfc\/(\d+)(?:\/|$)/u.exec(pathname);
   const value = Number(match?.[1]);
@@ -1243,6 +1341,28 @@ function isSameOrigin(origin: string | null, requestUrl: string): boolean {
 
 function isMutation(request: Request): boolean {
   return request.method !== "GET" && request.method !== "HEAD" && request.method !== "OPTIONS";
+}
+
+function mutationProtectionError(request: Request): RpcError | undefined {
+  const requestCredentials = credentials(request);
+  if (
+    requestCredentials.sessionToken === undefined ||
+    requestCredentials.bearerToken !== undefined
+  ) {
+    return undefined;
+  }
+  const csrfCookie = parseCookies(request.headers.get("Cookie"))["jot_csrf"];
+  const csrfHeader = request.headers.get("X-CSRF-Token");
+  return isSameOrigin(request.headers.get("Origin"), request.url) &&
+    csrfHeader !== null &&
+    csrfHeader === csrfCookie
+    ? undefined
+    : {
+        code: "csrf_rejected",
+        message: "The mutation failed origin or CSRF validation.",
+        retryable: false,
+        status: 403,
+      };
 }
 
 function isApplicationPath(pathname: string): boolean {

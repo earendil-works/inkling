@@ -48,6 +48,7 @@ export interface ApiClientService {
   readonly createDocument: (
     request: CreateDocumentRequest,
   ) => Effect.Effect<DocumentResponse, ApiError>;
+  readonly allocateRfc: (documentId: string) => Effect.Effect<DocumentMetadataDto, ApiError>;
   readonly readDocument: (documentId: string) => Effect.Effect<DocumentResponse, ApiError>;
   readonly uploadAttachment: (
     documentId: string,
@@ -209,6 +210,12 @@ export function makeApiClient(capabilityToken?: string): ApiClientService {
     });
 
   return {
+    allocateRfc: (documentId) =>
+      mutation(
+        `/api/documents/${encodeURIComponent(documentId)}/rfc`,
+        DocumentMetadataSchema,
+        "POST",
+      ),
     authenticationStatus: request("/api/auth/status", AuthenticationStatusSchema),
     createApiKey: (label) => mutation("/api/api-keys", ApiKeyCreatedSchema, "POST", { label }),
     createDocument: (input) => mutation("/api/documents", DocumentResponseSchema, "POST", input),

@@ -47,7 +47,7 @@ test(
       await first.locator("[data-new-document]").click();
       await first.locator('input[name="title"]').fill("Browser collaboration");
       assert.equal(await first.locator('textarea[name="body"]').count(), 0);
-      await first.locator('input[name="rfc"]').check();
+      assert.equal(await first.locator('input[name="rfc"]').isChecked(), false);
       await first
         .locator("[data-new-form]")
         .evaluate((form: HTMLFormElement) =>
@@ -61,6 +61,15 @@ test(
       );
       assert.equal(await first.locator("[data-api-status]").textContent(), "Saved");
       assert.equal(await first.locator(".cm-content").textContent(), "");
+      await first.locator("[data-document-details] > summary").click();
+      await first.locator("[data-allocate-rfc]").click();
+      await first.waitForFunction(
+        () =>
+          document.querySelector(".document-bar .document-identity > span")?.textContent ===
+          "RFC 0001",
+      );
+      assert.equal(await first.locator("[data-allocate-rfc]").count(), 0);
+      await first.locator("[data-document-details] > summary").click();
       await first.locator(".cm-content").click();
       await first.keyboard.insertText(
         "Shared starting body\n\nSecond line\n\n```ts\nconst answer: number = 42;\n```\n\nThird line",

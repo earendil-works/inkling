@@ -2,6 +2,7 @@ import { Effect, Either, Fiber, Layer, Schema, Stream } from "effect";
 
 import {
   activateDocument,
+  allocateRfcNumber,
   applyCatalogSummary,
   authenticateApiKey,
   authorizeDocument,
@@ -1055,6 +1056,17 @@ export function makeLocalJotApplication(
             ),
           );
         }),
+      assignRfcNumber: (credentials, rawDocumentId, rfcNumber) =>
+        Effect.gen(function* () {
+          const room = yield* getRoom(rawDocumentId);
+          const principal = yield* resolvePrincipal(credentials, rawDocumentId);
+          const metadata = yield* room
+            .assignRfcNumber(principal, rfcNumber, new Date().toISOString())
+            .pipe(Effect.mapError(toApplicationError));
+          yield* projectDocument(room);
+          yield* scheduleCheckpoint(room);
+          return metadata as DocumentMetadataDto;
+        }),
       createDocument: (credentials, request) =>
         Effect.gen(function* () {
           const principal = yield* resolvePrincipal(credentials);
@@ -1549,6 +1561,22 @@ export function makeLocalJotApplication(
           return yield* readPublished(
             entry.documentId,
             `/rfc/${String(rfcNumber).padStart(4, "0")}`,
+          );
+        }),
+      reserveRfcNumber: (credentials, rawDocumentId) =>
+        Effect.gen(function* () {
+          const principal = yield* resolvePrincipal(credentials);
+          yield* authorizeWorkspace(principal, "create-document").pipe(
+            Effect.mapError(toApplicationError),
+          );
+          return yield* withState(
+            allocateRfcNumber(state.catalog, rawDocumentId).pipe(
+              Effect.mapError(toApplicationError),
+              Effect.tap(({ state: catalog }) =>
+                saveState({ ...state, catalog }).pipe(Effect.mapError(toApplicationError)),
+              ),
+              Effect.map((allocation) => allocation.rfcNumber),
+            ),
           );
         }),
       replaceBody: (credentials, rawDocumentId, request) =>

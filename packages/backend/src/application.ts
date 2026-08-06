@@ -173,6 +173,15 @@ export interface JotApplicationService {
     credentials: RequestCredentials,
     request: CreateDocumentRequest,
   ) => Effect.Effect<DocumentResponse, ApplicationError>;
+  readonly reserveRfcNumber: (
+    credentials: RequestCredentials,
+    documentId: string,
+  ) => Effect.Effect<number, ApplicationError>;
+  readonly assignRfcNumber: (
+    credentials: RequestCredentials,
+    documentId: string,
+    rfcNumber: number,
+  ) => Effect.Effect<DocumentMetadataDto, ApplicationError>;
   readonly importDocument: (
     credentials: RequestCredentials,
     request: ImportDocumentRequest,

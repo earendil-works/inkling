@@ -44,7 +44,7 @@ test(
 
         const create = await fetch(`${baseUrl}/api/documents`, {
           body: JSON.stringify({
-            allocateRfc: true,
+            allocateRfc: false,
             body: "Initial body",
             creationKey: "integration-document",
             title: "Integrated RFC",
@@ -54,6 +54,23 @@ test(
         });
         assert.equal(create.status, 200);
         let document = (await create.json()) as DocumentWire;
+        assert.equal(document.metadata.rfcNumber, undefined);
+        const allocate = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/rfc`, {
+          headers: authorization,
+          method: "POST",
+        });
+        assert.equal(allocate.status, 200);
+        const allocated = (await allocate.json()) as DocumentWire["metadata"];
+        assert.equal(allocated.rfcNumber, 1);
+        const allocateAgain = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/rfc`, {
+          headers: authorization,
+          method: "POST",
+        });
+        assert.equal(allocateAgain.status, 200);
+        assert.equal(
+          ((await allocateAgain.json()) as DocumentWire["metadata"]).headRevision,
+          allocated.headRevision,
+        );
 
         await appendOverWebSocket(
           baseUrl,
@@ -348,6 +365,7 @@ interface DocumentWire {
   readonly metadata: {
     readonly headRevision: number;
     readonly id: string;
+    readonly rfcNumber?: number | undefined;
   };
 }
 

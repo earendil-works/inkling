@@ -211,6 +211,27 @@ export function createDocumentMetadata(
   });
 }
 
+export function assignRfcNumber(
+  metadata: DocumentMetadata,
+  rfcNumber: number,
+  now: string,
+): Effect.Effect<DocumentMetadata, DomainError> {
+  if (!Number.isSafeInteger(rfcNumber) || rfcNumber < 1) {
+    return fail("invalid_rfc_number", "RFC numbers must be positive integers.");
+  }
+  if (metadata.rfcNumber !== undefined) {
+    return metadata.rfcNumber === rfcNumber
+      ? Effect.succeed(metadata)
+      : fail("rfc_already_allocated", "The document already has a different RFC number.");
+  }
+  return Effect.succeed({
+    ...metadata,
+    headRevision: nextDocumentRevision(metadata.headRevision),
+    rfcNumber,
+    updatedAt: now,
+  });
+}
+
 export function updateDocumentMetadata(
   metadata: DocumentMetadata,
   patch: MetadataPatch,

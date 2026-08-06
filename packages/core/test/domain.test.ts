@@ -4,7 +4,10 @@ import test from "node:test";
 import { Effect, Either } from "effect";
 
 import {
+  activateDocument,
+  allocateRfcNumber,
   applyUniqueTextReplacements,
+  assignRfcNumber,
   authorizeDocument,
   createCommentThread,
   createDocumentMetadata,
@@ -154,6 +157,32 @@ test("RFC reservations are idempotent and numbers are never reused", async () =>
   );
   assert.equal(retried.entry.documentId, first.entry.documentId);
   assert.equal(retried.state.nextRfcNumber, 2);
+
+  const unnumbered = await Effect.runPromise(
+    reserveDocument(retried.state, {
+      allocateRfc: false,
+      creationKey: "request-2",
+      documentId: "document_987654321",
+    }),
+  );
+  const active = await Effect.runPromise(
+    activateDocument(unnumbered.state, unnumbered.entry.documentId),
+  );
+  const allocated = await Effect.runPromise(allocateRfcNumber(active, unnumbered.entry.documentId));
+  assert.equal(allocated.rfcNumber, 2);
+  const allocatedAgain = await Effect.runPromise(
+    allocateRfcNumber(allocated.state, unnumbered.entry.documentId),
+  );
+  assert.equal(allocatedAgain.rfcNumber, 2);
+  assert.equal(allocatedAgain.state.nextRfcNumber, 3);
+
+  const metadata = await Effect.runPromise(
+    createDocumentMetadata({ id: unnumbered.entry.documentId, title: "Later RFC" }, now),
+  );
+  const numbered = await Effect.runPromise(assignRfcNumber(metadata, allocated.rfcNumber, now));
+  assert.equal(numbered.rfcNumber, 2);
+  assert.equal(numbered.headRevision, 1);
+  assert.equal(await Effect.runPromise(assignRfcNumber(numbered, 2, now)), numbered);
 });
 
 test("comment authors may edit their messages while stable anchors remain structured", async () => {

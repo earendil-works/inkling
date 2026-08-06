@@ -17,6 +17,7 @@ export type {
   Visibility,
 } from "./domain/document.ts";
 export {
+  assignRfcNumber,
   attachmentId,
   createDocumentMetadata,
   documentId,
@@ -96,12 +97,14 @@ export type {
   CatalogSummary,
   DocumentReservation,
   PeopleDirectoryEntry,
+  RfcAllocation,
   RegistryEntry,
   RegistryStatus,
   WorkspaceCatalogState,
 } from "./domain/catalog.ts";
 export {
   activateDocument,
+  allocateRfcNumber,
   applyCatalogSummary,
   emptyWorkspaceCatalog,
   findPerson,

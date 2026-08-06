@@ -2,23 +2,34 @@ import { useEffect, useState } from "react";
 
 import type { DocumentMetadataDto } from "@earendil-works/jot-protocol";
 
+import type { ApiClientService, ApiError } from "../api.ts";
+import { useEffectAction } from "../effect-hooks.ts";
+import { Button } from "./button.tsx";
 import { ConfirmationDialog } from "./confirmation-dialog.tsx";
+import { FormError } from "./form-error.tsx";
 import { SelectField } from "./select-field.tsx";
 import { TextField } from "./text-field.tsx";
 
 export interface DocumentDetailsProps {
+  readonly api: ApiClientService;
   readonly canEdit: boolean;
   readonly metadata: DocumentMetadataDto;
+  readonly onMetadataChanged: (metadata: DocumentMetadataDto) => void;
   readonly onUpdate: (input: Readonly<Record<string, unknown>>) => void;
 }
 
 export function DocumentDetails({
+  api,
   canEdit,
   metadata,
+  onMetadataChanged,
   onUpdate,
 }: DocumentDetailsProps): React.JSX.Element {
   const [labels, setLabels] = useState(metadata.labels.join(", "));
   const [confirmPublic, setConfirmPublic] = useState(false);
+  const allocation = useEffectAction<undefined, DocumentMetadataDto, ApiError>(() =>
+    api.allocateRfc(metadata.id),
+  );
 
   useEffect(() => {
     setLabels(metadata.labels.join(", "));
@@ -76,6 +87,24 @@ export function DocumentDetails({
             <option value="normal">Normal</option>
             <option value="confidential">Confidential</option>
           </SelectField>
+          {metadata.rfcNumber === undefined && canEdit ? (
+            <div className="document-details__allocation">
+              <Button
+                data-allocate-rfc=""
+                disabled={allocation.state.pending}
+                onClick={() =>
+                  allocation.execute(undefined, {
+                    onSuccess: onMetadataChanged,
+                  })
+                }
+                size="small"
+                variant="primary"
+              >
+                {allocation.state.pending ? "Allocating…" : "Allocate RFC number"}
+              </Button>
+              <FormError>{allocation.state.error?.message}</FormError>
+            </div>
+          ) : null}
           <TextField
             data-labels=""
             disabled={!canEdit}

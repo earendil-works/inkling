@@ -835,6 +835,10 @@ select:disabled {
   box-shadow: var(--shadow);
 }
 
+.document-details__allocation .primary-button {
+  width: 100%;
+}
+
 .workbench {
   display: grid;
   min-width: 0;

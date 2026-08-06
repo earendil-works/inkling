@@ -221,6 +221,25 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
     ),
   );
 
+  app.post("/api/documents/:documentId/rfc", (context) =>
+    execute(context, options, (service) =>
+      mutation(
+        context,
+        service
+          .reserveRfcNumber(credentials(context), context.req.param("documentId"))
+          .pipe(
+            Effect.flatMap((rfcNumber) =>
+              service.assignRfcNumber(
+                credentials(context),
+                context.req.param("documentId"),
+                rfcNumber,
+              ),
+            ),
+          ),
+      ),
+    ),
+  );
+
   app.post("/api/documents/:documentId/edits", (context) =>
     execute(context, options, (service) =>
       mutation(context, readJson(context, EditBodyRequestSchema)).pipe(

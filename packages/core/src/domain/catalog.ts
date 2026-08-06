@@ -57,6 +57,11 @@ export interface DocumentReservation {
   readonly entry: RegistryEntry;
 }
 
+export interface RfcAllocation {
+  readonly state: WorkspaceCatalogState;
+  readonly rfcNumber: number;
+}
+
 export interface CatalogSearchOptions {
   readonly includeDeleted?: boolean | undefined;
   readonly publicOnly?: boolean | undefined;
@@ -119,6 +124,37 @@ export function activateDocument(
   document: DocumentId,
 ): Effect.Effect<WorkspaceCatalogState, DomainError> {
   return updateEntry(state, document, (entry) => ({ ...entry, status: "active" }));
+}
+
+export function allocateRfcNumber(
+  state: WorkspaceCatalogState,
+  rawDocumentId: string,
+): Effect.Effect<RfcAllocation, DomainError> {
+  return Effect.gen(function* () {
+    const id = yield* documentId(rawDocumentId);
+    const entry = state.entries.find((candidate) => candidate.documentId === id);
+    if (entry === undefined || entry.status !== "active") {
+      return yield* failure("document_not_active", "The document is not active in the workspace.");
+    }
+    if (entry.rfcNumber !== undefined) {
+      return { rfcNumber: entry.rfcNumber, state };
+    }
+
+    const rfcNumber = state.nextRfcNumber;
+    if (state.entries.some((candidate) => candidate.rfcNumber === rfcNumber)) {
+      return yield* failure("duplicate_rfc_number", `RFC ${rfcNumber} is already allocated.`);
+    }
+    return {
+      rfcNumber,
+      state: {
+        ...state,
+        entries: state.entries.map((candidate) =>
+          candidate.documentId === id ? { ...candidate, rfcNumber } : candidate,
+        ),
+        nextRfcNumber: rfcNumber + 1,
+      },
+    };
+  });
 }
 
 export function tombstoneDocument(

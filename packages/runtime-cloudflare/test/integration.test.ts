@@ -57,6 +57,18 @@ test(
       const authorization = { Authorization: `Bearer ${apiKey}` };
       const first = await createDocument(running.baseUrl, authorization, "first", true);
       const second = await createDocument(running.baseUrl, authorization, "second", false);
+      assert.equal(first.metadata.rfcNumber, 1);
+      assert.equal(second.metadata.rfcNumber, undefined);
+      const allocation = await fetch(`${running.baseUrl}/api/documents/${second.metadata.id}/rfc`, {
+        headers: authorization,
+        method: "POST",
+      });
+      assert.equal(allocation.status, 200);
+      assert.equal(((await allocation.json()) as DocumentWire["metadata"]).rfcNumber, 2);
+      assert.equal(
+        (await readDocument(running.baseUrl, second.metadata.id, authorization)).metadata.rfcNumber,
+        2,
+      );
       const edited = await fetch(`${running.baseUrl}/api/documents/${first.metadata.id}/edits`, {
         body: JSON.stringify({
           edits: [{ newText: "durable", oldText: "initial" }],
@@ -106,10 +118,13 @@ test(
           (await readDocument(running.baseUrl, first.metadata.id, authorization)).body,
           "durable first",
         );
-        assert.equal(
-          (await readDocument(running.baseUrl, second.metadata.id, authorization)).body,
-          "initial second",
+        const persistedSecond = await readDocument(
+          running.baseUrl,
+          second.metadata.id,
+          authorization,
         );
+        assert.equal(persistedSecond.body, "initial second");
+        assert.equal(persistedSecond.metadata.rfcNumber, 2);
       } finally {
         await running.stop();
         running = undefined;
@@ -124,7 +139,11 @@ test(
 
 interface DocumentWire {
   readonly body: string;
-  readonly metadata: { readonly headRevision: number; readonly id: string };
+  readonly metadata: {
+    readonly headRevision: number;
+    readonly id: string;
+    readonly rfcNumber?: number | undefined;
+  };
 }
 
 async function createDocument(

@@ -83,8 +83,10 @@ export function EditorToolbar({
           </span>
         </Button>
         <DocumentDetails
+          api={api}
           canEdit={canEditMetadata}
           metadata={metadata}
+          onMetadataChanged={onMetadataChanged}
           onUpdate={onMetadataUpdate}
         />
         {shared ? null : (

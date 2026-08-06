@@ -2,6 +2,7 @@ import { Context, Data, Effect, PubSub, Schema, Stream } from "effect";
 
 import {
   applyUniqueTextReplacements,
+  assignRfcNumber,
   authorizeDocument,
   createCommentThread,
   deleteCommentMessage,
@@ -154,6 +155,11 @@ export interface DocumentAuthorityService {
     expectedRevision: number,
     now: string,
   ) => Effect.Effect<AcceptedBodyUpdate, AuthorityError>;
+  readonly assignRfcNumber: (
+    principal: Principal,
+    rfcNumber: number,
+    now: string,
+  ) => Effect.Effect<DocumentMetadata, AuthorityError>;
   readonly updateMetadata: (
     principal: Principal,
     patch: MetadataPatch,
@@ -430,6 +436,18 @@ export function makeDocumentAuthority(
             );
             const update = yield* updateForReplacement(state.collaborative, replacement);
             return yield* commitBodyUpdateUnlocked(update, `agent-${expectedRevision}-${now}`, now);
+          }),
+        ),
+      assignRfcNumber: (principal, rfcNumber, now) =>
+        withLock(
+          Effect.gen(function* () {
+            yield* authorizeDocument(principal, "edit-metadata", state.metadata, now);
+            const metadata = yield* assignRfcNumber(state.metadata, rfcNumber, now);
+            if (metadata === state.metadata) return metadata;
+            const entry = yield* persist("metadata-event", metadata, state.comments, undefined);
+            state = { ...state, dirty: true, metadata, sequence: entry.sequence };
+            yield* PubSub.publish(pubsub, { metadata, type: "metadata-changed" });
+            return metadata;
           }),
         ),
       checkpoint: (now) =>
