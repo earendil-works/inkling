@@ -76,7 +76,6 @@ export function EditorWorkbench({
           aria-label="Rendered document preview"
           className="markdown-body"
           data-preview=""
-          onKeyUp={capturePreviewSelection}
           onPointerUp={capturePreviewSelection}
           ref={previewRef}
         />

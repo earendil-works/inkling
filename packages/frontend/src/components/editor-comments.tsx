@@ -10,6 +10,7 @@ import { useAppContext } from "../app-context.tsx";
 import {
   renderPreviewCommentBubbles,
   renderPreviewCommentComposer,
+  updateEditorCommentComposer,
   updateEditorCommentDecorations,
 } from "../comments.ts";
 import type { PreviewSourceRange, ProjectedCommentThread } from "../comments.ts";
@@ -171,6 +172,24 @@ export function EditorComments({
     sessionRevision,
     visibleProjections,
   ]);
+
+  useEffect(() => {
+    const editor = sessionRef.current?.editor;
+    if (editor === undefined) return;
+    let frame: number | undefined;
+    const revealComposer = (): void => {
+      const selection = editor.state.selection.main;
+      const range =
+        canComment && !selection.empty ? { end: selection.to, start: selection.from } : undefined;
+      if (frame !== undefined) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => updateEditorCommentComposer(editor, range));
+    };
+    editor.dom.addEventListener("pointerup", revealComposer);
+    return () => {
+      if (frame !== undefined) cancelAnimationFrame(frame);
+      editor.dom.removeEventListener("pointerup", revealComposer);
+    };
+  }, [canComment, sessionRef, sessionRevision]);
 
   const commentAction = useEffectAction<CommentOperation, CommentStateDto, ApiError>(
     (operation) => {

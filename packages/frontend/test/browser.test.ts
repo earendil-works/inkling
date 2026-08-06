@@ -101,6 +101,8 @@ test(
       const sourceCommentComposer = first.locator(
         '[data-comment-composer][data-comment-surface="source"]',
       );
+      assert.equal(await sourceCommentComposer.count(), 0);
+      await first.locator(".cm-content").dispatchEvent("pointerup");
       await sourceCommentComposer.waitFor();
       assert.equal(
         await sourceCommentComposer.evaluate((bubble) => getComputedStyle(bubble).opacity),

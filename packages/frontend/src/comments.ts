@@ -19,6 +19,7 @@ export interface PreviewSourceRange {
 
 const replaceCommentDecorations = StateEffect.define<readonly ProjectedCommentThread[]>();
 const setCommentComposerEnabled = StateEffect.define<boolean>();
+const setCommentComposerRange = StateEffect.define<PreviewSourceRange | undefined>();
 
 class CommentBubbleWidget extends WidgetType {
   readonly thread: CommentThreadDto;
@@ -112,19 +113,39 @@ const commentDecorationField = StateField.define<DecorationSet>({
 interface CommentComposerDecorationState {
   readonly decorations: DecorationSet;
   readonly enabled: boolean;
+  readonly range: PreviewSourceRange | undefined;
 }
 
 const commentComposerDecorationField = StateField.define<CommentComposerDecorationState>({
-  create: (state) => ({ decorations: selectionComposerDecorations(state, false), enabled: false }),
+  create: () => ({ decorations: Decoration.none, enabled: false, range: undefined }),
   provide: (field) => EditorView.decorations.from(field, (value) => value.decorations),
   update: (value, transaction) => {
-    const enabled = transaction.effects.reduce(
-      (current, effect) => (effect.is(setCommentComposerEnabled) ? effect.value : current),
-      value.enabled,
-    );
+    let enabled = value.enabled;
+    let range =
+      value.range === undefined
+        ? undefined
+        : {
+            end: transaction.changes.mapPos(value.range.end, -1),
+            start: transaction.changes.mapPos(value.range.start, 1),
+          };
+    for (const effect of transaction.effects) {
+      if (effect.is(setCommentComposerEnabled)) enabled = effect.value;
+      if (effect.is(setCommentComposerRange)) range = effect.value;
+    }
+    const selection = transaction.state.selection.main;
+    if (
+      !enabled ||
+      selection.empty ||
+      range === undefined ||
+      range.start !== selection.from ||
+      range.end !== selection.to
+    ) {
+      range = undefined;
+    }
     return {
-      decorations: selectionComposerDecorations(transaction.state, enabled),
+      decorations: selectionComposerDecorations(transaction.state, range),
       enabled,
+      range,
     };
   },
 });
@@ -134,14 +155,16 @@ export const commentDecorationsExtension: Extension = [
   commentComposerDecorationField,
 ];
 
-function selectionComposerDecorations(state: EditorState, enabled: boolean): DecorationSet {
-  const selection = state.selection.main;
-  if (!enabled || selection.empty) return Decoration.none;
-  const position = trailingVisiblePosition(state.doc, selection.from, selection.to);
+function selectionComposerDecorations(
+  state: EditorState,
+  range: PreviewSourceRange | undefined,
+): DecorationSet {
+  if (range === undefined) return Decoration.none;
+  const position = trailingVisiblePosition(state.doc, range.start, range.end);
   return Decoration.set([
     Decoration.widget({
       side: -1,
-      widget: new CommentComposerBubbleWidget(selection.from, selection.to),
+      widget: new CommentComposerBubbleWidget(range.start, range.end),
     }).range(position),
   ]);
 }
@@ -165,6 +188,13 @@ export function updateEditorCommentDecorations(
       setCommentComposerEnabled.of(composerEnabled),
     ],
   });
+}
+
+export function updateEditorCommentComposer(
+  editor: EditorView,
+  range: PreviewSourceRange | undefined,
+): void {
+  editor.dispatch({ effects: setCommentComposerRange.of(range) });
 }
 
 export function renderPreviewCommentBubbles(
