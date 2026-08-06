@@ -27,8 +27,7 @@ import { ButtonLink } from "./components/button-link.tsx";
 import { Button } from "./components/button.tsx";
 import { CheckboxField } from "./components/checkbox-field.tsx";
 import { CommentThreadCard } from "./components/comment-thread-card.tsx";
-import { SelectField } from "./components/select-field.tsx";
-import { TextField } from "./components/text-field.tsx";
+import { DocumentDetails } from "./components/document-details.tsx";
 import { CommentComposer } from "./comment-composer.tsx";
 import {
   commentDecorationsExtension,
@@ -112,7 +111,6 @@ export function EditorScreen({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
   const [titleDraft, setTitleDraft] = useState(metadata.title);
-  const [labelsDraft, setLabelsDraft] = useState(metadata.labels.join(", "));
   const initiallyEditable = !shared || initial.metadata.sharing.access === "edit";
   const canEdit = permissions?.includes("edit-body") ?? initiallyEditable;
   const canComment = permissions?.includes("comment") ?? false;
@@ -121,8 +119,7 @@ export function EditorScreen({
 
   useEffect(() => {
     setTitleDraft(metadata.title);
-    setLabelsDraft(metadata.labels.join(", "));
-  }, [metadata.labels, metadata.title]);
+  }, [metadata.title]);
 
   useEffect(() => {
     const parent = editorHostRef.current;
@@ -533,82 +530,11 @@ export function EditorScreen({
               {openCount}
             </span>
           </Button>
-          <details className="document-details" data-document-details="">
-            <summary className="toolbar-button">Details</summary>
-            <div className="document-details__menu">
-              <SelectField
-                data-state=""
-                disabled={!canEditMetadata}
-                label="State"
-                onChange={(event) => updateMetadata({ lifecycleState: event.currentTarget.value })}
-                value={metadata.lifecycleState}
-              >
-                {[
-                  metadata.lifecycleState,
-                  "draft",
-                  "discussion",
-                  "accepted",
-                  "implemented",
-                  "abandoned",
-                ]
-                  .filter((value, index, values) => values.indexOf(value) === index)
-                  .map((value) => (
-                    <option key={value}>{value}</option>
-                  ))}
-              </SelectField>
-              <SelectField
-                data-visibility=""
-                disabled={!canEditMetadata}
-                label="Visibility"
-                onChange={(event) => {
-                  const visibility =
-                    event.currentTarget.value === "public" ? "public" : "workspace";
-                  if (
-                    visibility === "public" &&
-                    metadata.sensitivity === "confidential" &&
-                    !window.confirm("Publish confidential metadata as public?")
-                  ) {
-                    event.currentTarget.value = metadata.visibility;
-                    return;
-                  }
-                  updateMetadata({
-                    confirmConfidentialPublic: visibility === "public",
-                    visibility,
-                  });
-                }}
-                value={metadata.visibility}
-              >
-                <option value="workspace">Workspace</option>
-                <option value="public">Public</option>
-              </SelectField>
-              <SelectField
-                data-sensitivity=""
-                disabled={!canEditMetadata}
-                label="Sensitivity"
-                onChange={(event) => updateMetadata({ sensitivity: event.currentTarget.value })}
-                value={metadata.sensitivity}
-              >
-                <option value="normal">Normal</option>
-                <option value="confidential">Confidential</option>
-              </SelectField>
-              <TextField
-                data-labels=""
-                disabled={!canEditMetadata}
-                label="Labels"
-                onBlur={() =>
-                  updateMetadata({
-                    labels: labelsDraft
-                      .split(",")
-                      .map((label) => label.trim())
-                      .filter(Boolean),
-                  })
-                }
-                onChange={(event) => setLabelsDraft(event.currentTarget.value)}
-                placeholder="Comma separated"
-                value={labelsDraft}
-              />
-            </div>
-          </details>
+          <DocumentDetails
+            canEdit={canEditMetadata}
+            metadata={metadata}
+            onUpdate={updateMetadata}
+          />
           {shared ? null : (
             <>
               <Button
