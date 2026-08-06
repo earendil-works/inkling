@@ -1,56 +1,25 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Effect } from "effect";
 
-import type {
-  AuthenticationStatus,
-  CatalogResponse,
-  DocumentResponse,
-  PresenceDto,
-} from "@earendil-works/jot-protocol";
+import type { PresenceDto } from "@earendil-works/jot-protocol";
 
 import { ApiError, makeApiClient } from "./api.ts";
 import type { ApiClientService } from "./api.ts";
 import { AppContext } from "./app-context.tsx";
 import type { AppContextValue, AppStatus, ToastKind } from "./app-context.tsx";
-import { AuthenticationScreen } from "./auth-screen.tsx";
 import { AppHeader } from "./components/app-header.tsx";
-import { Button } from "./components/button.tsx";
+import { preloadDocumentScreen, RouteView } from "./components/route-view.tsx";
+import type { RouteModel } from "./components/route-view.tsx";
 import { ToastRegion } from "./components/toast-region.tsx";
 import type { ToastController } from "./components/toast-region.tsx";
 import { useEffectQuery } from "./effect-hooks.ts";
 import { installClientRouter } from "./navigation.ts";
 import type { ClientRouter, NavigateOptions } from "./navigation.ts";
-import { WorkspaceScreen } from "./workspace-screen.tsx";
-
-const loadEditorScreen = () =>
-  import("./editor-screen.tsx").then(({ EditorScreen }) => ({ default: EditorScreen }));
-const loadReaderScreen = () =>
-  import("./reader-screen.tsx").then(({ ReaderScreen }) => ({ default: ReaderScreen }));
-const EditorScreen = lazy(loadEditorScreen);
-const ReaderScreen = lazy(loadReaderScreen);
 
 interface LocationState {
   readonly generation: number;
   readonly url: URL;
 }
-
-interface RouteBase {
-  readonly api: ApiClientService;
-  readonly capabilityToken: string | undefined;
-}
-
-type RouteModel =
-  | (RouteBase & {
-      readonly methods: AuthenticationStatus["authenticationMethods"];
-      readonly mode: "login" | "setup";
-      readonly screen: "authentication";
-    })
-  | (RouteBase & {
-      readonly document: DocumentResponse;
-      readonly screen: "editor" | "reader";
-      readonly shared: boolean;
-    })
-  | (RouteBase & { readonly catalog: CatalogResponse; readonly screen: "workspace" });
 
 export function App(): React.JSX.Element {
   const [locationState, setLocationState] = useState<LocationState>(() => ({
@@ -130,64 +99,6 @@ export function App(): React.JSX.Element {
   );
 }
 
-function RouteView({
-  refresh,
-  state,
-}: {
-  readonly refresh: () => void;
-  readonly state:
-    | { readonly status: "loading"; readonly data: RouteModel | undefined }
-    | { readonly status: "success"; readonly data: RouteModel }
-    | {
-        readonly status: "failure";
-        readonly data: RouteModel | undefined;
-        readonly error: ApiError;
-      };
-}): React.JSX.Element {
-  const model = state.data;
-  if (model === undefined) {
-    if (state.status === "failure") {
-      return (
-        <main className="fatal-layout" id="app" tabIndex={-1}>
-          <section>
-            <p className="eyebrow">Runtime failure</p>
-            <h1>Jot could not open.</h1>
-            <p>{state.error.message}</p>
-            <Button variant="primary" data-retry="" onClick={refresh} type="button">
-              Try again
-            </Button>
-          </section>
-        </main>
-      );
-    }
-    return <main aria-busy="true" className="route-loading" id="app" tabIndex={-1} />;
-  }
-  switch (model.screen) {
-    case "authentication":
-      return <AuthenticationScreen api={model.api} methods={model.methods} mode={model.mode} />;
-    case "workspace":
-      return <WorkspaceScreen api={model.api} initialCatalog={model.catalog} />;
-    case "reader":
-      return (
-        <Suspense fallback={<main className="route-loading" id="app" />}>
-          <ReaderScreen document={model.document} shared={model.shared} />
-        </Suspense>
-      );
-    case "editor":
-      return (
-        <Suspense fallback={<main className="route-loading" id="app" />}>
-          <EditorScreen
-            api={model.api}
-            capabilityToken={model.capabilityToken}
-            document={model.document}
-            key={`${model.document.metadata.id}:${model.shared ? "shared" : "workspace"}`}
-            shared={model.shared}
-          />
-        </Suspense>
-      );
-  }
-}
-
 function loadRoute(url: URL): Effect.Effect<RouteModel, ApiError> {
   const capabilityToken = url.searchParams.get("cap") ?? undefined;
   const api = makeApiClient(capabilityToken);
@@ -261,7 +172,7 @@ function loadDocumentRoute(
         retryable: true,
         status: 0,
       }),
-    try: screen === "editor" ? loadEditorScreen : loadReaderScreen,
+    try: () => preloadDocumentScreen(screen),
   });
   return Effect.all([api.readDocument(documentId), preload], { concurrency: "unbounded" }).pipe(
     Effect.map(([document]): RouteModel => ({
