@@ -380,7 +380,8 @@ select:disabled {
 .new-document form,
 .settings-dialog form,
 .sharing-dialog form,
-.guest-identity-dialog form {
+.guest-identity-dialog form,
+.confirmation-dialog form {
   display: grid;
   gap: 1rem;
 }
@@ -538,8 +539,28 @@ select:disabled {
 
 .settings-dialog,
 .sharing-dialog,
-.guest-identity-dialog {
+.guest-identity-dialog,
+.confirmation-dialog {
   width: min(36rem, calc(100vw - 2rem));
+}
+
+.confirmation-dialog {
+  padding: 1.5rem;
+}
+
+.confirmation-dialog h2 {
+  margin: 0.3rem 0 0;
+}
+
+.confirmation-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 0.5rem;
+}
+
+.confirmation-dialog__danger {
+  background: var(--danger);
 }
 
 .dialog-note {

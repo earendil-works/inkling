@@ -21,6 +21,7 @@ import { CommentComposer } from "./comment-composer.tsx";
 import { CommentControls } from "./comment-controls.tsx";
 import type { CommentControlsHandle } from "./comment-controls.tsx";
 import { CommentThreadCard } from "./comment-thread-card.tsx";
+import { ConfirmationDialog } from "./confirmation-dialog.tsx";
 
 type ComposerRequest =
   | { readonly kind: "create"; readonly quote: string; readonly range: PreviewSourceRange }
@@ -36,6 +37,10 @@ type ComposerRequest =
       readonly quote: string;
       readonly threadId: string;
     };
+
+type PendingDeletion =
+  | { readonly kind: "delete-message"; readonly messageId: string; readonly threadId: string }
+  | { readonly kind: "delete-thread"; readonly threadId: string };
 
 interface CommentOperation {
   readonly body?: string | undefined;
@@ -93,6 +98,7 @@ export function EditorComments({
   const activeAnchorRef = useRef<HTMLElement | undefined>(undefined);
   const [activeAnchorRevision, setActiveAnchorRevision] = useState(0);
   const [composer, setComposer] = useState<ComposerRequest>();
+  const [pendingDeletion, setPendingDeletion] = useState<PendingDeletion>();
 
   useEffect(() => {
     const session = sessionRef.current;
@@ -285,27 +291,14 @@ export function EditorComments({
         canManage={canManage}
         onClose={() => setActiveThreadId(undefined)}
         onDeleteMessage={(messageId) => {
-          if (activeThread === undefined || !window.confirm("Delete this comment message?")) return;
-          commentAction.execute(
-            { request: { kind: "delete-message", messageId, threadId: activeThread.id } },
-            {
-              onFailure: (error) => showToast(error.message, "error"),
-              onSuccess: onCommentsChange,
-            },
-          );
+          if (activeThread !== undefined) {
+            setPendingDeletion({ kind: "delete-message", messageId, threadId: activeThread.id });
+          }
         }}
         onDeleteThread={() => {
-          if (activeThread === undefined || !window.confirm("Delete this comment thread?")) return;
-          commentAction.execute(
-            { request: { kind: "delete-thread", threadId: activeThread.id } },
-            {
-              onFailure: (error) => showToast(error.message, "error"),
-              onSuccess: (next) => {
-                onCommentsChange(next);
-                setActiveThreadId(undefined);
-              },
-            },
-          );
+          if (activeThread !== undefined) {
+            setPendingDeletion({ kind: "delete-thread", threadId: activeThread.id });
+          }
         }}
         onEdit={(messageId, initialBody) => {
           if (activeThread !== undefined) {
@@ -367,6 +360,39 @@ export function EditorComments({
           }
         />
       )}
+      <ConfirmationDialog
+        confirmLabel={
+          pendingDeletion?.kind === "delete-thread" ? "Delete thread" : "Delete comment"
+        }
+        description={
+          pendingDeletion?.kind === "delete-thread"
+            ? "The thread and all of its replies will be permanently deleted."
+            : "This comment message will be permanently deleted."
+        }
+        onCancel={() => setPendingDeletion(undefined)}
+        onConfirm={() => {
+          if (pendingDeletion === undefined) return;
+          commentAction.execute(
+            { request: pendingDeletion },
+            {
+              onFailure: (error) => showToast(error.message, "error"),
+              onSuccess: (next) => {
+                onCommentsChange(next);
+                if (pendingDeletion.kind === "delete-thread") setActiveThreadId(undefined);
+                setPendingDeletion(undefined);
+              },
+            },
+          );
+        }}
+        open={pendingDeletion !== undefined}
+        pending={commentAction.state.pending}
+        title={
+          pendingDeletion?.kind === "delete-thread"
+            ? "Delete this comment thread?"
+            : "Delete this comment?"
+        }
+        tone="danger"
+      />
     </>
   );
 }
