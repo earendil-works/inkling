@@ -4,7 +4,7 @@
   color-scheme: light dark;
   --public-border: #c9ceca;
   --public-muted: #626a65;
-  font-family: ui-serif, Georgia, serif;
+  font-family: var(--serif);
   line-height: 1.65;
 }
 
@@ -28,9 +28,7 @@ header {
   justify-content: space-between;
   padding: 1rem 3vw;
   border-bottom: 1px solid var(--public-border);
-  font:
-    700 0.75rem ui-monospace,
-    monospace;
+  font: 700 0.75rem var(--mono);
   letter-spacing: 0.08em;
 }
 
@@ -49,9 +47,7 @@ main {
 
 aside {
   color: var(--public-muted);
-  font:
-    0.8rem ui-monospace,
-    monospace;
+  font: 0.8rem var(--mono);
 }
 
 aside ol {
@@ -86,9 +82,7 @@ pre.jot-code {
   border-radius: 3px;
   background: var(--code-background);
   color: var(--code-text);
-  font:
-    0.8rem/1.55 ui-monospace,
-    monospace;
+  font: 0.8rem/1.55 var(--mono);
 }
 
 table {
@@ -125,7 +119,7 @@ img {
 }
 
 .catalog small {
-  font-family: ui-monospace, monospace;
+  font-family: var(--mono);
 }
 
 @media (width <= 50rem) {

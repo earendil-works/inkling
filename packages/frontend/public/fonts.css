@@ -1,0 +1,11 @@
+/*
+ * Commit Mono and Plantin are not distributed by Google Fonts. JetBrains Mono
+ * keeps the editor's neutral coding face, while Newsreader provides the sturdy
+ * editorial serif used for prose.
+ */
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400..800;1,400..800&family=Newsreader:ital,opsz,wght@0,6..72,400..800;1,6..72,400..800&display=swap");
+
+:root {
+  --serif: "Newsreader", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+}

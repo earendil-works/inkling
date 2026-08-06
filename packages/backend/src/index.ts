@@ -822,7 +822,7 @@ function publicCatalogHtml(titleValue: string, catalog: CatalogResponse): string
       return `<li><a class="title" href="${href}">${metadata.rfcNumber === undefined ? "Document" : `RFC ${String(metadata.rfcNumber).padStart(4, "0")}`} — ${escapeHtml(metadata.title)}</a><p>${escapeHtml(excerpt)}</p><small><a href="/state/${encodeURIComponent(metadata.lifecycleState)}">${escapeHtml(metadata.lifecycleState)}</a> · ${escapeHtml(metadata.updatedAt.slice(0, 10))} ${labels}</small></li>`;
     })
     .join("");
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Published Jot documents"><title>${title} — Jot</title><link rel="stylesheet" href="/public.css"></head><body><header><a href="/">JOT</a><span>PUBLIC CATALOG</span></header><main><article><h1>${title}</h1><ol class="catalog">${rows || "<li>No published documents.</li>"}</ol></article></main></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Published Jot documents"><title>${title} — Jot</title><link rel="stylesheet" href="/fonts.css"><link rel="stylesheet" href="/public.css"></head><body><header><a href="/">JOT</a><span>PUBLIC CATALOG</span></header><main><article><h1>${title}</h1><ol class="catalog">${rows || "<li>No published documents.</li>"}</ol></article></main></body></html>`;
 }
 
 function publicDocumentHtml(document: {
@@ -844,7 +844,7 @@ function publicDocumentHtml(document: {
         `<li class="depth-${heading.depth}"><a href="#${escapeHtml(heading.id)}">${escapeHtml(heading.text)}</a></li>`,
     )
     .join("");
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${description}"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><link rel="canonical" href="${escapeHtml(document.canonicalPath)}"><title>${title} — Jot</title><link rel="stylesheet" href="/public.css"></head><body><header><a href="/">JOT</a><span>RFC ${String(document.metadata.rfcNumber ?? "—").padStart(4, "0")}</span></header><main><aside><p>Contents</p><ol>${toc}</ol></aside><article>${document.html}</article></main></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${description}"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><link rel="canonical" href="${escapeHtml(document.canonicalPath)}"><title>${title} — Jot</title><link rel="stylesheet" href="/fonts.css"><link rel="stylesheet" href="/public.css"></head><body><header><a href="/">JOT</a><span>RFC ${String(document.metadata.rfcNumber ?? "—").padStart(4, "0")}</span></header><main><aside><p>Contents</p><ol>${toc}</ol></aside><article>${document.html}</article></main></body></html>`;
 }
 
 function escapeHtml(value: string): string {
@@ -857,4 +857,4 @@ function escapeHtml(value: string): string {
 }
 
 const contentSecurityPolicy =
-  "default-src 'none'; img-src 'self' https: data:; style-src 'self'; script-src 'self'; connect-src 'self'; font-src 'self'; base-uri 'none'; frame-ancestors 'none'";
+  "default-src 'none'; img-src 'self' https: data:; style-src 'self' https://fonts.googleapis.com; script-src 'self'; connect-src 'self'; font-src 'self' https://fonts.gstatic.com; base-uri 'none'; frame-ancestors 'none'";

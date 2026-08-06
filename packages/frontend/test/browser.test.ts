@@ -80,6 +80,20 @@ test(
       const editorKeyword = first.locator(".cm-content .tok-keyword").last();
       assert.equal(await editorKeyword.textContent(), "const");
       assert.equal(await editorKeyword.getAttribute("class"), renderedKeywordClass);
+      const typography = await first.evaluate(() => {
+        const editor = document.querySelector<HTMLElement>(".cm-scroller");
+        const code = document.querySelector<HTMLElement>("[data-preview] pre");
+        if (editor === null) throw new Error("Editor scroller is missing.");
+        if (code === null) throw new Error("Preview code block is missing.");
+        return {
+          code: getComputedStyle(code).fontFamily,
+          editor: getComputedStyle(editor).fontFamily,
+          prose: getComputedStyle(document.body).fontFamily,
+        };
+      });
+      assert.match(typography.prose, /Newsreader/u);
+      assert.match(typography.editor, /JetBrains Mono/u);
+      assert.equal(typography.code, typography.editor);
 
       const second = await context.newPage();
       await second.goto(`${baseUrl}/documents/${documentId}/edit`);

@@ -15,8 +15,6 @@
   --accent-soft: #dff2eb;
   --danger: #b84735;
   --shadow: 0 16px 50px rgb(24 32 28 / 14%);
-  --sans: "Avenir Next", Avenir, "Helvetica Neue", sans-serif;
-  --mono: "SFMono-Regular", "Cascadia Mono", "Liberation Mono", monospace;
   --page-padding: clamp(1rem, 3vw, 3rem);
   --masthead-height: 3.25rem;
 }
@@ -72,7 +70,7 @@ body {
   min-height: 100vh;
   background: var(--page);
   color: var(--text);
-  font-family: var(--sans);
+  font-family: var(--serif);
 }
 
 button,
@@ -847,7 +845,12 @@ select:disabled {
 
 .cm-editor {
   background: var(--surface);
-  font: 0.9rem/1.65 var(--mono);
+  font-size: 0.9rem;
+}
+
+.editor-host .cm-editor .cm-scroller {
+  font-family: var(--mono);
+  line-height: 1.65;
 }
 
 .cm-editor.cm-focused {
@@ -973,7 +976,7 @@ select:disabled {
   min-height: 10rem;
   padding: 0.9rem;
   color: var(--text);
-  font: 0.95rem/1.55 var(--sans);
+  font: 0.95rem/1.55 var(--serif);
   letter-spacing: normal;
   text-transform: none;
 }
@@ -1005,7 +1008,7 @@ select:disabled {
   display: block;
   margin-top: 0.2rem;
   color: var(--text);
-  font: 600 1rem/1.3 var(--sans);
+  font: 600 1rem/1.3 var(--serif);
   letter-spacing: -0.02em;
   text-transform: none;
 }
