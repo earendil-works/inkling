@@ -141,8 +141,10 @@ export function EditorScreen({
         onClosePreview={() => setPreviewOpen(false)}
         onPreviewRendered={() => setPreviewRevision((revision) => revision + 1)}
         onPreviewSelection={(range) => editorCommentsRef.current?.setPreviewSelection(range)}
+        previewHeadings={rendered.headings}
         previewHtml={rendered.html}
         previewRef={previewRef}
+        metadata={metadata}
       />
       {displayName === undefined ? null : (
         <EditorComments

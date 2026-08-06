@@ -1,12 +1,16 @@
 import { useEffect, useRef } from "react";
 import { Effect, Fiber } from "effect";
 
+import type { DocumentMetadataDto } from "@earendil-works/jot-protocol";
+import type { RenderHeading } from "@earendil-works/jot-renderer";
+
 import type { ConnectionState } from "../collaboration.ts";
 import { selectedPreviewSourceRange } from "../comments.ts";
 import type { PreviewSourceRange } from "../comments.ts";
 import { browserRuntime } from "../effect-runtime.ts";
 import { renderMermaid } from "../markdown.tsx";
 import { Button } from "./button.tsx";
+import { DocumentPage } from "./document-page.tsx";
 
 export interface EditorWorkbenchProps {
   readonly connectionState: ConnectionState;
@@ -14,8 +18,10 @@ export interface EditorWorkbenchProps {
   readonly onClosePreview: () => void;
   readonly onPreviewRendered: () => void;
   readonly onPreviewSelection: (range: PreviewSourceRange | undefined) => void;
+  readonly previewHeadings: readonly RenderHeading[];
   readonly previewHtml: string;
   readonly previewRef: React.RefObject<HTMLElement | null>;
+  readonly metadata: DocumentMetadataDto;
 }
 
 export function EditorWorkbench({
@@ -24,8 +30,10 @@ export function EditorWorkbench({
   onClosePreview,
   onPreviewRendered,
   onPreviewSelection,
+  previewHeadings,
   previewHtml,
   previewRef,
+  metadata,
 }: EditorWorkbenchProps): React.JSX.Element {
   const renderedCallbackRef = useRef(onPreviewRendered);
   renderedCallbackRef.current = onPreviewRendered;
@@ -72,13 +80,19 @@ export function EditorWorkbench({
             ×
           </Button>
         </div>
-        <article
-          aria-label="Rendered document preview"
-          className="markdown-body"
-          data-preview=""
-          onPointerUp={capturePreviewSelection}
-          ref={previewRef}
-        />
+        <div className="editor-preview-page">
+          <div className="editor-preview-page__paper">
+            <DocumentPage headings={previewHeadings} metadata={metadata}>
+              <article
+                aria-label="Rendered document preview"
+                className="markdown-body reader-body editor-preview-body"
+                data-preview=""
+                onPointerUp={capturePreviewSelection}
+                ref={previewRef}
+              />
+            </DocumentPage>
+          </div>
+        </div>
       </div>
     </section>
   );

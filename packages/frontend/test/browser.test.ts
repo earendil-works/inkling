@@ -79,6 +79,20 @@ test(
       await first.locator("[data-labels]").press("Tab");
       assert.equal((await labelsUpdated).status(), 200);
       await first.locator("[data-document-details] > summary").click();
+      assert.equal(
+        await first.locator(".editor-preview-page [data-document-page] h1").textContent(),
+        "Browser collaboration",
+      );
+      assert.match(
+        await first.locator(".editor-preview-page [data-document-metadata]").innerText(),
+        /Authors\s+Not specified[\s\S]+Created[\s\S]+Updated/iu,
+      );
+      assert.equal(
+        await first
+          .locator('.editor-preview-page .reader-labels a[href="/labels?label=platform"]')
+          .textContent(),
+        "platform",
+      );
       await first.locator(".cm-content").click();
       await first.keyboard.insertText(
         "Shared starting body\n\n## Architecture\n\nSecond line\n\n```ts\nconst answer: number = 42;\n```\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n```mermaid\nnot a mermaid diagram\n```\n\nThird line",
@@ -109,12 +123,19 @@ test(
       );
       await first.waitForSelector("[data-reader]");
       await first.waitForSelector("[data-reader-toc]");
+      assert.match(
+        await first.locator("[data-reader] [data-document-metadata]").innerText(),
+        /Authors\s+Not specified[\s\S]+Created[\s\S]+Updated/iu,
+      );
       assert.equal(
         await first.getByRole("navigation", { name: "On this page" }).locator("p").textContent(),
         "On this page",
       );
       assert.equal(
-        await first.getByRole("link", { name: "Architecture" }).getAttribute("href"),
+        await first
+          .getByRole("navigation", { name: "On this page" })
+          .getByRole("link", { name: "Architecture" })
+          .getAttribute("href"),
         "#architecture",
       );
       assert.equal(await first.locator("[data-api-status]").count(), 0);
