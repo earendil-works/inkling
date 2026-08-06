@@ -3,9 +3,9 @@ import { useEffect } from "react";
 import type { DocumentResponse } from "@earendil-works/jot-protocol";
 
 import { useAppContext } from "./app-context.tsx";
-import { ButtonLink } from "./components/button-link.tsx";
 import { MarkdownArticle } from "./components/markdown-article.tsx";
-import { documentHref, formatDate } from "./ui.ts";
+import { ReaderToolbar } from "./components/reader-toolbar.tsx";
+import { formatDate } from "./ui.ts";
 
 export interface ReaderScreenProps {
   readonly document: DocumentResponse;
@@ -15,8 +15,6 @@ export interface ReaderScreenProps {
 export function ReaderScreen({ document, shared }: ReaderScreenProps): React.JSX.Element {
   const { setParticipants, setStatus } = useAppContext();
   const openComments = document.comments.threads.filter((thread) => !thread.resolved).length;
-  const canEdit = !shared || document.metadata.sharing.access === "edit";
-
   useEffect(() => {
     setParticipants([]);
     setStatus({ label: "Document loaded", state: "ready" });
@@ -24,32 +22,7 @@ export function ReaderScreen({ document, shared }: ReaderScreenProps): React.JSX
 
   return (
     <main className="reader-layout" id="app" tabIndex={-1}>
-      <nav className="document-bar reader-toolbar" aria-label="Document navigation">
-        <div className="document-identity">
-          <span>
-            {document.metadata.rfcNumber === undefined
-              ? "Document"
-              : `RFC ${String(document.metadata.rfcNumber).padStart(4, "0")}`}
-          </span>
-          <strong className="reader-toolbar__title">{document.metadata.title}</strong>
-        </div>
-        <div className="document-actions">
-          <ButtonLink className="document-mode-link" href="/" variant="toolbar">
-            All documents
-          </ButtonLink>
-          {canEdit ? (
-            <ButtonLink
-              className="document-mode-link"
-              data-open-editor=""
-              href={documentHref(document.metadata.id, shared, "edit")}
-              size="small"
-              variant="primary"
-            >
-              Edit
-            </ButtonLink>
-          ) : null}
-        </div>
-      </nav>
+      <ReaderToolbar metadata={document.metadata} shared={shared} />
       <div className="reader-document" data-reader="">
         <header className="reader-heading">
           <p className="eyebrow">
