@@ -4,7 +4,7 @@ import type { DocumentResponse } from "@earendil-works/jot-protocol";
 
 import { useAppContext } from "./app-context.tsx";
 import { ButtonLink } from "./components/button-link.tsx";
-import { MarkdownArticle } from "./markdown.tsx";
+import { MarkdownArticle } from "./components/markdown-article.tsx";
 import { documentHref, formatDate } from "./ui.ts";
 
 export interface ReaderScreenProps {

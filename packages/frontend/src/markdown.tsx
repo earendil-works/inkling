@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo } from "react";
 import type { Mermaid } from "mermaid";
-import { Effect, Fiber } from "effect";
+import { Effect } from "effect";
 
 import { makeMarkdownRenderer } from "@earendil-works/jot-renderer";
 
 import { useEffectQuery } from "./effect-hooks.ts";
-import { browserRuntime } from "./effect-runtime.ts";
 
 const renderer = makeMarkdownRenderer();
 let mermaidPromise: Promise<Mermaid> | undefined;
@@ -28,38 +27,6 @@ export function useRenderedMarkdown(source: string, sourcePositions: boolean): R
     html: state.data?.html ?? "",
     loading: state.status === "loading",
   };
-}
-
-export interface MarkdownArticleProps {
-  readonly className?: string | undefined;
-  readonly source: string;
-  readonly sourcePositions?: boolean | undefined;
-}
-
-export function MarkdownArticle({
-  className,
-  source,
-  sourcePositions = false,
-}: MarkdownArticleProps): React.JSX.Element {
-  const articleRef = useRef<HTMLElement>(null);
-  const rendered = useRenderedMarkdown(source, sourcePositions);
-  useEffect(() => {
-    const article = articleRef.current;
-    if (article === null || rendered.html === "") return;
-    const fiber = browserRuntime.runFork(renderMermaid(article));
-    return () => {
-      browserRuntime.runFork(Fiber.interrupt(fiber));
-    };
-  }, [rendered.html]);
-
-  return (
-    <article
-      className={className}
-      data-preview=""
-      ref={articleRef}
-      dangerouslySetInnerHTML={{ __html: rendered.html }}
-    />
-  );
 }
 
 export function renderMermaid(root: ParentNode): Effect.Effect<void> {
