@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import type { DocumentResponse } from "@earendil-works/jot-protocol";
 
 import { useAppContext } from "./app-context.tsx";
+import { ButtonLink } from "./components/button-link.tsx";
 import { MarkdownArticle } from "./markdown.tsx";
 import { documentHref, formatDate } from "./ui.ts";
 
@@ -33,17 +34,19 @@ export function ReaderScreen({ document, shared }: ReaderScreenProps): React.JSX
           <strong className="reader-toolbar__title">{document.metadata.title}</strong>
         </div>
         <div className="document-actions">
-          <a className="toolbar-button document-mode-link" href="/">
+          <ButtonLink className="document-mode-link" href="/" variant="toolbar">
             All documents
-          </a>
+          </ButtonLink>
           {canEdit ? (
-            <a
-              className="primary-button primary-button--small document-mode-link"
+            <ButtonLink
+              className="document-mode-link"
               data-open-editor=""
               href={documentHref(document.metadata.id, shared, "edit")}
+              size="small"
+              variant="primary"
             >
               Edit
-            </a>
+            </ButtonLink>
           ) : null}
         </div>
       </nav>

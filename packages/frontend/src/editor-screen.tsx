@@ -24,6 +24,7 @@ import type { ApiClientService } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
 import { makeCollaborationClient } from "./collaboration.ts";
 import type { CollaborationClient, ConnectionState } from "./collaboration.ts";
+import { ButtonLink } from "./components/button-link.tsx";
 import { Button } from "./components/button.tsx";
 import { CommentComposer } from "./comment-composer.tsx";
 import {
@@ -475,12 +476,13 @@ export function EditorScreen({
           />
         </div>
         <div className="document-actions">
-          <a
-            className="toolbar-button document-mode-link"
+          <ButtonLink
+            className="document-mode-link"
             href={documentHref(metadata.id, shared, "read")}
+            variant="toolbar"
           >
             Read
-          </a>
+          </ButtonLink>
           <Button
             aria-pressed={previewOpen}
             className="preview-toggle"

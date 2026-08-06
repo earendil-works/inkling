@@ -4,6 +4,7 @@ import type { AuthenticationStatus } from "@earendil-works/jot-protocol";
 
 import type { ApiClientService, ApiError } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
+import { ButtonLink } from "./components/button-link.tsx";
 import { Button } from "./components/button.tsx";
 import { useEffectAction } from "./effect-hooks.ts";
 
@@ -74,9 +75,9 @@ export function AuthenticationScreen({
             </>
           ) : null}
           {methods.includes("google") ? (
-            <a className="primary-button google-button" href="/api/auth/google/start">
+            <ButtonLink className="google-button" href="/api/auth/google/start" variant="primary">
               Continue with Google
-            </a>
+            </ButtonLink>
           ) : null}
           <p className="form-error" data-form-error="">
             {authentication.state.error?.message}
