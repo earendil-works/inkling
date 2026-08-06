@@ -3,6 +3,7 @@ import type { Mermaid } from "mermaid";
 import { Effect } from "effect";
 
 import { makeMarkdownRenderer } from "@earendil-works/jot-renderer";
+import type { RenderHeading } from "@earendil-works/jot-renderer";
 
 import {
   mountMermaidDiagramControls,
@@ -11,12 +12,14 @@ import {
 import { useEffectQuery } from "./effect-hooks.ts";
 
 const renderer = makeMarkdownRenderer();
+const emptyHeadings: readonly RenderHeading[] = [];
 let mermaidPromise: Promise<Mermaid> | undefined;
 let diagramGeneration = 0;
 
 export interface RenderedMarkdown {
   readonly html: string;
   readonly error: string | undefined;
+  readonly headings: readonly RenderHeading[];
   readonly loading: boolean;
 }
 
@@ -28,6 +31,7 @@ export function useRenderedMarkdown(source: string, sourcePositions: boolean): R
   const { state } = useEffectQuery(query, `${sourcePositions ? "positioned" : "plain"}:${source}`);
   return {
     error: state.status === "failure" ? state.error.message : undefined,
+    headings: state.data?.headings ?? emptyHeadings,
     html: state.data?.html ?? "",
     loading: state.status === "loading",
   };

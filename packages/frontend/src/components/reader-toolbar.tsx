@@ -13,30 +13,20 @@ export function ReaderToolbar({ metadata, shared }: ReaderToolbarProps): React.J
 
   return (
     <nav className="document-bar reader-toolbar" aria-label="Document navigation">
-      <div className="document-identity">
-        <span>
-          {metadata.rfcNumber === undefined
-            ? "Document"
-            : `RFC ${String(metadata.rfcNumber).padStart(4, "0")}`}
-        </span>
-        <strong className="reader-toolbar__title">{metadata.title}</strong>
-      </div>
-      <div className="document-actions">
-        <ButtonLink className="document-mode-link" href="/" variant="toolbar">
-          All documents
+      <ButtonLink className="reader-back-link" href="/" variant="text">
+        All documents
+      </ButtonLink>
+      {canEdit ? (
+        <ButtonLink
+          className="document-mode-link"
+          data-open-editor=""
+          href={documentHref(metadata.id, shared, "edit")}
+          size="small"
+          variant="primary"
+        >
+          Edit
         </ButtonLink>
-        {canEdit ? (
-          <ButtonLink
-            className="document-mode-link"
-            data-open-editor=""
-            href={documentHref(metadata.id, shared, "edit")}
-            size="small"
-            variant="primary"
-          >
-            Edit
-          </ButtonLink>
-        ) : null}
-      </div>
+      ) : null}
     </nav>
   );
 }

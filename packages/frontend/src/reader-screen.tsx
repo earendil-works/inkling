@@ -19,8 +19,10 @@ export function ReaderScreen({ document, shared }: ReaderScreenProps): React.JSX
 
   return (
     <main className="reader-layout" id="app" tabIndex={-1}>
-      <ReaderToolbar metadata={document.metadata} shared={shared} />
-      <ReaderDocument document={document} />
+      <div className="reader-paper">
+        <ReaderToolbar metadata={document.metadata} shared={shared} />
+        <ReaderDocument document={document} />
+      </div>
     </main>
   );
 }

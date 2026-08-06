@@ -2,21 +2,16 @@ import { useEffect, useRef } from "react";
 import { Fiber } from "effect";
 
 import { browserRuntime } from "../effect-runtime.ts";
-import { renderMermaid, useRenderedMarkdown } from "../markdown.tsx";
+import { renderMermaid } from "../markdown.tsx";
+import type { RenderedMarkdown } from "../markdown.tsx";
 
 export interface MarkdownArticleProps {
   readonly className?: string | undefined;
-  readonly source: string;
-  readonly sourcePositions?: boolean | undefined;
+  readonly rendered: RenderedMarkdown;
 }
 
-export function MarkdownArticle({
-  className,
-  source,
-  sourcePositions = false,
-}: MarkdownArticleProps): React.JSX.Element {
+export function MarkdownArticle({ className, rendered }: MarkdownArticleProps): React.JSX.Element {
   const articleRef = useRef<HTMLElement>(null);
-  const rendered = useRenderedMarkdown(source, sourcePositions);
 
   useEffect(() => {
     const article = articleRef.current;

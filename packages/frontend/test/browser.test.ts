@@ -73,7 +73,7 @@ test(
       await first.locator("[data-document-details] > summary").click();
       await first.locator(".cm-content").click();
       await first.keyboard.insertText(
-        "Shared starting body\n\nSecond line\n\n```ts\nconst answer: number = 42;\n```\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n```mermaid\nnot a mermaid diagram\n```\n\nThird line",
+        "Shared starting body\n\n## Architecture\n\nSecond line\n\n```ts\nconst answer: number = 42;\n```\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n```mermaid\nnot a mermaid diagram\n```\n\nThird line",
       );
       await first.waitForSelector(".cm-content .tok-keyword");
       await first.waitForSelector("[data-preview] .tok-keyword");
@@ -100,6 +100,15 @@ test(
         "same-document",
       );
       await first.waitForSelector("[data-reader]");
+      await first.waitForSelector("[data-reader-toc]");
+      assert.equal(
+        await first.getByRole("navigation", { name: "On this page" }).locator("p").textContent(),
+        "On this page",
+      );
+      assert.equal(
+        await first.getByRole("link", { name: "Architecture" }).getAttribute("href"),
+        "#architecture",
+      );
       assert.equal(await first.locator("[data-api-status]").count(), 0);
       assert.equal(await first.locator(".cm-editor").count(), 0);
       assert.match(await first.locator("[data-preview]").innerText(), /Shared starting body/u);
