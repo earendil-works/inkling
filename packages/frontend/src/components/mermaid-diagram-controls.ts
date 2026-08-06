@@ -3,6 +3,16 @@ interface MermaidControlButton {
   readonly kind: "reset" | "zoom-in" | "zoom-out";
 }
 
+export function mountMermaidDiagramError(diagram: HTMLElement): void {
+  if (diagram.dataset["mermaidError"] !== undefined) return;
+  diagram.dataset["mermaidError"] = "";
+  diagram.querySelector(":scope > .jot-mermaid__controls")?.remove();
+  const message = document.createElement("p");
+  message.className = "jot-mermaid__error";
+  message.textContent = "Diagram preview unavailable — showing Mermaid source.";
+  diagram.prepend(message);
+}
+
 export function mountMermaidDiagramControls(diagram: HTMLElement, svg: string): void {
   const viewport = document.createElement("div");
   viewport.className = "mermaid-viewport";

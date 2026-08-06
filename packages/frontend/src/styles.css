@@ -1724,6 +1724,26 @@ select:disabled {
   background: white;
 }
 
+.jot-mermaid[data-mermaid-error] {
+  min-height: 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+}
+
+.jot-mermaid > .jot-mermaid__error {
+  margin: 0 0 0.5rem;
+  color: var(--danger);
+  font: 0.62rem/1.4 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.jot-mermaid[data-mermaid-error] > pre {
+  margin-top: 0;
+}
+
 .mermaid-viewport {
   cursor: grab;
   transform-origin: center;

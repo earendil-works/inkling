@@ -73,10 +73,17 @@ test(
       await first.locator("[data-document-details] > summary").click();
       await first.locator(".cm-content").click();
       await first.keyboard.insertText(
-        "Shared starting body\n\nSecond line\n\n```ts\nconst answer: number = 42;\n```\n\nThird line",
+        "Shared starting body\n\nSecond line\n\n```ts\nconst answer: number = 42;\n```\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n```mermaid\nnot a mermaid diagram\n```\n\nThird line",
       );
       await first.waitForSelector(".cm-content .tok-keyword");
       await first.waitForSelector("[data-preview] .tok-keyword");
+      await first.waitForSelector("[data-preview] [data-mermaid] .mermaid-viewport");
+      await first.waitForSelector("[data-preview] [data-mermaid-error]");
+      assert.match(
+        await first.locator("[data-preview] [data-mermaid-error]").innerText(),
+        /not a mermaid diagram/u,
+      );
+      assert.equal(await first.locator('body > div[id^="djot-mermaid-"]').count(), 0);
       await first.waitForFunction(
         () => document.querySelector("[data-save-state]")?.textContent === "Saved",
       );
@@ -97,6 +104,8 @@ test(
       assert.equal(await first.locator(".cm-editor").count(), 0);
       assert.match(await first.locator("[data-preview]").innerText(), /Shared starting body/u);
       await first.waitForSelector("[data-preview] .tok-keyword");
+      await first.waitForSelector("[data-preview] [data-mermaid-error]");
+      assert.equal(await first.locator('body > div[id^="djot-mermaid-"]').count(), 0);
       const renderedKeyword = first.locator("[data-preview] .tok-keyword");
       assert.equal(await renderedKeyword.textContent(), "const");
       assert.equal(await renderedKeyword.getAttribute("class"), editorKeywordClass);

@@ -4,7 +4,10 @@ import { Effect } from "effect";
 
 import { makeMarkdownRenderer } from "@earendil-works/jot-renderer";
 
-import { mountMermaidDiagramControls } from "./components/mermaid-diagram-controls.ts";
+import {
+  mountMermaidDiagramControls,
+  mountMermaidDiagramError,
+} from "./components/mermaid-diagram-controls.ts";
 import { useEffectQuery } from "./effect-hooks.ts";
 
 const renderer = makeMarkdownRenderer();
@@ -37,16 +40,24 @@ export function renderMermaid(root: ParentNode): Effect.Effect<void> {
     catch: () => undefined,
     try: async () => {
       const mermaid = await loadMermaid();
-      await Promise.all(
-        diagrams.map(async (diagram) => {
-          const code = diagram.querySelector("code")?.textContent ?? "";
-          const rendered = await mermaid.render(`jot-mermaid-${++diagramGeneration}`, code);
-          if (!diagram.isConnected) return;
-          mountMermaidDiagramControls(diagram, rendered.svg);
-        }),
-      );
+      await Promise.all(diagrams.map((diagram) => renderMermaidDiagram(mermaid, diagram)));
     },
   }).pipe(Effect.ignore);
+}
+
+async function renderMermaidDiagram(mermaid: Mermaid, diagram: HTMLElement): Promise<void> {
+  const code = diagram.querySelector("code")?.textContent ?? "";
+  try {
+    const parsed = await mermaid.parse(code, { suppressErrors: true });
+    if (parsed === false) {
+      if (diagram.isConnected) mountMermaidDiagramError(diagram);
+      return;
+    }
+    const rendered = await mermaid.render(`jot-mermaid-${++diagramGeneration}`, code);
+    if (diagram.isConnected) mountMermaidDiagramControls(diagram, rendered.svg);
+  } catch {
+    if (diagram.isConnected) mountMermaidDiagramError(diagram);
+  }
 }
 
 function loadMermaid(): Promise<Mermaid> {
@@ -54,6 +65,7 @@ function loadMermaid(): Promise<Mermaid> {
     mermaid.initialize({
       securityLevel: "strict",
       startOnLoad: false,
+      suppressErrorRendering: true,
       theme: document.documentElement.dataset["theme"] === "dark" ? "dark" : "neutral",
     });
     return mermaid;
