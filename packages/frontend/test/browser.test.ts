@@ -45,7 +45,9 @@ test(
       await first.locator('input[name="title"]').fill("Browser collaboration");
       await first
         .locator('textarea[name="body"]')
-        .fill("Shared starting body\n\nSecond line\n\nThird line");
+        .fill(
+          "Shared starting body\n\nSecond line\n\n```ts\nconst answer: number = 42;\n```\n\nThird line",
+        );
       await first.locator('input[name="rfc"]').check();
       await first
         .locator("[data-new-form]")
@@ -58,6 +60,8 @@ test(
       await first.waitForSelector("[data-reader]");
       assert.equal(await first.locator(".cm-editor").count(), 0);
       assert.match(await first.locator("[data-preview]").innerText(), /Shared starting body/u);
+      await first.waitForSelector("[data-preview] .hljs-keyword");
+      assert.equal(await first.locator("[data-preview] .hljs-keyword").textContent(), "const");
       await first.evaluate(() => {
         document.documentElement.dataset["browserNavigation"] = "same-document";
       });
@@ -69,6 +73,11 @@ test(
       );
       await first.waitForFunction(
         () => document.querySelector("[data-save-state]")?.textContent === "Saved",
+      );
+      await first.waitForFunction(() =>
+        [...document.querySelectorAll(".cm-content .cm-line span")].some(
+          (token) => token.textContent === "const" && token.className !== "",
+        ),
       );
 
       const second = await context.newPage();

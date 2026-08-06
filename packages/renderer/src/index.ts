@@ -108,12 +108,17 @@ function renderMarkdown(markdown: string, options: RenderOptions): RenderedMarkd
       }
       return `<div class="jot-mermaid" data-mermaid${sourceAttributes}><pre><code>${parser.utils.escapeHtml(source)}</code></pre><div class="jot-mermaid__controls"><button type="button" data-mermaid-zoom-in aria-label="Zoom in">+</button><button type="button" data-mermaid-zoom-out aria-label="Zoom out">−</button><button type="button" data-mermaid-reset>Reset</button></div></div>\n`;
     }
-    const highlighted =
-      language.length > 0 && hljs.getLanguage(language) !== undefined
-        ? hljs.highlight(source, { language }).value
-        : parser.utils.escapeHtml(source);
-    const className =
-      language.length === 0 ? "" : ` class="language-${parser.utils.escapeHtml(language)}"`;
+    const canHighlight = language.length > 0 && hljs.getLanguage(language) !== undefined;
+    const highlighted = canHighlight
+      ? hljs.highlight(source, { language }).value
+      : parser.utils.escapeHtml(source);
+    const classes = [
+      canHighlight ? "hljs" : undefined,
+      language ? `language-${language}` : undefined,
+    ]
+      .filter((value): value is string => value !== undefined)
+      .map((value) => parser.utils.escapeHtml(value));
+    const className = classes.length === 0 ? "" : ` class="${classes.join(" ")}"`;
     return `<pre class="jot-code"${sourceAttributes}><code${className}>${highlighted}</code></pre>\n`;
   };
 

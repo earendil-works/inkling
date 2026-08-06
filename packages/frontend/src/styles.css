@@ -14,6 +14,16 @@
   --accent: #087f68;
   --accent-soft: #dff2eb;
   --danger: #b84735;
+  --code-background: #f1f4f0;
+  --code-text: #27312c;
+  --code-comment: #707a73;
+  --code-keyword: #a13f59;
+  --code-title: #6957a5;
+  --code-attribute: #176d8a;
+  --code-string: #277044;
+  --code-symbol: #a35827;
+  --code-addition: #dff3e5;
+  --code-deletion: #f8dedb;
   --shadow: 0 16px 50px rgb(24 32 28 / 14%);
   --sans: "Avenir Next", Avenir, "Helvetica Neue", sans-serif;
   --mono: "SFMono-Regular", "Cascadia Mono", "Liberation Mono", monospace;
@@ -33,6 +43,16 @@
   --accent: #63c7ad;
   --accent-soft: #173c33;
   --danger: #ef806c;
+  --code-background: #171a18;
+  --code-text: #e5ebe6;
+  --code-comment: #89938c;
+  --code-keyword: #ff8c9f;
+  --code-title: #c5b6ff;
+  --code-attribute: #87cef1;
+  --code-string: #9bd6ae;
+  --code-symbol: #efad72;
+  --code-addition: #193c27;
+  --code-deletion: #4c2422;
   --shadow: 0 16px 50px rgb(0 0 0 / 34%);
 }
 
@@ -49,6 +69,16 @@
     --accent: #63c7ad;
     --accent-soft: #173c33;
     --danger: #ef806c;
+    --code-background: #171a18;
+    --code-text: #e5ebe6;
+    --code-comment: #89938c;
+    --code-keyword: #ff8c9f;
+    --code-title: #c5b6ff;
+    --code-attribute: #87cef1;
+    --code-string: #9bd6ae;
+    --code-symbol: #efad72;
+    --code-addition: #193c27;
+    --code-deletion: #4c2422;
     --shadow: 0 16px 50px rgb(0 0 0 / 34%);
   }
 }
@@ -1349,10 +1379,86 @@ select:disabled {
 .markdown-body pre {
   overflow: auto;
   padding: 1rem;
+  border: 1px solid var(--border);
   border-radius: 3px;
-  background: #171a18;
-  color: #f3f5f3;
+  background: var(--code-background);
+  color: var(--code-text);
   font: 0.8rem/1.55 var(--mono);
+}
+
+.markdown-body .hljs-doctag,
+.markdown-body .hljs-keyword,
+.markdown-body .hljs-meta .hljs-keyword,
+.markdown-body .hljs-template-tag,
+.markdown-body .hljs-template-variable,
+.markdown-body .hljs-type,
+.markdown-body .hljs-variable.language_ {
+  color: var(--code-keyword);
+}
+
+.markdown-body .hljs-title,
+.markdown-body .hljs-title.class_,
+.markdown-body .hljs-title.class_.inherited__,
+.markdown-body .hljs-title.function {
+  color: var(--code-title);
+}
+
+.markdown-body .hljs-attr,
+.markdown-body .hljs-attribute,
+.markdown-body .hljs-literal,
+.markdown-body .hljs-meta,
+.markdown-body .hljs-number,
+.markdown-body .hljs-operator,
+.markdown-body .hljs-selector-attr,
+.markdown-body .hljs-selector-class,
+.markdown-body .hljs-selector-id,
+.markdown-body .hljs-variable {
+  color: var(--code-attribute);
+}
+
+.markdown-body .hljs-meta .hljs-string,
+.markdown-body .hljs-regexp,
+.markdown-body .hljs-string,
+.markdown-body .hljs-name,
+.markdown-body .hljs-selector-pseudo,
+.markdown-body .hljs-selector-tag {
+  color: var(--code-string);
+}
+
+.markdown-body .hljs-built_in,
+.markdown-body .hljs-bullet,
+.markdown-body .hljs-symbol {
+  color: var(--code-symbol);
+}
+
+.markdown-body .hljs-code,
+.markdown-body .hljs-comment,
+.markdown-body .hljs-formula,
+.markdown-body .hljs-quote {
+  color: var(--code-comment);
+}
+
+.markdown-body .hljs-section {
+  color: var(--code-attribute);
+  font-weight: 700;
+}
+
+.markdown-body .hljs-emphasis {
+  font-style: italic;
+}
+
+.markdown-body .hljs-strong {
+  font-weight: 700;
+}
+
+.markdown-body .hljs-addition {
+  background: var(--code-addition);
+  color: var(--code-string);
+}
+
+.markdown-body .hljs-deletion {
+  background: var(--code-deletion);
+  color: var(--code-keyword);
 }
 
 .markdown-body :not(pre) > code {

@@ -42,14 +42,26 @@ test("interactive rendering annotates block elements with Markdown source ranges
   assert.doesNotMatch(published.html, /data-jot-source/u);
 });
 
-test("source ranges survive custom fenced-code rendering", async () => {
+test("fenced code is syntax highlighted with language metadata", async () => {
   const rendered = await Effect.runPromise(
-    renderer.render("```ts\nconst value = 1;\n```", { sourcePositions: true }),
+    renderer.render("```ts\nconst value: number = 1;\n```", { sourcePositions: true }),
   );
   assert.match(
     rendered.html,
-    /<pre class="jot-code" data-jot-source-start="0" data-jot-source-end="26"/u,
+    /<pre class="jot-code" data-jot-source-start="0" data-jot-source-end="34"/u,
   );
+  assert.match(rendered.html, /<code class="hljs language-ts">/u);
+  assert.match(rendered.html, /<span class="hljs-keyword">const<\/span>/u);
+  assert.match(rendered.html, /<span class="hljs-built_in">number<\/span>/u);
+});
+
+test("unknown fenced languages remain escaped", async () => {
+  const rendered = await Effect.runPromise(
+    renderer.render("```not-a-language\n<script>alert(1)</script>\n```"),
+  );
+  assert.match(rendered.html, /<code class="language-not-a-language">/u);
+  assert.match(rendered.html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/u);
+  assert.doesNotMatch(rendered.html, /<script>/u);
 });
 
 test("oversized Mermaid input is rejected without an interactive placeholder", async () => {

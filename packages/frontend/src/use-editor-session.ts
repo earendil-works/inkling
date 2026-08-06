@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { markdown } from "@codemirror/lang-markdown";
+import { languages } from "@codemirror/language-data";
 import { Compartment, EditorState } from "@codemirror/state";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { EditorView, basicSetup } from "codemirror";
@@ -89,7 +90,7 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
       state: EditorState.create({
         extensions: [
           basicSetup,
-          markdown(),
+          markdown({ codeLanguages: languages }),
           yCollab(yBody, awareness),
           commentDecorationsExtension,
           editable.of(EditorView.editable.of(initiallyEditable)),
@@ -110,6 +111,17 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
           }),
         ],
       }),
+    });
+    const themeObserver = new MutationObserver(() => {
+      editor.dispatch({
+        effects: theme.reconfigure(
+          document.documentElement.dataset["theme"] === "dark" ? oneDark : [],
+        ),
+      });
+    });
+    themeObserver.observe(document.documentElement, {
+      attributeFilter: ["data-theme"],
+      attributes: true,
     });
     const updateBody = (): void => {
       setBody(yBody.toString());
@@ -158,6 +170,7 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
       browserRuntime.runFork(Fiber.interrupt(collaborationFiber));
       if (client !== undefined) browserRuntime.runFork(client.close);
       yBody.unobserve(updateBody);
+      themeObserver.disconnect();
       editor.destroy();
       awareness.destroy();
       yDocument.destroy();

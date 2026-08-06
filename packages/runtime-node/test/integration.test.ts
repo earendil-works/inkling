@@ -59,10 +59,13 @@ test(
           baseUrl,
           document.metadata.id,
           cookieHeader,
-          " from collaboration",
+          " from collaboration\n\n```ts\nconst value: number = 1;\n```",
         );
         document = await readDocument(baseUrl, document.metadata.id, authorization);
-        assert.equal(document.body, "Initial body from collaboration");
+        assert.equal(
+          document.body,
+          "Initial body from collaboration\n\n```ts\nconst value: number = 1;\n```",
+        );
 
         const edit = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/edits`, {
           body: JSON.stringify({
@@ -74,7 +77,10 @@ test(
         });
         assert.equal(edit.status, 200);
         document = (await edit.json()) as DocumentWire;
-        assert.equal(document.body, "Durable body from collaboration");
+        assert.equal(
+          document.body,
+          "Durable body from collaboration\n\n```ts\nconst value: number = 1;\n```",
+        );
 
         const stale = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/edits`, {
           body: JSON.stringify({
@@ -153,7 +159,10 @@ test(
         assert.equal(publish.status, 200);
         const published = await fetch(`${baseUrl}/rfc/0001`);
         assert.equal(published.status, 200);
-        assert.match(await published.text(), /Integrated RFC/u);
+        const publishedHtml = await published.text();
+        assert.match(publishedHtml, /Integrated RFC/u);
+        assert.match(publishedHtml, /class="hljs-keyword">const<\/span>/u);
+        assert.match(publishedHtml, /--code-keyword:#a13f59/u);
         document = await readDocument(baseUrl, document.metadata.id, authorization);
         const workingTitle = await fetch(
           `${baseUrl}/api/documents/${document.metadata.id}/metadata`,
@@ -235,7 +244,10 @@ test(
       await withServer(directory, async (baseUrl) => {
         const authorization = { Authorization: `Bearer ${first.apiKey}` };
         const recovered = await readDocument(baseUrl, first.documentId, authorization);
-        assert.equal(recovered.body, "Durable body from collaboration");
+        assert.equal(
+          recovered.body,
+          "Durable body from collaboration\n\n```ts\nconst value: number = 1;\n```",
+        );
         assert.equal(recovered.comments.threads.length, 1);
         assert.equal((await fetch(`${baseUrl}/rfc/0001`)).status, 200);
       });
