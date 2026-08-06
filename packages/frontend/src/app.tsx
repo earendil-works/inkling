@@ -15,6 +15,8 @@ import type { AppContextValue, AppStatus, ToastKind } from "./app-context.tsx";
 import { AuthenticationScreen } from "./auth-screen.tsx";
 import { AppHeader } from "./components/app-header.tsx";
 import { Button } from "./components/button.tsx";
+import { ToastRegion } from "./components/toast-region.tsx";
+import type { ToastController } from "./components/toast-region.tsx";
 import { useEffectQuery } from "./effect-hooks.ts";
 import { installClientRouter } from "./navigation.ts";
 import type { ClientRouter, NavigateOptions } from "./navigation.ts";
@@ -50,12 +52,6 @@ type RouteModel =
     })
   | (RouteBase & { readonly catalog: CatalogResponse; readonly screen: "workspace" });
 
-interface ToastMessage {
-  readonly id: number;
-  readonly kind: ToastKind;
-  readonly message: string;
-}
-
 export function App(): React.JSX.Element {
   const [locationState, setLocationState] = useState<LocationState>(() => ({
     generation: 0,
@@ -67,8 +63,7 @@ export function App(): React.JSX.Element {
     state: "connecting",
   });
   const [participants, setParticipants] = useState<readonly PresenceDto[]>([]);
-  const [toasts, setToasts] = useState<readonly ToastMessage[]>([]);
-  const toastIdRef = useRef(0);
+  const toastRef = useRef<ToastController>(null);
 
   useEffect(() => {
     const router = installClientRouter(isApplicationUrl, () =>
@@ -93,13 +88,10 @@ export function App(): React.JSX.Element {
     router.navigate(destination, options);
   }, []);
   const refreshRoute = useCallback(() => routerRef.current?.refresh(), []);
-  const showToast = useCallback((message: string, kind: ToastKind) => {
-    const id = ++toastIdRef.current;
-    setToasts((current) => [...current, { id, kind, message }]);
-    window.setTimeout(() => {
-      setToasts((current) => current.filter((toast) => toast.id !== id));
-    }, 4_000);
-  }, []);
+  const showToast = useCallback(
+    (message: string, kind: ToastKind) => toastRef.current?.show(message, kind),
+    [],
+  );
 
   const routeEffect = useMemo(() => loadRoute(locationState.url), [locationState.url]);
   const route = useEffectQuery(
@@ -133,13 +125,7 @@ export function App(): React.JSX.Element {
     <AppContext.Provider value={context}>
       <AppHeader participants={participants} status={status} />
       <RouteView refresh={route.refresh} state={route.state} />
-      <div className="toast-region" data-toasts="" role="status" aria-live="polite">
-        {toasts.map((toast) => (
-          <div className={`toast toast--${toast.kind}`} key={toast.id}>
-            {toast.message}
-          </div>
-        ))}
-      </div>
+      <ToastRegion ref={toastRef} />
     </AppContext.Provider>
   );
 }
