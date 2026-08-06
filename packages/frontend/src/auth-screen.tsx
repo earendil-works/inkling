@@ -21,10 +21,7 @@ export function AuthenticationScreen({
           {mode === "setup" ? "First run / local owner" : "Private workspace"}
         </p>
         <h1>{mode === "setup" ? "Make this workspace yours." : "Continue writing."}</h1>
-        <p>
-          Jot keeps the working head private, journals every accepted edit, and publishes only
-          explicit revisions.
-        </p>
+        <p>Jot is a collaborative place to write and discuss.</p>
       </section>
       <AuthenticationForm api={api} methods={methods} mode={mode} />
     </main>
