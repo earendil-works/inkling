@@ -14,7 +14,6 @@ import type {
   DocumentMetadataDto,
   DocumentResponse,
   PresenceDto,
-  ShareResponse,
 } from "@earendil-works/jot-protocol";
 
 import { ApiError } from "./api.ts";
@@ -28,6 +27,7 @@ import { Button } from "./components/button.tsx";
 import { CheckboxField } from "./components/checkbox-field.tsx";
 import { CommentThreadCard } from "./components/comment-thread-card.tsx";
 import { DocumentDetails } from "./components/document-details.tsx";
+import { SharingControl } from "./components/sharing-control.tsx";
 import { CommentComposer } from "./comment-composer.tsx";
 import {
   commentDecorationsExtension,
@@ -411,12 +411,6 @@ export function EditorScreen({
   const publishAction = useEffectAction<void, DocumentMetadataDto, ApiError>(() =>
     api.publish(metadata.id),
   );
-  const shareAction = useEffectAction<
-    "disabled" | "view" | "comment" | "edit",
-    ShareResponse,
-    ApiError
-  >((access) => api.updateShare(metadata.id, access, metadata.headRevision));
-
   const activeThread = comments.threads.find((thread) => thread.id === activeThreadId);
 
   const handleWorkbenchClick = (event: React.MouseEvent<HTMLElement>): void => {
@@ -520,47 +514,19 @@ export function EditorScreen({
           />
           {shared ? null : (
             <>
-              <Button
-                variant="toolbar"
-                data-share=""
-                onClick={() => {
-                  const selected = window.prompt(
-                    "Share access: disabled, view, comment, or edit",
-                    metadata.sharing.access,
-                  );
-                  if (
-                    selected !== "disabled" &&
-                    selected !== "view" &&
-                    selected !== "comment" &&
-                    selected !== "edit"
-                  )
-                    return;
-                  shareAction.execute(selected, {
-                    onFailure: (error) => showToast(error.message, "error"),
-                    onSuccess: (response) => {
-                      setMetadata((current) => ({
-                        ...current,
-                        headRevision: current.headRevision + 1,
-                        sharing: response.policy,
-                      }));
-                      if (response.capabilityUrl === undefined) {
-                        showToast("Share access updated.", "success");
-                      } else {
-                        browserRuntime.runFork(
-                          Effect.tryPromise({
-                            catch: () => undefined,
-                            try: () => navigator.clipboard.writeText(response.capabilityUrl ?? ""),
-                          }).pipe(Effect.ignore),
-                        );
-                        showToast("Capability URL copied. It will not be shown again.", "success");
-                      }
-                    },
-                  });
-                }}
-                type="button"
-              >
-                Share
-              </Button>
+              <SharingControl
+                access={metadata.sharing.access}
+                api={api}
+                documentId={metadata.id}
+                expectedRevision={metadata.headRevision}
+                onUpdated={(response) =>
+                  setMetadata((current) => ({
+                    ...current,
+                    headRevision: current.headRevision + 1,
+                    sharing: response.policy,
+                  }))
+                }
+              />
               <Button
                 size="small"
                 variant="primary"

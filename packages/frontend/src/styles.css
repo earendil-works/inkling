@@ -378,7 +378,8 @@ select:disabled {
 
 .auth-panel form,
 .new-document form,
-.settings-dialog form {
+.settings-dialog form,
+.sharing-dialog form {
   display: grid;
   gap: 1rem;
 }
@@ -527,13 +528,22 @@ select:disabled {
 }
 
 .new-document,
-.settings-dialog {
+.settings-dialog,
+.sharing-dialog {
   width: min(40rem, calc(100vw - 2rem));
   padding: 1.5rem;
 }
 
-.settings-dialog {
+.settings-dialog,
+.sharing-dialog {
   width: min(36rem, calc(100vw - 2rem));
+}
+
+.dialog-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
 }
 
 .dialog-heading {
