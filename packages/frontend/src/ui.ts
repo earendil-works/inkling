@@ -26,10 +26,11 @@ export function colorFor(value: string): string {
   return `hsl(${Math.abs(hash) % 360} 58% 46%)`;
 }
 
-export function guestName(): string {
-  const existing = localStorage.getItem("jot-guest-name");
-  if (existing !== null && existing.trim() !== "") return existing;
-  const entered = window.prompt("Your display name")?.trim() || "Guest";
-  localStorage.setItem("jot-guest-name", entered);
-  return entered;
+export function storedGuestName(): string | undefined {
+  const existing = localStorage.getItem("jot-guest-name")?.trim();
+  return existing === "" ? undefined : existing;
+}
+
+export function storeGuestName(displayName: string): void {
+  localStorage.setItem("jot-guest-name", displayName);
 }

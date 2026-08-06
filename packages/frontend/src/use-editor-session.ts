@@ -18,7 +18,7 @@ import { makeCollaborationClient } from "./collaboration.ts";
 import type { CollaborationClient, ConnectionState } from "./collaboration.ts";
 import { commentDecorationsExtension } from "./comments.ts";
 import { browserRuntime } from "./effect-runtime.ts";
-import { colorFor, guestName, randomId } from "./ui.ts";
+import { colorFor, randomId } from "./ui.ts";
 
 export interface EditorSession {
   readonly awareness: Awareness;
@@ -39,6 +39,7 @@ interface EditorSessionCallbacks {
 
 interface UseEditorSessionOptions extends EditorSessionCallbacks {
   readonly capabilityToken: string | undefined;
+  readonly displayName: string | undefined;
   readonly documentId: string;
   readonly initialBody: string;
   readonly initiallyEditable: boolean;
@@ -54,8 +55,15 @@ export interface EditorSessionState {
 }
 
 export function useEditorSession(options: UseEditorSessionOptions): EditorSessionState {
-  const { capabilityToken, documentId, initialBody, initiallyEditable, shared, ...callbacks } =
-    options;
+  const {
+    capabilityToken,
+    displayName,
+    documentId,
+    initialBody,
+    initiallyEditable,
+    shared,
+    ...callbacks
+  } = options;
   const callbacksRef = useRef<EditorSessionCallbacks>(callbacks);
   callbacksRef.current = callbacks;
   const editorHostRef = useRef<HTMLDivElement>(null);
@@ -66,7 +74,7 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
 
   useEffect(() => {
     const parent = editorHostRef.current;
-    if (parent === null) return;
+    if (parent === null || displayName === undefined) return;
     const yDocument = new Y.Doc();
     const yBody = yDocument.getText("body");
     const awareness = new Awareness(yDocument);
@@ -93,7 +101,7 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
             browserRuntime.runFork(
               client.sendPresence({
                 color: participantColor,
-                displayName: shared ? guestName() : "Owner",
+                displayName,
                 participantId,
                 selectionEnd: selection.to,
                 selectionStart: selection.from,
@@ -116,7 +124,7 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
         documentId,
         yDocument,
         capabilityToken,
-        shared ? guestName() : undefined,
+        shared ? displayName : undefined,
         {
           onComments: (comments) => callbacksRef.current.onComments(comments),
           onError: (message) => callbacksRef.current.onError(message),
@@ -156,7 +164,7 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
       sessionRef.current = undefined;
       callbacksRef.current.onParticipants([]);
     };
-  }, [capabilityToken, documentId, initiallyEditable, shared]);
+  }, [capabilityToken, displayName, documentId, initiallyEditable, shared]);
 
   return { body, editorHostRef, sessionRef, sessionRevision, yRevision };
 }

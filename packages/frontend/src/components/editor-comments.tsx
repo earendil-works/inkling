@@ -16,7 +16,6 @@ import {
 import type { PreviewSourceRange, ProjectedCommentThread } from "../comments.ts";
 import { useEffectAction } from "../effect-hooks.ts";
 import { browserRuntime } from "../effect-runtime.ts";
-import { guestName } from "../ui.ts";
 import type { EditorSession } from "../use-editor-session.ts";
 import { CommentComposer } from "./comment-composer.tsx";
 import { CommentControls } from "./comment-controls.tsx";
@@ -55,6 +54,7 @@ export interface EditorCommentsHandle {
 
 export interface EditorCommentsProps {
   readonly api: ApiClientService;
+  readonly authorDisplayName: string;
   readonly canComment: boolean;
   readonly canManage: boolean;
   readonly comments: CommentStateDto;
@@ -65,12 +65,12 @@ export interface EditorCommentsProps {
   readonly ref?: React.Ref<EditorCommentsHandle> | undefined;
   readonly sessionRef: React.RefObject<EditorSession | undefined>;
   readonly sessionRevision: number;
-  readonly shared: boolean;
   readonly yRevision: number;
 }
 
 export function EditorComments({
   api,
+  authorDisplayName,
   canComment,
   canManage,
   comments,
@@ -81,7 +81,6 @@ export function EditorComments({
   ref,
   sessionRef,
   sessionRevision,
-  shared,
   yRevision,
 }: EditorCommentsProps): React.JSX.Element {
   const { showToast } = useAppContext();
@@ -177,7 +176,7 @@ export function EditorComments({
           return createCommentAnchor(session.body, request.range.start, request.range.end).pipe(
             Effect.mapError(() => uiError("The selected text is no longer available.")),
             Effect.flatMap((anchor) =>
-              api.createThread(documentId, anchor, commentBody, shared ? guestName() : "Owner"),
+              api.createThread(documentId, anchor, commentBody, authorDisplayName),
             ),
           );
         }
@@ -187,7 +186,7 @@ export function EditorComments({
             request.threadId,
             request.parentId,
             commentBody,
-            shared ? guestName() : "Owner",
+            authorDisplayName,
           );
         case "edit":
           return api.editMessage(documentId, request.threadId, request.messageId, commentBody);

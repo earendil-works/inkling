@@ -248,6 +248,8 @@ test(
       await shared.waitForSelector("[data-reader]");
       assert.equal(await shared.locator(".cm-editor").count(), 0);
       await shared.locator("[data-open-editor]").click();
+      await shared.getByLabel("Display name").fill("Browser reviewer");
+      await shared.getByRole("button", { name: "Join document" }).click();
       await shared.waitForFunction(
         () => document.querySelector(".cm-content")?.getAttribute("contenteditable") === "true",
       );

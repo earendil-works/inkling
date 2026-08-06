@@ -9,8 +9,10 @@ import { EditorComments } from "./components/editor-comments.tsx";
 import type { EditorCommentsHandle } from "./components/editor-comments.tsx";
 import { EditorToolbar } from "./components/editor-toolbar.tsx";
 import { connectionLabel, EditorWorkbench } from "./components/editor-workbench.tsx";
+import { GuestIdentityDialog } from "./components/guest-identity-dialog.tsx";
 import { useEffectAction } from "./effect-hooks.ts";
 import { useRenderedMarkdown } from "./markdown.tsx";
+import { documentHref, storedGuestName, storeGuestName } from "./ui.ts";
 import { useEditorSession } from "./use-editor-session.ts";
 
 export interface EditorScreenProps {
@@ -26,11 +28,14 @@ export function EditorScreen({
   document: initial,
   shared,
 }: EditorScreenProps): React.JSX.Element {
-  const { setParticipants, setStatus, showToast } = useAppContext();
+  const { navigate, setParticipants, setStatus, showToast } = useAppContext();
   const previewRef = useRef<HTMLElement>(null);
   const editorCommentsRef = useRef<EditorCommentsHandle>(null);
   const [metadata, setMetadata] = useState(initial.metadata);
   const [comments, setComments] = useState(initial.comments);
+  const [displayName, setDisplayName] = useState<string | undefined>(() =>
+    shared ? storedGuestName() : "Owner",
+  );
   const [permissions, setPermissions] = useState<readonly string[]>();
   const [previewRevision, setPreviewRevision] = useState(0);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -38,6 +43,7 @@ export function EditorScreen({
   const initiallyEditable = !shared || initial.metadata.sharing.access === "edit";
   const { body, editorHostRef, sessionRef, sessionRevision, yRevision } = useEditorSession({
     capabilityToken,
+    displayName,
     documentId: initial.metadata.id,
     initialBody: initial.body,
     initiallyEditable,
@@ -127,21 +133,33 @@ export function EditorScreen({
         previewHtml={rendered.html}
         previewRef={previewRef}
       />
-      <EditorComments
-        api={api}
-        canComment={canComment}
-        canManage={permissions?.includes("manage-comments") ?? false}
-        comments={comments}
-        documentId={metadata.id}
-        onCommentsChange={setComments}
-        previewRef={previewRef}
-        previewRevision={previewRevision}
-        ref={editorCommentsRef}
-        sessionRef={sessionRef}
-        sessionRevision={sessionRevision}
-        shared={shared}
-        yRevision={yRevision}
-      />
+      {displayName === undefined ? null : (
+        <EditorComments
+          api={api}
+          authorDisplayName={displayName}
+          canComment={canComment}
+          canManage={permissions?.includes("manage-comments") ?? false}
+          comments={comments}
+          documentId={metadata.id}
+          onCommentsChange={setComments}
+          previewRef={previewRef}
+          previewRevision={previewRevision}
+          ref={editorCommentsRef}
+          sessionRef={sessionRef}
+          sessionRevision={sessionRevision}
+          yRevision={yRevision}
+        />
+      )}
+      {shared && displayName === undefined ? (
+        <GuestIdentityDialog
+          onCancel={() => navigate(documentHref(metadata.id, true, "read"))}
+          onIdentify={(name) => {
+            storeGuestName(name);
+            setDisplayName(name);
+          }}
+          open
+        />
+      ) : null}
     </main>
   );
 }
