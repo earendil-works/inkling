@@ -26,6 +26,7 @@ import { makeCollaborationClient } from "./collaboration.ts";
 import type { CollaborationClient, ConnectionState } from "./collaboration.ts";
 import { ButtonLink } from "./components/button-link.tsx";
 import { Button } from "./components/button.tsx";
+import { SelectField } from "./components/select-field.tsx";
 import { TextField } from "./components/text-field.tsx";
 import { CommentComposer } from "./comment-composer.tsx";
 import {
@@ -539,69 +540,61 @@ export function EditorScreen({
           <details className="document-details" data-document-details="">
             <summary className="toolbar-button">Details</summary>
             <div className="document-details__menu">
-              <label>
-                State
-                <select
-                  data-state=""
-                  disabled={!canEditMetadata}
-                  onChange={(event) =>
-                    updateMetadata({ lifecycleState: event.currentTarget.value })
+              <SelectField
+                data-state=""
+                disabled={!canEditMetadata}
+                label="State"
+                onChange={(event) => updateMetadata({ lifecycleState: event.currentTarget.value })}
+                value={metadata.lifecycleState}
+              >
+                {[
+                  metadata.lifecycleState,
+                  "draft",
+                  "discussion",
+                  "accepted",
+                  "implemented",
+                  "abandoned",
+                ]
+                  .filter((value, index, values) => values.indexOf(value) === index)
+                  .map((value) => (
+                    <option key={value}>{value}</option>
+                  ))}
+              </SelectField>
+              <SelectField
+                data-visibility=""
+                disabled={!canEditMetadata}
+                label="Visibility"
+                onChange={(event) => {
+                  const visibility =
+                    event.currentTarget.value === "public" ? "public" : "workspace";
+                  if (
+                    visibility === "public" &&
+                    metadata.sensitivity === "confidential" &&
+                    !window.confirm("Publish confidential metadata as public?")
+                  ) {
+                    event.currentTarget.value = metadata.visibility;
+                    return;
                   }
-                  value={metadata.lifecycleState}
-                >
-                  {[
-                    metadata.lifecycleState,
-                    "draft",
-                    "discussion",
-                    "accepted",
-                    "implemented",
-                    "abandoned",
-                  ]
-                    .filter((value, index, values) => values.indexOf(value) === index)
-                    .map((value) => (
-                      <option key={value}>{value}</option>
-                    ))}
-                </select>
-              </label>
-              <label>
-                Visibility
-                <select
-                  data-visibility=""
-                  disabled={!canEditMetadata}
-                  onChange={(event) => {
-                    const visibility =
-                      event.currentTarget.value === "public" ? "public" : "workspace";
-                    if (
-                      visibility === "public" &&
-                      metadata.sensitivity === "confidential" &&
-                      !window.confirm("Publish confidential metadata as public?")
-                    ) {
-                      event.currentTarget.value = metadata.visibility;
-                      return;
-                    }
-                    updateMetadata({
-                      confirmConfidentialPublic: visibility === "public",
-                      visibility,
-                    });
-                  }}
-                  value={metadata.visibility}
-                >
-                  <option value="workspace">Workspace</option>
-                  <option value="public">Public</option>
-                </select>
-              </label>
-              <label>
-                Sensitivity
-                <select
-                  data-sensitivity=""
-                  disabled={!canEditMetadata}
-                  onChange={(event) => updateMetadata({ sensitivity: event.currentTarget.value })}
-                  value={metadata.sensitivity}
-                >
-                  <option value="normal">Normal</option>
-                  <option value="confidential">Confidential</option>
-                </select>
-              </label>
+                  updateMetadata({
+                    confirmConfidentialPublic: visibility === "public",
+                    visibility,
+                  });
+                }}
+                value={metadata.visibility}
+              >
+                <option value="workspace">Workspace</option>
+                <option value="public">Public</option>
+              </SelectField>
+              <SelectField
+                data-sensitivity=""
+                disabled={!canEditMetadata}
+                label="Sensitivity"
+                onChange={(event) => updateMetadata({ sensitivity: event.currentTarget.value })}
+                value={metadata.sensitivity}
+              >
+                <option value="normal">Normal</option>
+                <option value="confidential">Confidential</option>
+              </SelectField>
               <TextField
                 data-labels=""
                 disabled={!canEditMetadata}
