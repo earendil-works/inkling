@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./components/button.tsx";
+import { ModalDialog } from "./components/modal-dialog.tsx";
 import { TextareaField } from "./components/textarea-field.tsx";
 
 export interface CommentComposerProps {
@@ -21,15 +22,12 @@ export function CommentComposer({
   submitLabel,
   title,
 }: CommentComposerProps): React.JSX.Element {
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const [body, setBody] = useState(initialBody);
   const [invalid, setInvalid] = useState(false);
 
   useEffect(() => {
-    const dialog = dialogRef.current;
     const textarea = bodyRef.current;
-    dialog?.showModal();
     textarea?.focus();
     textarea?.setSelectionRange(textarea.value.length, textarea.value.length);
   }, []);
@@ -46,14 +44,12 @@ export function CommentComposer({
   };
 
   return (
-    <dialog
+    <ModalDialog
       className="comment-composer-dialog"
       data-comment-composer-dialog=""
-      onCancel={(event) => {
-        event.preventDefault();
-        if (!pending) onCancel();
-      }}
-      ref={dialogRef}
+      onDismiss={onCancel}
+      open
+      preventDismiss={pending}
     >
       <form
         className="comment-composer-form"
@@ -132,6 +128,6 @@ export function CommentComposer({
           </div>
         </div>
       </form>
-    </dialog>
+    </ModalDialog>
   );
 }

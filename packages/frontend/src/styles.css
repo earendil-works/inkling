@@ -513,10 +513,8 @@ select:disabled {
 }
 
 /* Dialogs */
-.new-document,
-.settings-dialog {
-  width: min(40rem, calc(100vw - 2rem));
-  padding: 1.5rem;
+.modal-dialog {
+  margin: auto;
   border: 1px solid var(--border-strong);
   border-radius: 4px;
   background: var(--surface);
@@ -524,13 +522,18 @@ select:disabled {
   color: var(--text);
 }
 
-.settings-dialog {
-  width: min(36rem, calc(100vw - 2rem));
+.modal-dialog::backdrop {
+  background: rgb(8 12 10 / 42%);
 }
 
-.new-document::backdrop,
-.settings-dialog::backdrop {
-  background: rgb(8 12 10 / 42%);
+.new-document,
+.settings-dialog {
+  width: min(40rem, calc(100vw - 2rem));
+  padding: 1.5rem;
+}
+
+.settings-dialog {
+  width: min(36rem, calc(100vw - 2rem));
 }
 
 .dialog-heading {
@@ -882,11 +885,7 @@ select:disabled {
   max-height: calc(100dvh - 2rem);
   padding: 0;
   overflow: auto;
-  border: 1px solid var(--border-strong);
   border-radius: 6px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-  color: var(--text);
 }
 
 .comment-composer-dialog::backdrop {

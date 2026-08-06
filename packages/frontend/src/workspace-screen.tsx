@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useState } from "react";
 import { Effect } from "effect";
 
 import type {
@@ -14,6 +14,7 @@ import { useAppContext } from "./app-context.tsx";
 import { Button } from "./components/button.tsx";
 import { CheckboxField } from "./components/checkbox-field.tsx";
 import { FormError } from "./components/form-error.tsx";
+import { ModalDialog } from "./components/modal-dialog.tsx";
 import { TextareaField } from "./components/textarea-field.tsx";
 import { TextField } from "./components/text-field.tsx";
 import { useEffectAction, useEffectQuery } from "./effect-hooks.ts";
@@ -32,7 +33,7 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
     api.listDocuments(deferredSearch),
     `catalog:${deferredSearch}`,
   );
-  const newDialogRef = useRef<HTMLDialogElement>(null);
+  const [newDocumentOpen, setNewDocumentOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [allocateRfc, setAllocateRfc] = useState(false);
@@ -57,7 +58,7 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
       },
       {
         onSuccess: (document) => {
-          newDialogRef.current?.close();
+          setNewDocumentOpen(false);
           navigate(`/documents/${encodeURIComponent(document.metadata.id)}`);
         },
       },
@@ -74,7 +75,7 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
         <Button
           variant="primary"
           data-new-document=""
-          onClick={() => newDialogRef.current?.showModal()}
+          onClick={() => setNewDocumentOpen(true)}
           type="button"
         >
           New document
@@ -96,14 +97,19 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
         <LogoutButton api={api} />
       </section>
       <Catalog catalog={catalog} />
-      <dialog className="new-document" data-new-dialog="" ref={newDialogRef}>
+      <ModalDialog
+        className="new-document"
+        data-new-dialog=""
+        onDismiss={() => setNewDocumentOpen(false)}
+        open={newDocumentOpen}
+      >
         <form data-new-form="" onSubmit={submitDocument}>
           <div className="dialog-heading">
             <p className="eyebrow">Begin a working head</p>
             <Button
               aria-label="Close"
               variant="icon"
-              onClick={() => newDialogRef.current?.close()}
+              onClick={() => setNewDocumentOpen(false)}
               type="button"
             >
               ×
@@ -137,7 +143,7 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
           </Button>
           <FormError data-new-error="">{createDocument.state.error?.message}</FormError>
         </form>
-      </dialog>
+      </ModalDialog>
       {settingsOpen ? <SettingsDialog api={api} onClose={() => setSettingsOpen(false)} /> : null}
     </main>
   );
@@ -209,7 +215,6 @@ interface SettingsDialogProps {
 }
 
 function SettingsDialog({ api, onClose }: SettingsDialogProps): React.JSX.Element {
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const [label, setLabel] = useState("");
   const [keys, setKeys] = useState<readonly ApiKeyDto[]>([]);
   const [agentCommand, setAgentCommand] = useState<string>();
@@ -226,16 +231,10 @@ function SettingsDialog({ api, onClose }: SettingsDialogProps): React.JSX.Elemen
   );
 
   useEffect(() => {
-    dialogRef.current?.showModal();
-  }, []);
-  useEffect(() => {
     if (keyQuery.state.data !== undefined) setKeys(keyQuery.state.data);
   }, [keyQuery.state.data]);
 
-  const close = (): void => {
-    dialogRef.current?.close();
-    onClose();
-  };
+  const close = (): void => onClose();
   const submit = (event: React.FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
     if (label.trim() === "") return;
@@ -249,7 +248,7 @@ function SettingsDialog({ api, onClose }: SettingsDialogProps): React.JSX.Elemen
   };
 
   return (
-    <dialog className="settings-dialog" data-settings-dialog="" onCancel={close} ref={dialogRef}>
+    <ModalDialog className="settings-dialog" data-settings-dialog="" onDismiss={close} open>
       <form data-settings-form="" onSubmit={submit}>
         <div className="dialog-heading">
           <p className="eyebrow">API keys / agent access</p>
@@ -324,6 +323,6 @@ function SettingsDialog({ api, onClose }: SettingsDialogProps): React.JSX.Elemen
           {revokeKey.state.error?.message}
         </FormError>
       </form>
-    </dialog>
+    </ModalDialog>
   );
 }
