@@ -12,6 +12,7 @@ import type {
 import type { ApiClientService, ApiError } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
 import { Button } from "./components/button.tsx";
+import { CheckboxField } from "./components/checkbox-field.tsx";
 import { TextareaField } from "./components/textarea-field.tsx";
 import { TextField } from "./components/text-field.tsx";
 import { useEffectAction, useEffectQuery } from "./effect-hooks.ts";
@@ -116,15 +117,12 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
             required
             value={title}
           />
-          <label className="checkbox">
-            <input
-              checked={allocateRfc}
-              name="rfc"
-              onChange={(event) => setAllocateRfc(event.currentTarget.checked)}
-              type="checkbox"
-            />
-            Allocate an RFC number
-          </label>
+          <CheckboxField
+            checked={allocateRfc}
+            label="Allocate an RFC number"
+            name="rfc"
+            onChange={(event) => setAllocateRfc(event.currentTarget.checked)}
+          />
           <TextareaField
             label="Opening Markdown"
             name="body"

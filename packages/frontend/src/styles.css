@@ -537,13 +537,13 @@ select:disabled {
   margin-bottom: 0.5rem;
 }
 
-.checkbox {
+.checkbox-field {
   display: flex;
   align-items: center;
   gap: 0.55rem;
 }
 
-.checkbox input {
+.checkbox-field input {
   width: auto;
 }
 
@@ -985,15 +985,8 @@ select:disabled {
 }
 
 .resolved-toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
   padding-top: 0.8rem;
   border-top: 1px solid var(--border);
-}
-
-.resolved-toggle input {
-  width: auto;
 }
 
 .orphaned-comments {

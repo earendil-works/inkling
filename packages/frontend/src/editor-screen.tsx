@@ -26,6 +26,7 @@ import { makeCollaborationClient } from "./collaboration.ts";
 import type { CollaborationClient, ConnectionState } from "./collaboration.ts";
 import { ButtonLink } from "./components/button-link.tsx";
 import { Button } from "./components/button.tsx";
+import { CheckboxField } from "./components/checkbox-field.tsx";
 import { SelectField } from "./components/select-field.tsx";
 import { TextField } from "./components/text-field.tsx";
 import { CommentComposer } from "./comment-composer.tsx";
@@ -739,15 +740,13 @@ export function EditorScreen({
         >
           Comment on selection
         </Button>
-        <label className="resolved-toggle">
-          <input
-            checked={showResolved}
-            data-show-resolved=""
-            onChange={(event) => setShowResolved(event.currentTarget.checked)}
-            type="checkbox"
-          />
-          Show resolved threads
-        </label>
+        <CheckboxField
+          checked={showResolved}
+          className="resolved-toggle"
+          data-show-resolved=""
+          label="Show resolved threads"
+          onChange={(event) => setShowResolved(event.currentTarget.checked)}
+        />
         <div className="orphaned-comments" data-orphaned-comments="" hidden={orphaned.length === 0}>
           {orphaned.length === 0 ? null : (
             <p>
