@@ -1,0 +1,69 @@
+import { useEffect, useState } from "react";
+import type { CSSProperties } from "react";
+
+import type { PresenceDto } from "@earendil-works/jot-protocol";
+
+import type { AppStatus } from "../app-context.tsx";
+import { Button } from "./button.tsx";
+
+export interface AppHeaderProps {
+  readonly participants: readonly PresenceDto[];
+  readonly status: AppStatus;
+}
+
+export function AppHeader({ participants, status }: AppHeaderProps): React.JSX.Element {
+  const [theme, setTheme] = useState<"dark" | "light">(() =>
+    document.documentElement.dataset["theme"] === "dark" ? "dark" : "light",
+  );
+
+  useEffect(() => {
+    document.documentElement.dataset["theme"] = theme;
+    document
+      .querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+      ?.setAttribute("content", theme === "dark" ? "#151816" : "#fbfbfa");
+  }, [theme]);
+
+  const toggleTheme = (): void => {
+    setTheme((current) => {
+      const next = current === "dark" ? "light" : "dark";
+      localStorage.setItem("jot-theme", next);
+      return next;
+    });
+  };
+
+  return (
+    <header className="masthead">
+      <a className="wordmark" href="/" aria-label="Jot home">
+        JOT<span>/</span>
+      </a>
+      <div className="masthead__right">
+        <div className="participants" data-participants="" aria-label="Connected participants">
+          {participants.map((participant) => (
+            <span
+              className="participant"
+              key={participant.participantId}
+              style={{ "--participant": participant.color } as CSSProperties}
+              title={participant.displayName}
+            >
+              {participant.displayName.slice(0, 1).toUpperCase()}
+            </span>
+          ))}
+        </div>
+        <div className="api-state" role="status" aria-live="polite">
+          <span className="api-state__light" aria-hidden="true" />
+          <span data-api-status="">{status.label}</span>
+        </div>
+        <Button
+          aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+          data-theme-toggle=""
+          onClick={(event) => {
+            if (event.detail <= 1) toggleTheme();
+          }}
+          variant="icon"
+        >
+          ◐
+        </Button>
+      </div>
+    </header>
+  );
+}

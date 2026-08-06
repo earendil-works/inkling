@@ -13,6 +13,7 @@ import type { ApiClientService } from "./api.ts";
 import { AppContext } from "./app-context.tsx";
 import type { AppContextValue, AppStatus, ToastKind } from "./app-context.tsx";
 import { AuthenticationScreen } from "./auth-screen.tsx";
+import { AppHeader } from "./components/app-header.tsx";
 import { Button } from "./components/button.tsx";
 import { useEffectQuery } from "./effect-hooks.ts";
 import { installClientRouter } from "./navigation.ts";
@@ -68,9 +69,6 @@ export function App(): React.JSX.Element {
   const [participants, setParticipants] = useState<readonly PresenceDto[]>([]);
   const [toasts, setToasts] = useState<readonly ToastMessage[]>([]);
   const toastIdRef = useRef(0);
-  const [theme, setTheme] = useState<"dark" | "light">(() =>
-    document.documentElement.dataset["theme"] === "dark" ? "dark" : "light",
-  );
 
   useEffect(() => {
     const router = installClientRouter(isApplicationUrl, () =>
@@ -121,12 +119,6 @@ export function App(): React.JSX.Element {
     }
   }, [navigating]);
   useEffect(() => {
-    document.documentElement.dataset["theme"] = theme;
-    document
-      .querySelector<HTMLMetaElement>('meta[name="theme-color"]')
-      ?.setAttribute("content", theme === "dark" ? "#151816" : "#fbfbfa");
-  }, [theme]);
-  useEffect(() => {
     if (route.state.status === "failure" && route.state.data !== undefined) {
       showToast(route.state.error.message, "error");
     }
@@ -139,45 +131,7 @@ export function App(): React.JSX.Element {
 
   return (
     <AppContext.Provider value={context}>
-      <header className="masthead">
-        <a className="wordmark" href="/" aria-label="Jot home">
-          JOT<span>/</span>
-        </a>
-        <div className="masthead__right">
-          <div className="participants" data-participants="" aria-label="Connected participants">
-            {participants.map((participant) => (
-              <span
-                className="participant"
-                key={participant.participantId}
-                style={{ "--participant": participant.color } as React.CSSProperties}
-                title={participant.displayName}
-              >
-                {participant.displayName.slice(0, 1).toUpperCase()}
-              </span>
-            ))}
-          </div>
-          <div className="api-state" role="status" aria-live="polite">
-            <span className="api-state__light" aria-hidden="true" />
-            <span data-api-status="">{status.label}</span>
-          </div>
-          <Button
-            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
-            variant="icon"
-            data-theme-toggle=""
-            onClick={(event) => {
-              if (event.detail > 1) return;
-              setTheme((current) => {
-                const next = current === "dark" ? "light" : "dark";
-                localStorage.setItem("jot-theme", next);
-                return next;
-              });
-            }}
-            type="button"
-          >
-            ◐
-          </Button>
-        </div>
-      </header>
+      <AppHeader participants={participants} status={status} />
       <RouteView refresh={route.refresh} state={route.state} />
       <div className="toast-region" data-toasts="" role="status" aria-live="polite">
         {toasts.map((toast) => (
