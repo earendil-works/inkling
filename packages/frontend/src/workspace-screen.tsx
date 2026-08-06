@@ -4,12 +4,9 @@ import type { CatalogResponse } from "@earendil-works/jot-protocol";
 
 import type { ApiClientService } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
-import { Button } from "./components/button.tsx";
+import { CatalogControls } from "./components/catalog-controls.tsx";
 import { DocumentCatalog } from "./components/document-catalog.tsx";
-import { LogoutButton } from "./components/logout-button.tsx";
 import { NewDocumentControl } from "./components/new-document-control.tsx";
-import { SettingsDialog } from "./components/settings-dialog.tsx";
-import { TextField } from "./components/text-field.tsx";
 import { useEffectQuery } from "./effect-hooks.ts";
 
 export interface WorkspaceScreenProps {
@@ -25,7 +22,6 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
     api.listDocuments(deferredSearch),
     `catalog:${deferredSearch}`,
   );
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const catalog = catalogQuery.state.data ?? initialCatalog;
 
   useEffect(() => {
@@ -41,23 +37,8 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
         </div>
         <NewDocumentControl api={api} />
       </section>
-      <section className="catalog-tools" aria-label="Document tools">
-        <TextField
-          className="search-field"
-          data-search=""
-          label="Search"
-          onChange={(event) => setSearch(event.currentTarget.value)}
-          placeholder="Title, body, people, state…"
-          type="search"
-          value={search}
-        />
-        <Button variant="text" data-settings="" onClick={() => setSettingsOpen(true)} type="button">
-          API &amp; agents
-        </Button>
-        <LogoutButton api={api} />
-      </section>
+      <CatalogControls api={api} onSearchChange={setSearch} search={search} />
       <DocumentCatalog catalog={catalog} />
-      {settingsOpen ? <SettingsDialog api={api} onClose={() => setSettingsOpen(false)} /> : null}
     </main>
   );
 }
