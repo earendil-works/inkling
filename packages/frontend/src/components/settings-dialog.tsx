@@ -7,6 +7,7 @@ import type { ApiClientService, ApiError } from "../api.ts";
 import { useEffectAction, useEffectQuery } from "../effect-hooks.ts";
 import { Button } from "./button.tsx";
 import { ConfirmationDialog } from "./confirmation-dialog.tsx";
+import { DialogHeader } from "./dialog-header.tsx";
 import { FormError } from "./form-error.tsx";
 import { ModalDialog } from "./modal-dialog.tsx";
 import { TextField } from "./text-field.tsx";
@@ -51,14 +52,21 @@ export function SettingsDialog({ api, onClose }: SettingsDialogProps): React.JSX
 
   return (
     <>
-      <ModalDialog className="settings-dialog" data-settings-dialog="" onDismiss={onClose} open>
+      <ModalDialog
+        aria-labelledby="settings-dialog-title"
+        className="settings-dialog"
+        data-settings-dialog=""
+        onDismiss={onClose}
+        open
+      >
         <form data-settings-form="" onSubmit={submit}>
-          <div className="dialog-heading">
-            <p className="eyebrow">API keys / agent access</p>
-            <Button aria-label="Close" onClick={onClose} variant="icon">
-              ×
-            </Button>
-          </div>
+          <DialogHeader
+            closeLabel="Close settings"
+            eyebrow="API keys / agent access"
+            onClose={onClose}
+            title="Workspace settings"
+            titleId="settings-dialog-title"
+          />
           <div data-api-keys="">
             {keyQuery.state.status === "loading" && keys.length === 0 ? <p>Loading keys…</p> : null}
             {keys.length === 0 && keyQuery.state.status !== "loading" ? (

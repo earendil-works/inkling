@@ -8,6 +8,7 @@ import { useAppContext } from "../app-context.tsx";
 import { useEffectAction } from "../effect-hooks.ts";
 import { browserRuntime } from "../effect-runtime.ts";
 import { Button } from "./button.tsx";
+import { DialogHeader } from "./dialog-header.tsx";
 import { FormError } from "./form-error.tsx";
 import { ModalDialog } from "./modal-dialog.tsx";
 import { SelectField } from "./select-field.tsx";
@@ -50,6 +51,7 @@ export function SharingControl({
         Share
       </Button>
       <ModalDialog
+        aria-labelledby="sharing-dialog-title"
         className="sharing-dialog"
         onDismiss={dismiss}
         open={open}
@@ -77,20 +79,14 @@ export function SharingControl({
             });
           }}
         >
-          <div className="dialog-heading">
-            <div>
-              <p className="eyebrow">Capability access</p>
-              <h2>Share document</h2>
-            </div>
-            <Button
-              aria-label="Close sharing settings"
-              disabled={updateShare.state.pending}
-              onClick={dismiss}
-              variant="icon"
-            >
-              ×
-            </Button>
-          </div>
+          <DialogHeader
+            closeLabel="Close sharing settings"
+            disabled={updateShare.state.pending}
+            eyebrow="Capability access"
+            onClose={dismiss}
+            title="Share document"
+            titleId="sharing-dialog-title"
+          />
           <SelectField
             label="Anyone with the capability link can"
             onChange={(event) => {

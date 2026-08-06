@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { Button } from "./button.tsx";
+import { DialogHeader } from "./dialog-header.tsx";
 import { ModalDialog } from "./modal-dialog.tsx";
 import { TextField } from "./text-field.tsx";
 
@@ -18,7 +19,12 @@ export function GuestIdentityDialog({
   const [displayName, setDisplayName] = useState("");
 
   return (
-    <ModalDialog className="guest-identity-dialog" onDismiss={onCancel} open={open}>
+    <ModalDialog
+      aria-labelledby="guest-identity-dialog-title"
+      className="guest-identity-dialog"
+      onDismiss={onCancel}
+      open={open}
+    >
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -26,15 +32,13 @@ export function GuestIdentityDialog({
           if (name !== "") onIdentify(name);
         }}
       >
-        <div className="dialog-heading">
-          <div>
-            <p className="eyebrow">Shared document</p>
-            <h2>Join the discussion</h2>
-          </div>
-          <Button aria-label="Return to reader" onClick={onCancel} variant="icon">
-            ×
-          </Button>
-        </div>
+        <DialogHeader
+          closeLabel="Return to reader"
+          eyebrow="Shared document"
+          onClose={onCancel}
+          title="Join the discussion"
+          titleId="guest-identity-dialog-title"
+        />
         <TextField
           autoComplete="name"
           autoFocus

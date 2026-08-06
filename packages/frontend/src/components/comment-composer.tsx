@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./button.tsx";
+import { DialogHeader } from "./dialog-header.tsx";
 import { ModalDialog } from "./modal-dialog.tsx";
 import { TextareaField } from "./textarea-field.tsx";
 
@@ -45,6 +46,7 @@ export function CommentComposer({
 
   return (
     <ModalDialog
+      aria-labelledby="comment-composer-dialog-title"
       className="comment-composer-dialog"
       data-comment-composer-dialog=""
       onDismiss={onCancel}
@@ -59,22 +61,16 @@ export function CommentComposer({
           submit();
         }}
       >
-        <div className="comment-composer-heading">
-          <div>
-            <p className="eyebrow">Discussion</p>
-            <h2 data-comment-composer-title="">{title}</h2>
-          </div>
-          <Button
-            aria-label="Cancel comment"
-            variant="icon"
-            data-comment-cancel=""
-            disabled={pending}
-            onClick={onCancel}
-            type="button"
-          >
-            ×
-          </Button>
-        </div>
+        <DialogHeader
+          className="comment-composer-heading"
+          closeLabel="Cancel comment"
+          disabled={pending}
+          eyebrow="Discussion"
+          onClose={onCancel}
+          title={title}
+          titleDataAttributes={{ "data-comment-composer-title": "" }}
+          titleId="comment-composer-dialog-title"
+        />
         {quote === undefined || quote.length === 0 ? null : (
           <blockquote data-comment-composer-quote="">{quote}</blockquote>
         )}

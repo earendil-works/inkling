@@ -8,6 +8,7 @@ import { useEffectAction } from "../effect-hooks.ts";
 import { randomId } from "../ui.ts";
 import { Button } from "./button.tsx";
 import { CheckboxField } from "./checkbox-field.tsx";
+import { DialogHeader } from "./dialog-header.tsx";
 import { FormError } from "./form-error.tsx";
 import { ModalDialog } from "./modal-dialog.tsx";
 import { TextareaField } from "./textarea-field.tsx";
@@ -52,6 +53,7 @@ export function NewDocumentDialog({
 
   return (
     <ModalDialog
+      aria-labelledby="new-document-dialog-title"
       className="new-document"
       data-new-dialog=""
       onDismiss={onDismiss}
@@ -59,17 +61,14 @@ export function NewDocumentDialog({
       preventDismiss={createDocument.state.pending}
     >
       <form data-new-form="" onSubmit={submit}>
-        <div className="dialog-heading">
-          <p className="eyebrow">Begin a working head</p>
-          <Button
-            aria-label="Close"
-            disabled={createDocument.state.pending}
-            onClick={onDismiss}
-            variant="icon"
-          >
-            ×
-          </Button>
-        </div>
+        <DialogHeader
+          closeLabel="Close new document dialog"
+          disabled={createDocument.state.pending}
+          eyebrow="Begin a working head"
+          onClose={onDismiss}
+          title="New document"
+          titleId="new-document-dialog-title"
+        />
         <TextField
           autoFocus
           label="Title"
