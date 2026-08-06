@@ -10,7 +10,6 @@ import * as Y from "yjs";
 
 import { createCommentAnchor, resolveCommentAnchor } from "@earendil-works/jot-collaboration";
 import type {
-  AttachmentMetadataDto,
   CommentStateDto,
   DocumentMetadataDto,
   DocumentResponse,
@@ -23,6 +22,7 @@ import type { ApiClientService } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
 import { makeCollaborationClient } from "./collaboration.ts";
 import type { CollaborationClient, ConnectionState } from "./collaboration.ts";
+import { AttachmentButton } from "./components/attachment-button.tsx";
 import { ButtonLink } from "./components/button-link.tsx";
 import { Button } from "./components/button.tsx";
 import { CheckboxField } from "./components/checkbox-field.tsx";
@@ -408,9 +408,6 @@ export function EditorScreen({
       { onFailure: (error) => showToast(error.message, "error"), onSuccess: setMetadata },
     );
   };
-  const attachmentAction = useEffectAction<File, AttachmentMetadataDto, ApiError>((file) =>
-    api.uploadAttachment(metadata.id, file),
-  );
   const publishAction = useEffectAction<void, DocumentMetadataDto, ApiError>(() =>
     api.publish(metadata.id),
   );
@@ -488,38 +485,24 @@ export function EditorScreen({
           >
             Preview
           </Button>
-          <label className="toolbar-button attachment-button">
-            Attach
-            <input
-              accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain"
-              data-attachment=""
-              disabled={!canEdit}
-              onChange={(event) => {
-                const input = event.currentTarget;
-                const file = input.files?.[0];
-                if (file === undefined) return;
-                attachmentAction.execute(file, {
-                  onFailure: (error) => showToast(error.message, "error"),
-                  onSuccess: (attachment) => {
-                    const session = sessionRef.current;
-                    if (session === undefined) return;
-                    const selection = session.editor.state.selection.main;
-                    const label = attachment.filename.replaceAll("[", "").replaceAll("]", "");
-                    const insertedMarkdown = attachment.mediaType.startsWith("image/")
-                      ? `![${label}](${attachment.url})`
-                      : `[${label}](${attachment.url})`;
-                    session.editor.dispatch({
-                      changes: { from: selection.from, insert: insertedMarkdown, to: selection.to },
-                      selection: { anchor: selection.from + insertedMarkdown.length },
-                    });
-                    input.value = "";
-                    showToast("Attachment uploaded and linked.", "success");
-                  },
-                });
-              }}
-              type="file"
-            />
-          </label>
+          <AttachmentButton
+            api={api}
+            disabled={!canEdit}
+            documentId={metadata.id}
+            onUploaded={(attachment) => {
+              const session = sessionRef.current;
+              if (session === undefined) return;
+              const selection = session.editor.state.selection.main;
+              const label = attachment.filename.replaceAll("[", "").replaceAll("]", "");
+              const insertedMarkdown = attachment.mediaType.startsWith("image/")
+                ? `![${label}](${attachment.url})`
+                : `[${label}](${attachment.url})`;
+              session.editor.dispatch({
+                changes: { from: selection.from, insert: insertedMarkdown, to: selection.to },
+                selection: { anchor: selection.from + insertedMarkdown.length },
+              });
+            }}
+          />
           <Button
             variant="toolbar"
             onClick={() => commentMenuRef.current?.showPopover()}
