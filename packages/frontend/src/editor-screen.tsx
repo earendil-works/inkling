@@ -25,6 +25,7 @@ import { Button } from "./components/button.tsx";
 import { CheckboxField } from "./components/checkbox-field.tsx";
 import { CommentThreadCard } from "./components/comment-thread-card.tsx";
 import { EditorToolbar } from "./components/editor-toolbar.tsx";
+import { connectionLabel, EditorWorkbench } from "./components/editor-workbench.tsx";
 import { CommentComposer } from "./comment-composer.tsx";
 import {
   commentDecorationsExtension,
@@ -464,36 +465,13 @@ export function EditorScreen({
         previewOpen={previewOpen}
         shared={shared}
       />
-      <section className="workbench">
-        <div className="source-pane" data-source-pane="">
-          <div className="pane-label">
-            <span>Markdown</span>
-            <span data-save-state="">{connectionLabel(connectionState)}</span>
-          </div>
-          <div className="editor-host" data-editor="" ref={editorHostRef} />
-        </div>
-        <div className="preview-pane" data-preview-pane="">
-          <div className="pane-label">
-            <span>Preview</span>
-            <Button
-              aria-label="Close preview"
-              variant="icon"
-              data-preview-close=""
-              onClick={() => setPreviewOpen(false)}
-              type="button"
-            >
-              ×
-            </Button>
-          </div>
-          <article
-            className="markdown-body"
-            data-preview=""
-            onKeyUp={() => updatePreviewSelection(previewRef.current, setPreviewSelection)}
-            onPointerUp={() => updatePreviewSelection(previewRef.current, setPreviewSelection)}
-            ref={previewRef}
-          />
-        </div>
-      </section>
+      <EditorWorkbench
+        connectionState={connectionState}
+        editorHostRef={editorHostRef}
+        onClosePreview={() => setPreviewOpen(false)}
+        onPreviewSelection={setPreviewSelection}
+        previewRef={previewRef}
+      />
       <div
         aria-label="Comment controls"
         className="comment-menu"
@@ -634,24 +612,6 @@ export function EditorScreen({
       )}
     </main>
   );
-}
-
-function connectionLabel(state: ConnectionState): string {
-  const labels: Record<ConnectionState, string> = {
-    connecting: "Connecting",
-    disconnected: "Offline — edits unsaved",
-    ready: "Saved",
-    saving: "Saving…",
-  };
-  return labels[state];
-}
-
-function updatePreviewSelection(
-  preview: HTMLElement | null,
-  setSelection: (range: PreviewSourceRange | undefined) => void,
-): void {
-  if (preview === null) return;
-  window.setTimeout(() => setSelection(selectedPreviewSourceRange(preview)));
 }
 
 function uiError(message: string): ApiError {
