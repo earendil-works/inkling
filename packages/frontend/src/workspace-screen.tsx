@@ -1,4 +1,4 @@
-import { useDeferredValue, useState } from "react";
+import { useState } from "react";
 
 import type { CatalogResponse } from "@earendil-works/jot-protocol";
 
@@ -6,7 +6,6 @@ import type { ApiClientService } from "./api.ts";
 import { CatalogControls } from "./components/catalog-controls.tsx";
 import { DocumentCatalog } from "./components/document-catalog.tsx";
 import { NewDocumentControl } from "./components/new-document-control.tsx";
-import { useEffectQuery } from "./effect-hooks.ts";
 
 export interface WorkspaceScreenProps {
   readonly api: ApiClientService;
@@ -14,13 +13,7 @@ export interface WorkspaceScreenProps {
 }
 
 export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): React.JSX.Element {
-  const [search, setSearch] = useState("");
-  const deferredSearch = useDeferredValue(search);
-  const catalogQuery = useEffectQuery(
-    api.listDocuments(deferredSearch),
-    `catalog:${deferredSearch}`,
-  );
-  const catalog = catalogQuery.state.data ?? initialCatalog;
+  const [catalog, setCatalog] = useState(initialCatalog);
 
   return (
     <main className="workspace-layout" id="app" tabIndex={-1}>
@@ -31,7 +24,7 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
         </div>
         <NewDocumentControl api={api} />
       </section>
-      <CatalogControls api={api} onSearchChange={setSearch} search={search} />
+      <CatalogControls api={api} initialCatalog={initialCatalog} onResultsChange={setCatalog} />
       <DocumentCatalog catalog={catalog} />
     </main>
   );

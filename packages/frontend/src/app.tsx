@@ -150,7 +150,7 @@ function loadRoute(url: URL): Effect.Effect<RouteModel, ApiError> {
         };
         return Effect.succeed(model);
       }
-      return api.listDocuments().pipe(
+      return api.listDocuments(url.searchParams.get("q") ?? "").pipe(
         Effect.map((catalog): RouteModel => ({
           account: authentication.principal,
           api,

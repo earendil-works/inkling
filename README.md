@@ -94,6 +94,30 @@ pnpm run build
 pnpm --filter @earendil-works/jot-runtime-cloudflare run deploy
 ```
 
+## Search
+
+Press `/` or <kbd>Cmd/Ctrl</kbd>+<kbd>K</kbd> from the workspace to focus search. Plain terms search titles, complete working-head bodies, RFC numbers, labels, states, and people. Terms are combined with AND; quote a phrase to keep it together and prefix a term or filter with `-` to exclude it.
+
+Search supports Gmail-style filters:
+
+| Filter                    | Example                                                                     |
+| ------------------------- | --------------------------------------------------------------------------- |
+| Label                     | `label:platform` or `tag:"machine learning"`                                |
+| Lifecycle state           | `state:discussion`                                                          |
+| Visibility or sensitivity | `visibility:workspace sensitivity:confidential`                             |
+| People                    | `author:name@example.com`, `reviewer:alex`, `approver:sam`, or `person:lee` |
+| RFC number                | `rfc:42`                                                                    |
+| Document kind             | `is:rfc`, `is:note`, `is:published`, or `is:unpublished`                    |
+| Presence                  | `has:rfc` or `has:publication`                                              |
+
+For example:
+
+```text
+label:platform state:discussion "durable checkpoint" -sensitivity:confidential
+```
+
+Search reads the workspace's derived catalog projection, which indexes each complete normalized working head and its structured metadata. It does not load every document authority for each query, and the projection can be rebuilt from authoritative checkpoints.
+
 ## Checks
 
 ```sh

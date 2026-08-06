@@ -99,6 +99,30 @@ test(
       const renderedKeyword = first.locator("[data-preview] .tok-keyword");
       assert.equal(await renderedKeyword.textContent(), "const");
       assert.equal(await renderedKeyword.getAttribute("class"), editorKeywordClass);
+      await first.getByRole("link", { name: "All documents" }).click();
+      await first.waitForSelector("[data-document-search]");
+      await first.keyboard.press("/");
+      const documentSearch = first.locator("[data-search]");
+      assert.equal(
+        await documentSearch.evaluate((input) => input === document.activeElement),
+        true,
+      );
+      await documentSearch.fill("lab");
+      await first.waitForSelector("[data-search-completions]");
+      assert.equal(
+        await first.locator("[data-search-completions] code").first().textContent(),
+        "label:",
+      );
+      await documentSearch.fill("rfc:1 answer");
+      await first.waitForSelector("[data-search-result]");
+      assert.match(
+        await first.locator("[data-search-result]").first().innerText(),
+        /Browser collaboration/u,
+      );
+      assert.match(await first.locator("[data-search-result]").first().innerText(), /answer/u);
+      assert.equal(new URL(first.url()).searchParams.get("q"), "rfc:1 answer");
+      await documentSearch.press("Enter");
+      await first.waitForURL(/\/documents\/[^/]+$/u);
       await first.locator("[data-open-editor]").click();
       await first.waitForURL(/\/documents\/[^/]+\/edit$/u);
       await first.waitForFunction(
