@@ -21,8 +21,8 @@ import type { ApiClientService } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
 import { makeCollaborationClient } from "./collaboration.ts";
 import type { CollaborationClient, ConnectionState } from "./collaboration.ts";
-import { Button } from "./components/button.tsx";
-import { CheckboxField } from "./components/checkbox-field.tsx";
+import { CommentControls } from "./components/comment-controls.tsx";
+import type { CommentControlsHandle } from "./components/comment-controls.tsx";
 import { CommentThreadCard } from "./components/comment-thread-card.tsx";
 import { EditorToolbar } from "./components/editor-toolbar.tsx";
 import { connectionLabel, EditorWorkbench } from "./components/editor-workbench.tsx";
@@ -88,7 +88,7 @@ export function EditorScreen({
   const { setParticipants, setStatus, showToast } = useAppContext();
   const editorHostRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLElement>(null);
-  const commentMenuRef = useRef<HTMLDivElement>(null);
+  const commentControlsRef = useRef<CommentControlsHandle>(null);
   const sessionRef = useRef<EditorSession | undefined>(undefined);
   const participantMapRef = useRef(new Map<string, PresenceDto>());
   const [metadata, setMetadata] = useState(initial.metadata);
@@ -347,9 +347,7 @@ export function EditorScreen({
     setComposer(undefined);
     setPreviewSelection(undefined);
     document.getSelection()?.removeAllRanges();
-    if (commentMenuRef.current?.matches(":popover-open") === true) {
-      commentMenuRef.current.hidePopover();
-    }
+    commentControlsRef.current?.close();
   };
   const submitComposer = (value: string): void => {
     if (composer === undefined) return;
@@ -452,7 +450,7 @@ export function EditorScreen({
         }}
         onMetadataChanged={setMetadata}
         onMetadataUpdate={updateMetadata}
-        onOpenComments={() => commentMenuRef.current?.showPopover()}
+        onOpenComments={() => commentControlsRef.current?.open()}
         onSharingChanged={(response) =>
           setMetadata((current) => ({
             ...current,
@@ -472,67 +470,14 @@ export function EditorScreen({
         onPreviewSelection={setPreviewSelection}
         previewRef={previewRef}
       />
-      <div
-        aria-label="Comment controls"
-        className="comment-menu"
-        id="comment-menu"
-        popover="auto"
-        ref={commentMenuRef}
-      >
-        <div className="comment-menu__heading">
-          <div>
-            <p className="eyebrow">Anchored discussion</p>
-            <b>Comments in context</b>
-          </div>
-          <Button
-            aria-label="Close comment controls"
-            variant="icon"
-            onClick={() => commentMenuRef.current?.hidePopover()}
-            type="button"
-          >
-            ×
-          </Button>
-        </div>
-        <p>Select Markdown or rendered text. Comments stay attached as the document changes.</p>
-        <Button
-          variant="primary"
-          data-comment-new=""
-          disabled={!canComment}
-          onClick={commentOnSelection}
-          type="button"
-        >
-          Comment on selection
-        </Button>
-        <CheckboxField
-          checked={showResolved}
-          className="resolved-toggle"
-          data-show-resolved=""
-          label="Show resolved threads"
-          onChange={(event) => setShowResolved(event.currentTarget.checked)}
-        />
-        <div className="orphaned-comments" data-orphaned-comments="" hidden={orphaned.length === 0}>
-          {orphaned.length === 0 ? null : (
-            <p>
-              <b>
-                {orphaned.length} orphaned {orphaned.length === 1 ? "thread" : "threads"}
-              </b>
-              <br />
-              Its original text was removed.
-            </p>
-          )}
-          {orphaned.map((projection) => (
-            <Button
-              data-comment-bubble={projection.thread.id}
-              data-comment-surface="preview"
-              key={projection.thread.id}
-              type="button"
-            >
-              <span>{projection.thread.messages[0]?.authorDisplayName ?? "Unknown author"}</span>
-              {projection.thread.messages[0]?.body ?? "Open comment"}
-            </Button>
-          ))}
-        </div>
-      </div>
+      <CommentControls
+        canComment={canComment}
+        onCommentOnSelection={commentOnSelection}
+        onShowResolvedChange={setShowResolved}
+        orphaned={orphaned}
+        ref={commentControlsRef}
+        showResolved={showResolved}
+      />
       <CommentThreadCard
         anchorRef={activeAnchorRef}
         anchorRevision={activeAnchorRevision}
