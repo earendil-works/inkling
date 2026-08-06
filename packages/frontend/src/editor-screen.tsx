@@ -1,26 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { markdown } from "@codemirror/lang-markdown";
-import { Compartment, EditorState } from "@codemirror/state";
-import { oneDark } from "@codemirror/theme-one-dark";
-import { EditorView, basicSetup } from "codemirror";
 import { Effect, Fiber } from "effect";
-import { Awareness } from "y-protocols/awareness";
-import { yCollab } from "y-codemirror.next";
-import * as Y from "yjs";
 
 import { createCommentAnchor, resolveCommentAnchor } from "@earendil-works/jot-collaboration";
 import type {
   CommentStateDto,
   DocumentMetadataDto,
   DocumentResponse,
-  PresenceDto,
 } from "@earendil-works/jot-protocol";
 
 import { ApiError } from "./api.ts";
 import type { ApiClientService } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
-import { makeCollaborationClient } from "./collaboration.ts";
-import type { CollaborationClient, ConnectionState } from "./collaboration.ts";
+import type { ConnectionState } from "./collaboration.ts";
 import { CommentControls } from "./components/comment-controls.tsx";
 import type { CommentControlsHandle } from "./components/comment-controls.tsx";
 import { CommentComposer } from "./components/comment-composer.tsx";
@@ -28,7 +19,6 @@ import { CommentThreadCard } from "./components/comment-thread-card.tsx";
 import { EditorToolbar } from "./components/editor-toolbar.tsx";
 import { connectionLabel, EditorWorkbench } from "./components/editor-workbench.tsx";
 import {
-  commentDecorationsExtension,
   renderPreviewCommentBubbles,
   renderPreviewCommentComposer,
   selectedPreviewSourceRange,
@@ -38,15 +28,8 @@ import type { PreviewSourceRange, ProjectedCommentThread } from "./comments.ts";
 import { useEffectAction } from "./effect-hooks.ts";
 import { browserRuntime } from "./effect-runtime.ts";
 import { renderMermaid, useRenderedMarkdown } from "./markdown.tsx";
-import { colorFor, guestName, randomId } from "./ui.ts";
-
-interface EditorSession {
-  readonly awareness: Awareness;
-  readonly body: Y.Text;
-  readonly client: CollaborationClient | undefined;
-  readonly document: Y.Doc;
-  readonly editor: EditorView;
-}
+import { guestName } from "./ui.ts";
+import { useEditorSession } from "./use-editor-session.ts";
 
 type ComposerRequest =
   | { readonly kind: "create"; readonly quote: string; readonly range: PreviewSourceRange }
@@ -86,17 +69,11 @@ export function EditorScreen({
   shared,
 }: EditorScreenProps): React.JSX.Element {
   const { setParticipants, setStatus, showToast } = useAppContext();
-  const editorHostRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLElement>(null);
   const commentControlsRef = useRef<CommentControlsHandle>(null);
-  const sessionRef = useRef<EditorSession | undefined>(undefined);
-  const participantMapRef = useRef(new Map<string, PresenceDto>());
   const [metadata, setMetadata] = useState(initial.metadata);
   const [comments, setComments] = useState(initial.comments);
   const [permissions, setPermissions] = useState<readonly string[]>();
-  const [body, setBody] = useState(initial.body);
-  const [yRevision, setYRevision] = useState(0);
-  const [sessionRevision, setSessionRevision] = useState(0);
   const [previewRevision, setPreviewRevision] = useState(0);
   const [projectedComments, setProjectedComments] = useState<readonly ProjectedCommentThread[]>([]);
   const [showResolved, setShowResolved] = useState(false);
@@ -109,117 +86,29 @@ export function EditorScreen({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
   const initiallyEditable = !shared || initial.metadata.sharing.access === "edit";
+  const { body, editorHostRef, sessionRef, sessionRevision, yRevision } = useEditorSession({
+    capabilityToken,
+    documentId: initial.metadata.id,
+    initialBody: initial.body,
+    initiallyEditable,
+    onComments: setComments,
+    onError: (message) => showToast(message, "error"),
+    onMetadata: setMetadata,
+    onParticipants: setParticipants,
+    onPermissions: (actions) => {
+      setPermissions(actions);
+      if (!actions.includes("edit-body")) setPreviewOpen(false);
+    },
+    onState: (state) => {
+      setConnectionState(state);
+      setStatus({ label: connectionLabel(state), state: state === "ready" ? "ready" : state });
+    },
+    shared,
+  });
   const canEdit = permissions?.includes("edit-body") ?? initiallyEditable;
   const canComment = permissions?.includes("comment") ?? false;
   const canEditMetadata = permissions?.includes("edit-metadata") ?? !shared;
   const rendered = useRenderedMarkdown(body, true);
-
-  useEffect(() => {
-    const parent = editorHostRef.current;
-    if (parent === null) return;
-    const yDocument = new Y.Doc();
-    const yBody = yDocument.getText("body");
-    const awareness = new Awareness(yDocument);
-    const editable = new Compartment();
-    const theme = new Compartment();
-    const participantId = randomId("participant");
-    const participantColor = colorFor(participantId);
-    let client: CollaborationClient | undefined;
-    const editor = new EditorView({
-      parent,
-      state: EditorState.create({
-        extensions: [
-          basicSetup,
-          markdown(),
-          yCollab(yBody, awareness),
-          commentDecorationsExtension,
-          editable.of(EditorView.editable.of(initiallyEditable)),
-          theme.of(document.documentElement.dataset["theme"] === "dark" ? oneDark : []),
-          EditorView.lineWrapping,
-          EditorView.updateListener.of((update) => {
-            if (!update.selectionSet || client === undefined) return;
-            const selection = update.state.selection.main;
-            browserRuntime.runFork(
-              client.sendPresence({
-                color: participantColor,
-                displayName: shared ? guestName() : "Owner",
-                participantId,
-                selectionEnd: selection.to,
-                selectionStart: selection.from,
-              }),
-            );
-          }),
-        ],
-      }),
-    });
-    const updateBody = (): void => {
-      setBody(yBody.toString());
-      setYRevision((revision) => revision + 1);
-    };
-    yBody.observe(updateBody);
-    sessionRef.current = { awareness, body: yBody, client, document: yDocument, editor };
-    setSessionRevision((revision) => revision + 1);
-
-    const collaborationFiber = browserRuntime.runFork(
-      makeCollaborationClient(
-        initial.metadata.id,
-        yDocument,
-        capabilityToken,
-        shared ? guestName() : undefined,
-        {
-          onComments: setComments,
-          onError: (message) => showToast(message, "error"),
-          onMetadata: setMetadata,
-          onPermissions: (actions) => {
-            setPermissions(actions);
-            const editableNow = actions.includes("edit-body");
-            editor.dispatch({ effects: editable.reconfigure(EditorView.editable.of(editableNow)) });
-            if (!editableNow) setPreviewOpen(false);
-          },
-          onPresence: (presence) => {
-            participantMapRef.current.set(presence.participantId, presence);
-            setParticipants([...participantMapRef.current.values()].slice(0, 6));
-          },
-          onState: (state) => {
-            setConnectionState(state);
-            setStatus({
-              label: connectionLabel(state),
-              state: state === "ready" ? "ready" : state,
-            });
-          },
-        },
-      ).pipe(
-        Effect.tap((created) =>
-          Effect.sync(() => {
-            client = created;
-            sessionRef.current = { awareness, body: yBody, client, document: yDocument, editor };
-          }),
-        ),
-        Effect.catchAll((error) => Effect.sync(() => showToast(error.message, "error"))),
-      ),
-    );
-
-    return () => {
-      browserRuntime.runFork(Fiber.interrupt(collaborationFiber));
-      if (client !== undefined) browserRuntime.runFork(client.close);
-      yBody.unobserve(updateBody);
-      editor.destroy();
-      awareness.destroy();
-      yDocument.destroy();
-      sessionRef.current = undefined;
-      participantMapRef.current.clear();
-      setParticipants([]);
-    };
-  }, [
-    api,
-    capabilityToken,
-    initial.metadata.id,
-    initiallyEditable,
-    setParticipants,
-    setStatus,
-    shared,
-    showToast,
-  ]);
 
   useEffect(() => {
     const preview = previewRef.current;
