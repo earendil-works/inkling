@@ -17,8 +17,11 @@ import {
   emptyCommentState,
   encodeBase62,
   IdGenerator,
+  normalizeSearchText,
+  parseCatalogSearchQuery,
   personId,
   reserveDocument,
+  searchCatalog,
   SecretHasher,
   SecureToken,
   emptyAuthenticationState,
@@ -27,9 +30,36 @@ import {
   updateDocumentMetadata,
   updateSharingPolicy,
 } from "../src/index.ts";
-import type { CommentActor, Principal } from "../src/index.ts";
+import type {
+  CatalogSummary,
+  CommentActor,
+  DocumentMetadata,
+  Principal,
+  WorkspaceCatalogState,
+} from "../src/index.ts";
 
 const now = "2026-01-02T03:04:05.000Z";
+
+function catalogSummary(metadata: DocumentMetadata, body: string): CatalogSummary {
+  return {
+    approvers: metadata.approvers,
+    authors: metadata.authors,
+    documentId: metadata.id,
+    excerpt: normalizeSearchText(body).slice(0, 240),
+    labels: metadata.labels,
+    metadata,
+    normalizedBody: normalizeSearchText(body),
+    publishedRevision: metadata.publishedRevision,
+    revision: metadata.headRevision,
+    reviewers: metadata.reviewers,
+    rfcNumber: metadata.rfcNumber,
+    sensitivity: metadata.sensitivity,
+    state: metadata.lifecycleState,
+    title: metadata.title,
+    updatedAt: metadata.updatedAt,
+    visibility: metadata.visibility,
+  };
+}
 
 test("identifiers use the canonical base62 alphabet", () => {
   assert.equal(encodeBase62(Uint8Array.of(0)), "0");
@@ -183,6 +213,75 @@ test("RFC reservations are idempotent and numbers are never reused", async () =>
   assert.equal(numbered.rfcNumber, 2);
   assert.equal(numbered.headRevision, 1);
   assert.equal(await Effect.runPromise(assignRfcNumber(numbered, 2, now)), numbered);
+});
+
+test("catalog search covers full bodies and Gmail-style metadata filters", async () => {
+  const authorId = await Effect.runPromise(personId("armin@example.com"));
+  const author = {
+    displayName: "A. Ronacher",
+    email: "armin@example.com",
+    id: authorId,
+  };
+  const rfcMetadata = await Effect.runPromise(
+    createDocumentMetadata(
+      {
+        authors: [author],
+        id: "document_search_rfc",
+        labels: ["machine-learning", "platform"],
+        rfcNumber: 42,
+        title: "Durable Search",
+      },
+      now,
+    ),
+  );
+  const noteMetadata = await Effect.runPromise(
+    createDocumentMetadata(
+      {
+        id: "document_search_note",
+        labels: ["platform"],
+        sensitivity: "confidential",
+        title: "Private planning notes",
+      },
+      now,
+    ),
+  );
+  const deepBody = `${"ordinary introduction ".repeat(30)}durable checkpoint recovery details`;
+  const state: WorkspaceCatalogState = {
+    entries: [
+      {
+        creationKey: "search-rfc",
+        documentId: rfcMetadata.id,
+        rfcNumber: rfcMetadata.rfcNumber,
+        status: "active",
+        summary: catalogSummary(rfcMetadata, deepBody),
+      },
+      {
+        creationKey: "search-note",
+        documentId: noteMetadata.id,
+        status: "active",
+        summary: catalogSummary(noteMetadata, "confidential budget planning"),
+      },
+    ],
+    nextRfcNumber: 43,
+    people: [{ aliases: ["mitsuhiko"], person: author }],
+  };
+
+  assert.deepEqual(parseCatalogSearchQuery('label:"machine learning" -state:abandoned'), {
+    terms: [
+      { field: "label", negated: false, value: "machine learning" },
+      { field: "state", negated: true, value: "abandoned" },
+    ],
+  });
+  const fullText = searchCatalog(state, '"durable checkpoint"');
+  assert.equal(fullText[0]?.documentId, rfcMetadata.id);
+  assert.match(fullText[0]?.excerpt ?? "", /durable checkpoint/u);
+  assert.equal(
+    searchCatalog(state, "label:platform -is:confidential")[0]?.documentId,
+    rfcMetadata.id,
+  );
+  assert.equal(searchCatalog(state, "author:mitsuhiko")[0]?.documentId, rfcMetadata.id);
+  assert.equal(searchCatalog(state, "rfc:0042")[0]?.documentId, rfcMetadata.id);
+  assert.equal(searchCatalog(state, "is:note")[0]?.documentId, noteMetadata.id);
 });
 
 test("comment authors may edit their messages while stable anchors remain structured", async () => {

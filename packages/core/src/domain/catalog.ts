@@ -68,6 +68,32 @@ export interface CatalogSearchOptions {
   readonly limit?: number | undefined;
 }
 
+export const catalogSearchFields = [
+  "label",
+  "state",
+  "visibility",
+  "sensitivity",
+  "author",
+  "reviewer",
+  "approver",
+  "person",
+  "rfc",
+  "is",
+  "has",
+] as const;
+
+export type CatalogSearchField = (typeof catalogSearchFields)[number];
+
+export interface CatalogSearchTerm {
+  readonly field?: CatalogSearchField | undefined;
+  readonly negated: boolean;
+  readonly value: string;
+}
+
+export interface CatalogSearchQuery {
+  readonly terms: readonly CatalogSearchTerm[];
+}
+
 export function emptyWorkspaceCatalog(startingRfcNumber = 1): WorkspaceCatalogState {
   return { entries: [], nextRfcNumber: startingRfcNumber, people: [] };
 }
@@ -180,7 +206,7 @@ export function searchCatalog(
   query: string,
   options: CatalogSearchOptions = {},
 ): readonly CatalogSummary[] {
-  const terms = normalizeSearchText(query).split(" ").filter(Boolean);
+  const parsed = parseCatalogSearchQuery(query);
   const limit = Math.max(1, Math.min(options.limit ?? 100, 500));
   return state.entries
     .filter((entry) => options.includeDeleted === true || entry.status === "active")
@@ -190,15 +216,32 @@ export function searchCatalog(
         options.publicOnly !== true ||
         (summary.visibility === "public" && summary.publishedRevision !== undefined),
     )
-    .map((summary) => ({ score: scoreSummary(summary, terms, state.people), summary }))
-    .filter(({ score }) => terms.length === 0 || score > 0)
+    .flatMap((summary) => {
+      const score = scoreSummary(summary, parsed, state.people);
+      return score === undefined ? [] : [{ score, summary }];
+    })
     .toSorted(
       (left, right) =>
         right.score - left.score ||
         Date.parse(right.summary.updatedAt) - Date.parse(left.summary.updatedAt),
     )
     .slice(0, limit)
-    .map(({ summary }) => summary);
+    .map(({ summary }) => withMatchingExcerpt(summary, parsed));
+}
+
+export function parseCatalogSearchQuery(query: string): CatalogSearchQuery {
+  return {
+    terms: tokenizeSearchQuery(query).flatMap((rawToken): readonly CatalogSearchTerm[] => {
+      const negated = rawToken.startsWith("-") && rawToken.length > 1;
+      const token = negated ? rawToken.slice(1) : rawToken;
+      const separator = token.indexOf(":");
+      const rawField = separator === -1 ? undefined : token.slice(0, separator).toLowerCase();
+      const field = rawField === undefined ? undefined : searchFieldAliases[rawField];
+      const rawValue = field === undefined ? token : token.slice(separator + 1);
+      const value = normalizeSearchText(rawValue);
+      return value === "" ? [] : [{ field, negated, value }];
+    }),
+  };
 }
 
 export function publicCatalog(state: WorkspaceCatalogState): readonly CatalogSummary[] {
@@ -238,45 +281,274 @@ export function normalizeSearchText(value: string): string {
     .trim();
 }
 
+interface IndexedCatalogSummary {
+  readonly all: string;
+  readonly approvers: string;
+  readonly authors: string;
+  readonly body: string;
+  readonly labels: readonly string[];
+  readonly people: string;
+  readonly reviewers: string;
+  readonly rfc: string;
+  readonly sensitivity: string;
+  readonly state: string;
+  readonly title: string;
+  readonly visibility: string;
+}
+
+const searchFieldAliases: Readonly<Record<string, CatalogSearchField | undefined>> = {
+  approver: "approver",
+  author: "author",
+  from: "author",
+  has: "has",
+  is: "is",
+  label: "label",
+  person: "person",
+  reviewer: "reviewer",
+  rfc: "rfc",
+  sensitivity: "sensitivity",
+  state: "state",
+  status: "state",
+  tag: "label",
+  visibility: "visibility",
+};
+
 function scoreSummary(
   summary: CatalogSummary,
-  terms: readonly string[],
+  query: CatalogSearchQuery,
   directory: readonly PeopleDirectoryEntry[],
-): number {
-  if (terms.length === 0) {
-    return 1;
+): number | undefined {
+  if (query.terms.length === 0) return 1;
+  const indexed = indexSummary(summary, directory);
+  let score = 0;
+  for (const term of query.terms) {
+    const matched =
+      term.field === undefined
+        ? indexed.all.includes(term.value)
+        : matchesSearchFilter(summary, indexed, term.field, term.value);
+    if (term.negated ? matched : !matched) return undefined;
+    if (!term.negated) {
+      score +=
+        term.field === undefined
+          ? scoreFreeText(summary, indexed, term.value)
+          : scoreFilter(term.field);
+    }
   }
-  const people = [...summary.authors, ...summary.reviewers, ...summary.approvers]
-    .flatMap((person) =>
-      [person.displayName, person.email].concat(
-        directory.find((entry) => entry.person.id === person.id)?.aliases ?? [],
-      ),
-    )
-    .join(" ");
-  const weighted = [
-    [String(summary.rfcNumber ?? ""), 12],
-    [summary.title, 10],
-    [summary.labels.join(" "), 8],
-    [people, 6],
-    [summary.state, 5],
-    [summary.visibility, 4],
-    [summary.excerpt, 3],
-    [summary.normalizedBody, 1],
-  ] as const;
-  return terms.every((term) =>
-    weighted.some(([value]) => normalizeSearchText(value).includes(term)),
-  )
-    ? terms.reduce(
-        (score, term) =>
-          score +
-          weighted.reduce(
-            (fieldScore, [value, weight]) =>
-              fieldScore + (normalizeSearchText(value).includes(term) ? weight : 0),
-            0,
+  return score;
+}
+
+function indexSummary(
+  summary: CatalogSummary,
+  directory: readonly PeopleDirectoryEntry[],
+): IndexedCatalogSummary {
+  const personText = (people: readonly PersonReference[]): string =>
+    normalizeSearchText(
+      people
+        .flatMap((person) =>
+          [person.displayName, person.email].concat(
+            directory.find((entry) => entry.person.id === person.id)?.aliases ?? [],
           ),
-        0,
-      )
-    : 0;
+        )
+        .join(" "),
+    );
+  const authors = personText(summary.authors);
+  const reviewers = personText(summary.reviewers);
+  const approvers = personText(summary.approvers);
+  const labels = summary.labels.map(normalizeSearchText);
+  const rfc =
+    summary.rfcNumber === undefined
+      ? ""
+      : normalizeSearchText(
+          `rfc ${summary.rfcNumber} ${String(summary.rfcNumber).padStart(4, "0")}`,
+        );
+  const title = normalizeSearchText(summary.title);
+  const state = normalizeSearchText(summary.state);
+  const visibility = normalizeSearchText(summary.visibility);
+  const sensitivity = normalizeSearchText(summary.sensitivity);
+  const people = `${authors} ${reviewers} ${approvers}`.trim();
+  return {
+    all: [
+      rfc,
+      title,
+      labels.join(" "),
+      people,
+      state,
+      visibility,
+      sensitivity,
+      summary.metadata?.relatedDocuments.map((related) => related.documentId).join(" ") ?? "",
+      summary.normalizedBody,
+    ]
+      .filter(Boolean)
+      .join(" "),
+    approvers,
+    authors,
+    body: summary.normalizedBody,
+    labels,
+    people,
+    reviewers,
+    rfc,
+    sensitivity,
+    state,
+    title,
+    visibility,
+  };
+}
+
+function matchesSearchFilter(
+  summary: CatalogSummary,
+  indexed: IndexedCatalogSummary,
+  field: CatalogSearchField,
+  value: string,
+): boolean {
+  switch (field) {
+    case "label":
+      return indexed.labels.includes(value);
+    case "state":
+      return indexed.state === value;
+    case "visibility":
+      return indexed.visibility === value;
+    case "sensitivity":
+      return indexed.sensitivity === value;
+    case "author":
+      return indexed.authors.includes(value);
+    case "reviewer":
+      return indexed.reviewers.includes(value);
+    case "approver":
+      return indexed.approvers.includes(value);
+    case "person":
+      return indexed.people.includes(value);
+    case "rfc": {
+      const requested = Number(value.replace(/^rfc /u, ""));
+      return Number.isSafeInteger(requested) && summary.rfcNumber === requested;
+    }
+    case "has":
+      return value === "rfc"
+        ? summary.rfcNumber !== undefined
+        : value === "publication"
+          ? summary.publishedRevision !== undefined
+          : false;
+    case "is":
+      switch (value) {
+        case "rfc":
+          return summary.rfcNumber !== undefined;
+        case "note":
+          return summary.rfcNumber === undefined;
+        case "published":
+          return summary.publishedRevision !== undefined;
+        case "unpublished":
+          return summary.publishedRevision === undefined;
+        case "confidential":
+          return summary.sensitivity === "confidential";
+        case "public":
+          return summary.visibility === "public";
+        case "workspace":
+          return summary.visibility === "workspace";
+        default:
+          return false;
+      }
+  }
+}
+
+function scoreFreeText(
+  summary: CatalogSummary,
+  indexed: IndexedCatalogSummary,
+  value: string,
+): number {
+  let score = 0;
+  if (indexed.rfc === value || String(summary.rfcNumber ?? "") === String(Number(value))) {
+    score += 500;
+  }
+  if (indexed.title === value) score += 400;
+  if (indexed.title.startsWith(value)) score += 250;
+  else if (indexed.title.includes(value)) score += 180;
+  if (indexed.labels.includes(value)) score += 180;
+  else if (indexed.labels.some((label) => label.includes(value))) score += 120;
+  if (indexed.people.includes(value)) score += 100;
+  if (indexed.state === value) score += 90;
+  if (indexed.visibility === value || indexed.sensitivity === value) score += 60;
+  if (indexed.body.includes(value)) score += 20;
+  return score + 1;
+}
+
+function scoreFilter(field: CatalogSearchField): number {
+  switch (field) {
+    case "rfc":
+      return 500;
+    case "label":
+    case "has":
+    case "is":
+      return 180;
+    case "author":
+    case "reviewer":
+    case "approver":
+    case "person":
+      return 120;
+    case "state":
+      return 100;
+    case "visibility":
+    case "sensitivity":
+      return 80;
+  }
+}
+
+function withMatchingExcerpt(summary: CatalogSummary, query: CatalogSearchQuery): CatalogSummary {
+  const excerpt = matchingExcerpt(summary, query);
+  return excerpt === summary.excerpt ? summary : { ...summary, excerpt };
+}
+
+function matchingExcerpt(summary: CatalogSummary, query: CatalogSearchQuery): string {
+  const candidates = query.terms.filter(
+    (term) =>
+      !term.negated && term.field === undefined && summary.normalizedBody.includes(term.value),
+  );
+  const first = candidates
+    .map((term) => summary.normalizedBody.indexOf(term.value))
+    .filter((position) => position >= 0)
+    .toSorted((left, right) => left - right)[0];
+  if (first === undefined || summary.normalizedBody.length <= 240) return summary.excerpt;
+
+  let start = Math.max(0, first - 80);
+  let end = Math.min(summary.normalizedBody.length, start + 240);
+  if (start > 0) {
+    const boundary = summary.normalizedBody.indexOf(" ", start);
+    if (boundary !== -1 && boundary < first) start = boundary + 1;
+  }
+  if (end < summary.normalizedBody.length) {
+    const boundary = summary.normalizedBody.lastIndexOf(" ", end);
+    if (boundary > first) end = boundary;
+  }
+  return `${start > 0 ? "…" : ""}${summary.normalizedBody.slice(start, end)}${end < summary.normalizedBody.length ? "…" : ""}`;
+}
+
+function tokenizeSearchQuery(query: string): readonly string[] {
+  const tokens: string[] = [];
+  let token = "";
+  let quote: '"' | "'" | undefined;
+  let escaped = false;
+  const commit = (): void => {
+    if (token !== "") tokens.push(token);
+    token = "";
+  };
+
+  for (const character of query) {
+    if (escaped) {
+      token += character;
+      escaped = false;
+    } else if (character === "\\" && quote !== undefined) {
+      escaped = true;
+    } else if (character === quote) {
+      quote = undefined;
+    } else if ((character === '"' || character === "'") && quote === undefined) {
+      quote = character;
+    } else if (/\s/u.test(character) && quote === undefined) {
+      commit();
+    } else {
+      token += character;
+    }
+  }
+  if (escaped) token += "\\";
+  commit();
+  return tokens;
 }
 
 function updateEntry(

@@ -98,6 +98,16 @@ test(
           document.body,
           "Durable body from collaboration\n\n```ts\nconst value: number = 1;\n```",
         );
+        const search = await fetch(
+          `${baseUrl}/api/documents?q=${encodeURIComponent("rfc:1 state:draft durable")}`,
+          { headers: authorization },
+        );
+        assert.equal(search.status, 200);
+        assert.equal(
+          ((await search.json()) as { documents: readonly DocumentWire[] }).documents[0]?.metadata
+            .id,
+          document.metadata.id,
+        );
 
         const stale = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/edits`, {
           body: JSON.stringify({

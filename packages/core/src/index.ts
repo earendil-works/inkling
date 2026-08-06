@@ -93,7 +93,10 @@ export {
 export type { LineRange, TextReplacement } from "./domain/body.ts";
 export { applyUniqueTextReplacements, BodyEditError, readLineRange } from "./domain/body.ts";
 export type {
+  CatalogSearchField,
   CatalogSearchOptions,
+  CatalogSearchQuery,
+  CatalogSearchTerm,
   CatalogSummary,
   DocumentReservation,
   PeopleDirectoryEntry,
@@ -106,9 +109,11 @@ export {
   activateDocument,
   allocateRfcNumber,
   applyCatalogSummary,
+  catalogSearchFields,
   emptyWorkspaceCatalog,
   findPerson,
   normalizeSearchText,
+  parseCatalogSearchQuery,
   publicCatalog,
   reserveDocument,
   searchCatalog,

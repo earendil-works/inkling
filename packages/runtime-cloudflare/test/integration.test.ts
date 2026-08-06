@@ -104,6 +104,15 @@ test(
         first.metadata.id,
         "Newest projected title",
       );
+      const search = await fetch(
+        `${running.baseUrl}/api/documents?q=${encodeURIComponent("rfc:1 durable")}`,
+        { headers: authorization },
+      );
+      assert.equal(search.status, 200);
+      assert.equal(
+        ((await search.json()) as { documents: readonly DocumentWire[] }).documents[0]?.metadata.id,
+        first.metadata.id,
+      );
       const backup = await fetch(`${running.baseUrl}/api/admin/backup`, {
         headers: authorization,
       });
