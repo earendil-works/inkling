@@ -14,16 +14,6 @@
   --accent: #087f68;
   --accent-soft: #dff2eb;
   --danger: #b84735;
-  --code-background: #f1f4f0;
-  --code-text: #27312c;
-  --code-comment: #707a73;
-  --code-keyword: #a13f59;
-  --code-title: #6957a5;
-  --code-attribute: #176d8a;
-  --code-string: #277044;
-  --code-symbol: #a35827;
-  --code-addition: #dff3e5;
-  --code-deletion: #f8dedb;
   --shadow: 0 16px 50px rgb(24 32 28 / 14%);
   --sans: "Avenir Next", Avenir, "Helvetica Neue", sans-serif;
   --mono: "SFMono-Regular", "Cascadia Mono", "Liberation Mono", monospace;
@@ -43,16 +33,6 @@
   --accent: #63c7ad;
   --accent-soft: #173c33;
   --danger: #ef806c;
-  --code-background: #171a18;
-  --code-text: #e5ebe6;
-  --code-comment: #89938c;
-  --code-keyword: #ff8c9f;
-  --code-title: #c5b6ff;
-  --code-attribute: #87cef1;
-  --code-string: #9bd6ae;
-  --code-symbol: #efad72;
-  --code-addition: #193c27;
-  --code-deletion: #4c2422;
   --shadow: 0 16px 50px rgb(0 0 0 / 34%);
 }
 
@@ -69,16 +49,6 @@
     --accent: #63c7ad;
     --accent-soft: #173c33;
     --danger: #ef806c;
-    --code-background: #171a18;
-    --code-text: #e5ebe6;
-    --code-comment: #89938c;
-    --code-keyword: #ff8c9f;
-    --code-title: #c5b6ff;
-    --code-attribute: #87cef1;
-    --code-string: #9bd6ae;
-    --code-symbol: #efad72;
-    --code-addition: #193c27;
-    --code-deletion: #4c2422;
     --shadow: 0 16px 50px rgb(0 0 0 / 34%);
   }
 }
@@ -1384,68 +1354,6 @@ select:disabled {
   background: var(--code-background);
   color: var(--code-text);
   font: 0.8rem/1.55 var(--mono);
-}
-
-:is(.markdown-body, .cm-content) .tok-keyword,
-:is(.markdown-body, .cm-content) .tok-atom,
-:is(.markdown-body, .cm-content) .tok-bool {
-  color: var(--code-keyword);
-}
-
-:is(.markdown-body, .cm-content) .tok-typeName,
-:is(.markdown-body, .cm-content) .tok-className,
-:is(.markdown-body, .cm-content) .tok-namespace,
-:is(.markdown-body, .cm-content) .tok-heading {
-  color: var(--code-title);
-}
-
-:is(.markdown-body, .cm-content) .tok-variableName,
-:is(.markdown-body, .cm-content) .tok-propertyName,
-:is(.markdown-body, .cm-content) .tok-labelName,
-:is(.markdown-body, .cm-content) .tok-literal,
-:is(.markdown-body, .cm-content) .tok-number,
-:is(.markdown-body, .cm-content) .tok-operator,
-:is(.markdown-body, .cm-content) .tok-link {
-  color: var(--code-attribute);
-}
-
-:is(.markdown-body, .cm-content) .tok-string,
-:is(.markdown-body, .cm-content) .tok-string2,
-:is(.markdown-body, .cm-content) .tok-url {
-  color: var(--code-string);
-}
-
-:is(.markdown-body, .cm-content) .tok-macroName,
-:is(.markdown-body, .cm-content) .tok-variableName2 {
-  color: var(--code-symbol);
-}
-
-:is(.markdown-body, .cm-content) .tok-comment,
-:is(.markdown-body, .cm-content) .tok-meta {
-  color: var(--code-comment);
-}
-
-:is(.markdown-body, .cm-content) .tok-emphasis {
-  font-style: italic;
-}
-
-:is(.markdown-body, .cm-content) .tok-strong {
-  font-weight: 700;
-}
-
-:is(.markdown-body, .cm-content) .tok-inserted {
-  background: var(--code-addition);
-  color: var(--code-string);
-}
-
-:is(.markdown-body, .cm-content) .tok-deleted {
-  background: var(--code-deletion);
-  color: var(--code-keyword);
-}
-
-:is(.markdown-body, .cm-content) .tok-invalid {
-  color: var(--danger);
-  text-decoration: underline wavy;
 }
 
 .markdown-body :not(pre) > code {

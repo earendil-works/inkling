@@ -1,0 +1,105 @@
+:root {
+  --code-background: #f1f4f0;
+  --code-text: #27312c;
+  --code-comment: #707a73;
+  --code-keyword: #a13f59;
+  --code-title: #6957a5;
+  --code-attribute: #176d8a;
+  --code-string: #277044;
+  --code-symbol: #a35827;
+  --code-addition: #dff3e5;
+  --code-deletion: #f8dedb;
+  --code-invalid: #b84735;
+}
+
+:root[data-theme="dark"] {
+  --code-background: #171a18;
+  --code-text: #e5ebe6;
+  --code-comment: #89938c;
+  --code-keyword: #ff8c9f;
+  --code-title: #c5b6ff;
+  --code-attribute: #87cef1;
+  --code-string: #9bd6ae;
+  --code-symbol: #efad72;
+  --code-addition: #193c27;
+  --code-deletion: #4c2422;
+  --code-invalid: #ef806c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --code-background: #171a18;
+    --code-text: #e5ebe6;
+    --code-comment: #89938c;
+    --code-keyword: #ff8c9f;
+    --code-title: #c5b6ff;
+    --code-attribute: #87cef1;
+    --code-string: #9bd6ae;
+    --code-symbol: #efad72;
+    --code-addition: #193c27;
+    --code-deletion: #4c2422;
+    --code-invalid: #ef806c;
+  }
+}
+
+.tok-keyword,
+.tok-atom,
+.tok-bool {
+  color: var(--code-keyword);
+}
+
+.tok-typeName,
+.tok-className,
+.tok-namespace,
+.tok-heading {
+  color: var(--code-title);
+}
+
+.tok-variableName,
+.tok-propertyName,
+.tok-labelName,
+.tok-literal,
+.tok-number,
+.tok-operator,
+.tok-link {
+  color: var(--code-attribute);
+}
+
+.tok-string,
+.tok-string2,
+.tok-url {
+  color: var(--code-string);
+}
+
+.tok-macroName,
+.tok-variableName2 {
+  color: var(--code-symbol);
+}
+
+.tok-comment,
+.tok-meta {
+  color: var(--code-comment);
+}
+
+.tok-emphasis {
+  font-style: italic;
+}
+
+.tok-strong {
+  font-weight: 700;
+}
+
+.tok-inserted {
+  background: var(--code-addition);
+  color: var(--code-string);
+}
+
+.tok-deleted {
+  background: var(--code-deletion);
+  color: var(--code-keyword);
+}
+
+.tok-invalid {
+  color: var(--code-invalid);
+  text-decoration: underline wavy;
+}

@@ -1,0 +1,139 @@
+@import url("/syntax-theme.css");
+
+:root {
+  color-scheme: light dark;
+  --public-border: #c9ceca;
+  --public-muted: #626a65;
+  font-family: ui-serif, Georgia, serif;
+  line-height: 1.65;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --public-border: #4b534e;
+    --public-muted: #a4aaa6;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  padding: 1rem 3vw;
+  border-bottom: 1px solid var(--public-border);
+  font:
+    700 0.75rem ui-monospace,
+    monospace;
+  letter-spacing: 0.08em;
+}
+
+header a {
+  color: inherit;
+}
+
+main {
+  display: grid;
+  max-width: 78rem;
+  grid-template-columns: minmax(12rem, 18rem) minmax(0, 48rem);
+  gap: clamp(2rem, 6vw, 7rem);
+  margin: 0 auto;
+  padding: clamp(3rem, 8vw, 8rem) 3vw;
+}
+
+aside {
+  color: var(--public-muted);
+  font:
+    0.8rem ui-monospace,
+    monospace;
+}
+
+aside ol {
+  padding-left: 1.2rem;
+}
+
+aside a {
+  color: inherit;
+  text-underline-offset: 0.2em;
+}
+
+.depth-3 {
+  margin-left: 1rem;
+}
+
+article {
+  min-width: 0;
+}
+
+article h1 {
+  font-size: clamp(2.8rem, 7vw, 5.5rem);
+  line-height: 0.95;
+}
+
+pre {
+  overflow: auto;
+  padding: 1rem;
+}
+
+pre.jot-code {
+  border: 1px solid var(--public-border);
+  border-radius: 3px;
+  background: var(--code-background);
+  color: var(--code-text);
+  font:
+    0.8rem/1.55 ui-monospace,
+    monospace;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+td,
+th {
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--public-border);
+}
+
+img {
+  max-width: 100%;
+}
+
+.catalog {
+  padding: 0;
+  list-style: none;
+}
+
+.catalog li {
+  padding: 1.5rem 0;
+  border-bottom: 1px solid var(--public-border);
+}
+
+.catalog .title {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.catalog p {
+  margin: 0.4rem 0;
+}
+
+.catalog small {
+  font-family: ui-monospace, monospace;
+}
+
+@media (width <= 50rem) {
+  main {
+    grid-template-columns: 1fr;
+  }
+
+  aside {
+    display: none;
+  }
+}

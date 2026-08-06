@@ -159,10 +159,20 @@ test(
         assert.equal(publish.status, 200);
         const published = await fetch(`${baseUrl}/rfc/0001`);
         assert.equal(published.status, 200);
+        const publishedCsp = published.headers.get("content-security-policy") ?? "";
+        assert.match(publishedCsp, /style-src 'self'/u);
+        assert.doesNotMatch(publishedCsp, /style-src 'unsafe-inline'/u);
         const publishedHtml = await published.text();
         assert.match(publishedHtml, /Integrated RFC/u);
         assert.match(publishedHtml, /class="tok-keyword">const<\/span>/u);
-        assert.match(publishedHtml, /--code-keyword:#a13f59/u);
+        assert.match(publishedHtml, /<link rel="stylesheet" href="\/public\.css">/u);
+        assert.doesNotMatch(publishedHtml, /<style>/u);
+        const publicStylesheet = await fetch(`${baseUrl}/public.css`);
+        assert.equal(publicStylesheet.status, 200);
+        assert.match(await publicStylesheet.text(), /@import url\("\/syntax-theme\.css"\)/u);
+        const syntaxTheme = await fetch(`${baseUrl}/syntax-theme.css`);
+        assert.equal(syntaxTheme.status, 200);
+        assert.match(await syntaxTheme.text(), /\.tok-keyword/u);
         document = await readDocument(baseUrl, document.metadata.id, authorization);
         const workingTitle = await fetch(
           `${baseUrl}/api/documents/${document.metadata.id}/metadata`,
