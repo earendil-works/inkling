@@ -38,6 +38,7 @@ test(
         .locator("[data-auth-form]")
         .evaluate((form: HTMLFormElement) => form.requestSubmit());
       await first.waitForSelector("[data-new-document]");
+      assert.equal(await first.locator(".workspace-heading h1").textContent(), "Jots");
       assert.equal(await first.locator("[data-account-name]").textContent(), "Owner");
       assert.equal(await first.locator("[data-api-status]").count(), 0);
       assert.equal(await first.locator(".catalog-tools [data-logout]").count(), 0);

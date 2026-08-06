@@ -30,7 +30,7 @@ export function AppHeader({
     document.documentElement.dataset["theme"] = theme;
     document
       .querySelector<HTMLMetaElement>('meta[name="theme-color"]')
-      ?.setAttribute("content", theme === "dark" ? "#151816" : "#fbfbfa");
+      ?.setAttribute("content", theme === "dark" ? "#2e2d2b" : "#faf9f6");
   }, [theme]);
 
   const toggleTheme = (): void => {
