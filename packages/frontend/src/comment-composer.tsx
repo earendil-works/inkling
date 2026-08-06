@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./components/button.tsx";
+import { Textarea } from "./components/textarea.tsx";
 
 export interface CommentComposerProps {
   readonly initialBody?: string | undefined;
@@ -83,7 +84,7 @@ export function CommentComposer({
         )}
         <label className="comment-composer-field">
           Comment
-          <textarea
+          <Textarea
             aria-invalid={invalid}
             data-comment-body=""
             maxLength={20_000}

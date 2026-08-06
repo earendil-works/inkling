@@ -13,6 +13,7 @@ import type { ApiClientService, ApiError } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
 import { Button } from "./components/button.tsx";
 import { Input } from "./components/input.tsx";
+import { Textarea } from "./components/textarea.tsx";
 import { useEffectAction, useEffectQuery } from "./effect-hooks.ts";
 import { formatDate, randomId } from "./ui.ts";
 
@@ -129,7 +130,7 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
           </label>
           <label>
             Opening Markdown
-            <textarea
+            <Textarea
               name="body"
               onChange={(event) => setBody(event.currentTarget.value)}
               placeholder={"# Context\n\nStart with the decision…"}
