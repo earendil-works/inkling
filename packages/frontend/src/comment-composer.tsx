@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./components/button.tsx";
-import { Textarea } from "./components/textarea.tsx";
+import { TextareaField } from "./components/textarea-field.tsx";
 
 export interface CommentComposerProps {
   readonly initialBody?: string | undefined;
@@ -82,30 +82,29 @@ export function CommentComposer({
         {quote === undefined || quote.length === 0 ? null : (
           <blockquote data-comment-composer-quote="">{quote}</blockquote>
         )}
-        <label className="comment-composer-field">
-          Comment
-          <Textarea
-            aria-invalid={invalid}
-            data-comment-body=""
-            maxLength={20_000}
-            onChange={(event) => {
-              setBody(event.currentTarget.value);
-              if (invalid) setInvalid(false);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-                event.preventDefault();
-                submit();
-              }
-            }}
-            placeholder="Write a clear, useful comment…"
-            ref={bodyRef}
-            required
-            rows={7}
-            value={body}
-          />
-        </label>
-        {invalid ? <p className="form-error">Enter a comment before submitting.</p> : null}
+        <TextareaField
+          aria-invalid={invalid}
+          className="comment-composer-field"
+          data-comment-body=""
+          error={invalid ? "Enter a comment before submitting." : undefined}
+          label="Comment"
+          maxLength={20_000}
+          onChange={(event) => {
+            setBody(event.currentTarget.value);
+            if (invalid) setInvalid(false);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+              event.preventDefault();
+              submit();
+            }
+          }}
+          placeholder="Write a clear, useful comment…"
+          ref={bodyRef}
+          required
+          rows={7}
+          value={body}
+        />
         <div className="comment-composer-footer">
           <span>
             <kbd>⌘</kbd>

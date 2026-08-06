@@ -12,8 +12,8 @@ import type {
 import type { ApiClientService, ApiError } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
 import { Button } from "./components/button.tsx";
+import { TextareaField } from "./components/textarea-field.tsx";
 import { TextField } from "./components/text-field.tsx";
-import { Textarea } from "./components/textarea.tsx";
 import { useEffectAction, useEffectQuery } from "./effect-hooks.ts";
 import { formatDate, randomId } from "./ui.ts";
 
@@ -125,16 +125,14 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
             />
             Allocate an RFC number
           </label>
-          <label>
-            Opening Markdown
-            <Textarea
-              name="body"
-              onChange={(event) => setBody(event.currentTarget.value)}
-              placeholder={"# Context\n\nStart with the decision…"}
-              rows={9}
-              value={body}
-            />
-          </label>
+          <TextareaField
+            label="Opening Markdown"
+            name="body"
+            onChange={(event) => setBody(event.currentTarget.value)}
+            placeholder={"# Context\n\nStart with the decision…"}
+            rows={9}
+            value={body}
+          />
           <Button variant="primary" disabled={createDocument.state.pending} type="submit">
             {createDocument.state.pending ? "Creating…" : "Create document"}
           </Button>
