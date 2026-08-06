@@ -14,7 +14,7 @@ export function ReaderToolbar({ metadata, shared }: ReaderToolbarProps): React.J
   return (
     <nav className="document-bar reader-toolbar" aria-label="Document navigation">
       <ButtonLink className="reader-back-link" href="/" variant="text">
-        All documents
+        All notes and RFCs
       </ButtonLink>
       {canEdit ? (
         <ButtonLink

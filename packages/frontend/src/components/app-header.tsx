@@ -43,7 +43,7 @@ export function AppHeader({
 
   return (
     <header className="masthead">
-      <a className="wordmark" href="/" aria-label="Jot home">
+      <a className="wordmark" href="/" aria-label="Notes and RFCs home">
         JOT<span>/</span>
       </a>
       <div className="masthead__right">

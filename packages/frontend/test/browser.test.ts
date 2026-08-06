@@ -38,7 +38,7 @@ test(
         .locator("[data-auth-form]")
         .evaluate((form: HTMLFormElement) => form.requestSubmit());
       await first.waitForSelector("[data-new-document]");
-      assert.equal(await first.locator(".workspace-heading h1").textContent(), "Jots");
+      assert.equal(await first.locator(".workspace-heading h1").textContent(), "Notes and RFCs");
       assert.equal(await first.locator("[data-account-name]").textContent(), "Owner");
       assert.equal(await first.locator("[data-api-status]").count(), 0);
       assert.equal(await first.locator(".catalog-tools [data-logout]").count(), 0);
@@ -70,6 +70,14 @@ test(
           "RFC 0001",
       );
       assert.equal(await first.locator("[data-allocate-rfc]").count(), 0);
+      const labelsUpdated = first.waitForResponse(
+        (response) =>
+          response.request().method() === "PATCH" &&
+          response.url().includes(`/api/documents/${documentId}/metadata`),
+      );
+      await first.locator("[data-labels]").fill("architecture, platform");
+      await first.locator("[data-labels]").press("Tab");
+      assert.equal((await labelsUpdated).status(), 200);
       await first.locator("[data-document-details] > summary").click();
       await first.locator(".cm-content").click();
       await first.keyboard.insertText(
@@ -118,7 +126,16 @@ test(
       const renderedKeyword = first.locator("[data-preview] .tok-keyword");
       assert.equal(await renderedKeyword.textContent(), "const");
       assert.equal(await renderedKeyword.getAttribute("class"), editorKeywordClass);
-      await first.getByRole("link", { name: "All documents" }).click();
+      await first.getByRole("link", { name: "All notes and RFCs" }).click();
+      await first.waitForSelector("[data-document-search]");
+      await first.getByRole("link", { name: "Browse labels" }).click();
+      await first.waitForURL(/\/labels$/u);
+      await first.waitForSelector("[data-label-index]");
+      assert.equal(await first.locator(".workspace-heading h1").textContent(), "Labels");
+      await first.getByRole("link", { name: /platform/u }).click();
+      assert.equal(new URL(first.url()).searchParams.get("label"), "platform");
+      assert.match(await first.locator("[data-catalog]").innerText(), /Browser collaboration/u);
+      await first.getByRole("link", { name: "All notes and RFCs" }).click();
       await first.waitForSelector("[data-document-search]");
       await first.keyboard.press("/");
       const documentSearch = first.locator("[data-search]");

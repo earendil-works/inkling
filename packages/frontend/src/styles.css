@@ -484,6 +484,13 @@ select:disabled {
   border-bottom: 1px solid var(--border);
 }
 
+.catalog-tool-links {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 1rem;
+}
+
 .document-search {
   position: relative;
   z-index: 30;
@@ -805,6 +812,82 @@ select:disabled {
 .empty-state p,
 .comments-empty {
   color: var(--muted);
+}
+
+/* Labels */
+.labels-heading .eyebrow a {
+  text-decoration: none;
+}
+
+.labels-heading .eyebrow a:hover {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 0.18em;
+}
+
+.label-index {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  border-top: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+}
+
+.label-index__item {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.4rem 1rem;
+  padding: 1rem;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+}
+
+.label-index__item:hover {
+  background: var(--surface-muted);
+}
+
+.label-index__name {
+  overflow: hidden;
+  font-size: 1.15rem;
+  font-style: italic;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.label-index__documents {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.label-index__count {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  color: var(--muted);
+  font: 0.6rem/1.4 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.label-results__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.label-results__heading p {
+  color: var(--muted);
+  font: 0.65rem/1.4 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 /* Dialogs */
@@ -2152,8 +2235,9 @@ select:disabled {
     flex-wrap: wrap;
   }
 
-  .catalog-tools > .text-button {
-    margin-left: auto;
+  .catalog-tool-links {
+    width: 100%;
+    justify-content: flex-end;
   }
 
   .document-search {

@@ -110,7 +110,7 @@ export function DocumentSearch({
       }}
     >
       <label className="document-search__label" htmlFor={inputId}>
-        Search every working head
+        Search notes and RFCs
       </label>
       <div className="document-search__control">
         <svg aria-hidden="true" viewBox="0 0 24 24">

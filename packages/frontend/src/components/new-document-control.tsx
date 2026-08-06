@@ -14,7 +14,7 @@ export function NewDocumentControl({ api }: NewDocumentControlProps): React.JSX.
   return (
     <>
       <Button variant="primary" data-new-document="" onClick={() => setOpen(true)}>
-        New document
+        New note or RFC
       </Button>
       <NewDocumentDialog api={api} onDismiss={() => setOpen(false)} open={open} />
     </>

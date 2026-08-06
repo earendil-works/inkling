@@ -64,7 +64,7 @@ export function NewDocumentDialog({
           disabled={createDocument.state.pending}
           eyebrow="Begin a working head"
           onClose={onDismiss}
-          title="New document"
+          title="New note or RFC"
           titleId="new-document-dialog-title"
         />
         <TextField
@@ -78,12 +78,12 @@ export function NewDocumentDialog({
         />
         <CheckboxField
           checked={allocateRfc}
-          label="Allocate an RFC number"
+          label="Create as an RFC and allocate a number"
           name="rfc"
           onChange={(event) => setAllocateRfc(event.currentTarget.checked)}
         />
         <Button disabled={createDocument.state.pending} type="submit" variant="primary">
-          {createDocument.state.pending ? "Creating…" : "Create document"}
+          {createDocument.state.pending ? "Creating…" : allocateRfc ? "Create RFC" : "Create note"}
         </Button>
         <FormError data-new-error="">{createDocument.state.error?.message}</FormError>
       </form>

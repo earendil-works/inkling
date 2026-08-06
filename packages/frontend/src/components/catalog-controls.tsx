@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { CatalogResponse } from "@earendil-works/jot-protocol";
 
 import type { ApiClientService } from "../api.ts";
+import { ButtonLink } from "./button-link.tsx";
 import { Button } from "./button.tsx";
 import { DocumentSearch } from "./document-search.tsx";
 import { SettingsDialog } from "./settings-dialog.tsx";
@@ -28,9 +29,14 @@ export function CatalogControls({
           initialCatalog={initialCatalog}
           onResultsChange={onResultsChange}
         />
-        <Button variant="text" data-settings="" onClick={() => setSettingsOpen(true)}>
-          API &amp; agents
-        </Button>
+        <div className="catalog-tool-links">
+          <ButtonLink href="/labels" variant="text">
+            Browse labels
+          </ButtonLink>
+          <Button variant="text" data-settings="" onClick={() => setSettingsOpen(true)}>
+            API &amp; agents
+          </Button>
+        </div>
       </section>
       {settingsOpen ? <SettingsDialog api={api} onClose={() => setSettingsOpen(false)} /> : null}
     </>

@@ -150,6 +150,18 @@ function loadRoute(url: URL): Effect.Effect<RouteModel, ApiError> {
         };
         return Effect.succeed(model);
       }
+      if (url.pathname === "/labels") {
+        return api.listDocuments().pipe(
+          Effect.map((catalog): RouteModel => ({
+            account: authentication.principal,
+            api,
+            capabilityToken,
+            catalog,
+            screen: "labels",
+            selectedLabel: url.searchParams.get("label") ?? undefined,
+          })),
+        );
+      }
       return api.listDocuments(url.searchParams.get("q") ?? "").pipe(
         Effect.map((catalog): RouteModel => ({
           account: authentication.principal,
@@ -199,6 +211,7 @@ function isApplicationUrl(url: URL): boolean {
   return (
     url.origin === location.origin &&
     (url.pathname === "/" ||
+      url.pathname === "/labels" ||
       url.pathname.startsWith("/documents/") ||
       url.pathname.startsWith("/share/"))
   );

@@ -9,6 +9,7 @@ import type {
 import type { ApiClientService, ApiError } from "../api.ts";
 import { AuthenticationScreen } from "../auth-screen.tsx";
 import type { EffectQueryState } from "../effect-hooks.ts";
+import { LabelsScreen } from "../labels-screen.tsx";
 import { WorkspaceScreen } from "../workspace-screen.tsx";
 import { Button } from "./button.tsx";
 
@@ -35,6 +36,11 @@ export type RouteModel =
       readonly document: DocumentResponse;
       readonly screen: "editor" | "reader";
       readonly shared: boolean;
+    })
+  | (RouteBase & {
+      readonly catalog: CatalogResponse;
+      readonly screen: "labels";
+      readonly selectedLabel: string | undefined;
     })
   | (RouteBase & { readonly catalog: CatalogResponse; readonly screen: "workspace" });
 
@@ -68,6 +74,8 @@ export function RouteView({ refresh, state }: RouteViewProps): React.JSX.Element
       return <AuthenticationScreen api={model.api} methods={model.methods} mode={model.mode} />;
     case "workspace":
       return <WorkspaceScreen api={model.api} initialCatalog={model.catalog} />;
+    case "labels":
+      return <LabelsScreen catalog={model.catalog} selectedLabel={model.selectedLabel} />;
     case "reader":
       return (
         <Suspense fallback={<main aria-busy="true" className="route-loading" id="app" />}>

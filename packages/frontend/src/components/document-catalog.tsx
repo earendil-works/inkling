@@ -12,8 +12,8 @@ export function DocumentCatalog({ catalog }: DocumentCatalogProps): React.JSX.El
       <section className="catalog" data-catalog="" aria-live="polite">
         <div className="empty-state">
           <span>Ø</span>
-          <h2>No documents found.</h2>
-          <p>Start a document or adjust the search.</p>
+          <h2>No notes or RFCs found.</h2>
+          <p>Create one or adjust the search.</p>
         </div>
       </section>
     );

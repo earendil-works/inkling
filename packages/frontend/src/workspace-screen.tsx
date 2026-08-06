@@ -20,7 +20,7 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
       <section className="workspace-heading">
         <div>
           <p className="eyebrow">Workspace / recent activity</p>
-          <h1>Jots</h1>
+          <h1>Notes and RFCs</h1>
         </div>
         <NewDocumentControl api={api} />
       </section>
