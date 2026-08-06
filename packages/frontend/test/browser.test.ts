@@ -46,20 +46,42 @@ test(
       assert.notEqual(await first.locator("html").getAttribute("data-theme"), initialTheme);
       await first.locator("[data-new-document]").click();
       await first.locator('input[name="title"]').fill("Browser collaboration");
-      await first
-        .locator('textarea[name="body"]')
-        .fill(
-          "Shared starting body\n\nSecond line\n\n```ts\nconst answer: number = 42;\n```\n\nThird line",
-        );
+      assert.equal(await first.locator('textarea[name="body"]').count(), 0);
       await first.locator('input[name="rfc"]').check();
       await first
         .locator("[data-new-form]")
         .evaluate((form: HTMLFormElement) =>
           form.requestSubmit(form.querySelector('button[type="submit"]')),
         );
-      await first.waitForURL(/\/documents\//u);
-      const documentId = first.url().split("/").at(-1);
+      await first.waitForURL(/\/documents\/[^/]+\/edit$/u);
+      const documentId = first.url().split("/").at(-2);
       assert.ok(documentId);
+      await first.waitForFunction(
+        () => document.querySelector("[data-save-state]")?.textContent === "Saved",
+      );
+      assert.equal(await first.locator("[data-api-status]").textContent(), "Saved");
+      assert.equal(await first.locator(".cm-content").textContent(), "");
+      await first.locator(".cm-content").click();
+      await first.keyboard.insertText(
+        "Shared starting body\n\nSecond line\n\n```ts\nconst answer: number = 42;\n```\n\nThird line",
+      );
+      await first.waitForSelector(".cm-content .tok-keyword");
+      await first.waitForSelector("[data-preview] .tok-keyword");
+      await first.waitForFunction(
+        () => document.querySelector("[data-save-state]")?.textContent === "Saved",
+      );
+      const editorKeyword = first.locator(".cm-content .tok-keyword").last();
+      assert.equal(await editorKeyword.textContent(), "const");
+      const editorKeywordClass = await editorKeyword.getAttribute("class");
+      await first.evaluate(() => {
+        document.documentElement.dataset["browserNavigation"] = "same-document";
+      });
+      await first.getByRole("link", { name: "Read" }).click();
+      await first.waitForURL(/\/documents\/[^/]+$/u);
+      assert.equal(
+        await first.locator("html").getAttribute("data-browser-navigation"),
+        "same-document",
+      );
       await first.waitForSelector("[data-reader]");
       assert.equal(await first.locator("[data-api-status]").count(), 0);
       assert.equal(await first.locator(".cm-editor").count(), 0);
@@ -67,24 +89,14 @@ test(
       await first.waitForSelector("[data-preview] .tok-keyword");
       const renderedKeyword = first.locator("[data-preview] .tok-keyword");
       assert.equal(await renderedKeyword.textContent(), "const");
-      const renderedKeywordClass = await renderedKeyword.getAttribute("class");
-      await first.evaluate(() => {
-        document.documentElement.dataset["browserNavigation"] = "same-document";
-      });
+      assert.equal(await renderedKeyword.getAttribute("class"), editorKeywordClass);
       await first.locator("[data-open-editor]").click();
       await first.waitForURL(/\/documents\/[^/]+\/edit$/u);
-      assert.equal(
-        await first.locator("html").getAttribute("data-browser-navigation"),
-        "same-document",
-      );
       await first.waitForFunction(
         () => document.querySelector("[data-save-state]")?.textContent === "Saved",
       );
       assert.equal(await first.locator("[data-api-status]").textContent(), "Saved");
       await first.waitForSelector(".cm-content .tok-keyword");
-      const editorKeyword = first.locator(".cm-content .tok-keyword").last();
-      assert.equal(await editorKeyword.textContent(), "const");
-      assert.equal(await editorKeyword.getAttribute("class"), renderedKeywordClass);
       const typography = await first.evaluate(() => {
         const editor = document.querySelector<HTMLElement>(".cm-scroller");
         const code = document.querySelector<HTMLElement>("[data-preview] pre");

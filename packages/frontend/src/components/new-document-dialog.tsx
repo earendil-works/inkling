@@ -11,7 +11,6 @@ import { CheckboxField } from "./checkbox-field.tsx";
 import { DialogHeader } from "./dialog-header.tsx";
 import { FormError } from "./form-error.tsx";
 import { ModalDialog } from "./modal-dialog.tsx";
-import { TextareaField } from "./textarea-field.tsx";
 import { TextField } from "./text-field.tsx";
 
 export interface NewDocumentDialogProps {
@@ -27,7 +26,6 @@ export function NewDocumentDialog({
 }: NewDocumentDialogProps): React.JSX.Element {
   const { navigate } = useAppContext();
   const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
   const [allocateRfc, setAllocateRfc] = useState(false);
   const createDocument = useEffectAction<CreateDocumentRequest, DocumentResponse, ApiError>(
     (input) => api.createDocument(input),
@@ -38,14 +36,14 @@ export function NewDocumentDialog({
     createDocument.execute(
       {
         allocateRfc,
-        body,
+        body: "",
         creationKey: randomId("request"),
         title,
       },
       {
         onSuccess: (document) => {
           onDismiss();
-          navigate(`/documents/${encodeURIComponent(document.metadata.id)}`);
+          navigate(`/documents/${encodeURIComponent(document.metadata.id)}/edit`);
         },
       },
     );
@@ -83,14 +81,6 @@ export function NewDocumentDialog({
           label="Allocate an RFC number"
           name="rfc"
           onChange={(event) => setAllocateRfc(event.currentTarget.checked)}
-        />
-        <TextareaField
-          label="Opening Markdown"
-          name="body"
-          onChange={(event) => setBody(event.currentTarget.value)}
-          placeholder={"# Context\n\nStart with the decision…"}
-          rows={9}
-          value={body}
         />
         <Button disabled={createDocument.state.pending} type="submit" variant="primary">
           {createDocument.state.pending ? "Creating…" : "Create document"}
