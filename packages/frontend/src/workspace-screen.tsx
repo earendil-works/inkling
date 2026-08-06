@@ -12,6 +12,7 @@ import type {
 import type { ApiClientService, ApiError } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
 import { Button } from "./components/button.tsx";
+import { Input } from "./components/input.tsx";
 import { useEffectAction, useEffectQuery } from "./effect-hooks.ts";
 import { formatDate, randomId } from "./ui.ts";
 
@@ -79,7 +80,7 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
       <section className="catalog-tools" aria-label="Document tools">
         <label className="search-field">
           <span>Search</span>
-          <input
+          <Input
             data-search=""
             onChange={(event) => setSearch(event.currentTarget.value)}
             placeholder="Title, body, people, state…"
@@ -108,7 +109,7 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
           </div>
           <label>
             Title
-            <input
+            <Input
               autoFocus
               maxLength={300}
               name="title"
@@ -118,7 +119,7 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
             />
           </label>
           <label className="checkbox">
-            <input
+            <Input
               checked={allocateRfc}
               name="rfc"
               onChange={(event) => setAllocateRfc(event.currentTarget.checked)}
@@ -301,7 +302,7 @@ function SettingsDialog({ api, onClose }: SettingsDialogProps): React.JSX.Elemen
         </div>
         <label>
           New key label
-          <input
+          <Input
             maxLength={200}
             name="api-key-label"
             onChange={(event) => setLabel(event.currentTarget.value)}

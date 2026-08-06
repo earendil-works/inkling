@@ -6,6 +6,7 @@ import type { ApiClientService, ApiError } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
 import { ButtonLink } from "./components/button-link.tsx";
 import { Button } from "./components/button.tsx";
+import { Input } from "./components/input.tsx";
 import { useEffectAction } from "./effect-hooks.ts";
 
 export interface AuthenticationScreenProps {
@@ -54,7 +55,7 @@ export function AuthenticationScreen({
             <>
               <label>
                 Password
-                <input
+                <Input
                   autoComplete={mode === "setup" ? "new-password" : "current-password"}
                   autoFocus
                   minLength={12}

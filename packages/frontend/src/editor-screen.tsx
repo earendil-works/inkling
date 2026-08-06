@@ -26,6 +26,7 @@ import { makeCollaborationClient } from "./collaboration.ts";
 import type { CollaborationClient, ConnectionState } from "./collaboration.ts";
 import { ButtonLink } from "./components/button-link.tsx";
 import { Button } from "./components/button.tsx";
+import { Input } from "./components/input.tsx";
 import { CommentComposer } from "./comment-composer.tsx";
 import {
   commentDecorationsExtension,
@@ -463,7 +464,7 @@ export function EditorScreen({
               ? "Document"
               : `RFC ${String(metadata.rfcNumber).padStart(4, "0")}`}
           </span>
-          <input
+          <Input
             aria-label="Document title"
             className="title-input"
             data-title=""
@@ -495,7 +496,7 @@ export function EditorScreen({
           </Button>
           <label className="toolbar-button attachment-button">
             Attach
-            <input
+            <Input
               accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain"
               data-attachment=""
               disabled={!canEdit}
@@ -603,7 +604,7 @@ export function EditorScreen({
               </label>
               <label>
                 Labels
-                <input
+                <Input
                   data-labels=""
                   disabled={!canEditMetadata}
                   onBlur={() =>
@@ -748,7 +749,7 @@ export function EditorScreen({
           Comment on selection
         </Button>
         <label className="resolved-toggle">
-          <input
+          <Input
             checked={showResolved}
             data-show-resolved=""
             onChange={(event) => setShowResolved(event.currentTarget.checked)}
