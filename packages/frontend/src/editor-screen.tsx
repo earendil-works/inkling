@@ -27,6 +27,7 @@ import { Button } from "./components/button.tsx";
 import { CheckboxField } from "./components/checkbox-field.tsx";
 import { CommentThreadCard } from "./components/comment-thread-card.tsx";
 import { DocumentDetails } from "./components/document-details.tsx";
+import { PublishButton } from "./components/publish-button.tsx";
 import { SharingControl } from "./components/sharing-control.tsx";
 import { CommentComposer } from "./comment-composer.tsx";
 import {
@@ -408,9 +409,6 @@ export function EditorScreen({
       { onFailure: (error) => showToast(error.message, "error"), onSuccess: setMetadata },
     );
   };
-  const publishAction = useEffectAction<void, DocumentMetadataDto, ApiError>(() =>
-    api.publish(metadata.id),
-  );
   const activeThread = comments.threads.find((thread) => thread.id === activeThreadId);
 
   const handleWorkbenchClick = (event: React.MouseEvent<HTMLElement>): void => {
@@ -527,24 +525,12 @@ export function EditorScreen({
                   }))
                 }
               />
-              <Button
-                size="small"
-                variant="primary"
-                data-publish=""
-                disabled={publishAction.state.pending}
-                onClick={() =>
-                  publishAction.execute(undefined, {
-                    onFailure: (error) => showToast(error.message, "error"),
-                    onSuccess: (next) => {
-                      setMetadata(next);
-                      showToast("Revision published.", "success");
-                    },
-                  })
-                }
-                type="button"
-              >
-                {metadata.publishedRevision === undefined ? "Publish" : "Republish"}
-              </Button>
+              <PublishButton
+                api={api}
+                documentId={metadata.id}
+                onPublished={setMetadata}
+                published={metadata.publishedRevision !== undefined}
+              />
             </>
           )}
         </div>
