@@ -79,10 +79,10 @@ test(
       });
       assert.equal(edited.status, 200);
       let changed = (await edited.json()) as DocumentWire;
-      assert.equal(changed.body, "durable first");
-      assert.equal(
+      assert.match(changed.body, /---\n\ndurable first$/u);
+      assert.match(
         (await readDocument(running.baseUrl, second.metadata.id, authorization)).body,
-        "initial second",
+        /---\n\ninitial second$/u,
       );
       changed = await updateTitle(
         running.baseUrl,
@@ -123,16 +123,16 @@ test(
 
       running = await startWrangler(directory, google.origin);
       try {
-        assert.equal(
+        assert.match(
           (await readDocument(running.baseUrl, first.metadata.id, authorization)).body,
-          "durable first",
+          /---\n\ndurable first$/u,
         );
         const persistedSecond = await readDocument(
           running.baseUrl,
           second.metadata.id,
           authorization,
         );
-        assert.equal(persistedSecond.body, "initial second");
+        assert.match(persistedSecond.body, /---\n\ninitial second$/u);
         assert.equal(persistedSecond.metadata.rfcNumber, 2);
       } finally {
         await running.stop();

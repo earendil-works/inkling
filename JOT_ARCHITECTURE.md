@@ -66,9 +66,9 @@ Markdown exports, rendered HTML, search indexes, snippets, state indexes, keywor
 
 ### 4.5 Security-sensitive metadata is structured
 
-Visibility, sharing, publication, and permissions are not inferred from collaborative Markdown or YAML frontmatter. They are structured fields changed through validated commands.
+Visibility, sharing, publication, and permissions are not inferred from collaborative Markdown alone. They are structured fields changed through validated commands.
 
-Frontmatter is an import and export format, not the live security model.
+Collaborative frontmatter may propose publication state, visibility, sensitivity, and labels. Those values drive the live publication preview, but they do not change authorization while editing. An authorized, explicit publish command validates and promotes them into the structured metadata stored with the published revision. Sharing, RFC allocation, and publication state are never controlled by frontmatter.
 
 ### 4.6 Local and Cloudflare are adapters around the same core
 
@@ -341,9 +341,9 @@ Metadata is changed by explicit document commands. The collaborative body cannot
 
 ### 7.3 Collaborative body
 
-The body is a Yjs text value containing Markdown without security-sensitive frontmatter. It is the only directly collaborative field in the initial design.
+The body is a Yjs text value containing Markdown and optional publication frontmatter. It is the only directly collaborative field in the initial design.
 
-Title and other metadata can still update live, but their updates are serialized server commands rather than opaque collaborative changes.
+Publication frontmatter contains collaboratively edited presentation values such as lifecycle state, intended visibility, sensitivity, and labels. Renderers omit it from prose and use it for live preview. Structured metadata remains authoritative for authorization until an explicit publish command validates and promotes the frontmatter values. Title and metadata outside this publication frontmatter are serialized server commands rather than opaque collaborative changes.
 
 ### 7.4 Comments
 
@@ -573,6 +573,8 @@ The working head is the latest accepted document state. Editors, capability view
 
 A document may designate a checkpoint as its published revision. Public canonical routes serve this immutable revision rather than an in-progress editing head.
 
+Before capturing the revision, publishing parses and validates collaborative publication frontmatter and applies its allowed values through the same structured metadata validation used by explicit metadata commands.
+
 Publishing records:
 
 - Published document revision.
@@ -732,7 +734,7 @@ Raw HTML is disabled by default. If later enabled for trusted workspaces, it mus
 
 ### 15.2 Editor preview
 
-Preview rendering is debounced and must not block typing or collaboration. Mermaid diagram rendering is separately debounced and preserves pan and zoom state for unchanged diagrams where practical.
+Preview rendering is debounced and must not block typing or collaboration. It parses publication frontmatter, omits it from rendered prose, and reflects valid draft metadata immediately without changing authorization. Mermaid diagram rendering is separately debounced and preserves pan and zoom state for unchanged diagrams where practical.
 
 Comments are overlaid using resolved anchor positions after rendering. Rendered HTML never becomes authoritative document state.
 

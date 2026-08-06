@@ -382,7 +382,13 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
   app.post("/api/documents/:documentId/publish", (context) =>
     execute(context, options, (service) =>
       mutation(context, Effect.void).pipe(
-        Effect.zipRight(service.publish(credentials(context), context.req.param("documentId"))),
+        Effect.zipRight(
+          service.publish(
+            credentials(context),
+            context.req.param("documentId"),
+            context.req.query("confirmConfidentialPublic") === "true",
+          ),
+        ),
       ),
     ),
   );

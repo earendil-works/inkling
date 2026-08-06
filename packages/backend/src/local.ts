@@ -85,7 +85,12 @@ import type {
   ServerCollaborationMessage,
   ShareResponse,
 } from "@earendil-works/jot-protocol";
-import { MarkdownRenderer } from "@earendil-works/jot-renderer";
+import {
+  MarkdownRenderer,
+  parseDocumentSource,
+  RenderError,
+  serializeDocumentFrontmatter,
+} from "@earendil-works/jot-renderer";
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -245,6 +250,21 @@ export function makeLocalJotApplication(
           const room = yield* provideAuthorityDependencies(
             makeDocumentAuthority({ documentId: id, workspaceId: state.workspaceId }),
           ).pipe(Effect.mapError(toApplicationError));
+          const now = new Date().toISOString();
+          const current = yield* room
+            .snapshot(ownerPrincipal, now)
+            .pipe(Effect.mapError(toApplicationError));
+          if (!current.body.startsWith("---\n")) {
+            yield* room
+              .replaceBody(
+                ownerPrincipal,
+                withMetadataFrontmatter(current.body, current.metadata),
+                current.metadata.headRevision,
+                now,
+              )
+              .pipe(Effect.mapError(toApplicationError));
+            yield* room.checkpoint(now).pipe(Effect.mapError(toApplicationError));
+          }
           rooms.set(id, room);
           return room;
         }),
@@ -1099,7 +1119,7 @@ export function makeLocalJotApplication(
           const room = yield* provideAuthorityDependencies(
             makeDocumentAuthority({
               documentId: reservation.entry.documentId,
-              initialBody: request.body ?? "",
+              initialBody: withMetadataFrontmatter(request.body ?? "", metadata),
               initialMetadata: metadata,
               workspaceId: state.workspaceId,
             }),
@@ -1168,7 +1188,7 @@ export function makeLocalJotApplication(
           const room = yield* provideAuthorityDependencies(
             makeDocumentAuthority({
               documentId: reservation.entry.documentId,
-              initialBody: request.body,
+              initialBody: withMetadataFrontmatter(request.body, metadata),
               initialMetadata: metadata,
               workspaceId: state.workspaceId,
             }),
@@ -1517,12 +1537,36 @@ export function makeLocalJotApplication(
                 authentication: logoutSession(state.authentication, credentials.sessionToken),
               }).pipe(Effect.mapError(toApplicationError)),
             ),
-      publish: (credentials, rawDocumentId) =>
+      publish: (credentials, rawDocumentId, confirmConfidentialPublic = false) =>
         Effect.gen(function* () {
           const room = yield* getRoom(rawDocumentId);
           const principal = yield* resolvePrincipal(credentials, rawDocumentId);
+          const now = new Date().toISOString();
+          const current = yield* room
+            .snapshot(principal, now)
+            .pipe(Effect.mapError(toApplicationError));
+          const source = yield* parseDocumentSource(current.body).pipe(
+            Effect.mapError(toApplicationError),
+          );
+          if (source.frontmatter !== undefined) {
+            const frontmatter = source.frontmatter;
+            yield* room
+              .updateMetadata(
+                principal,
+                {
+                  labels: frontmatter.labels,
+                  lifecycleState: frontmatter.state,
+                  sensitivity: frontmatter.sensitivity,
+                  visibility: frontmatter.visibility,
+                },
+                current.metadata.headRevision,
+                now,
+                confirmConfidentialPublic,
+              )
+              .pipe(Effect.mapError(toApplicationError));
+          }
           const metadata = yield* room
-            .publish(principal, new Date().toISOString())
+            .publish(principal, now)
             .pipe(Effect.mapError(toApplicationError));
           const published = yield* room
             .snapshot(ownerPrincipal, new Date().toISOString())
@@ -2188,8 +2232,20 @@ function attachmentObjectKey(
   return `workspaces/${workspaceId}/documents/${documentKey}/attachments/${attachmentId}`;
 }
 
+function withMetadataFrontmatter(body: string, metadata: DocumentMetadata): string {
+  if (body.startsWith("---\n")) return body;
+  const frontmatter = serializeDocumentFrontmatter({
+    labels: metadata.labels,
+    sensitivity: metadata.sensitivity,
+    state: metadata.lifecycleState,
+    visibility: metadata.visibility,
+  });
+  return body === "" ? frontmatter : `${frontmatter}\n${body}`;
+}
+
 function excerpt(body: string): string {
-  return body
+  const withoutFrontmatter = body.replace(/^---\n[\s\S]*?\n---[\t ]*(?:\n|$)/u, "");
+  return withoutFrontmatter
     .replace(/```[\s\S]*?```/gu, " ")
     .replace(/[^\p{Letter}\p{Number}\s]+/gu, " ")
     .replace(/\s+/gu, " ")
@@ -2318,6 +2374,15 @@ function toApplicationError(error: unknown): ApplicationError {
       message: error.message,
       retryable: false,
       status: error.code === "revision_conflict" ? 409 : 400,
+    });
+  }
+  if (error instanceof RenderError) {
+    return new ApplicationError({
+      cause: error,
+      code: "invalid_document_source",
+      message: error.message,
+      retryable: false,
+      status: 400,
     });
   }
   if (error instanceof StorageError) {

@@ -94,6 +94,25 @@ pnpm run build
 pnpm --filter @earendil-works/jot-runtime-cloudflare run deploy
 ```
 
+## Document frontmatter
+
+Publication details live at the beginning of the collaborative Markdown source:
+
+```yaml
+---
+state: discussion
+visibility: workspace
+sensitivity: normal
+labels:
+  - architecture
+  - platform
+---
+```
+
+The frontmatter is edited collaboratively, omitted from rendered prose, and reflected immediately in the live publication preview. Publishing validates these values and incorporates them into the structured published revision. Until an authorized member explicitly publishes, frontmatter changes do not alter document authorization or expose a working head. RFC allocation, sharing, and publication remain explicit controls.
+
+Existing documents without frontmatter are upgraded when their document authority next loads.
+
 ## Search
 
 Press `/` or <kbd>Cmd/Ctrl</kbd>+<kbd>K</kbd> from the workspace to focus search. Plain terms search titles, complete working-head bodies, RFC numbers, labels, states, and people. Terms are combined with AND; quote a phrase to keep it together and prefix a term or filter with `-` to exclude it.

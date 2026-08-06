@@ -9,6 +9,7 @@ import type {
 import type { ApiClientService, ApiError } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
 import type { ConnectionState } from "./collaboration.ts";
+import { metadataWithFrontmatter } from "./components/document-page.tsx";
 import { EditorComments } from "./components/editor-comments.tsx";
 import type { EditorCommentsHandle } from "./components/editor-comments.tsx";
 import { EditorToolbar } from "./components/editor-toolbar.tsx";
@@ -76,6 +77,7 @@ export function EditorScreen({
   const canComment = permissions?.includes("comment") ?? false;
   const canEditMetadata = permissions?.includes("edit-metadata") ?? !shared;
   const rendered = useRenderedMarkdown(body, true);
+  const previewMetadata = metadataWithFrontmatter(metadata, rendered.frontmatter);
 
   useEffect(() => {
     if (rendered.error !== undefined) showToast(`Preview failed: ${rendered.error}`, "error");
@@ -133,6 +135,7 @@ export function EditorScreen({
         onTogglePreview={() => setPreviewOpen((open) => !open)}
         openCommentCount={openCount}
         previewOpen={previewOpen}
+        publicationMetadata={previewMetadata}
         shared={shared}
       />
       <EditorWorkbench
@@ -144,7 +147,7 @@ export function EditorScreen({
         previewHeadings={rendered.headings}
         previewHtml={rendered.html}
         previewRef={previewRef}
-        metadata={metadata}
+        metadata={previewMetadata}
       />
       {displayName === undefined ? null : (
         <EditorComments

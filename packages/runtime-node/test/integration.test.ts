@@ -79,9 +79,9 @@ test(
           " from collaboration\n\n```ts\nconst value: number = 1;\n```",
         );
         document = await readDocument(baseUrl, document.metadata.id, authorization);
-        assert.equal(
+        assert.match(
           document.body,
-          "Initial body from collaboration\n\n```ts\nconst value: number = 1;\n```",
+          /---\n\nInitial body from collaboration\n\n```ts\nconst value: number = 1;\n```$/u,
         );
 
         const edit = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/edits`, {
@@ -94,9 +94,9 @@ test(
         });
         assert.equal(edit.status, 200);
         document = (await edit.json()) as DocumentWire;
-        assert.equal(
+        assert.match(
           document.body,
-          "Durable body from collaboration\n\n```ts\nconst value: number = 1;\n```",
+          /---\n\nDurable body from collaboration\n\n```ts\nconst value: number = 1;\n```$/u,
         );
         const search = await fetch(
           `${baseUrl}/api/documents?q=${encodeURIComponent("rfc:1 state:draft durable")}`,
@@ -187,6 +187,22 @@ test(
           method: "PATCH",
         });
         assert.equal(metadata.status, 200);
+        const metadataResponse = (await metadata.json()) as DocumentWire["metadata"];
+        const frontmatter = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/edits`, {
+          body: JSON.stringify({
+            edits: [
+              { newText: "visibility: public", oldText: "visibility: workspace" },
+              {
+                newText: "labels:\n  - architecture\n  - platform",
+                oldText: "labels: []",
+              },
+            ],
+            expectedRevision: metadataResponse.headRevision,
+          }),
+          headers: { ...authorization, "Content-Type": "application/json" },
+          method: "POST",
+        });
+        assert.equal(frontmatter.status, 200);
         assert.equal((await fetch(`${baseUrl}/rfc/0001`)).status, 404);
         const publish = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/publish`, {
           headers: authorization,
@@ -207,6 +223,7 @@ test(
         assert.match(publishedHtml, />Ada Lovelace<\/a>/u);
         assert.match(publishedHtml, /href="\/keyword\/architecture"/u);
         assert.match(publishedHtml, /Target decision/u);
+        assert.doesNotMatch(publishedHtml, /visibility: public/u);
         assert.match(publishedHtml, /class="tok-keyword">const<\/span>/u);
         assert.match(publishedHtml, /<link rel="stylesheet" href="\/fonts\.css">/u);
         assert.match(publishedHtml, /<link rel="stylesheet" href="\/public\.css">/u);
@@ -306,9 +323,9 @@ test(
       await withServer(directory, async (baseUrl) => {
         const authorization = { Authorization: `Bearer ${first.apiKey}` };
         const recovered = await readDocument(baseUrl, first.documentId, authorization);
-        assert.equal(
+        assert.match(
           recovered.body,
-          "Durable body from collaboration\n\n```ts\nconst value: number = 1;\n```",
+          /---\n\nDurable body from collaboration\n\n```ts\nconst value: number = 1;\n```$/u,
         );
         assert.equal(recovered.comments.threads.length, 1);
         assert.equal((await fetch(`${baseUrl}/rfc/0001`)).status, 200);
@@ -368,7 +385,7 @@ test("backup corruption is rejected and a fresh installation restores portably",
       });
       assert.equal(restored.status, 200);
       const document = await readDocument(baseUrl, source.documentId, source.authorization);
-      assert.equal(document.body, "Portable recovery body");
+      assert.match(document.body, /---\n\nPortable recovery body$/u);
       const verification = await fetch(`${baseUrl}/api/admin/verify`, {
         headers: source.authorization,
       });

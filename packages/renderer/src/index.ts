@@ -4,6 +4,7 @@ import { classHighlighter, highlightCode } from "@lezer/highlight";
 import { Context, Data, Effect, Layer } from "effect";
 import MarkdownIt from "markdown-it";
 import type { MarkdownIt as MarkdownItType, Token } from "markdown-it";
+import YAML from "yaml";
 
 const jotCodeLanguages = languages;
 export const jotSyntaxHighlighter = classHighlighter;
@@ -14,7 +15,21 @@ export interface RenderHeading {
   readonly text: string;
 }
 
+export interface DocumentFrontmatter {
+  readonly labels?: readonly string[] | undefined;
+  readonly sensitivity?: "confidential" | "normal" | undefined;
+  readonly state?: string | undefined;
+  readonly visibility?: "public" | "workspace" | undefined;
+}
+
+export interface ParsedDocumentSource {
+  readonly body: string;
+  readonly bodyOffset: number;
+  readonly frontmatter: DocumentFrontmatter | undefined;
+}
+
 export interface RenderedMarkdown {
+  readonly frontmatter: DocumentFrontmatter | undefined;
   readonly html: string;
   readonly headings: readonly RenderHeading[];
 }
@@ -50,14 +65,53 @@ export function makeMarkdownRenderer(): MarkdownRendererService {
     render: (markdown, options = {}) =>
       markdown.length > 5_000_000
         ? Effect.fail(new RenderError({ message: "Markdown exceeds the 5 MB render limit." }))
-        : Effect.tryPromise({
-            catch: (cause) => new RenderError({ cause, message: "Markdown rendering failed." }),
-            try: () => renderMarkdown(markdown, options),
-          }),
+        : parseDocumentSource(markdown).pipe(
+            Effect.flatMap((source) =>
+              Effect.tryPromise({
+                catch: (cause) => new RenderError({ cause, message: "Markdown rendering failed." }),
+                try: () => renderMarkdown(source, options),
+              }),
+            ),
+          ),
   };
 }
 
-async function renderMarkdown(markdown: string, options: RenderOptions): Promise<RenderedMarkdown> {
+export function parseDocumentSource(
+  markdown: string,
+): Effect.Effect<ParsedDocumentSource, RenderError> {
+  return Effect.try({
+    catch: (cause) =>
+      new RenderError({
+        cause,
+        message: cause instanceof Error ? cause.message : "Document frontmatter is invalid.",
+      }),
+    try: () => parseDocumentSourceUnsafe(markdown),
+  });
+}
+
+export function serializeDocumentFrontmatter(frontmatter: {
+  readonly labels: readonly string[];
+  readonly sensitivity: "confidential" | "normal";
+  readonly state: string;
+  readonly visibility: "public" | "workspace";
+}): string {
+  const yaml = YAML.stringify(
+    {
+      state: frontmatter.state,
+      visibility: frontmatter.visibility,
+      sensitivity: frontmatter.sensitivity,
+      labels: [...frontmatter.labels],
+    },
+    { lineWidth: 0 },
+  ).trimEnd();
+  return `---\n${yaml}\n---\n`;
+}
+
+async function renderMarkdown(
+  source: ParsedDocumentSource,
+  options: RenderOptions,
+): Promise<RenderedMarkdown> {
+  const { body: markdown, bodyOffset, frontmatter } = source;
   const headings: RenderHeading[] = [];
   const usedHeadingIds = new Map<string, number>();
   const lineOffsets = sourceLineOffsets(markdown);
@@ -72,7 +126,7 @@ async function renderMarkdown(markdown: string, options: RenderOptions): Promise
     for (const token of state.tokens) {
       rewriteTokenUrls(token, parser, options);
       if (options.sourcePositions === true) {
-        annotateSourcePosition(token, lineOffsets, markdown.length);
+        annotateSourcePosition(token, lineOffsets, markdown.length, bodyOffset);
       }
       if (token.type === "inline" && token.children !== null) {
         for (const child of token.children) {
@@ -105,19 +159,19 @@ async function renderMarkdown(markdown: string, options: RenderOptions): Promise
       return "";
     }
     const language = token.info.trim().split(/\s+/u)[0]?.toLocaleLowerCase("en") ?? "";
-    const source = token.content;
+    const code = token.content;
     const sourceAttributes = parser.renderer.renderAttrs(token);
     if (language === "mermaid") {
-      if (source.length > 100_000) {
+      if (code.length > 100_000) {
         return `<pre class="jot-code jot-code--rejected"${sourceAttributes}><code>Mermaid diagram exceeds the 100 KB render limit.</code></pre>\n`;
       }
-      return `<div class="jot-mermaid" data-mermaid${sourceAttributes}><pre><code>${parser.utils.escapeHtml(source)}</code></pre><div class="jot-mermaid__controls"><button type="button" data-mermaid-zoom-in aria-label="Zoom in">+</button><button type="button" data-mermaid-zoom-out aria-label="Zoom out">−</button><button type="button" data-mermaid-reset>Reset</button></div></div>\n`;
+      return `<div class="jot-mermaid" data-mermaid${sourceAttributes}><pre><code>${parser.utils.escapeHtml(code)}</code></pre><div class="jot-mermaid__controls"><button type="button" data-mermaid-zoom-in aria-label="Zoom in">+</button><button type="button" data-mermaid-zoom-out aria-label="Zoom out">−</button><button type="button" data-mermaid-reset>Reset</button></div></div>\n`;
     }
     const description = findJotCodeLanguage(token.info);
     const highlighted =
       description?.support === undefined
-        ? parser.utils.escapeHtml(source)
-        : highlightCodeAsHtml(source, description.support.language.parser, parser.utils.escapeHtml);
+        ? parser.utils.escapeHtml(code)
+        : highlightCodeAsHtml(code, description.support.language.parser, parser.utils.escapeHtml);
     const classes = [
       description?.support === undefined ? undefined : "jot-syntax",
       language ? `language-${language}` : undefined,
@@ -140,9 +194,65 @@ async function renderMarkdown(markdown: string, options: RenderOptions): Promise
     [...languagesToLoad].map((description) => description.load().catch(() => undefined)),
   );
   return {
+    frontmatter,
     headings,
     html: parser.renderer.render(tokens, parser.options, environment),
   };
+}
+
+function parseDocumentSourceUnsafe(markdown: string): ParsedDocumentSource {
+  if (!markdown.startsWith("---\n")) {
+    return { body: markdown, bodyOffset: 0, frontmatter: undefined };
+  }
+  const match = /^---\n([\s\S]*?)\n---[\t ]*(?:\n|$)/u.exec(markdown);
+  if (match === null) {
+    throw new Error("Document frontmatter is not terminated.");
+  }
+  const parsed = YAML.parse(match[1] ?? "") as unknown;
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Document frontmatter must be a YAML mapping.");
+  }
+  const values = parsed as Readonly<Record<string, unknown>>;
+  const state = optionalNonEmptyString(values["state"], "state");
+  const visibility = optionalEnum(values["visibility"], "visibility", ["public", "workspace"]);
+  const sensitivity = optionalEnum(values["sensitivity"], "sensitivity", [
+    "confidential",
+    "normal",
+  ]);
+  const labels = optionalLabels(values["labels"]);
+  return {
+    body: markdown.slice(match[0].length),
+    bodyOffset: match[0].length,
+    frontmatter: { labels, sensitivity, state, visibility },
+  };
+}
+
+function optionalNonEmptyString(value: unknown, label: string): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error(`Frontmatter ${label} must be a non-empty string.`);
+  }
+  return value.trim();
+}
+
+function optionalEnum<const Value extends string>(
+  value: unknown,
+  label: string,
+  allowed: readonly Value[],
+): Value | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || !allowed.includes(value as Value)) {
+    throw new Error(`Frontmatter ${label} must be one of: ${allowed.join(", ")}.`);
+  }
+  return value as Value;
+}
+
+function optionalLabels(value: unknown): readonly string[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.some((label) => typeof label !== "string")) {
+    throw new Error("Frontmatter labels must be a list of strings.");
+  }
+  return value.map((label) => String(label).trim()).filter(Boolean);
 }
 
 export function findJotCodeLanguage(info: string): LanguageDescription | null {
@@ -199,10 +309,11 @@ function annotateSourcePosition(
   token: Token,
   lineOffsets: readonly number[],
   markdownLength: number,
+  bodyOffset: number,
 ): void {
   if (!sourcePositionTokenTypes.has(token.type) || token.map === null) return;
-  const start = lineOffsets[token.map[0]] ?? markdownLength;
-  const end = lineOffsets[token.map[1]] ?? markdownLength;
+  const start = (lineOffsets[token.map[0]] ?? markdownLength) + bodyOffset;
+  const end = (lineOffsets[token.map[1]] ?? markdownLength) + bodyOffset;
   token.attrSet("data-jot-source-start", String(start));
   token.attrSet("data-jot-source-end", String(end));
   token.attrSet("data-jot-source-kind", token.type.replace(/_(?:open|block)$/u, ""));

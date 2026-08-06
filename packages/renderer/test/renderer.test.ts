@@ -19,6 +19,27 @@ test("rendering disables raw HTML and dangerous URLs", async () => {
   assert.match(rendered.html, /target="_blank"/u);
 });
 
+test("frontmatter is parsed without entering rendered content", async () => {
+  const source =
+    "---\nstate: discussion\nvisibility: public\nsensitivity: normal\nlabels:\n  - architecture\n  - platform\n---\n## Decision\n\nBody";
+  const rendered = await Effect.runPromise(renderer.render(source, { sourcePositions: true }));
+  assert.deepEqual(rendered.frontmatter, {
+    labels: ["architecture", "platform"],
+    sensitivity: "normal",
+    state: "discussion",
+    visibility: "public",
+  });
+  assert.doesNotMatch(rendered.html, /visibility/u);
+  assert.match(rendered.html, /<h2 id="decision" data-jot-source-start="103"/u);
+});
+
+test("invalid frontmatter fails with a useful error", async () => {
+  const error = await Effect.runPromise(
+    Effect.flip(renderer.render("---\nvisibility: everyone\n---\nBody")),
+  );
+  assert.match(error.message, /visibility must be one of/u);
+});
+
 test("headings are deterministic and duplicate-safe", async () => {
   const rendered = await Effect.runPromise(renderer.render("# Same\n\n## Same"));
   assert.deepEqual(rendered.headings, [

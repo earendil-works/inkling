@@ -61,8 +61,11 @@ test(
         () => document.querySelector("[data-save-state]")?.textContent === "Saved",
       );
       assert.equal(await first.locator("[data-api-status]").textContent(), "Saved");
-      assert.equal(await first.locator(".cm-content").textContent(), "");
-      await first.locator("[data-document-details] > summary").click();
+      assert.match(
+        await first.locator(".cm-content").innerText(),
+        /---\s+state: draft\s+visibility: workspace\s+sensitivity: normal\s+labels: \[\]\s+---/u,
+      );
+      assert.equal(await first.locator("[data-document-details]").count(), 0);
       await first.locator("[data-allocate-rfc]").click();
       await first.waitForFunction(
         () =>
@@ -70,15 +73,11 @@ test(
           "RFC 0001",
       );
       assert.equal(await first.locator("[data-allocate-rfc]").count(), 0);
-      const labelsUpdated = first.waitForResponse(
-        (response) =>
-          response.request().method() === "PATCH" &&
-          response.url().includes(`/api/documents/${documentId}/metadata`),
-      );
-      await first.locator("[data-labels]").fill("architecture, platform");
-      await first.locator("[data-labels]").press("Tab");
-      assert.equal((await labelsUpdated).status(), 200);
-      await first.locator("[data-document-details] > summary").click();
+      const labelsLine = first.locator(".cm-line").filter({ hasText: "labels: []" });
+      await labelsLine.click();
+      await first.keyboard.press("End");
+      await first.keyboard.press("Shift+Home");
+      await first.keyboard.insertText("labels:\n  - architecture\n  - platform");
       assert.equal(
         await first.locator(".editor-preview-page [data-document-page] h1").textContent(),
         "Browser collaboration",
@@ -94,8 +93,9 @@ test(
         "platform",
       );
       await first.locator(".cm-content").click();
+      await first.keyboard.press("ControlOrMeta+End");
       await first.keyboard.insertText(
-        "Shared starting body\n\n## Architecture\n\nSecond line\n\n```ts\nconst answer: number = 42;\n```\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n```mermaid\nnot a mermaid diagram\n```\n\nThird line",
+        "\nShared starting body\n\n## Architecture\n\nSecond line\n\n```ts\nconst answer: number = 42;\n```\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n```mermaid\nnot a mermaid diagram\n```\n\nThird line",
       );
       await first.waitForSelector(".cm-content .tok-keyword");
       await first.waitForSelector("[data-preview] .tok-keyword");
@@ -112,6 +112,14 @@ test(
       const editorKeyword = first.locator(".cm-content .tok-keyword").last();
       assert.equal(await editorKeyword.textContent(), "const");
       const editorKeywordClass = await editorKeyword.getAttribute("class");
+      const publication = first.waitForResponse(
+        (response) => response.request().method() === "POST" && response.url().endsWith("/publish"),
+      );
+      await first.locator("[data-publish]").click();
+      assert.equal((await publication).status(), 200);
+      await first.waitForFunction(
+        () => document.querySelector("[data-publish]")?.textContent === "Republish",
+      );
       await first.evaluate(() => {
         document.documentElement.dataset["browserNavigation"] = "same-document";
       });
@@ -274,12 +282,15 @@ test(
           .map((part) => part.trim())
           .find((part) => part.startsWith("jot_csrf="))
           ?.slice("jot_csrf=".length);
+        const documentResponse = await fetch(`/api/documents/${id}`);
+        const source = (await documentResponse.json()) as { body: string };
+        const start = source.body.indexOf("Shared starting body");
         await fetch(`/api/documents/${id}/comments`, {
           body: JSON.stringify({
             authorDisplayName: "Browser owner",
             body: "Browser comment",
             // Browser line selections commonly include the trailing newline.
-            selection: { end: "Shared starting body\n".length, start: 0 },
+            selection: { end: start + "Shared starting body\n".length, start },
           }),
           headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf ?? "" },
           method: "POST",
@@ -342,8 +353,8 @@ test(
       );
       await second.locator("[data-comment-close]").click();
 
-      await first.locator(".cm-content").click();
-      await first.keyboard.press("ControlOrMeta+Home");
+      await first.locator(".cm-line").filter({ hasText: "Shared starting body" }).click();
+      await first.keyboard.press("Home");
       await first.keyboard.insertText("Before ");
       await Promise.all(
         [first, second].map((page) =>

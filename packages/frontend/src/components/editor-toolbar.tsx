@@ -6,10 +6,10 @@ import type {
 
 import type { ApiClientService } from "../api.ts";
 import { documentHref } from "../ui.ts";
+import { AllocateRfcButton } from "./allocate-rfc-button.tsx";
 import { AttachmentButton } from "./attachment-button.tsx";
 import { ButtonLink } from "./button-link.tsx";
 import { Button } from "./button.tsx";
-import { DocumentDetails } from "./document-details.tsx";
 import { EditableDocumentTitle } from "./editable-document-title.tsx";
 import { PublishButton } from "./publish-button.tsx";
 import { SharingControl } from "./sharing-control.tsx";
@@ -27,6 +27,7 @@ export interface EditorToolbarProps {
   readonly onTogglePreview: () => void;
   readonly openCommentCount: number;
   readonly previewOpen: boolean;
+  readonly publicationMetadata: DocumentMetadataDto;
   readonly shared: boolean;
 }
 
@@ -43,6 +44,7 @@ export function EditorToolbar({
   onTogglePreview,
   openCommentCount,
   previewOpen,
+  publicationMetadata,
   shared,
 }: EditorToolbarProps): React.JSX.Element {
   return (
@@ -82,12 +84,11 @@ export function EditorToolbar({
             {openCommentCount}
           </span>
         </Button>
-        <DocumentDetails
+        <AllocateRfcButton
           api={api}
-          canEdit={canEditMetadata}
+          canAllocate={canEditMetadata}
           metadata={metadata}
-          onMetadataChanged={onMetadataChanged}
-          onUpdate={onMetadataUpdate}
+          onAllocated={onMetadataChanged}
         />
         {shared ? null : (
           <>
@@ -100,7 +101,7 @@ export function EditorToolbar({
             />
             <PublishButton
               api={api}
-              documentId={metadata.id}
+              metadata={publicationMetadata}
               onPublished={onMetadataChanged}
               published={metadata.publishedRevision !== undefined}
             />

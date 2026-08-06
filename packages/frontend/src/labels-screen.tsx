@@ -60,7 +60,7 @@ function LabelIndex({ groups }: { readonly groups: readonly LabelGroup[] }): Rea
       <section className="empty-state" data-label-index="">
         <span>Ø</span>
         <h2>No labels yet.</h2>
-        <p>Add labels from a note or RFC’s details menu.</p>
+        <p>Add labels in a note or RFC’s Markdown frontmatter.</p>
       </section>
     );
   }

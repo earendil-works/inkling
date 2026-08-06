@@ -15,6 +15,7 @@
     "@codemirror/language-data": "6.5.2",
     "@lezer/highlight": "1.2.3",
     "effect": "3.22.1",
-    "markdown-it": "15.0.0"
+    "markdown-it": "15.0.0",
+    "yaml": "2.8.2"
   }
 }

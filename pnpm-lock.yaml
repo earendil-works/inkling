@@ -186,6 +186,9 @@ importers:
       markdown-it:
         specifier: 15.0.0
         version: 15.0.0
+      yaml:
+        specifier: 2.8.2
+        version: 2.8.2
 
   packages/runtime-cloudflare:
     dependencies:
