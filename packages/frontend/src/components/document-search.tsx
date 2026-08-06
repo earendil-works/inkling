@@ -44,10 +44,11 @@ export function DocumentSearch({
   );
   const inputId = useId();
   const listboxId = `${inputId}-results`;
-  const settled = deferredQuery === query && search.state.status !== "loading";
+  const pending = deferredQuery !== query || search.state.status === "loading";
+  const displayedCatalog = search.state.data ?? initialCatalog;
   const topResults = useMemo(
-    () => (settled ? (search.state.data?.documents.slice(0, 8) ?? []) : []),
-    [search.state.data, settled],
+    () => displayedCatalog.documents.slice(0, 8),
+    [displayedCatalog.documents],
   );
   const completions = useMemo(
     () => searchCompletions(query, initialCatalog),
@@ -192,28 +193,27 @@ export function DocumentSearch({
             </div>
           )}
           <div
+            aria-busy={pending}
             aria-label="Document search results"
             className="document-search__results"
             id={listboxId}
             role="listbox"
           >
-            {query.trim() === "" ? null : !settled ? (
-              <p aria-live="polite" className="document-search__message">
-                Searching titles, metadata, and complete working heads…
-              </p>
-            ) : search.state.status === "failure" ? (
+            {query.trim() === "" ? null : search.state.status === "failure" && !pending ? (
               <p className="document-search__message is-error" role="alert">
                 {search.state.error.message}
               </p>
             ) : topResults.length === 0 ? (
               <p aria-live="polite" className="document-search__message">
-                No document matches this query.
+                {pending
+                  ? "Searching titles, metadata, and complete working heads…"
+                  : "No document matches this query."}
               </p>
             ) : (
               <>
                 <div className="document-search__result-heading">
                   <span>Top matches</span>
-                  <small>{search.state.data?.documents.length ?? 0} found</small>
+                  <small>{displayedCatalog.documents.length} found</small>
                 </div>
                 {topResults.map((document, index) => {
                   const { metadata } = document;

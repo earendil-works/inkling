@@ -114,6 +114,9 @@ test(
         "label:",
       );
       await documentSearch.fill("rfc:1 answer");
+      await first.waitForFunction(
+        () => document.querySelector('[role="listbox"]')?.getAttribute("aria-busy") === "false",
+      );
       await first.waitForSelector("[data-search-result]");
       assert.match(
         await first.locator("[data-search-result]").first().innerText(),
@@ -121,6 +124,21 @@ test(
       );
       assert.match(await first.locator("[data-search-result]").first().innerText(), /answer/u);
       assert.equal(new URL(first.url()).searchParams.get("q"), "rfc:1 answer");
+      await first.route("**/api/documents?q=*", async (route) => {
+        if (new URL(route.request().url()).searchParams.get("q") === 'rfc:1 "answer"') {
+          await new Promise((resolve) => setTimeout(resolve, 350));
+        }
+        await route.continue();
+      });
+      await documentSearch.fill('rfc:1 "answer"');
+      await first.waitForFunction(
+        () => document.querySelector('[role="listbox"]')?.getAttribute("aria-busy") === "true",
+      );
+      assert.equal(await first.locator("[data-search-result]").count(), 1);
+      await first.waitForFunction(
+        () => document.querySelector('[role="listbox"]')?.getAttribute("aria-busy") === "false",
+      );
+      assert.equal(await first.locator("[data-search-result]").count(), 1);
       await documentSearch.press("Enter");
       await first.waitForURL(/\/documents\/[^/]+$/u);
       await first.locator("[data-open-editor]").click();
