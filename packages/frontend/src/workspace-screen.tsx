@@ -15,6 +15,7 @@ import { Button } from "./components/button.tsx";
 import { CheckboxField } from "./components/checkbox-field.tsx";
 import { DocumentCatalog } from "./components/document-catalog.tsx";
 import { FormError } from "./components/form-error.tsx";
+import { LogoutButton } from "./components/logout-button.tsx";
 import { ModalDialog } from "./components/modal-dialog.tsx";
 import { TextareaField } from "./components/textarea-field.tsx";
 import { TextField } from "./components/text-field.tsx";
@@ -147,24 +148,6 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
       </ModalDialog>
       {settingsOpen ? <SettingsDialog api={api} onClose={() => setSettingsOpen(false)} /> : null}
     </main>
-  );
-}
-
-function LogoutButton({ api }: { readonly api: ApiClientService }): React.JSX.Element {
-  const { navigate } = useAppContext();
-  const logout = useEffectAction<void, void, ApiError>(() => api.logout);
-  return (
-    <Button
-      variant="text"
-      data-logout=""
-      disabled={logout.state.pending}
-      onClick={() =>
-        logout.execute(undefined, { onSuccess: () => navigate("/", { replace: true }) })
-      }
-      type="button"
-    >
-      Sign out
-    </Button>
   );
 }
 
