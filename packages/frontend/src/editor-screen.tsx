@@ -21,15 +21,10 @@ import type { ApiClientService } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
 import { makeCollaborationClient } from "./collaboration.ts";
 import type { CollaborationClient, ConnectionState } from "./collaboration.ts";
-import { AttachmentButton } from "./components/attachment-button.tsx";
-import { ButtonLink } from "./components/button-link.tsx";
 import { Button } from "./components/button.tsx";
 import { CheckboxField } from "./components/checkbox-field.tsx";
 import { CommentThreadCard } from "./components/comment-thread-card.tsx";
-import { DocumentDetails } from "./components/document-details.tsx";
-import { EditableDocumentTitle } from "./components/editable-document-title.tsx";
-import { PublishButton } from "./components/publish-button.tsx";
-import { SharingControl } from "./components/sharing-control.tsx";
+import { EditorToolbar } from "./components/editor-toolbar.tsx";
 import { CommentComposer } from "./comment-composer.tsx";
 import {
   commentDecorationsExtension,
@@ -42,7 +37,7 @@ import type { PreviewSourceRange, ProjectedCommentThread } from "./comments.ts";
 import { useEffectAction } from "./effect-hooks.ts";
 import { browserRuntime } from "./effect-runtime.ts";
 import { renderMermaid, useRenderedMarkdown } from "./markdown.tsx";
-import { colorFor, documentHref, guestName, randomId } from "./ui.ts";
+import { colorFor, guestName, randomId } from "./ui.ts";
 
 interface EditorSession {
   readonly awareness: Awareness;
@@ -436,89 +431,39 @@ export function EditorScreen({
 
   return (
     <main className={layoutClass} id="app" onClick={handleWorkbenchClick} tabIndex={-1}>
-      <section className="document-bar">
-        <EditableDocumentTitle
-          canEdit={canEditMetadata}
-          onCommit={(title) => updateMetadata({ title })}
-          rfcNumber={metadata.rfcNumber}
-          title={metadata.title}
-        />
-        <div className="document-actions">
-          <ButtonLink
-            className="document-mode-link"
-            href={documentHref(metadata.id, shared, "read")}
-            variant="toolbar"
-          >
-            Read
-          </ButtonLink>
-          <Button
-            aria-pressed={previewOpen}
-            className="preview-toggle"
-            variant="toolbar"
-            data-preview-toggle=""
-            onClick={() => setPreviewOpen((open) => !open)}
-            type="button"
-          >
-            Preview
-          </Button>
-          <AttachmentButton
-            api={api}
-            disabled={!canEdit}
-            documentId={metadata.id}
-            onUploaded={(attachment) => {
-              const session = sessionRef.current;
-              if (session === undefined) return;
-              const selection = session.editor.state.selection.main;
-              const label = attachment.filename.replaceAll("[", "").replaceAll("]", "");
-              const insertedMarkdown = attachment.mediaType.startsWith("image/")
-                ? `![${label}](${attachment.url})`
-                : `[${label}](${attachment.url})`;
-              session.editor.dispatch({
-                changes: { from: selection.from, insert: insertedMarkdown, to: selection.to },
-                selection: { anchor: selection.from + insertedMarkdown.length },
-              });
-            }}
-          />
-          <Button
-            variant="toolbar"
-            onClick={() => commentMenuRef.current?.showPopover()}
-            type="button"
-          >
-            Comments{" "}
-            <span className="comment-count" data-comment-count="">
-              {openCount}
-            </span>
-          </Button>
-          <DocumentDetails
-            canEdit={canEditMetadata}
-            metadata={metadata}
-            onUpdate={updateMetadata}
-          />
-          {shared ? null : (
-            <>
-              <SharingControl
-                access={metadata.sharing.access}
-                api={api}
-                documentId={metadata.id}
-                expectedRevision={metadata.headRevision}
-                onUpdated={(response) =>
-                  setMetadata((current) => ({
-                    ...current,
-                    headRevision: current.headRevision + 1,
-                    sharing: response.policy,
-                  }))
-                }
-              />
-              <PublishButton
-                api={api}
-                documentId={metadata.id}
-                onPublished={setMetadata}
-                published={metadata.publishedRevision !== undefined}
-              />
-            </>
-          )}
-        </div>
-      </section>
+      <EditorToolbar
+        api={api}
+        canEdit={canEdit}
+        canEditMetadata={canEditMetadata}
+        metadata={metadata}
+        onAttachment={(attachment) => {
+          const session = sessionRef.current;
+          if (session === undefined) return;
+          const selection = session.editor.state.selection.main;
+          const label = attachment.filename.replaceAll("[", "").replaceAll("]", "");
+          const insertedMarkdown = attachment.mediaType.startsWith("image/")
+            ? `![${label}](${attachment.url})`
+            : `[${label}](${attachment.url})`;
+          session.editor.dispatch({
+            changes: { from: selection.from, insert: insertedMarkdown, to: selection.to },
+            selection: { anchor: selection.from + insertedMarkdown.length },
+          });
+        }}
+        onMetadataChanged={setMetadata}
+        onMetadataUpdate={updateMetadata}
+        onOpenComments={() => commentMenuRef.current?.showPopover()}
+        onSharingChanged={(response) =>
+          setMetadata((current) => ({
+            ...current,
+            headRevision: current.headRevision + 1,
+            sharing: response.policy,
+          }))
+        }
+        onTogglePreview={() => setPreviewOpen((open) => !open)}
+        openCommentCount={openCount}
+        previewOpen={previewOpen}
+        shared={shared}
+      />
       <section className="workbench">
         <div className="source-pane" data-source-pane="">
           <div className="pane-label">
