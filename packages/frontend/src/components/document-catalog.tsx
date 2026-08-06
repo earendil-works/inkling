@@ -1,6 +1,6 @@
 import type { CatalogResponse } from "@earendil-works/jot-protocol";
 
-import { formatDate } from "../ui.ts";
+import { DocumentCatalogRow } from "./document-catalog-row.tsx";
 
 export interface DocumentCatalogProps {
   readonly catalog: CatalogResponse;
@@ -21,30 +21,9 @@ export function DocumentCatalog({ catalog }: DocumentCatalogProps): React.JSX.El
 
   return (
     <section className="catalog" data-catalog="" aria-live="polite">
-      {catalog.documents.map(({ excerpt, metadata }, index) => {
-        const number =
-          metadata.rfcNumber === undefined
-            ? "NOTE"
-            : `RFC ${String(metadata.rfcNumber).padStart(4, "0")}`;
-        return (
-          <a
-            className="catalog-row"
-            href={`/documents/${encodeURIComponent(metadata.id)}`}
-            key={metadata.id}
-          >
-            <span className="catalog-row__index">{String(index + 1).padStart(2, "0")}</span>
-            <span className="catalog-row__main">
-              <strong>{metadata.title}</strong>
-              <small>{excerpt || "No body text yet"}</small>
-            </span>
-            <span className="catalog-row__meta">
-              <b>{number}</b>
-              <span>{metadata.lifecycleState}</span>
-              <time dateTime={metadata.updatedAt}>{formatDate(metadata.updatedAt)}</time>
-            </span>
-          </a>
-        );
-      })}
+      {catalog.documents.map((document, index) => (
+        <DocumentCatalogRow document={document} index={index} key={document.metadata.id} />
+      ))}
     </section>
   );
 }
