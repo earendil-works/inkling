@@ -4,6 +4,7 @@ import type { AuthenticationStatus } from "@earendil-works/jot-protocol";
 
 import type { ApiClientService, ApiError } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
+import { Button } from "./components/button.tsx";
 import { useEffectAction } from "./effect-hooks.ts";
 
 export interface AuthenticationScreenProps {
@@ -63,17 +64,13 @@ export function AuthenticationScreen({
                   value={password}
                 />
               </label>
-              <button
-                className="primary-button"
-                disabled={authentication.state.pending}
-                type="submit"
-              >
+              <Button variant="primary" disabled={authentication.state.pending} type="submit">
                 {authentication.state.pending
                   ? "Connecting…"
                   : mode === "setup"
                     ? "Initialize workspace"
                     : "Sign in"}
-              </button>
+              </Button>
             </>
           ) : null}
           {methods.includes("google") ? (

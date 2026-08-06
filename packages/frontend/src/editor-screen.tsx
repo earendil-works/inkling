@@ -24,6 +24,7 @@ import type { ApiClientService } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
 import { makeCollaborationClient } from "./collaboration.ts";
 import type { CollaborationClient, ConnectionState } from "./collaboration.ts";
+import { Button } from "./components/button.tsx";
 import { CommentComposer } from "./comment-composer.tsx";
 import {
   commentDecorationsExtension,
@@ -480,15 +481,16 @@ export function EditorScreen({
           >
             Read
           </a>
-          <button
+          <Button
             aria-pressed={previewOpen}
-            className="toolbar-button preview-toggle"
+            className="preview-toggle"
+            variant="toolbar"
             data-preview-toggle=""
             onClick={() => setPreviewOpen((open) => !open)}
             type="button"
           >
             Preview
-          </button>
+          </Button>
           <label className="toolbar-button attachment-button">
             Attach
             <input
@@ -521,8 +523,8 @@ export function EditorScreen({
               type="file"
             />
           </label>
-          <button
-            className="toolbar-button"
+          <Button
+            variant="toolbar"
             onClick={() => commentMenuRef.current?.showPopover()}
             type="button"
           >
@@ -530,7 +532,7 @@ export function EditorScreen({
             <span className="comment-count" data-comment-count="">
               {openCount}
             </span>
-          </button>
+          </Button>
           <details className="document-details" data-document-details="">
             <summary className="toolbar-button">Details</summary>
             <div className="document-details__menu">
@@ -619,8 +621,8 @@ export function EditorScreen({
           </details>
           {shared ? null : (
             <>
-              <button
-                className="toolbar-button"
+              <Button
+                variant="toolbar"
                 data-share=""
                 onClick={() => {
                   const selected = window.prompt(
@@ -659,9 +661,10 @@ export function EditorScreen({
                 type="button"
               >
                 Share
-              </button>
-              <button
-                className="primary-button primary-button--small"
+              </Button>
+              <Button
+                size="small"
+                variant="primary"
                 data-publish=""
                 disabled={publishAction.state.pending}
                 onClick={() =>
@@ -676,7 +679,7 @@ export function EditorScreen({
                 type="button"
               >
                 {metadata.publishedRevision === undefined ? "Publish" : "Republish"}
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -692,15 +695,15 @@ export function EditorScreen({
         <div className="preview-pane" data-preview-pane="">
           <div className="pane-label">
             <span>Preview</span>
-            <button
+            <Button
               aria-label="Close preview"
-              className="icon-button"
+              variant="icon"
               data-preview-close=""
               onClick={() => setPreviewOpen(false)}
               type="button"
             >
               ×
-            </button>
+            </Button>
           </div>
           <article
             className="markdown-body"
@@ -723,25 +726,25 @@ export function EditorScreen({
             <p className="eyebrow">Anchored discussion</p>
             <b>Comments in context</b>
           </div>
-          <button
+          <Button
             aria-label="Close comment controls"
-            className="icon-button"
+            variant="icon"
             onClick={() => commentMenuRef.current?.hidePopover()}
             type="button"
           >
             ×
-          </button>
+          </Button>
         </div>
         <p>Select Markdown or rendered text. Comments stay attached as the document changes.</p>
-        <button
-          className="primary-button"
+        <Button
+          variant="primary"
           data-comment-new=""
           disabled={!canComment}
           onClick={commentOnSelection}
           type="button"
         >
           Comment on selection
-        </button>
+        </Button>
         <label className="resolved-toggle">
           <input
             checked={showResolved}
@@ -762,7 +765,7 @@ export function EditorScreen({
             </p>
           )}
           {orphaned.map((projection) => (
-            <button
+            <Button
               data-comment-bubble={projection.thread.id}
               data-comment-surface="preview"
               key={projection.thread.id}
@@ -770,7 +773,7 @@ export function EditorScreen({
             >
               <span>{projection.thread.messages[0]?.authorDisplayName ?? "Unknown author"}</span>
               {projection.thread.messages[0]?.body ?? "Open comment"}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -885,15 +888,15 @@ function CommentThread({
     <section className={`comment-thread ${thread.resolved ? "is-resolved" : ""}`}>
       <div className="comment-thread__heading">
         <span>Thread</span>
-        <button
+        <Button
           aria-label="Close comment thread"
-          className="icon-button"
+          variant="icon"
           data-comment-close=""
           onClick={onClose}
           type="button"
         >
           ×
-        </button>
+        </Button>
       </div>
       <blockquote>{thread.anchor.quote || "Orphaned selection"}</blockquote>
       {thread.messages.map((message) => (
@@ -901,34 +904,34 @@ function CommentThread({
           <b>{message.authorDisplayName}</b>
           <p>{message.body}</p>
           <span>
-            <button
+            <Button
               data-edit-message={`${thread.id}:${message.id}`}
               onClick={() => onEdit(message.id, message.body)}
               type="button"
             >
               Edit
-            </button>
-            <button
+            </Button>
+            <Button
               data-delete-message={`${thread.id}:${message.id}`}
               onClick={() => onDeleteMessage(message.id)}
               type="button"
             >
               Delete
-            </button>
+            </Button>
           </span>
         </div>
       ))}
       <div className="comment-actions">
-        <button data-reply-thread={thread.id} onClick={onReply} type="button">
+        <Button data-reply-thread={thread.id} onClick={onReply} type="button">
           Reply
-        </button>
-        <button data-resolve-thread={thread.id} onClick={onResolve} type="button">
+        </Button>
+        <Button data-resolve-thread={thread.id} onClick={onResolve} type="button">
           {thread.resolved ? "Reopen" : "Resolve"}
-        </button>
+        </Button>
         {canManage ? (
-          <button data-delete-thread={thread.id} onClick={onDeleteThread} type="button">
+          <Button data-delete-thread={thread.id} onClick={onDeleteThread} type="button">
             Delete thread
-          </button>
+          </Button>
         ) : null}
       </div>
     </section>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Button } from "./components/button.tsx";
 
 export interface CommentComposerProps {
   readonly initialBody?: string | undefined;
@@ -66,16 +67,16 @@ export function CommentComposer({
             <p className="eyebrow">Discussion</p>
             <h2 data-comment-composer-title="">{title}</h2>
           </div>
-          <button
+          <Button
             aria-label="Cancel comment"
-            className="icon-button"
+            variant="icon"
             data-comment-cancel=""
             disabled={pending}
             onClick={onCancel}
             type="button"
           >
             ×
-          </button>
+          </Button>
         </div>
         {quote === undefined || quote.length === 0 ? null : (
           <blockquote data-comment-composer-quote="">{quote}</blockquote>
@@ -110,23 +111,24 @@ export function CommentComposer({
             <kbd>Enter</kbd> to submit
           </span>
           <div>
-            <button
-              className="toolbar-button"
+            <Button
+              variant="toolbar"
               data-comment-cancel=""
               disabled={pending}
               onClick={onCancel}
               type="button"
             >
               Cancel
-            </button>
-            <button
-              className="primary-button primary-button--small"
+            </Button>
+            <Button
+              size="small"
+              variant="primary"
               data-comment-submit=""
               disabled={pending}
               type="submit"
             >
               {pending ? "Saving…" : submitLabel}
-            </button>
+            </Button>
           </div>
         </div>
       </form>

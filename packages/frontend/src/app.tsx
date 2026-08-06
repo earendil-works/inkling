@@ -13,6 +13,7 @@ import type { ApiClientService } from "./api.ts";
 import { AppContext } from "./app-context.tsx";
 import type { AppContextValue, AppStatus, ToastKind } from "./app-context.tsx";
 import { AuthenticationScreen } from "./auth-screen.tsx";
+import { Button } from "./components/button.tsx";
 import { useEffectQuery } from "./effect-hooks.ts";
 import { installClientRouter } from "./navigation.ts";
 import type { ClientRouter, NavigateOptions } from "./navigation.ts";
@@ -159,9 +160,9 @@ export function App(): React.JSX.Element {
             <span className="api-state__light" aria-hidden="true" />
             <span data-api-status="">{status.label}</span>
           </div>
-          <button
+          <Button
             aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
-            className="icon-button"
+            variant="icon"
             data-theme-toggle=""
             onClick={(event) => {
               if (event.detail > 1) return;
@@ -174,7 +175,7 @@ export function App(): React.JSX.Element {
             type="button"
           >
             ◐
-          </button>
+          </Button>
         </div>
       </header>
       <RouteView refresh={route.refresh} state={route.state} />
@@ -212,9 +213,9 @@ function RouteView({
             <p className="eyebrow">Runtime failure</p>
             <h1>Jot could not open.</h1>
             <p>{state.error.message}</p>
-            <button className="primary-button" data-retry="" onClick={refresh} type="button">
+            <Button variant="primary" data-retry="" onClick={refresh} type="button">
               Try again
-            </button>
+            </Button>
           </section>
         </main>
       );

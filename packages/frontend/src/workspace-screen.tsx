@@ -11,6 +11,7 @@ import type {
 
 import type { ApiClientService, ApiError } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
+import { Button } from "./components/button.tsx";
 import { useEffectAction, useEffectQuery } from "./effect-hooks.ts";
 import { formatDate, randomId } from "./ui.ts";
 
@@ -66,14 +67,14 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
           <p className="eyebrow">Workspace / recent activity</p>
           <h1>The working set.</h1>
         </div>
-        <button
-          className="primary-button"
+        <Button
+          variant="primary"
           data-new-document=""
           onClick={() => newDialogRef.current?.showModal()}
           type="button"
         >
           New document
-        </button>
+        </Button>
       </section>
       <section className="catalog-tools" aria-label="Document tools">
         <label className="search-field">
@@ -86,14 +87,9 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
             value={search}
           />
         </label>
-        <button
-          className="text-button"
-          data-settings=""
-          onClick={() => setSettingsOpen(true)}
-          type="button"
-        >
+        <Button variant="text" data-settings="" onClick={() => setSettingsOpen(true)} type="button">
           API &amp; agents
-        </button>
+        </Button>
         <LogoutButton api={api} />
       </section>
       <Catalog catalog={catalog} />
@@ -101,14 +97,14 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
         <form data-new-form="" onSubmit={submitDocument}>
           <div className="dialog-heading">
             <p className="eyebrow">Begin a working head</p>
-            <button
+            <Button
               aria-label="Close"
-              className="icon-button"
+              variant="icon"
               onClick={() => newDialogRef.current?.close()}
               type="button"
             >
               ×
-            </button>
+            </Button>
           </div>
           <label>
             Title
@@ -140,9 +136,9 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
               value={body}
             />
           </label>
-          <button className="primary-button" disabled={createDocument.state.pending} type="submit">
+          <Button variant="primary" disabled={createDocument.state.pending} type="submit">
             {createDocument.state.pending ? "Creating…" : "Create document"}
-          </button>
+          </Button>
           <p className="form-error" data-new-error="">
             {createDocument.state.error?.message}
           </p>
@@ -199,8 +195,8 @@ function LogoutButton({ api }: { readonly api: ApiClientService }): React.JSX.El
   const { navigate } = useAppContext();
   const logout = useEffectAction<void, void, ApiError>(() => api.logout);
   return (
-    <button
-      className="text-button"
+    <Button
+      variant="text"
       data-logout=""
       disabled={logout.state.pending}
       onClick={() =>
@@ -209,7 +205,7 @@ function LogoutButton({ api }: { readonly api: ApiClientService }): React.JSX.El
       type="button"
     >
       Sign out
-    </button>
+    </Button>
   );
 }
 
@@ -263,9 +259,9 @@ function SettingsDialog({ api, onClose }: SettingsDialogProps): React.JSX.Elemen
       <form data-settings-form="" onSubmit={submit}>
         <div className="dialog-heading">
           <p className="eyebrow">API keys / agent access</p>
-          <button aria-label="Close" className="icon-button" onClick={close} type="button">
+          <Button aria-label="Close" variant="icon" onClick={close} type="button">
             ×
-          </button>
+          </Button>
         </div>
         <div data-api-keys="">
           {keyQuery.state.status === "loading" && keys.length === 0 ? <p>Loading keys…</p> : null}
@@ -279,8 +275,8 @@ function SettingsDialog({ api, onClose }: SettingsDialogProps): React.JSX.Elemen
                 <small>{key.revokedAt === undefined ? "Active" : "Revoked"}</small>
               </span>
               {key.revokedAt === undefined ? (
-                <button
-                  className="text-button"
+                <Button
+                  variant="text"
                   data-revoke-key={key.id}
                   onClick={() => {
                     if (!window.confirm("Revoke this API key?")) return;
@@ -298,7 +294,7 @@ function SettingsDialog({ api, onClose }: SettingsDialogProps): React.JSX.Elemen
                   type="button"
                 >
                   Revoke
-                </button>
+                </Button>
               ) : null}
             </div>
           ))}
@@ -313,21 +309,21 @@ function SettingsDialog({ api, onClose }: SettingsDialogProps): React.JSX.Elemen
             value={label}
           />
         </label>
-        <button className="primary-button" disabled={createKey.state.pending} type="submit">
+        <Button variant="primary" disabled={createKey.state.pending} type="submit">
           Create API key
-        </button>
+        </Button>
         {agentCommand === undefined ? null : (
           <section className="agent-instructions" data-agent-instructions="">
             <b>Copy this now — the key is shown once.</b>
             <pre data-agent-command="">{agentCommand}</pre>
-            <button
-              className="text-button"
+            <Button
+              variant="text"
               data-copy-agent=""
               onClick={() => copyCommand.execute(agentCommand)}
               type="button"
             >
               Copy setup command
-            </button>
+            </Button>
           </section>
         )}
         <p className="form-error" data-settings-error="">
