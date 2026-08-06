@@ -7,7 +7,7 @@ import { useAppContext } from "./app-context.tsx";
 import { Button } from "./components/button.tsx";
 import { DocumentCatalog } from "./components/document-catalog.tsx";
 import { LogoutButton } from "./components/logout-button.tsx";
-import { NewDocumentDialog } from "./components/new-document-dialog.tsx";
+import { NewDocumentControl } from "./components/new-document-control.tsx";
 import { SettingsDialog } from "./components/settings-dialog.tsx";
 import { TextField } from "./components/text-field.tsx";
 import { useEffectQuery } from "./effect-hooks.ts";
@@ -25,7 +25,6 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
     api.listDocuments(deferredSearch),
     `catalog:${deferredSearch}`,
   );
-  const [newDocumentOpen, setNewDocumentOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const catalog = catalogQuery.state.data ?? initialCatalog;
 
@@ -40,14 +39,7 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
           <p className="eyebrow">Workspace / recent activity</p>
           <h1>The working set.</h1>
         </div>
-        <Button
-          variant="primary"
-          data-new-document=""
-          onClick={() => setNewDocumentOpen(true)}
-          type="button"
-        >
-          New document
-        </Button>
+        <NewDocumentControl api={api} />
       </section>
       <section className="catalog-tools" aria-label="Document tools">
         <TextField
@@ -65,11 +57,6 @@ export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): 
         <LogoutButton api={api} />
       </section>
       <DocumentCatalog catalog={catalog} />
-      <NewDocumentDialog
-        api={api}
-        onDismiss={() => setNewDocumentOpen(false)}
-        open={newDocumentOpen}
-      />
       {settingsOpen ? <SettingsDialog api={api} onClose={() => setSettingsOpen(false)} /> : null}
     </main>
   );
