@@ -32,6 +32,7 @@ export interface RenderedMarkdown {
   readonly frontmatter: DocumentFrontmatter | undefined;
   readonly html: string;
   readonly headings: readonly RenderHeading[];
+  readonly title: string | undefined;
 }
 
 export interface RenderOptions {
@@ -184,8 +185,14 @@ async function renderMarkdown(
 
   const environment = {};
   const tokens = parser.parse(markdown, environment);
+  const titleIndex = tokens.findIndex(
+    (token) => token.type === "heading_open" && token.tag === "h1",
+  );
+  const title = titleIndex === -1 ? undefined : inlineTokenText(tokens[titleIndex + 1]);
+  const contentTokens =
+    titleIndex === -1 ? tokens : [...tokens.slice(0, titleIndex), ...tokens.slice(titleIndex + 3)];
   const languagesToLoad = new Set<LanguageDescription>();
-  for (const token of tokens) {
+  for (const token of contentTokens) {
     if (token.type !== "fence") continue;
     const description = findJotCodeLanguage(token.info);
     if (description !== null) languagesToLoad.add(description);
@@ -196,8 +203,21 @@ async function renderMarkdown(
   return {
     frontmatter,
     headings,
-    html: parser.renderer.render(tokens, parser.options, environment),
+    html: parser.renderer.render(contentTokens, parser.options, environment),
+    title,
   };
+}
+
+function inlineTokenText(token: Token | undefined): string | undefined {
+  if (token?.type !== "inline") return undefined;
+  const text = (token.children ?? [])
+    .map((child) =>
+      child.type === "softbreak" || child.type === "hardbreak" ? " " : child.content,
+    )
+    .join("")
+    .replace(/\s+/gu, " ")
+    .trim();
+  return text === "" ? undefined : text.slice(0, 300);
 }
 
 function parseDocumentSourceUnsafe(markdown: string): ParsedDocumentSource {

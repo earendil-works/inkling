@@ -22,6 +22,7 @@ export {
   createDocumentMetadata,
   documentId,
   documentRevision,
+  documentTitleFromMarkdown,
   DomainError,
   hasPendingPublicationChanges,
   knownLifecycleStates,

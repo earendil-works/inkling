@@ -197,7 +197,6 @@ export const MetadataPatchRequestSchema = Schema.Struct({
   reviewers: Schema.optional(Schema.Array(PersonSchema)),
   sensitivity: Schema.optional(Schema.Literal("normal", "confidential")),
   targetDecisionDate: Schema.optional(Schema.NullOr(Schema.String)),
-  title: Schema.optional(NonEmptyString),
   visibility: Schema.optional(Schema.Literal("public", "workspace")),
 });
 export type MetadataPatchRequest = typeof MetadataPatchRequestSchema.Type;

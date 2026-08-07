@@ -1,12 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 
-import type {
-  AuthenticationStatus,
-  DocumentMetadataDto,
-  DocumentResponse,
-} from "@earendil-works/jot-protocol";
+import type { AuthenticationStatus, DocumentResponse } from "@earendil-works/jot-protocol";
 
-import type { ApiClientService, ApiError } from "./api.ts";
+import type { ApiClientService } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
 import type { ConnectionState } from "./collaboration.ts";
 import { metadataWithFrontmatter } from "./components/document-page.tsx";
@@ -15,7 +11,6 @@ import type { EditorCommentsHandle } from "./components/editor-comments.tsx";
 import { EditorToolbar } from "./components/editor-toolbar.tsx";
 import { connectionLabel, EditorWorkbench } from "./components/editor-workbench.tsx";
 import { GuestIdentityDialog } from "./components/guest-identity-dialog.tsx";
-import { useEffectAction } from "./effect-hooks.ts";
 import { useRenderedMarkdown } from "./markdown.tsx";
 import { documentHref, storedGuestName, storeGuestName } from "./ui.ts";
 import type { FrontmatterVocabulary } from "./frontmatter-completion.ts";
@@ -85,19 +80,8 @@ export function EditorScreen({
   const canComment = permissions?.includes("comment") ?? false;
   const canEditMetadata = permissions?.includes("edit-metadata") ?? !shared;
   const rendered = useRenderedMarkdown(body, true);
-  const previewMetadata = metadataWithFrontmatter(metadata, rendered.frontmatter);
+  const previewMetadata = metadataWithFrontmatter(metadata, rendered.frontmatter, rendered.title);
 
-  const metadataAction = useEffectAction<
-    Readonly<Record<string, unknown>>,
-    DocumentMetadataDto,
-    ApiError
-  >((input) => api.updateMetadata(metadata.id, input));
-  const updateMetadata = (input: Readonly<Record<string, unknown>>): void => {
-    metadataAction.execute(
-      { expectedRevision: metadata.headRevision, ...input },
-      { onFailure: (error) => showToast(error.message, "error"), onSuccess: setMetadata },
-    );
-  };
   const openCount = comments.threads.filter((thread) => !thread.resolved).length;
   const layoutClass = `editor-layout ${canEdit ? "is-editable" : "is-reader"}${previewOpen ? " preview-open" : ""}`;
 
@@ -127,7 +111,6 @@ export function EditorScreen({
           });
         }}
         onMetadataChanged={setMetadata}
-        onMetadataUpdate={updateMetadata}
         onOpenComments={() => editorCommentsRef.current?.openControls()}
         onSharingChanged={(response) =>
           setMetadata((current) => ({
@@ -141,6 +124,7 @@ export function EditorScreen({
         previewOpen={previewOpen}
         publicationMetadata={previewMetadata}
         shared={shared}
+        title={previewMetadata.title}
       />
       <EditorWorkbench
         connectionState={connectionState}

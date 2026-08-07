@@ -40,22 +40,19 @@ test("invalid frontmatter fails with a useful error", async () => {
   assert.match(error.message, /visibility must be one of/u);
 });
 
-test("headings are deterministic and duplicate-safe", async () => {
-  const rendered = await Effect.runPromise(renderer.render("# Same\n\n## Same"));
-  assert.deepEqual(rendered.headings, [
-    { depth: 1, id: "same", text: "Same" },
-    { depth: 2, id: "same-2", text: "Same" },
-  ]);
-  assert.match(rendered.html, /id="same-2"/u);
+test("the first top-level heading becomes the title instead of rendered body content", async () => {
+  const rendered = await Effect.runPromise(renderer.render("# **Same** title\n\n## Same title"));
+  assert.equal(rendered.title, "Same title");
+  assert.deepEqual(rendered.headings, [{ depth: 2, id: "same-title", text: "Same title" }]);
+  assert.doesNotMatch(rendered.html, /<h1/u);
+  assert.match(rendered.html, /<h2 id="same-title"/u);
 });
 
 test("interactive rendering annotates block elements with Markdown source ranges", async () => {
   const markdown = "# Heading\n\nParagraph with **strong text**.\n\n- list item\n";
   const rendered = await Effect.runPromise(renderer.render(markdown, { sourcePositions: true }));
-  assert.match(
-    rendered.html,
-    /<h1 id="heading" data-jot-source-start="0" data-jot-source-end="10"/u,
-  );
+  assert.equal(rendered.title, "Heading");
+  assert.doesNotMatch(rendered.html, /<h1/u);
   assert.match(rendered.html, /<p data-jot-source-start="11" data-jot-source-end="43"/u);
   assert.match(rendered.html, /data-jot-source-kind="list_item"/u);
 

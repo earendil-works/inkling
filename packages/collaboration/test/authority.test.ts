@@ -155,6 +155,23 @@ test("an update is not applied when its durable append fails", async () => {
   assert.equal(after.body, "hello");
 });
 
+test("accepted body updates derive the document title from the top-level heading", async () => {
+  const fixtureValue = await fixture();
+  const authority = await fixtureValue.make();
+  const before = await Effect.runPromise(authority.snapshot(fixtureValue.principal, now));
+  const client = await Effect.runPromise(createCollaborativeDocument());
+  await Effect.runPromise(applyDocumentUpdate(client.document, before.stateUpdate));
+  client.body.delete(0, client.body.length);
+  client.body.insert(0, "# Derived title\n\nBody");
+  const update = await Effect.runPromise(encodeMissingState(client.document, before.stateVector));
+
+  await Effect.runPromise(
+    authority.acceptBodyUpdate(fixtureValue.principal, update, "title-update", now),
+  );
+  const after = await Effect.runPromise(authority.snapshot(fixtureValue.principal, now));
+  assert.equal(after.metadata.title, "Derived title");
+});
+
 test("checkpoint plus durable tail recovers every acknowledged update", async () => {
   const fixtureValue = await fixture();
   const authority = await fixtureValue.make();

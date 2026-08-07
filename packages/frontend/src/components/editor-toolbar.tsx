@@ -10,7 +10,7 @@ import { AllocateRfcButton } from "./allocate-rfc-button.tsx";
 import { AttachmentButton } from "./attachment-button.tsx";
 import { ButtonLink } from "./button-link.tsx";
 import { Button } from "./button.tsx";
-import { EditableDocumentTitle } from "./editable-document-title.tsx";
+import { DocumentIdentity } from "./document-identity.tsx";
 import { PublishButton } from "./publish-button.tsx";
 import { SharingControl } from "./sharing-control.tsx";
 
@@ -21,7 +21,6 @@ export interface EditorToolbarProps {
   readonly metadata: DocumentMetadataDto;
   readonly onAttachment: (attachment: AttachmentMetadataDto) => void;
   readonly onMetadataChanged: (metadata: DocumentMetadataDto) => void;
-  readonly onMetadataUpdate: (input: Readonly<Record<string, unknown>>) => void;
   readonly onOpenComments: () => void;
   readonly onSharingChanged: (response: ShareResponse) => void;
   readonly onTogglePreview: () => void;
@@ -29,6 +28,7 @@ export interface EditorToolbarProps {
   readonly previewOpen: boolean;
   readonly publicationMetadata: DocumentMetadataDto;
   readonly shared: boolean;
+  readonly title: string;
 }
 
 export function EditorToolbar({
@@ -38,7 +38,6 @@ export function EditorToolbar({
   metadata,
   onAttachment,
   onMetadataChanged,
-  onMetadataUpdate,
   onOpenComments,
   onSharingChanged,
   onTogglePreview,
@@ -46,15 +45,11 @@ export function EditorToolbar({
   previewOpen,
   publicationMetadata,
   shared,
+  title,
 }: EditorToolbarProps): React.JSX.Element {
   return (
     <section className="document-bar">
-      <EditableDocumentTitle
-        canEdit={canEditMetadata}
-        onCommit={(title) => onMetadataUpdate({ title })}
-        rfcNumber={metadata.rfcNumber}
-        title={metadata.title}
-      />
+      <DocumentIdentity rfcNumber={metadata.rfcNumber} title={title} />
       <div className="document-actions">
         <ButtonLink
           className="document-mode-link"

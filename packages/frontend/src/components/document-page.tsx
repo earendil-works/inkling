@@ -9,16 +9,16 @@ import { DocumentTableOfContents } from "./document-table-of-contents.tsx";
 export function metadataWithFrontmatter(
   metadata: DocumentMetadataDto,
   frontmatter: DocumentFrontmatter | undefined,
+  title?: string | undefined,
 ): DocumentMetadataDto {
-  return frontmatter === undefined
-    ? metadata
-    : {
-        ...metadata,
-        labels: frontmatter.labels ?? metadata.labels,
-        lifecycleState: frontmatter.state ?? metadata.lifecycleState,
-        sensitivity: frontmatter.sensitivity ?? metadata.sensitivity,
-        visibility: frontmatter.visibility ?? metadata.visibility,
-      };
+  return {
+    ...metadata,
+    labels: frontmatter?.labels ?? metadata.labels,
+    lifecycleState: frontmatter?.state ?? metadata.lifecycleState,
+    sensitivity: frontmatter?.sensitivity ?? metadata.sensitivity,
+    title: title ?? metadata.title,
+    visibility: frontmatter?.visibility ?? metadata.visibility,
+  };
 }
 
 export interface DocumentPageProps {

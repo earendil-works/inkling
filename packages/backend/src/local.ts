@@ -17,6 +17,7 @@ import {
   Digest,
   documentActions,
   documentId,
+  documentTitleFromMarkdown,
   DomainError,
   DurableDocumentJournal,
   emptyAuthenticationState,
@@ -254,14 +255,10 @@ export function makeLocalJotApplication(
           const current = yield* room
             .snapshot(ownerPrincipal, now)
             .pipe(Effect.mapError(toApplicationError));
-          if (!current.body.startsWith("---\n")) {
+          const scaffoldedBody = withMetadataFrontmatter(current.body, current.metadata);
+          if (scaffoldedBody !== current.body) {
             yield* room
-              .replaceBody(
-                ownerPrincipal,
-                withMetadataFrontmatter(current.body, current.metadata),
-                current.metadata.headRevision,
-                now,
-              )
+              .replaceBody(ownerPrincipal, scaffoldedBody, current.metadata.headRevision, now)
               .pipe(Effect.mapError(toApplicationError));
             yield* room.checkpoint(now).pipe(Effect.mapError(toApplicationError));
           }
@@ -362,6 +359,21 @@ export function makeLocalJotApplication(
       return options.principalResolver(credentials, targetDocumentId);
     };
 
+    const responseFromSnapshot = (
+      snapshot: DocumentSnapshot,
+      startLine?: number,
+      endLine?: number,
+    ): Effect.Effect<DocumentResponse, ApplicationError> =>
+      startLine === undefined && endLine === undefined
+        ? Effect.succeed(toDocumentResponse(snapshot))
+        : readLineRange(snapshot.body, {
+            end: endLine ?? Number.MAX_SAFE_INTEGER,
+            start: startLine ?? 1,
+          }).pipe(
+            Effect.mapError(toApplicationError),
+            Effect.map((body) => toDocumentResponse({ ...snapshot, body })),
+          );
+
     const snapshotFor = (
       room: DocumentAuthorityService,
       principal: Principal,
@@ -370,18 +382,46 @@ export function makeLocalJotApplication(
     ): Effect.Effect<DocumentResponse, ApplicationError> =>
       room.snapshot(principal, new Date().toISOString()).pipe(
         Effect.mapError(toApplicationError),
-        Effect.flatMap((snapshot) =>
-          startLine === undefined && endLine === undefined
-            ? Effect.succeed(toDocumentResponse(snapshot))
-            : readLineRange(snapshot.body, {
-                end: endLine ?? Number.MAX_SAFE_INTEGER,
-                start: startLine ?? 1,
-              }).pipe(
-                Effect.mapError(toApplicationError),
-                Effect.map((body) => toDocumentResponse({ ...snapshot, body })),
-              ),
-        ),
+        Effect.flatMap((snapshot) => responseFromSnapshot(snapshot, startLine, endLine)),
       );
+
+    const publishedSnapshotFor = (
+      room: DocumentAuthorityService,
+      principal: Principal,
+      startLine?: number,
+      endLine?: number,
+    ): Effect.Effect<DocumentResponse, ApplicationError> =>
+      Effect.gen(function* () {
+        const current = yield* room
+          .snapshot(principal, new Date().toISOString())
+          .pipe(Effect.mapError(toApplicationError));
+        const publishedRevision = current.metadata.publishedRevision;
+        if (publishedRevision === undefined) {
+          return {
+            ...toDocumentResponse(current),
+            body: "",
+            comments: { revision: 0, threads: [] },
+          };
+        }
+        const published = yield* provideAuthorityDependencies(
+          loadDocumentRevision(
+            { documentId: current.metadata.id, workspaceId: state.workspaceId },
+            publishedRevision,
+          ),
+        ).pipe(Effect.mapError(toApplicationError));
+        return yield* responseFromSnapshot(
+          {
+            ...published,
+            metadata: {
+              ...published.metadata,
+              publishedRevision,
+              sharing: current.metadata.sharing,
+            },
+          },
+          startLine,
+          endLine,
+        );
+      });
 
     const projectDocument = (
       room: DocumentAuthorityService,
@@ -1119,7 +1159,7 @@ export function makeLocalJotApplication(
             {
               id: reservation.entry.documentId,
               rfcNumber: reservation.entry.rfcNumber,
-              title: request.title,
+              title: documentTitleFromMarkdown(request.body ?? "") ?? request.title,
             },
             now,
           ).pipe(Effect.mapError(toApplicationError));
@@ -1189,7 +1229,7 @@ export function makeLocalJotApplication(
               rfcNumber: reservation.entry.rfcNumber,
               sensitivity: request.metadata.sensitivity,
               targetDecisionDate: request.metadata.targetDecisionDate,
-              title: request.metadata.title,
+              title: documentTitleFromMarkdown(request.body) ?? request.metadata.title,
               visibility: request.metadata.visibility,
             },
             importedAt,
@@ -1562,6 +1602,13 @@ export function makeLocalJotApplication(
           const source = yield* parseDocumentSource(current.body).pipe(
             Effect.mapError(toApplicationError),
           );
+          if (documentTitleFromMarkdown(current.body) === undefined) {
+            return yield* applicationFailure(
+              "title_required",
+              "Add a top-level Markdown heading before publishing.",
+              400,
+            );
+          }
           if (source.frontmatter !== undefined) {
             const frontmatter = source.frontmatter;
             yield* room
@@ -1596,11 +1643,14 @@ export function makeLocalJotApplication(
           yield* scheduleCheckpoint(room);
           return metadata as DocumentMetadataDto;
         }),
-      readDocument: (credentials, rawDocumentId, startLine, endLine) =>
+      readDocument: (credentials, rawDocumentId, startLine, endLine, published = false) =>
         Effect.gen(function* () {
           const room = yield* getRoom(rawDocumentId);
           const principal = yield* resolvePrincipal(credentials, rawDocumentId);
-          return yield* snapshotFor(room, principal, startLine, endLine);
+          const read = published
+            ? publishedSnapshotFor(room, principal, startLine, endLine)
+            : snapshotFor(room, principal, startLine, endLine);
+          return yield* read;
         }),
       readPublicDocument: (rawDocumentId) =>
         readPublished(rawDocumentId, `/public/documents/${encodeURIComponent(rawDocumentId)}`),
@@ -2252,20 +2302,29 @@ function attachmentObjectKey(
 }
 
 function withMetadataFrontmatter(body: string, metadata: DocumentMetadata): string {
-  if (body.startsWith("---\n")) return body;
   const frontmatter = serializeDocumentFrontmatter({
     labels: metadata.labels,
     sensitivity: metadata.sensitivity,
     state: metadata.lifecycleState,
     visibility: metadata.visibility,
   });
-  return body === "" ? frontmatter : `${frontmatter}\n${body}`;
+  const source = body.startsWith("---\n") ? body : `${frontmatter}\n${body}`;
+  if (documentTitleFromMarkdown(source) !== undefined) return source;
+
+  const title = metadata.title.replace(/\s+/gu, " ").trim();
+  const heading = `# ${title}\n`;
+  const match = /^---\n[\s\S]*?\n---[\t ]*(?:\n|$)/u.exec(source);
+  if (match === null) return body.startsWith("---\n") ? source : `${heading}\n${source}`;
+  const remaining = source.slice(match[0].length).trimStart();
+  return `${match[0]}\n${heading}${remaining === "" ? "" : `\n${remaining}`}`;
 }
 
 function excerpt(body: string): string {
   const withoutFrontmatter = body.replace(/^---\n[\s\S]*?\n---[\t ]*(?:\n|$)/u, "");
   return withoutFrontmatter
     .replace(/```[\s\S]*?```/gu, " ")
+    .replace(/^ {0,3}#[\t ]+.+(?:\n|$)/mu, " ")
+    .replace(/^(.+)\n {0,3}=+[\t ]*(?:\n|$)/mu, " ")
     .replace(/[^\p{Letter}\p{Number}\s]+/gu, " ")
     .replace(/\s+/gu, " ")
     .trim()
@@ -2312,7 +2371,6 @@ function metadataPatch(
       reviewers: yield* convertPeople(request.reviewers),
       sensitivity: request.sensitivity,
       targetDecisionDate: request.targetDecisionDate,
-      title: request.title,
       visibility: request.visibility,
     };
   });

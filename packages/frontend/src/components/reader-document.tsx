@@ -10,7 +10,16 @@ export interface ReaderDocumentProps {
 
 export function ReaderDocument({ document }: ReaderDocumentProps): React.JSX.Element {
   const rendered = useRenderedMarkdown(document.body, true);
-  const metadata = metadataWithFrontmatter(document.metadata, rendered.frontmatter);
+  if (document.metadata.publishedRevision === undefined) {
+    return (
+      <section className="empty-state reader-unpublished" data-reader="" data-unpublished="">
+        <span>○</span>
+        <h1>{document.metadata.title}</h1>
+        <p>This document has not been published yet.</p>
+      </section>
+    );
+  }
+  const metadata = metadataWithFrontmatter(document.metadata, rendered.frontmatter, rendered.title);
 
   return (
     <div className="reader-document" data-reader="">

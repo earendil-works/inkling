@@ -68,7 +68,7 @@ Markdown exports, rendered HTML, search indexes, snippets, state indexes, keywor
 
 Visibility, sharing, publication, and permissions are not inferred from collaborative Markdown alone. They are structured fields changed through validated commands.
 
-Collaborative frontmatter may propose publication state, visibility, sensitivity, and labels. Those values drive the live publication preview, but they do not change authorization while editing. An authorized, explicit publish command validates and promotes them into the structured metadata stored with the published revision. Sharing, RFC allocation, and publication state are never controlled by frontmatter.
+Collaborative frontmatter may propose publication state, visibility, sensitivity, and labels. Those values drive the live publication preview, but they do not change authorization while editing. The document title is the first top-level Markdown heading and is cached in structured state only as a derived projection. An authorized, explicit publish command validates and promotes frontmatter values into the structured metadata stored with the published revision. Sharing, RFC allocation, and publication state are never controlled by frontmatter.
 
 ### 4.6 Local and Cloudflare are adapters around the same core
 
@@ -323,7 +323,7 @@ RFC numbers are allocated monotonically within a workspace and are never reused,
 A document carries structured fields for:
 
 - Identifier and optional RFC number.
-- Title.
+- Derived title cached from the first top-level Markdown heading.
 - Lifecycle state.
 - Public or workspace visibility.
 - Normal or confidential sensitivity.
@@ -337,13 +337,13 @@ A document carries structured fields for:
 - Optional published revision.
 - Sharing policy.
 
-Metadata is changed by explicit document commands. The collaborative body cannot alter permissions or publication state.
+Authoritative metadata is changed by explicit document commands. The cached title is refreshed from accepted body updates. The collaborative body cannot alter permissions or publication state.
 
 ### 7.3 Collaborative body
 
-The body is a Yjs text value containing Markdown and optional publication frontmatter. It is the only directly collaborative field in the initial design.
+The body is a Yjs text value containing Markdown and optional publication frontmatter. It is the only directly collaborative field in the initial design. Its first top-level heading is the document title. Renderers present that heading in the document hero rather than duplicating it in prose, and catalog metadata caches its plain-text value as a rebuildable projection.
 
-Publication frontmatter contains collaboratively edited presentation values such as lifecycle state, intended visibility, sensitivity, and labels. Renderers omit it from prose and use it for live preview. Structured metadata remains authoritative for authorization until an explicit publish command validates and promotes the frontmatter values. Title and metadata outside this publication frontmatter are serialized server commands rather than opaque collaborative changes.
+Publication frontmatter contains collaboratively edited presentation values such as lifecycle state, intended visibility, sensitivity, and labels. Renderers omit it from prose and use it for live preview. Structured metadata remains authoritative for authorization until an explicit publish command validates and promotes the frontmatter values. Metadata outside the title heading and publication frontmatter is changed through serialized server commands rather than opaque collaborative changes.
 
 ### 7.4 Comments
 
@@ -547,7 +547,7 @@ A retry may repeat any step without allocating a second RFC number or creating a
 
 ### 11.3 Metadata projection
 
-After relevant document changes, the document authority sends a revisioned summary to the workspace authority. The summary includes listing metadata, an excerpt, and normalized search material.
+After relevant document changes, the document authority sends a revisioned summary to the workspace authority. The summary includes listing metadata, the title derived from the first top-level heading, an excerpt, and normalized search material.
 
 The workspace authority ignores stale summary revisions. If delivery fails, the document authority retains a durable outbox entry and retries.
 
@@ -567,13 +567,13 @@ An administrative repair operation rebuilds the workspace catalog from document 
 
 ### 12.1 Working head
 
-The working head is the latest accepted document state. Editors, capability viewers, commenters, and authorized workspace readers may see the working head according to document policy.
+The working head is the latest accepted document state. Editors and explicit working-head API operations may see it according to document policy. Standard document reader surfaces never render the working head: they show the latest published revision, or an unpublished state when no published revision exists.
 
 ### 12.2 Published revision
 
 A document may designate a checkpoint as its published revision. Public canonical routes serve this immutable revision rather than an in-progress editing head.
 
-Before capturing the revision, publishing parses and validates collaborative publication frontmatter and applies its allowed values through the same structured metadata validation used by explicit metadata commands.
+Before capturing the revision, publishing requires a non-empty top-level title heading, parses and validates collaborative publication frontmatter, and applies its allowed values through the same structured metadata validation used by explicit metadata commands.
 
 Publishing records:
 
@@ -588,7 +588,7 @@ A new publication replaces the public pointer but does not mutate the prior publ
 
 The initial clean-room implementation uses explicit publication for public canonical RFC pages. This avoids exposing half-written collaborative edits and makes public caching deterministic.
 
-Capability share links continue to expose the current working head according to their permissions.
+Capability read links expose the latest published revision. Capability edit sessions synchronize the current working head when their permissions allow editing.
 
 A later workspace option may automatically publish checkpoints after a quiet period, but automatic publication is not required for the initial cutover.
 
@@ -746,7 +746,7 @@ Authentication-varying controls are either omitted from cacheable HTML or loaded
 
 ### 15.4 Internal reads
 
-Internal working-head reads may be rendered dynamically or served from a recent private projection. They must be marked private and must not enter shared public caches.
+Internal document reader routes serve the latest published revision and are private unless the publication is publicly visible. Explicit editor and agent working-head reads may be rendered dynamically or served from a recent private projection. They must be marked private and must not enter shared public caches.
 
 ### 15.5 Canonical routes
 
@@ -769,7 +769,7 @@ Primary surfaces are:
 - Import, export, and administrative repair status.
 - Agent setup instructions.
 
-CodeMirror owns text editing, selection, composition, and local undo. Application state owns metadata, comments, permissions, connection status, and preview state.
+CodeMirror owns text editing, selection, composition, the title heading, and local undo. Application state owns structured metadata, comments, permissions, connection status, and preview state.
 
 Accessibility requirements include keyboard navigation, visible focus, semantic controls, dialog focus management, reduced-motion support, and non-color-only presence indicators.
 
@@ -1156,7 +1156,8 @@ The clean-room rewrite is ready for production migration when:
 - Structured metadata is separate from collaborative Markdown.
 - Comment anchors use collaborative relative positions with textual fallbacks.
 - Public canonical pages serve explicit published revisions.
-- Share links serve the authorized working head.
+- Reader and capability-view links serve the latest published revision; editor sessions use the authorized working head.
+- The first top-level Markdown heading is the document title.
 - Catalogs and rendered outputs are rebuildable projections.
 - D1 and Queues are not required initially.
 - Google OAuth is an identity adapter and can be added after the core architecture is operational.

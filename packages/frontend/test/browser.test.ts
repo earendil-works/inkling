@@ -136,6 +136,8 @@ test(
         "Pending edits",
       );
       await workingLabelRow.click();
+      await first.waitForSelector("[data-unpublished]");
+      assert.doesNotMatch(await first.locator("[data-reader]").innerText(), /architecture/u);
       await first.locator("[data-open-editor]").click();
       await first.waitForFunction(
         () => document.querySelector("[data-save-state]")?.textContent === "Saved",
@@ -177,6 +179,13 @@ test(
       );
       await first.waitForFunction(
         () => document.querySelector("[data-publish]")?.textContent === "Publish Changes",
+      );
+      await first.getByRole("link", { name: "Read" }).click();
+      await first.waitForSelector("[data-reader]");
+      assert.doesNotMatch(await first.locator("[data-reader]").innerText(), /Published follow-up/u);
+      await first.locator("[data-open-editor]").click();
+      await first.waitForFunction(
+        () => document.querySelector("[data-save-state]")?.textContent === "Saved",
       );
       const changedPublication = first.waitForResponse(
         (response) => response.request().method() === "POST" && response.url().endsWith("/publish"),

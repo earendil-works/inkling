@@ -159,6 +159,7 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
             context.req.param("documentId"),
             range.start,
             range.end,
+            context.req.query("published") === "true",
           ),
         ),
       );

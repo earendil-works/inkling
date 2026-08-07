@@ -8,6 +8,7 @@ import {
   deleteCommentMessage,
   deleteCommentThread,
   Digest,
+  documentTitleFromMarkdown,
   DomainError,
   DurableDocumentJournal,
   editCommentMessage,
@@ -48,6 +49,7 @@ import {
 import { decodeBase64, encodeBase64 } from "./binary.ts";
 import {
   applyDocumentUpdate,
+  bodyTextName,
   cloneDocument,
   CollaborationError,
   createCollaborativeDocument,
@@ -316,6 +318,8 @@ export function makeDocumentAuthority(
         const cloned = yield* cloneDocument(state.collaborative.document);
         yield* applyDocumentUpdate(cloned, update);
         const clonedState = yield* encodeDocumentState(cloned);
+        const title =
+          documentTitleFromMarkdown(cloned.getText(bodyTextName).toString()) ?? "Untitled";
         cloned.destroy();
         if (clonedState.byteLength > maxDocumentBytes) {
           return yield* collaborationFailure(
@@ -327,6 +331,7 @@ export function makeDocumentAuthority(
         const metadata: DocumentMetadata = {
           ...state.metadata,
           headRevision: nextDocumentRevision(state.metadata.headRevision),
+          title,
           updatedAt: now,
         };
         const entry = yield* persist(

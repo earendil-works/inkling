@@ -172,17 +172,6 @@ function main(arguments_: readonly string[]): Effect.Effect<void, unknown> {
         console.log(`Replaced ${target.documentId} at revision ${updated.metadata.headRevision}.`);
         return;
       }
-      case "rename": {
-        const target = yield* documentTarget(instance, arguments_, 1);
-        const title = yield* argument(arguments_, target.nextIndex, "title");
-        const current = yield* client.read(target.documentId);
-        const updated = yield* client.metadata(target.documentId, {
-          expectedRevision: current.metadata.headRevision,
-          title,
-        });
-        console.log(`Renamed ${target.documentId} to ${updated.title}.`);
-        return;
-      }
       case "metadata": {
         const target = yield* documentTarget(instance, arguments_, 1);
         const id = target.documentId;
@@ -470,7 +459,7 @@ function metadataFieldPatch(
   if (field === "targetDecisionDate" || field === "legacySourceUrl") {
     return Effect.succeed({ [field]: value === "none" ? null : value });
   }
-  if (new Set(["lifecycleState", "sensitivity", "title", "visibility"]).has(field)) {
+  if (new Set(["lifecycleState", "sensitivity", "visibility"]).has(field)) {
     return Effect.succeed({
       [field]: value,
       ...(field === "visibility" && value === "public" ? { confirmConfidentialPublic: true } : {}),
@@ -753,7 +742,6 @@ Usage:
   jot read [DOCUMENT] [--lines START:END]
   jot create TITLE [--rfc] [--body MARKDOWN]
   jot edit [DOCUMENT] OLD_TEXT NEW_TEXT
-  jot rename [DOCUMENT] TITLE
   jot replace [DOCUMENT] MARKDOWN_PATH|-
   jot metadata [DOCUMENT] FIELD VALUE
   jot delete|publish|unpublish [DOCUMENT]

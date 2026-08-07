@@ -191,6 +191,7 @@ export interface JotApplicationService {
     documentId: string,
     startLine?: number,
     endLine?: number,
+    published?: boolean,
   ) => Effect.Effect<DocumentResponse, ApplicationError>;
   readonly updateMetadata: (
     credentials: RequestCredentials,

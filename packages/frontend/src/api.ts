@@ -49,7 +49,10 @@ export interface ApiClientService {
     request: CreateDocumentRequest,
   ) => Effect.Effect<DocumentResponse, ApiError>;
   readonly allocateRfc: (documentId: string) => Effect.Effect<DocumentMetadataDto, ApiError>;
-  readonly readDocument: (documentId: string) => Effect.Effect<DocumentResponse, ApiError>;
+  readonly readDocument: (
+    documentId: string,
+    published?: boolean,
+  ) => Effect.Effect<DocumentResponse, ApiError>;
   readonly uploadAttachment: (
     documentId: string,
     file: File,
@@ -264,8 +267,11 @@ export function makeApiClient(capabilityToken?: string): ApiClientService {
         DocumentMetadataSchema,
         "POST",
       ),
-    readDocument: (documentId) =>
-      request(`/api/documents/${encodeURIComponent(documentId)}`, DocumentResponseSchema),
+    readDocument: (documentId, published = false) =>
+      request(
+        `/api/documents/${encodeURIComponent(documentId)}${published ? "?published=true" : ""}`,
+        DocumentResponseSchema,
+      ),
     readPublicRfc: (number) => request(`/api/public/rfc/${number}`, PublicDocumentResponseSchema),
     reply: (documentId, threadId, parentId, body, authorDisplayName) =>
       mutation(

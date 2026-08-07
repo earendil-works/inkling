@@ -81,7 +81,7 @@ test(
         document = await readDocument(baseUrl, document.metadata.id, authorization);
         assert.match(
           document.body,
-          /---\n\nInitial body from collaboration\n\n```ts\nconst value: number = 1;\n```$/u,
+          /---\n\n# Integrated RFC\n\nInitial body from collaboration\n\n```ts\nconst value: number = 1;\n```$/u,
         );
 
         const edit = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/edits`, {
@@ -96,7 +96,7 @@ test(
         document = (await edit.json()) as DocumentWire;
         assert.match(
           document.body,
-          /---\n\nDurable body from collaboration\n\n```ts\nconst value: number = 1;\n```$/u,
+          /---\n\n# Integrated RFC\n\nDurable body from collaboration\n\n```ts\nconst value: number = 1;\n```$/u,
         );
         const search = await fetch(
           `${baseUrl}/api/documents?q=${encodeURIComponent("rfc:1 state:draft durable")}`,
@@ -255,18 +255,31 @@ test(
         assert.equal(syntaxTheme.status, 200);
         assert.match(await syntaxTheme.text(), /\.tok-keyword/u);
         document = await readDocument(baseUrl, document.metadata.id, authorization);
-        const workingTitle = await fetch(
-          `${baseUrl}/api/documents/${document.metadata.id}/metadata`,
-          {
-            body: JSON.stringify({
-              expectedRevision: document.metadata.headRevision,
-              title: "Unpublished working title",
-            }),
-            headers: { ...authorization, "Content-Type": "application/json" },
-            method: "PATCH",
-          },
-        );
+        const workingTitle = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/edits`, {
+          body: JSON.stringify({
+            edits: [
+              {
+                newText: "# Unpublished working title",
+                oldText: "# Integrated RFC",
+              },
+            ],
+            expectedRevision: document.metadata.headRevision,
+          }),
+          headers: { ...authorization, "Content-Type": "application/json" },
+          method: "POST",
+        });
         assert.equal(workingTitle.status, 200);
+        const workingTitleDocument = (await workingTitle.json()) as DocumentWire;
+        assert.equal(workingTitleDocument.metadata.title, "Unpublished working title");
+        const publishedDocument = await fetch(
+          `${baseUrl}/api/documents/${document.metadata.id}?published=true`,
+          { headers: authorization },
+        );
+        assert.equal(publishedDocument.status, 200);
+        const publishedDocumentBody = (await publishedDocument.json()) as DocumentWire;
+        assert.equal(publishedDocumentBody.metadata.title, "Integrated RFC");
+        assert.match(publishedDocumentBody.body, /# Integrated RFC/u);
+        assert.doesNotMatch(publishedDocumentBody.body, /Unpublished working title/u);
         const isolatedPublication = await (await fetch(`${baseUrl}/rfc/0001`)).text();
         assert.match(isolatedPublication, /Integrated RFC/u);
         assert.doesNotMatch(isolatedPublication, /Unpublished working title/u);
@@ -337,7 +350,7 @@ test(
         const recovered = await readDocument(baseUrl, first.documentId, authorization);
         assert.match(
           recovered.body,
-          /---\n\nDurable body from collaboration\n\n```ts\nconst value: number = 1;\n```$/u,
+          /---\n\n# Unpublished working title\n\nDurable body from collaboration\n\n```ts\nconst value: number = 1;\n```$/u,
         );
         assert.equal(recovered.comments.threads.length, 1);
         assert.equal((await fetch(`${baseUrl}/rfc/0001`)).status, 200);
@@ -397,7 +410,7 @@ test("backup corruption is rejected and a fresh installation restores portably",
       });
       assert.equal(restored.status, 200);
       const document = await readDocument(baseUrl, source.documentId, source.authorization);
-      assert.match(document.body, /---\n\nPortable recovery body$/u);
+      assert.match(document.body, /---\n\n# Portable recovery\n\nPortable recovery body$/u);
       const verification = await fetch(`${baseUrl}/api/admin/verify`, {
         headers: source.authorization,
       });
@@ -422,7 +435,9 @@ interface DocumentWire {
   readonly metadata: {
     readonly headRevision: number;
     readonly id: string;
+    readonly publishedRevision?: number | undefined;
     readonly rfcNumber?: number | undefined;
+    readonly title: string;
   };
 }
 

@@ -194,9 +194,12 @@ function loadDocumentRoute(
       }),
     try: () => preloadDocumentScreen(screen),
   });
-  return Effect.all([api.readDocument(documentId), api.authenticationStatus, preload], {
-    concurrency: "unbounded",
-  }).pipe(
+  return Effect.all(
+    [api.readDocument(documentId, screen === "reader"), api.authenticationStatus, preload],
+    {
+      concurrency: "unbounded",
+    },
+  ).pipe(
     Effect.flatMap(([document, authentication]) =>
       (screen === "editor" && !shared && authentication.authenticated
         ? api.listDocuments().pipe(Effect.catchAll(() => Effect.succeed(undefined)))

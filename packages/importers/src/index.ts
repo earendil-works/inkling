@@ -91,7 +91,8 @@ export function importEarendilRfc(
     const parsed = yield* parseFrontmatter(markdown, context.sourcePath);
     const frontmatter = parsed.frontmatter;
     const warnings: string[] = [];
-    const title = firstString(frontmatter, ["title", "name"]) ?? firstHeading(parsed.body);
+    const headingTitle = firstHeading(parsed.body);
+    const title = headingTitle ?? firstString(frontmatter, ["title", "name"]);
     if (title === undefined) {
       return yield* importFailure(
         "invalid_metadata",
@@ -144,7 +145,7 @@ export function importEarendilRfc(
     const targetDecisionDate = normalizeDate(
       firstString(frontmatter, ["target_decision_date", "decision_date"]),
     );
-    const body = rewriteLegacyRfcLinks(removeMatchingTitleHeading(parsed.body, title));
+    const body = ensureTitleHeading(rewriteLegacyRfcLinks(parsed.body), title);
     const metadata: ImportedMetadataInput = {
       approvers,
       authors,
@@ -190,16 +191,18 @@ export function importExistingJot(
       ),
     );
     const comments = decodeLegacyComments(decoded.comments ?? [], context.sourcePath);
+    const body = (yield* parseFrontmatter(markdown, context.sourcePath)).body;
+    const title = firstHeading(body) ?? decoded.title;
     return {
       attachments: context.attachments ?? [],
-      body: (yield* parseFrontmatter(markdown, context.sourcePath)).body,
+      body: ensureTitleHeading(body, title),
       capabilityAccess: decoded.shareAccess,
       capabilityId: decoded.shareId,
       comments,
       metadata: {
         createdAt: normalizeDate(decoded.createdAt) ?? context.now,
         id: decoded.id,
-        title: decoded.title,
+        title,
         updatedAt: normalizeDate(decoded.updatedAt) ?? context.now,
       },
       people: context.people ?? [],
@@ -333,9 +336,10 @@ function firstHeading(markdown: string): string | undefined {
   return /^#\s+(.+)$/mu.exec(markdown)?.[1]?.trim();
 }
 
-function removeMatchingTitleHeading(markdown: string, title: string): string {
-  const match = /^#\s+(.+)\r?\n?/mu.exec(markdown);
-  return match?.[1]?.trim() === title ? markdown.replace(match[0], "").trimStart() : markdown;
+function ensureTitleHeading(markdown: string, title: string): string {
+  if (firstHeading(markdown) !== undefined) return markdown;
+  const body = markdown.trimStart();
+  return body === "" ? `# ${title}\n` : `# ${title}\n\n${body}`;
 }
 
 function numberFromPath(sourcePath: string): number | undefined {

@@ -82,15 +82,16 @@ test(
       });
       assert.equal(edited.status, 200);
       let changed = (await edited.json()) as DocumentWire;
-      assert.match(changed.body, /---\n\ndurable first$/u);
+      assert.match(changed.body, /---\n\n# Cloudflare first\n\ndurable first$/u);
       assert.match(
         (await readDocument(running.baseUrl, second.metadata.id, authorization)).body,
-        /---\n\ninitial second$/u,
+        /---\n\n# Cloudflare second\n\ninitial second$/u,
       );
       changed = await updateTitle(
         running.baseUrl,
         first.metadata.id,
         changed.metadata.headRevision,
+        "Cloudflare first",
         "Intermediate title",
         authorization,
       );
@@ -98,6 +99,7 @@ test(
         running.baseUrl,
         first.metadata.id,
         changed.metadata.headRevision,
+        "Intermediate title",
         "Newest projected title",
         authorization,
       );
@@ -127,14 +129,14 @@ test(
       try {
         assert.match(
           (await readDocument(running.baseUrl, first.metadata.id, authorization)).body,
-          /---\n\ndurable first$/u,
+          /---\n\n# Newest projected title\n\ndurable first$/u,
         );
         const persistedSecond = await readDocument(
           running.baseUrl,
           second.metadata.id,
           authorization,
         );
-        assert.match(persistedSecond.body, /---\n\ninitial second$/u);
+        assert.match(persistedSecond.body, /---\n\n# Cloudflare second\n\ninitial second$/u);
         assert.equal(persistedSecond.metadata.rfcNumber, 2);
       } finally {
         await running.stop();
@@ -192,16 +194,20 @@ async function updateTitle(
   baseUrl: string,
   documentId: string,
   expectedRevision: number,
+  oldTitle: string,
   title: string,
   headers: Readonly<Record<string, string>>,
 ): Promise<DocumentWire> {
-  const response = await fetch(`${baseUrl}/api/documents/${documentId}/metadata`, {
-    body: JSON.stringify({ expectedRevision, title }),
+  const response = await fetch(`${baseUrl}/api/documents/${documentId}/edits`, {
+    body: JSON.stringify({
+      edits: [{ newText: `# ${title}`, oldText: `# ${oldTitle}` }],
+      expectedRevision,
+    }),
     headers: { ...headers, "Content-Type": "application/json" },
-    method: "PATCH",
+    method: "POST",
   });
   assert.equal(response.status, 200);
-  return readDocument(baseUrl, documentId, headers);
+  return (await response.json()) as DocumentWire;
 }
 
 async function waitForCatalog(

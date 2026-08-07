@@ -52,7 +52,7 @@ See [the prior decision](../rfcs/0012-prior.md#outcome).
   assert.equal(imported.metadata.authors?.[0]?.displayName, "Armin Ronacher");
   assert.equal(imported.metadata.reviewers?.[0]?.displayName, "Robert Reviewer");
   assert.deepEqual(imported.relatedRfcNumbers, [12, 13]);
-  assert.equal(imported.body.startsWith("# Durable collaboration"), false);
+  assert.equal(imported.body.startsWith("# Durable collaboration"), true);
   assert.match(imported.body, /\/rfc\/0012#outcome/u);
 });
 
@@ -79,7 +79,7 @@ test("existing Jot import keeps share and comment migration data", async () => {
       { sourcePath: "notes/imported.md" },
     ),
   );
-  assert.equal(imported.body, "Body text");
+  assert.equal(imported.body, "# Imported note\n\nBody text");
   assert.equal(imported.capabilityAccess, "comment");
   assert.equal(imported.comments[0]?.messages[0]?.legacyId, "old-message");
   assert.equal(imported.comments[0]?.resolved, true);

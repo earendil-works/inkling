@@ -14,6 +14,7 @@ import {
   createWorkspaceSession,
   authenticateSession,
   documentId,
+  documentTitleFromMarkdown,
   emptyCommentState,
   encodeBase62,
   IdGenerator,
@@ -80,7 +81,7 @@ test("metadata revisions reject stale commands and confidential public transitio
   assert.equal(updated.lifecycleState, "custom imported state");
 
   const stale = await Effect.runPromise(
-    updateDocumentMetadata(updated, { title: "Stale" }, 0, now).pipe(Effect.either),
+    updateDocumentMetadata(updated, { lifecycleState: "stale" }, 0, now).pipe(Effect.either),
   );
   assert.equal(Either.isLeft(stale) && stale.left.code, "revision_conflict");
 
@@ -94,6 +95,17 @@ test("metadata revisions reject stale commands and confidential public transitio
     Either.isLeft(unsafePublic) && unsafePublic.left.code,
     "confidential_public_confirmation_required",
   );
+});
+
+test("document titles come from the first top-level Markdown heading", () => {
+  assert.equal(
+    documentTitleFromMarkdown(
+      "---\nstate: draft\n---\n\n```md\n# Not the title\n```\n\n# **Actual** [title](https://example.com)\n",
+    ),
+    "Actual title",
+  );
+  assert.equal(documentTitleFromMarkdown("Setext title\n===\n\nBody"), "Setext title");
+  assert.equal(documentTitleFromMarkdown("## Section only"), undefined);
 });
 
 test("workspace identity sessions retain their verified principal", async () => {

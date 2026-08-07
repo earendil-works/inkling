@@ -22,6 +22,7 @@ export interface RenderedMarkdown {
   readonly frontmatter: DocumentFrontmatter | undefined;
   readonly headings: readonly RenderHeading[];
   readonly loading: boolean;
+  readonly title: string | undefined;
 }
 
 export function useRenderedMarkdown(source: string, sourcePositions: boolean): RenderedMarkdown {
@@ -36,6 +37,7 @@ export function useRenderedMarkdown(source: string, sourcePositions: boolean): R
     headings: state.data?.headings ?? emptyHeadings,
     html: state.data?.html ?? "",
     loading: state.status === "loading",
+    title: state.data?.title,
   };
 }
 

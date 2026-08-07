@@ -97,7 +97,6 @@ export interface CreateMetadataInput {
 }
 
 export interface MetadataPatch {
-  readonly title?: string | undefined;
   readonly lifecycleState?: string | undefined;
   readonly visibility?: Visibility | undefined;
   readonly sensitivity?: Sensitivity | undefined;
@@ -151,6 +150,42 @@ export function hasPendingPublicationChanges(metadata: {
     metadata.publishedRevision === undefined ||
     metadata.headRevision > metadata.publishedRevision + 1
   );
+}
+
+export function documentTitleFromMarkdown(markdown: string): string | undefined {
+  const lines = markdown.replaceAll("\r\n", "\n").split("\n");
+  let lineIndex = lines[0] === "---" ? 1 : 0;
+  if (lineIndex === 1) {
+    while (lineIndex < lines.length && !/^---[\t ]*$/u.test(lines[lineIndex] ?? "")) {
+      lineIndex += 1;
+    }
+    lineIndex += 1;
+  }
+
+  let fence: string | undefined;
+  for (; lineIndex < lines.length; lineIndex += 1) {
+    const line = lines[lineIndex] ?? "";
+    const fenceMatch = /^ {0,3}(`{3,}|~{3,})/u.exec(line)?.[1];
+    if (fenceMatch !== undefined) {
+      if (fence === undefined) fence = fenceMatch[0];
+      else if (fenceMatch[0] === fence) fence = undefined;
+      continue;
+    }
+    if (fence !== undefined) continue;
+
+    const atx = /^ {0,3}#[\t ]+(.+?)[\t ]*#*[\t ]*$/u.exec(line)?.[1]?.trim();
+    if (atx !== undefined && atx !== "") {
+      const title = plainMarkdownHeading(atx);
+      if (title !== "") return title;
+    }
+
+    const following = lines[lineIndex + 1] ?? "";
+    if (line.trim() !== "" && /^ {0,3}=+[\t ]*$/u.test(following)) {
+      const title = plainMarkdownHeading(line.trim());
+      if (title !== "") return title;
+    }
+  }
+  return undefined;
 }
 
 export function validatePerson(person: PersonReference): Effect.Effect<void, DomainError> {
@@ -298,8 +333,6 @@ export function updateDocumentMetadata(
         patch.reviewers === undefined ? metadata.reviewers : yield* validatePeople(patch.reviewers),
       sensitivity,
       targetDecisionDate,
-      title:
-        patch.title === undefined ? metadata.title : yield* fromEither(validateTitle(patch.title)),
       updatedAt: yield* fromEither(validateDate(now, "update date")),
       visibility,
     };
@@ -395,6 +428,17 @@ export function requireRevision(
         "revision_conflict",
         `Expected revision ${expectedRevision}, current revision is ${metadata.headRevision}.`,
       );
+}
+
+function plainMarkdownHeading(value: string): string {
+  return value
+    .replace(/!\[([^\]]*)\]\([^)]*\)/gu, "$1")
+    .replace(/\[([^\]]+)\]\([^)]*\)/gu, "$1")
+    .replace(/[*_~`]+/gu, "")
+    .replace(/\\([\\`*_{}[\]()#+.!-])/gu, "$1")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .slice(0, 300);
 }
 
 function validateTitle(value: string): Either.Either<string, DomainError> {

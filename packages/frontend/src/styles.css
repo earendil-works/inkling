@@ -1287,6 +1287,7 @@ select:disabled {
   font-weight: 600;
   letter-spacing: -0.02em;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .document-actions {
