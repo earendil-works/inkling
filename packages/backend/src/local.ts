@@ -508,7 +508,7 @@ export function makeLocalJotApplication(
       emails: readonly string[],
     ): Effect.Effect<readonly PersonReference[], ApplicationError> =>
       options.peopleResolver === undefined
-        ? Effect.succeed(knownPeopleByEmail(state.catalog, emails))
+        ? Effect.succeed(knownPeopleByEmail(state.catalog, state.authentication, emails))
         : options.peopleResolver(emails);
 
     const authorsFromEmails = (
@@ -1570,8 +1570,8 @@ export function makeLocalJotApplication(
           );
           return {
             documents,
-            people: state.catalog.people.map(
-              (entry) => entry.person as DocumentMetadataDto["authors"][number],
+            people: workspacePeople(state.catalog, state.authentication).map(
+              (person) => person as DocumentMetadataDto["authors"][number],
             ),
           } satisfies CatalogResponse;
         }),
@@ -1605,7 +1605,7 @@ export function makeLocalJotApplication(
               "Password authentication is disabled for this deployment.",
               403,
             ),
-      loginWorkspaceIdentity: (identity) =>
+      loginWorkspaceIdentity: (identity, directoryPeople = []) =>
         withState(
           createWorkspaceSession(state.authentication, identity, new Date().toISOString()).pipe(
             Effect.provideService(IdGenerator, ids),
@@ -1613,10 +1613,11 @@ export function makeLocalJotApplication(
             Effect.provideService(SecureToken, tokens),
             Effect.mapError(toApplicationError),
             Effect.flatMap((created) => {
-              const existing = state.catalog.people.find(
+              const directoryCatalog = directoryPeople.reduce(upsertPerson, state.catalog);
+              const existing = directoryCatalog.people.find(
                 (entry) => entry.person.id === identity.personId,
               );
-              const catalog = upsertPerson(state.catalog, {
+              const catalog = upsertPerson(directoryCatalog, {
                 aliases: existing?.aliases ?? [],
                 person: {
                   displayName: identity.displayName,
@@ -2448,14 +2449,44 @@ function metadataPatch(
   });
 }
 
+function workspacePeople(
+  catalog: WorkspaceCatalogState,
+  authentication: AuthenticationState,
+): readonly PersonReference[] {
+  const people = new Map(
+    catalog.people.map((entry) => [entry.person.email.toLocaleLowerCase("en"), entry.person]),
+  );
+  for (const session of authentication.sessions) {
+    const email = session.email?.trim().toLocaleLowerCase("en");
+    const displayName = session.displayName?.trim();
+    if (
+      email === undefined ||
+      email === "" ||
+      displayName === undefined ||
+      displayName === "" ||
+      session.personId === undefined
+    ) {
+      continue;
+    }
+    people.set(email, { displayName, email, id: session.personId });
+  }
+  return [...people.values()];
+}
+
 function knownPeopleByEmail(
   catalog: WorkspaceCatalogState,
+  authentication: AuthenticationState,
   emails: readonly string[],
 ): readonly PersonReference[] {
-  const requested = new Set(emails.map((email) => email.trim().toLocaleLowerCase("en")));
-  return catalog.people
-    .map((entry) => entry.person)
-    .filter((person) => requested.has(person.email.toLocaleLowerCase("en")));
+  const people = workspacePeople(catalog, authentication);
+  return emails.flatMap((value): readonly PersonReference[] => {
+    const email = value.trim().toLocaleLowerCase("en");
+    const direct = people.find((person) => person.email.trim().toLocaleLowerCase("en") === email);
+    if (direct !== undefined) return [direct];
+    const normalized = normalizeSearchText(email);
+    const aliased = catalog.people.find((entry) => entry.aliases.includes(normalized))?.person;
+    return aliased === undefined ? [] : [{ ...aliased, email }];
+  });
 }
 
 function convertPeople(

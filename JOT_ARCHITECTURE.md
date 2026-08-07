@@ -210,7 +210,7 @@ Expected RFC states include draft, discussion, published, accepted, implemented,
 - People can be represented by canonical display name and email address.
 - Imported aliases can be normalized through a workspace people directory.
 - Search continues to match canonical names, primary email addresses, and known aliases.
-- Google Workspace directory synchronization may be added later without changing stored document authorship.
+- Google Workspace directory synchronization refreshes canonical names and aliases without changing email-identified document authorship.
 
 #### Google authentication
 
@@ -661,7 +661,7 @@ Local mode retains first-run owner password setup, durable sessions, API key adm
 
 Google OAuth is an identity adapter added to the request entry point. It produces verified workspace principals and does not change document state or collaboration protocols.
 
-Allowed-domain checks use verified email addresses. OAuth state and sessions are signed, time-limited, secure, HTTP-only, and same-site cookies.
+Allowed-domain checks use verified email addresses. OAuth state and sessions are signed, time-limited, secure, HTTP-only, and same-site cookies. Cloudflare requests the read-only Admin Directory user scope and, when the signed-in account is permitted to use it, refreshes the workspace people directory during login. The access token is used transiently and is never persisted; directory failure does not prevent authentication.
 
 ## 14. HTTP API and WebSocket protocol
 
@@ -918,7 +918,7 @@ Cookie-authenticated mutations require same-origin requests and CSRF protection.
 
 - Passwords use slow salted hashes.
 - API keys, session tokens, and capabilities are random and stored as hashes where possible.
-- OAuth client secrets and signing keys use runtime secret configuration, not R2 or checked-in files.
+- OAuth client secrets and signing keys use runtime secret configuration, not R2 or checked-in files. Google OAuth access tokens used for directory refresh are never persisted.
 - Logs never contain document bodies, raw credentials, capability URLs, or OAuth tokens.
 
 ### 21.5 Resource limits

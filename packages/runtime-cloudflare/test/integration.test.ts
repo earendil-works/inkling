@@ -55,6 +55,33 @@ test(
       });
       const apiKey = ((await keyResponse.json()) as { key: string }).key;
       const authorization = { Authorization: `Bearer ${apiKey}` };
+
+      // Simulate a workspace created before authenticated accounts were copied into the people
+      // directory. The active OAuth session still carries Armin's canonical display name, while
+      // the separately synchronized directory entry for Colin remains available.
+      const legacyBackup = await fetch(`${running.baseUrl}/api/admin/backup`, {
+        headers: authorization,
+      });
+      assert.equal(legacyBackup.status, 200);
+      const legacyArchive = (await legacyBackup.json()) as {
+        workspaceState: { catalog: { people: { person: { email: string } }[] } };
+      };
+      assert.ok(
+        legacyArchive.workspaceState.catalog.people.some(
+          (entry) => entry.person.email === "colin@earendil.com",
+        ),
+      );
+      legacyArchive.workspaceState.catalog.people =
+        legacyArchive.workspaceState.catalog.people.filter(
+          (entry) => entry.person.email !== "armin@earendil.com",
+        );
+      const legacyRestore = await fetch(`${running.baseUrl}/api/admin/restore`, {
+        body: JSON.stringify(legacyArchive),
+        headers: { ...authorization, "Content-Type": "application/json" },
+        method: "POST",
+      });
+      assert.equal(legacyRestore.status, 200);
+
       const first = await createDocument(running.baseUrl, authorization, "first", true);
       const second = await createDocument(running.baseUrl, authorization, "second", false);
       assert.equal(first.metadata.rfcNumber, 1);
@@ -73,7 +100,11 @@ test(
         body: JSON.stringify({
           edits: [
             { newText: "durable", oldText: "initial" },
-            { newText: "authors:\n  - admin@example.com", oldText: "authors: []" },
+            {
+              newText: "authors:\n  - armin@earendil.com\n  - alphatest0@earendil.com",
+              oldText: "authors: []",
+            },
+            { newText: "visibility: public", oldText: "visibility: workspace" },
             { newText: "labels:\n  - working", oldText: "labels: []" },
           ],
           expectedRevision: first.metadata.headRevision,
@@ -126,11 +157,22 @@ test(
       const publicationMetadata = (await publication.json()) as DocumentWire["metadata"];
       assert.deepEqual(publicationMetadata.authors, [
         {
-          displayName: "Cloudflare Tester",
-          email: "admin@example.com",
-          id: "admin@example.com",
+          displayName: "Armin Ronacher",
+          email: "armin@earendil.com",
+          id: "armin@earendil.com",
+        },
+        {
+          displayName: "Colin Hanna",
+          email: "alphatest0@earendil.com",
+          id: "alphatest0@earendil.com",
         },
       ]);
+      const publicRfc = await fetch(`${running.baseUrl}/rfc/0001`);
+      assert.equal(publicRfc.status, 200);
+      const publicHtml = await publicRfc.text();
+      assert.match(publicHtml, />Armin Ronacher<\/a>/u);
+      assert.match(publicHtml, />Colin Hanna<\/a>/u);
+      assert.match(publicHtml, /mailto:alphatest0@earendil\.com/u);
       const backup = await fetch(`${running.baseUrl}/api/admin/backup`, {
         headers: authorization,
       });
@@ -296,8 +338,8 @@ async function loginWithGoogle(baseUrl: string): Promise<string> {
     readonly principal?: { readonly displayName: string; readonly email?: string | undefined };
   };
   assert.equal(authenticatedBody.authenticated, true);
-  assert.equal(authenticatedBody.principal?.displayName, "Cloudflare Tester");
-  assert.equal(authenticatedBody.principal?.email, "admin@example.com");
+  assert.equal(authenticatedBody.principal?.displayName, "Armin Ronacher");
+  assert.equal(authenticatedBody.principal?.email, "armin@earendil.com");
   return cookie;
 }
 
@@ -316,6 +358,7 @@ async function startGoogleOAuthMock(): Promise<RunningGoogleOAuthMock> {
       nonce = url.searchParams.get("nonce") ?? undefined;
       const redirectUri = url.searchParams.get("redirect_uri");
       const state = url.searchParams.get("state");
+      assert.match(url.searchParams.get("scope") ?? "", /admin\.directory\.user\.readonly/u);
       assert.ok(nonce);
       assert.ok(redirectUri);
       assert.ok(state);
@@ -330,20 +373,43 @@ async function startGoogleOAuthMock(): Promise<RunningGoogleOAuthMock> {
       const header = base64UrlJson({ alg: "RS256", kid: "jot-test-key", typ: "JWT" });
       const claims = base64UrlJson({
         aud: "jot-test-client",
-        email: "admin@example.com",
+        email: "armin@earendil.com",
         email_verified: true,
         exp: Math.floor(Date.now() / 1_000) + 300,
-        hd: "example.com",
+        hd: "earendil.com",
         iss: "https://accounts.google.com",
-        name: "Cloudflare Tester",
+        name: "Armin Ronacher",
         nonce,
         sub: "google-test-user",
       });
       const unsigned = `${header}.${claims}`;
       const signature = sign("RSA-SHA256", Buffer.from(unsigned), privateKey).toString("base64url");
-      response
-        .writeHead(200, { "Content-Type": "application/json" })
-        .end(JSON.stringify({ id_token: `${unsigned}.${signature}` }));
+      response.writeHead(200, { "Content-Type": "application/json" }).end(
+        JSON.stringify({
+          access_token: "google-directory-access-token",
+          id_token: `${unsigned}.${signature}`,
+        }),
+      );
+      return;
+    }
+    if (url.pathname === "/directory/users") {
+      assert.equal(request.headers.authorization, "Bearer google-directory-access-token");
+      response.writeHead(200, { "Content-Type": "application/json" }).end(
+        JSON.stringify({
+          users: [
+            {
+              aliases: [],
+              name: { fullName: "Armin Ronacher" },
+              primaryEmail: "armin@earendil.com",
+            },
+            {
+              aliases: ["alphatest0@earendil.com"],
+              name: { fullName: "Colin Hanna" },
+              primaryEmail: "colin@earendil.com",
+            },
+          ],
+        }),
+      );
       return;
     }
     if (url.pathname === "/certificates") {
@@ -383,13 +449,14 @@ async function startWrangler(directory: string, googleOrigin: string): Promise<R
   await writeFile(
     environmentFile,
     [
-      "GOOGLE_ADMIN_EMAILS=admin@example.com",
-      "GOOGLE_ALLOWED_DOMAINS=example.com",
+      "GOOGLE_ADMIN_EMAILS=armin@earendil.com",
+      "GOOGLE_ALLOWED_DOMAINS=earendil.com",
       "GOOGLE_CLIENT_ID=jot-test-client",
       "GOOGLE_CLIENT_SECRET=jot-test-secret",
       `GOOGLE_REDIRECT_URI=${baseUrl}/api/auth/google/callback`,
       `JOT_GOOGLE_AUTHORIZATION_ENDPOINT=${googleOrigin}/authorize`,
       `JOT_GOOGLE_CERTIFICATES_ENDPOINT=${googleOrigin}/certificates`,
+      `JOT_GOOGLE_DIRECTORY_ENDPOINT=${googleOrigin}/directory/users`,
       `JOT_GOOGLE_TOKEN_ENDPOINT=${googleOrigin}/token`,
       "JOT_OAUTH_STATE_SECRET=jot-test-state-secret",
       "",

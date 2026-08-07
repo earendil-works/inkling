@@ -2,6 +2,7 @@ import { Context, Data, type Effect, type Stream } from "effect";
 
 import type {
   CatalogSummary,
+  PeopleDirectoryEntry,
   PersonReference,
   Principal,
   WorkspaceIdentity,
@@ -166,6 +167,7 @@ export interface JotApplicationService {
   readonly login: (password: string) => Effect.Effect<SessionResult, ApplicationError>;
   readonly loginWorkspaceIdentity: (
     identity: WorkspaceIdentity,
+    people?: readonly PeopleDirectoryEntry[],
   ) => Effect.Effect<SessionResult, ApplicationError>;
   readonly logout: (credentials: RequestCredentials) => Effect.Effect<void, ApplicationError>;
   readonly listDocuments: (

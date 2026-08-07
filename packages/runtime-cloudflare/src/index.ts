@@ -8,7 +8,12 @@ import {
   personId,
   WorkspaceStateStore,
 } from "@earendil-works/jot-core";
-import type { PersonReference, Principal, WorkspaceIdentity } from "@earendil-works/jot-core";
+import type {
+  PeopleDirectoryEntry,
+  PersonReference,
+  Principal,
+  WorkspaceIdentity,
+} from "@earendil-works/jot-core";
 import {
   ApplicationError,
   createBackendApp,
@@ -58,6 +63,7 @@ export interface CloudflareEnvironment {
   readonly GOOGLE_REDIRECT_URI?: string | undefined;
   readonly JOT_GOOGLE_AUTHORIZATION_ENDPOINT?: string | undefined;
   readonly JOT_GOOGLE_CERTIFICATES_ENDPOINT?: string | undefined;
+  readonly JOT_GOOGLE_DIRECTORY_ENDPOINT?: string | undefined;
   readonly JOT_GOOGLE_TOKEN_ENDPOINT?: string | undefined;
   readonly JOT_OAUTH_STATE_SECRET?: string | undefined;
   readonly JOT_DOCUMENTS: DurableObjectNamespace<DocumentDurableObject>;
@@ -117,10 +123,35 @@ export class WorkspaceDurableObject extends DurableObject<CloudflareEnvironment>
     );
   }
 
-  async loginIdentity(identity: WorkspaceIdentity): Promise<RpcResult<SessionResult>> {
+  async loginIdentity(
+    identity: WorkspaceIdentity,
+    directoryPeople: readonly GoogleDirectoryPerson[] = [],
+  ): Promise<RpcResult<SessionResult>> {
     return runRpc(
       this.#runtime,
-      Effect.flatMap(JotApplication, (application) => application.loginWorkspaceIdentity(identity)),
+      Effect.flatMap(JotApplication, (application) =>
+        Effect.forEach(directoryPeople, (person) =>
+          personId(person.email).pipe(
+            Effect.map((id): PeopleDirectoryEntry => ({
+              aliases: person.aliases,
+              person: { displayName: person.displayName, email: person.email, id },
+            })),
+          ),
+        ).pipe(
+          Effect.flatMap((people) => application.loginWorkspaceIdentity(identity, people)),
+          Effect.mapError((error) =>
+            error instanceof ApplicationError
+              ? error
+              : new ApplicationError({
+                  cause: error,
+                  code: "invalid_directory_person",
+                  message: "The Google Workspace directory returned an invalid person.",
+                  retryable: false,
+                  status: 400,
+                }),
+          ),
+        ),
+      ),
     );
   }
 
@@ -866,6 +897,12 @@ interface OAuthStatePayload {
   readonly verifier: string;
 }
 
+interface GoogleDirectoryPerson {
+  readonly aliases: readonly string[];
+  readonly displayName: string;
+  readonly email: string;
+}
+
 interface GoogleIdentityClaims {
   readonly aud: string;
   readonly email: string;
@@ -907,7 +944,10 @@ async function startGoogleAuthentication(
   authorization.searchParams.set("client_id", configuration.clientId);
   authorization.searchParams.set("redirect_uri", configuration.redirectUri);
   authorization.searchParams.set("response_type", "code");
-  authorization.searchParams.set("scope", "openid email profile");
+  authorization.searchParams.set(
+    "scope",
+    "openid email profile https://www.googleapis.com/auth/admin.directory.user.readonly",
+  );
   authorization.searchParams.set("state", payload.state);
   authorization.searchParams.set("nonce", payload.nonce);
   authorization.searchParams.set("code_challenge", challenge);
@@ -970,6 +1010,10 @@ async function finishGoogleAuthentication(
       Predicate.isReadonlyRecord(tokenBody) && typeof tokenBody["id_token"] === "string"
         ? tokenBody["id_token"]
         : undefined;
+    const accessToken =
+      Predicate.isReadonlyRecord(tokenBody) && typeof tokenBody["access_token"] === "string"
+        ? tokenBody["access_token"]
+        : undefined;
     if (!tokenResponse.ok || idToken === undefined) {
       return oauthFailure("Google rejected the authorization code.");
     }
@@ -999,7 +1043,11 @@ async function finishGoogleAuthentication(
       personId: await Effect.runPromise(personId(email)),
       role: administrators.has(email) ? "administrator" : "member",
     };
-    const session = await workspaceStub(environment).loginIdentity(identity);
+    const directoryPeople =
+      accessToken === undefined
+        ? []
+        : await readGoogleDirectory(accessToken, configuration.directoryEndpoint).catch(() => []);
+    const session = await workspaceStub(environment).loginIdentity(identity, directoryPeople);
     if (!session.ok) return protocolErrorResponse(session.error);
     const headers = new Headers({ Location: "/" });
     headers.append(
@@ -1057,11 +1105,88 @@ function googleConfiguration(request: Request, environment: CloudflareEnvironmen
       environment.JOT_GOOGLE_CERTIFICATES_ENDPOINT ?? "https://www.googleapis.com/oauth2/v3/certs",
     clientId,
     clientSecret,
+    directoryEndpoint:
+      environment.JOT_GOOGLE_DIRECTORY_ENDPOINT ??
+      "https://admin.googleapis.com/admin/directory/v1/users",
     redirectUri:
       environment.GOOGLE_REDIRECT_URI ?? `${new URL(request.url).origin}/api/auth/google/callback`,
     stateSecret: environment.JOT_OAUTH_STATE_SECRET ?? clientSecret,
     tokenEndpoint: environment.JOT_GOOGLE_TOKEN_ENDPOINT ?? "https://oauth2.googleapis.com/token",
   };
+}
+
+async function readGoogleDirectory(
+  accessToken: string,
+  endpoint: string,
+): Promise<readonly GoogleDirectoryPerson[]> {
+  const people = new Map<string, GoogleDirectoryPerson>();
+  const readPage = async (pageToken?: string, page = 0): Promise<void> => {
+    if (page >= 100) {
+      throw new Error("Google Directory pagination exceeded the safety limit.");
+    }
+    const url = new URL(endpoint);
+    url.searchParams.set("customer", "my_customer");
+    url.searchParams.set(
+      "fields",
+      "nextPageToken,users(primaryEmail,name/fullName,aliases,suspended,archived)",
+    );
+    url.searchParams.set("maxResults", "500");
+    url.searchParams.set("orderBy", "email");
+    url.searchParams.set("projection", "basic");
+    url.searchParams.set("showDeleted", "false");
+    if (pageToken !== undefined) url.searchParams.set("pageToken", pageToken);
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!response.ok) throw new Error("Google Directory rejected the access token.");
+    const body = (await response.json()) as unknown;
+    if (!Predicate.isReadonlyRecord(body)) {
+      throw new Error("Google Directory returned an invalid response.");
+    }
+    const users = Array.isArray(body["users"]) ? body["users"] : [];
+    for (const user of users) {
+      if (
+        !Predicate.isReadonlyRecord(user) ||
+        user["suspended"] === true ||
+        user["archived"] === true
+      ) {
+        continue;
+      }
+      const name = user["name"];
+      const displayName =
+        Predicate.isReadonlyRecord(name) && typeof name["fullName"] === "string"
+          ? name["fullName"].trim()
+          : "";
+      const email =
+        typeof user["primaryEmail"] === "string"
+          ? user["primaryEmail"].trim().toLocaleLowerCase("en")
+          : "";
+      if (
+        displayName === "" ||
+        displayName.length > 200 ||
+        email.length > 256 ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(email)
+      ) {
+        continue;
+      }
+      const aliases = Array.isArray(user["aliases"])
+        ? [
+            ...new Set(
+              user["aliases"]
+                .filter((alias): alias is string => typeof alias === "string")
+                .map((alias) => alias.trim().toLocaleLowerCase("en"))
+                .filter((alias) => alias !== email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(alias)),
+            ),
+          ].toSorted()
+        : [];
+      people.set(email, { aliases, displayName, email });
+    }
+    const nextPageToken =
+      typeof body["nextPageToken"] === "string" ? body["nextPageToken"] : undefined;
+    if (nextPageToken !== undefined) await readPage(nextPageToken, page + 1);
+  };
+  await readPage();
+  return [...people.values()];
 }
 
 async function verifyGoogleIdentityToken(
