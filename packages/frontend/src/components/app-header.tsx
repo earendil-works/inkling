@@ -44,7 +44,7 @@ export function AppHeader({
   return (
     <header className="masthead">
       <a className="wordmark" href="/" aria-label="Notes and RFCs home">
-        JOT<span>/</span>
+        Notes and RFCs
       </a>
       <div className="masthead__right">
         <div className="participants" data-participants="" aria-label="Connected participants">

@@ -39,6 +39,7 @@ test(
         .evaluate((form: HTMLFormElement) => form.requestSubmit());
       await first.waitForSelector("[data-new-document]");
       assert.equal(await first.locator(".workspace-heading h1").textContent(), "Notes and RFCs");
+      assert.equal(await first.locator(".wordmark").textContent(), "Notes and RFCs");
       assert.equal(await first.locator("[data-account-name]").textContent(), "Owner");
       assert.equal(await first.locator("[data-api-status]").count(), 0);
       assert.equal(await first.locator(".catalog-tools [data-logout]").count(), 0);
