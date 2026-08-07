@@ -66,6 +66,10 @@ export function EditorScreen({
       setPermissions(actions);
       if (!actions.includes("edit-body")) setPreviewOpen(false);
     },
+    onRevision: (revision) =>
+      setMetadata((current) =>
+        revision > current.headRevision ? { ...current, headRevision: revision } : current,
+      ),
     onState: (state) => {
       setConnectionState(state);
       setStatus({ label: connectionLabel(state), state });

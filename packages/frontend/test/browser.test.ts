@@ -160,13 +160,31 @@ test(
       const editorKeyword = first.locator(".cm-content .tok-keyword").last();
       assert.equal(await editorKeyword.textContent(), "const");
       const editorKeywordClass = await editorKeyword.getAttribute("class");
+      assert.equal(await first.locator("[data-publish]").textContent(), "Publish");
       const publication = first.waitForResponse(
         (response) => response.request().method() === "POST" && response.url().endsWith("/publish"),
       );
       await first.locator("[data-publish]").click();
       assert.equal((await publication).status(), 200);
       await first.waitForFunction(
-        () => document.querySelector("[data-publish]")?.textContent === "Republish",
+        () => document.querySelector("[data-publish]")?.textContent === "Publish",
+      );
+      await first.locator(".cm-content").click();
+      await first.keyboard.press("ControlOrMeta+End");
+      await first.keyboard.insertText("\n\nPublished follow-up");
+      await first.waitForFunction(
+        () => document.querySelector("[data-save-state]")?.textContent === "Saved",
+      );
+      await first.waitForFunction(
+        () => document.querySelector("[data-publish]")?.textContent === "Publish Changes",
+      );
+      const changedPublication = first.waitForResponse(
+        (response) => response.request().method() === "POST" && response.url().endsWith("/publish"),
+      );
+      await first.locator("[data-publish]").click();
+      assert.equal((await changedPublication).status(), 200);
+      await first.waitForFunction(
+        () => document.querySelector("[data-publish]")?.textContent === "Publish",
       );
       await first.evaluate(() => {
         document.documentElement.dataset["browserNavigation"] = "same-document";

@@ -28,6 +28,7 @@ export interface CollaborationCallbacks {
   readonly onMetadata: (metadata: DocumentMetadataDto) => void;
   readonly onPermissions: (actions: readonly string[]) => void;
   readonly onPresence: (presence: PresenceDto) => void;
+  readonly onRevision: (revision: number) => void;
   readonly onState: (state: ConnectionState) => void;
   readonly onError: (message: string) => void;
 }
@@ -117,6 +118,7 @@ export function makeCollaborationClient(
             }
             yield* Effect.sync(() => {
               unacknowledged.delete(message.clientUpdateId);
+              callbacks.onRevision(message.documentRevision);
               callbacks.onState(unacknowledged.size === 0 ? "ready" : "saving");
             });
             break;

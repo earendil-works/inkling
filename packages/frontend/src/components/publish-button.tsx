@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { hasPendingPublicationChanges } from "@earendil-works/jot-core";
 import type { DocumentMetadataDto } from "@earendil-works/jot-protocol";
 
 import type { ApiClientService, ApiError } from "../api.ts";
@@ -26,6 +27,7 @@ export function PublishButton({
   const publish = useEffectAction<boolean, DocumentMetadataDto, ApiError>((confirm) =>
     api.publish(metadata.id, confirm),
   );
+  const label = published && hasPendingPublicationChanges(metadata) ? "Publish Changes" : "Publish";
   const execute = (confirmConfidentialPublic: boolean): void => {
     publish.execute(confirmConfidentialPublic, {
       onFailure: (error) => showToast(error.message, "error"),
@@ -51,7 +53,7 @@ export function PublishButton({
           }
         }}
       >
-        {publish.state.pending ? "Publishing…" : published ? "Republish" : "Publish"}
+        {publish.state.pending ? "Publishing…" : label}
       </Button>
       <ConfirmationDialog
         confirmLabel="Publish confidential revision"

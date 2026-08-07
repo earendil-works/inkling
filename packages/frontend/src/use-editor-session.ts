@@ -43,6 +43,7 @@ interface EditorSessionCallbacks {
   readonly onMetadata: (metadata: DocumentMetadataDto) => void;
   readonly onParticipants: (participants: readonly PresenceDto[]) => void;
   readonly onPermissions: (permissions: readonly string[]) => void;
+  readonly onRevision: (revision: number) => void;
   readonly onState: (state: ConnectionState) => void;
 }
 
@@ -172,6 +173,7 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
             participantMap.set(presence.participantId, presence);
             callbacksRef.current.onParticipants([...participantMap.values()].slice(0, 6));
           },
+          onRevision: (revision) => callbacksRef.current.onRevision(revision),
           onState: (state) => callbacksRef.current.onState(state),
         },
       ).pipe(
