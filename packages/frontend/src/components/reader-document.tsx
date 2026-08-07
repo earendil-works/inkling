@@ -1,7 +1,8 @@
 import type { DocumentResponse } from "@earendil-works/jot-protocol";
 
 import { useRenderedMarkdown } from "../markdown.tsx";
-import { DocumentPage, metadataWithFrontmatter } from "./document-page.tsx";
+import { metadataWithFrontmatter } from "./document-metadata.ts";
+import { DocumentPage } from "./document-page.tsx";
 import { MarkdownArticle } from "./markdown-article.tsx";
 
 export interface ReaderDocumentProps {

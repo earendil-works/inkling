@@ -16,6 +16,7 @@ export interface RenderHeading {
 }
 
 export interface DocumentFrontmatter {
+  readonly authors?: readonly string[] | undefined;
   readonly labels?: readonly string[] | undefined;
   readonly sensitivity?: "confidential" | "normal" | undefined;
   readonly state?: string | undefined;
@@ -91,6 +92,7 @@ export function parseDocumentSource(
 }
 
 export function serializeDocumentFrontmatter(frontmatter: {
+  readonly authors: readonly string[];
   readonly labels: readonly string[];
   readonly sensitivity: "confidential" | "normal";
   readonly state: string;
@@ -98,6 +100,7 @@ export function serializeDocumentFrontmatter(frontmatter: {
 }): string {
   const yaml = YAML.stringify(
     {
+      authors: [...frontmatter.authors],
       state: frontmatter.state,
       visibility: frontmatter.visibility,
       sensitivity: frontmatter.sensitivity,
@@ -233,6 +236,7 @@ function parseDocumentSourceUnsafe(markdown: string): ParsedDocumentSource {
     throw new Error("Document frontmatter must be a YAML mapping.");
   }
   const values = parsed as Readonly<Record<string, unknown>>;
+  const authors = optionalAuthors(values["authors"]);
   const state = optionalNonEmptyString(values["state"], "state");
   const visibility = optionalEnum(values["visibility"], "visibility", ["public", "workspace"]);
   const sensitivity = optionalEnum(values["sensitivity"], "sensitivity", [
@@ -243,7 +247,7 @@ function parseDocumentSourceUnsafe(markdown: string): ParsedDocumentSource {
   return {
     body: markdown.slice(match[0].length),
     bodyOffset: match[0].length,
-    frontmatter: { labels, sensitivity, state, visibility },
+    frontmatter: { authors, labels, sensitivity, state, visibility },
   };
 }
 
@@ -265,6 +269,25 @@ function optionalEnum<const Value extends string>(
     throw new Error(`Frontmatter ${label} must be one of: ${allowed.join(", ")}.`);
   }
   return value as Value;
+}
+
+function optionalAuthors(value: unknown): readonly string[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.some((author) => typeof author !== "string")) {
+    throw new Error("Frontmatter authors must be a list of email addresses.");
+  }
+  const authors = [
+    ...new Set(
+      value.map((author) => String(author).trim().toLocaleLowerCase("en")).filter(Boolean),
+    ),
+  ];
+  if (
+    authors.length > 100 ||
+    authors.some((author) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(author) || author.length > 320)
+  ) {
+    throw new Error("Frontmatter authors must contain valid email addresses.");
+  }
+  return authors;
 }
 
 function optionalLabels(value: unknown): readonly string[] | undefined {

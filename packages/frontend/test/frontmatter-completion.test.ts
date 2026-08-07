@@ -8,6 +8,10 @@ import { makeFrontmatterCompletionSource } from "../src/frontmatter-completion.t
 
 const source = makeFrontmatterCompletionSource({
   labels: ["architecture", "platform", "needs:quotes"],
+  people: [
+    { displayName: "Ada Lovelace", email: "ada@example.com", id: "ada@example.com" },
+    { displayName: "Grace Hopper", email: "grace@example.com", id: "grace@example.com" },
+  ],
   states: ["under-review"],
 });
 
@@ -16,7 +20,7 @@ test("frontmatter completion offers missing fields", async () => {
 
   assert.deepEqual(
     result?.options.map((option) => option.label),
-    ["visibility", "sensitivity", "labels"],
+    ["authors", "visibility", "sensitivity", "labels"],
   );
 });
 
@@ -54,6 +58,18 @@ test("frontmatter completion offers known labels in block and flow lists", async
   const flow = await complete("---\nlabels: [architecture, pla|]\n---\nBody");
   assert.equal(flow?.from, "---\nlabels: [architecture, ".length);
   assert.equal(flow?.to, "---\nlabels: [architecture, pla".length);
+});
+
+test("frontmatter completion offers known author email addresses", async () => {
+  const block = await complete("---\nauthors:\n  - ad|\n---\nBody");
+  assert.deepEqual(
+    block?.options.map((option) => option.label),
+    ["ada@example.com", "grace@example.com"],
+  );
+  assert.equal(block?.options[0]?.detail, "Ada Lovelace");
+
+  const flow = await complete("---\nauthors: [grace@example.com, ad|]\n---\nBody");
+  assert.equal(flow?.from, "---\nauthors: [grace@example.com, ".length);
 });
 
 test("frontmatter completion stays out of Markdown content", async () => {

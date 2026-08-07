@@ -1,25 +1,10 @@
 import type { ReactNode } from "react";
 
 import type { DocumentMetadataDto } from "@earendil-works/jot-protocol";
-import type { DocumentFrontmatter, RenderHeading } from "@earendil-works/jot-renderer";
+import type { RenderHeading } from "@earendil-works/jot-renderer";
 
 import { formatDate } from "../ui.ts";
 import { DocumentTableOfContents } from "./document-table-of-contents.tsx";
-
-export function metadataWithFrontmatter(
-  metadata: DocumentMetadataDto,
-  frontmatter: DocumentFrontmatter | undefined,
-  title?: string | undefined,
-): DocumentMetadataDto {
-  return {
-    ...metadata,
-    labels: frontmatter?.labels ?? metadata.labels,
-    lifecycleState: frontmatter?.state ?? metadata.lifecycleState,
-    sensitivity: frontmatter?.sensitivity ?? metadata.sensitivity,
-    title: title ?? metadata.title,
-    visibility: frontmatter?.visibility ?? metadata.visibility,
-  };
-}
 
 export interface DocumentPageProps {
   readonly children: ReactNode;

@@ -1,6 +1,11 @@
 import { Context, Data, type Effect, type Stream } from "effect";
 
-import type { CatalogSummary, Principal, WorkspaceIdentity } from "@earendil-works/jot-core";
+import type {
+  CatalogSummary,
+  PersonReference,
+  Principal,
+  WorkspaceIdentity,
+} from "@earendil-works/jot-core";
 import type {
   ApiKeyCreated,
   ApiKeyDto,
@@ -110,6 +115,9 @@ export interface JotApplicationService {
   readonly applyDocumentProjection: (
     document: DocumentResponse,
   ) => Effect.Effect<void, ApplicationError>;
+  readonly resolvePeople: (
+    emails: readonly string[],
+  ) => Effect.Effect<readonly PersonReference[], ApplicationError>;
   readonly markCatalogDeleted: (documentId: string) => Effect.Effect<void, ApplicationError>;
   readonly releaseDocumentRoom: (documentId: string) => Effect.Effect<void>;
   /** Flushes all active document rooms to immutable checkpoints. */

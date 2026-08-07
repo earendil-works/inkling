@@ -29,6 +29,7 @@ import {
   publicCatalog,
   readLineRange,
   reserveDocument,
+  resolveAuthorsByEmail,
   revokeApiKey,
   searchCatalog,
   SecretHasher,
@@ -173,6 +174,9 @@ export interface LocalApplicationOptions {
         credentials: RequestCredentials,
         documentId?: string,
       ) => Effect.Effect<Principal, ApplicationError>)
+    | undefined;
+  readonly peopleResolver?:
+    | ((emails: readonly string[]) => Effect.Effect<readonly PersonReference[], ApplicationError>)
     | undefined;
 }
 
@@ -409,11 +413,12 @@ export function makeLocalJotApplication(
             publishedRevision,
           ),
         ).pipe(Effect.mapError(toApplicationError));
+        const metadata = yield* metadataWithResolvedAuthors(published.metadata);
         return yield* responseFromSnapshot(
           {
             ...published,
             metadata: {
-              ...published.metadata,
+              ...metadata,
               publishedRevision,
               sharing: current.metadata.sharing,
             },
@@ -499,6 +504,37 @@ export function makeLocalJotApplication(
         };
       });
 
+    const resolvePeople = (
+      emails: readonly string[],
+    ): Effect.Effect<readonly PersonReference[], ApplicationError> =>
+      options.peopleResolver === undefined
+        ? Effect.succeed(knownPeopleByEmail(state.catalog, emails))
+        : options.peopleResolver(emails);
+
+    const authorsFromEmails = (
+      emails: readonly string[],
+      metadata: DocumentMetadata,
+    ): Effect.Effect<readonly PersonReference[], ApplicationError> =>
+      resolvePeople(emails).pipe(
+        Effect.flatMap((directoryPeople) =>
+          resolveAuthorsByEmail(emails, [
+            ...directoryPeople,
+            ...metadata.authors,
+            ...metadata.reviewers,
+            ...metadata.approvers,
+          ]),
+        ),
+        Effect.mapError(toApplicationError),
+      );
+
+    const metadataWithResolvedAuthors = (
+      metadata: DocumentMetadata,
+    ): Effect.Effect<DocumentMetadata, ApplicationError> =>
+      authorsFromEmails(
+        metadata.authors.map((author) => author.email),
+        metadata,
+      ).pipe(Effect.map((authors) => ({ ...metadata, authors })));
+
     const readPublished = (
       rawDocumentId: string,
       canonicalPath: string,
@@ -525,13 +561,14 @@ export function makeLocalJotApplication(
         const rendered = yield* renderer
           .render(published.body, { rewriteUrl: rewriteRfcUrl })
           .pipe(Effect.mapError(toApplicationError));
+        const metadata = yield* metadataWithResolvedAuthors(published.metadata);
         return {
           canonicalPath,
           description: excerpt(published.body),
           headings: rendered.headings,
           html: rendered.html,
           metadata: {
-            ...published.metadata,
+            ...metadata,
             publishedRevision,
           } as DocumentMetadataDto,
         };
@@ -560,6 +597,7 @@ export function makeLocalJotApplication(
             ),
           ),
         ),
+      resolvePeople,
       releaseDocumentRoom: (rawDocumentId) =>
         Effect.gen(function* () {
           const room = rooms.get(rawDocumentId);
@@ -1476,23 +1514,27 @@ export function makeLocalJotApplication(
               ),
             ).pipe(
               Effect.mapError(toApplicationError),
-              Effect.map((snapshot) => {
-                const searchText = normalizeSearchText(
-                  `${snapshot.metadata.rfcNumber ?? ""} ${snapshot.metadata.title} ${snapshot.body} ${snapshot.metadata.labels.join(" ")}`,
-                );
-                return (normalizedQuery.length === 0 || searchText.includes(normalizedQuery)) &&
-                  (lifecycleState === undefined ||
-                    snapshot.metadata.lifecycleState === lifecycleState) &&
-                  (label === undefined || snapshot.metadata.labels.includes(label))
-                  ? {
-                      excerpt: excerpt(snapshot.body),
-                      metadata: {
-                        ...snapshot.metadata,
-                        publishedRevision,
-                      } as DocumentMetadataDto,
-                    }
-                  : undefined;
-              }),
+              Effect.flatMap((snapshot) =>
+                metadataWithResolvedAuthors(snapshot.metadata).pipe(
+                  Effect.map((metadata) => {
+                    const searchText = normalizeSearchText(
+                      `${metadata.rfcNumber ?? ""} ${metadata.title} ${snapshot.body} ${metadata.labels.join(" ")}`,
+                    );
+                    return (normalizedQuery.length === 0 || searchText.includes(normalizedQuery)) &&
+                      (lifecycleState === undefined ||
+                        metadata.lifecycleState === lifecycleState) &&
+                      (label === undefined || metadata.labels.includes(label))
+                      ? {
+                          excerpt: excerpt(snapshot.body),
+                          metadata: {
+                            ...metadata,
+                            publishedRevision,
+                          } as DocumentMetadataDto,
+                        }
+                      : undefined;
+                  }),
+                ),
+              ),
             );
           });
           return {
@@ -1526,7 +1568,12 @@ export function makeLocalJotApplication(
                   } as DocumentMetadataDto,
                 }),
           );
-          return { documents } satisfies CatalogResponse;
+          return {
+            documents,
+            people: state.catalog.people.map(
+              (entry) => entry.person as DocumentMetadataDto["authors"][number],
+            ),
+          } satisfies CatalogResponse;
         }),
       login: (password) =>
         passwordAuthenticationEnabled
@@ -1565,11 +1612,22 @@ export function makeLocalJotApplication(
             Effect.provideService(SecretHasher, hasher),
             Effect.provideService(SecureToken, tokens),
             Effect.mapError(toApplicationError),
-            Effect.flatMap((created) =>
-              tokens.generate(24).pipe(
+            Effect.flatMap((created) => {
+              const existing = state.catalog.people.find(
+                (entry) => entry.person.id === identity.personId,
+              );
+              const catalog = upsertPerson(state.catalog, {
+                aliases: existing?.aliases ?? [],
+                person: {
+                  displayName: identity.displayName,
+                  email: identity.email.toLocaleLowerCase("en"),
+                  id: identity.personId,
+                },
+              });
+              return tokens.generate(24).pipe(
                 Effect.mapError(toApplicationError),
                 Effect.flatMap((csrfToken) =>
-                  saveState({ ...state, authentication: created.state }).pipe(
+                  saveState({ ...state, authentication: created.state, catalog }).pipe(
                     Effect.mapError(toApplicationError),
                     Effect.as({
                       csrfToken,
@@ -1578,8 +1636,8 @@ export function makeLocalJotApplication(
                     }),
                   ),
                 ),
-              ),
-            ),
+              );
+            }),
           ),
         ),
       logout: (credentials) =>
@@ -1615,6 +1673,10 @@ export function makeLocalJotApplication(
               .updateMetadata(
                 principal,
                 {
+                  authors:
+                    frontmatter.authors === undefined
+                      ? undefined
+                      : yield* authorsFromEmails(frontmatter.authors, current.metadata),
                   labels: frontmatter.labels,
                   lifecycleState: frontmatter.state,
                   sensitivity: frontmatter.sensitivity,
@@ -2303,12 +2365,16 @@ function attachmentObjectKey(
 
 function withMetadataFrontmatter(body: string, metadata: DocumentMetadata): string {
   const frontmatter = serializeDocumentFrontmatter({
+    authors: metadata.authors.map((author) => author.email.toLocaleLowerCase("en")),
     labels: metadata.labels,
     sensitivity: metadata.sensitivity,
     state: metadata.lifecycleState,
     visibility: metadata.visibility,
   });
-  const source = body.startsWith("---\n") ? body : `${frontmatter}\n${body}`;
+  let source = body.startsWith("---\n") ? body : `${frontmatter}\n${body}`;
+  if (body.startsWith("---\n") && !/^authors[\t ]*:/mu.test(body)) {
+    source = body.replace(/^---\n/u, `---\n${authorsFrontmatterEntry(metadata.authors)}`);
+  }
   if (documentTitleFromMarkdown(source) !== undefined) return source;
 
   const title = metadata.title.replace(/\s+/gu, " ").trim();
@@ -2317,6 +2383,12 @@ function withMetadataFrontmatter(body: string, metadata: DocumentMetadata): stri
   if (match === null) return body.startsWith("---\n") ? source : `${heading}\n${source}`;
   const remaining = source.slice(match[0].length).trimStart();
   return `${match[0]}\n${heading}${remaining === "" ? "" : `\n${remaining}`}`;
+}
+
+function authorsFrontmatterEntry(authors: readonly PersonReference[]): string {
+  return authors.length === 0
+    ? "authors: []\n"
+    : `authors:\n${authors.map((author) => `  - ${JSON.stringify(author.email.toLocaleLowerCase("en"))}\n`).join("")}`;
 }
 
 function excerpt(body: string): string {
@@ -2374,6 +2446,16 @@ function metadataPatch(
       visibility: request.visibility,
     };
   });
+}
+
+function knownPeopleByEmail(
+  catalog: WorkspaceCatalogState,
+  emails: readonly string[],
+): readonly PersonReference[] {
+  const requested = new Set(emails.map((email) => email.trim().toLocaleLowerCase("en")));
+  return catalog.people
+    .map((entry) => entry.person)
+    .filter((person) => requested.has(person.email.toLocaleLowerCase("en")));
 }
 
 function convertPeople(

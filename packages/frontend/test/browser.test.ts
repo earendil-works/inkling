@@ -64,7 +64,7 @@ test(
       assert.equal(await first.locator("[data-api-status]").textContent(), "Saved");
       assert.match(
         await first.locator(".cm-content").innerText(),
-        /---\s+state: draft\s+visibility: workspace\s+sensitivity: normal\s+labels: \[\]\s+---/u,
+        /---\s+authors: \[\]\s+state: draft\s+visibility: workspace\s+sensitivity: normal\s+labels: \[\]\s+---/u,
       );
       const stateLine = first.locator(".cm-line").filter({ hasText: "state: draft" });
       await stateLine.click();

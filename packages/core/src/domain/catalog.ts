@@ -258,8 +258,16 @@ export function upsertPerson(
   entry: PeopleDirectoryEntry,
 ): WorkspaceCatalogState {
   const aliases = [...new Set(entry.aliases.map(normalizeSearchText).filter(Boolean))];
-  const people = state.people.filter((item) => item.person.id !== entry.person.id);
-  return { ...state, people: [...people, { ...entry, aliases }] };
+  const email = entry.person.email.trim().toLocaleLowerCase("en");
+  const people = state.people.filter(
+    (item) =>
+      item.person.id !== entry.person.id &&
+      item.person.email.trim().toLocaleLowerCase("en") !== email,
+  );
+  return {
+    ...state,
+    people: [...people, { ...entry, aliases, person: { ...entry.person, email } }],
+  };
 }
 
 export function findPerson(

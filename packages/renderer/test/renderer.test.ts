@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { Effect } from "effect";
 
-import { makeMarkdownRenderer } from "../src/index.ts";
+import { makeMarkdownRenderer, serializeDocumentFrontmatter } from "../src/index.ts";
 
 const renderer = makeMarkdownRenderer();
 
@@ -24,6 +24,7 @@ test("frontmatter is parsed without entering rendered content", async () => {
     "---\nstate: discussion\nvisibility: public\nsensitivity: normal\nlabels:\n  - architecture\n  - platform\n---\n## Decision\n\nBody";
   const rendered = await Effect.runPromise(renderer.render(source, { sourcePositions: true }));
   assert.deepEqual(rendered.frontmatter, {
+    authors: undefined,
     labels: ["architecture", "platform"],
     sensitivity: "normal",
     state: "discussion",
@@ -33,11 +34,35 @@ test("frontmatter is parsed without entering rendered content", async () => {
   assert.match(rendered.html, /<h2 id="decision" data-jot-source-start="103"/u);
 });
 
+test("author frontmatter uses normalized email identifiers", async () => {
+  const rendered = await Effect.runPromise(
+    renderer.render(
+      "---\nauthors: [Ada@Example.com, grace@example.com, ada@example.com]\n---\n# Title",
+    ),
+  );
+  assert.deepEqual(rendered.frontmatter?.authors, ["ada@example.com", "grace@example.com"]);
+  assert.match(
+    serializeDocumentFrontmatter({
+      authors: ["ada@example.com"],
+      labels: [],
+      sensitivity: "normal",
+      state: "draft",
+      visibility: "workspace",
+    }),
+    /authors:\n  - ada@example\.com/u,
+  );
+});
+
 test("invalid frontmatter fails with a useful error", async () => {
-  const error = await Effect.runPromise(
+  const visibilityError = await Effect.runPromise(
     Effect.flip(renderer.render("---\nvisibility: everyone\n---\nBody")),
   );
-  assert.match(error.message, /visibility must be one of/u);
+  assert.match(visibilityError.message, /visibility must be one of/u);
+
+  const authorError = await Effect.runPromise(
+    Effect.flip(renderer.render("---\nauthors: [not-an-email]\n---\nBody")),
+  );
+  assert.match(authorError.message, /valid email addresses/u);
 });
 
 test("the first top-level heading becomes the title instead of rendered body content", async () => {

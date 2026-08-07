@@ -198,6 +198,30 @@ export function validatePerson(person: PersonReference): Effect.Effect<void, Dom
   return Effect.void;
 }
 
+export function resolveAuthorsByEmail(
+  emails: readonly string[],
+  knownPeople: readonly PersonReference[],
+): Effect.Effect<readonly PersonReference[], DomainError> {
+  const normalizedEmails = [
+    ...new Set(emails.map((email) => email.trim().toLocaleLowerCase("en")).filter(Boolean)),
+  ];
+  if (normalizedEmails.length > 100) {
+    return fail("invalid_authors", "Documents may have up to 100 authors.");
+  }
+  return Effect.forEach(normalizedEmails, (email) =>
+    Effect.gen(function* () {
+      const known = knownPeople.find((person) => person.email.toLocaleLowerCase("en") === email);
+      const author: PersonReference = {
+        displayName: known?.displayName ?? email,
+        email,
+        id: yield* personId(email),
+      };
+      yield* validatePerson(author);
+      return author;
+    }),
+  );
+}
+
 export function createDocumentMetadata(
   input: CreateMetadataInput,
   now: string,

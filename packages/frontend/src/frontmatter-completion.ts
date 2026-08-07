@@ -7,15 +7,23 @@ import type {
 import { snippetCompletion } from "@codemirror/autocomplete";
 
 import { knownLifecycleStates } from "@earendil-works/jot-core";
+import type { PersonDto } from "@earendil-works/jot-protocol";
 
 export interface FrontmatterVocabulary {
   readonly labels: readonly string[];
+  readonly people: readonly PersonDto[];
   readonly states: readonly string[];
 }
 
 export const frontmatterFieldCompletionDetail = "Frontmatter field";
 
 const fieldCompletions: readonly Completion[] = [
+  snippetCompletion("authors:\n\t- ${}", {
+    detail: frontmatterFieldCompletionDetail,
+    info: "Author email addresses. Known workspace accounts render with their display names.",
+    label: "authors",
+    type: "property",
+  }),
   snippetCompletion("state: ${draft}", {
     detail: frontmatterFieldCompletionDetail,
     info: "Lifecycle state to apply when this revision is published.",
@@ -59,6 +67,12 @@ export function makeFrontmatterCompletionSource(
     label,
     type: "enum",
   }));
+  const authorCompletions = uniquePeople(vocabulary.people).map((person): Completion => ({
+    apply: yamlScalar(person.email),
+    detail: person.displayName,
+    label: person.email,
+    type: "enum",
+  }));
 
   return (context) => {
     const bounds = frontmatterBounds(context);
@@ -78,18 +92,27 @@ export function makeFrontmatterCompletionSource(
         return valueResult(context, valueFrom, staticValueCompletions[key]);
       }
       if (key === "labels") {
-        return inlineLabelResult(context, valueFrom, value, labelCompletions);
+        return inlineListResult(context, valueFrom, value, labelCompletions);
+      }
+      if (key === "authors") {
+        return inlineListResult(context, valueFrom, value, authorCompletions);
       }
       return null;
     }
 
-    const blockLabel = /^(\s*-\s*)(.*)$/u.exec(before);
-    if (
-      blockLabel?.[1] !== undefined &&
-      blockLabel[2] !== undefined &&
-      isLabelsBlockItem(context, line.number, blockLabel[1].indexOf("-"), bounds.fromLine)
-    ) {
-      return valueResult(context, line.from + blockLabel[1].length, labelCompletions);
+    const blockItem = /^(\s*-\s*)(.*)$/u.exec(before);
+    if (blockItem?.[1] !== undefined && blockItem[2] !== undefined) {
+      const field = blockListField(
+        context,
+        line.number,
+        blockItem[1].indexOf("-"),
+        bounds.fromLine,
+      );
+      const options =
+        field === "authors" ? authorCompletions : field === "labels" ? labelCompletions : undefined;
+      if (options !== undefined) {
+        return valueResult(context, line.from + blockItem[1].length, options);
+      }
     }
 
     const key = /^(\s*)([A-Za-z_-]*)$/u.exec(before);
@@ -168,7 +191,7 @@ function scalarCompletionEnd(context: CompletionContext): number {
   return context.pos + value.length;
 }
 
-function inlineLabelResult(
+function inlineListResult(
   context: CompletionContext,
   valueFrom: number,
   value: string,
@@ -203,20 +226,21 @@ function inlineLabelResult(
   };
 }
 
-function isLabelsBlockItem(
+function blockListField(
   context: CompletionContext,
   currentLine: number,
   currentIndent: number,
   firstFrontmatterLine: number,
-): boolean {
+): "authors" | "labels" | undefined {
   for (let lineNumber = currentLine - 1; lineNumber >= firstFrontmatterLine; lineNumber -= 1) {
     const text = context.state.doc.line(lineNumber).text;
     if (text.trim() === "") continue;
     const indent = /^\s*/u.exec(text)?.[0].length ?? 0;
     if (indent >= currentIndent) continue;
-    return /^labels[\t ]*:[\t ]*$/u.test(text);
+    const field = /^(authors|labels)[\t ]*:[\t ]*$/u.exec(text)?.[1];
+    return field === "authors" || field === "labels" ? field : undefined;
   }
-  return false;
+  return undefined;
 }
 
 function enumCompletions(values: readonly string[], detail: string): readonly Completion[] {
@@ -236,6 +260,15 @@ function uniqueValues(values: readonly string[]): readonly string[] {
     seen.add(normalized);
     return [normalized];
   });
+}
+
+function uniquePeople(people: readonly PersonDto[]): readonly PersonDto[] {
+  const byEmail = new Map<string, PersonDto>();
+  for (const person of people) {
+    const email = person.email.trim().toLocaleLowerCase("en");
+    if (email !== "" && !byEmail.has(email)) byEmail.set(email, { ...person, email });
+  }
+  return [...byEmail.values()].toSorted((left, right) => left.email.localeCompare(right.email));
 }
 
 function yamlScalar(value: string): string {

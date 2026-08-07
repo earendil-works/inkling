@@ -8,7 +8,7 @@ import {
   personId,
   WorkspaceStateStore,
 } from "@earendil-works/jot-core";
-import type { Principal, WorkspaceIdentity } from "@earendil-works/jot-core";
+import type { PersonReference, Principal, WorkspaceIdentity } from "@earendil-works/jot-core";
 import {
   ApplicationError,
   createBackendApp,
@@ -133,6 +133,13 @@ export class WorkspaceDurableObject extends DurableObject<CloudflareEnvironment>
       Effect.flatMap(JotApplication, (application) =>
         application.authorizeRequest(requestCredentials, documentId),
       ),
+    );
+  }
+
+  async resolvePeople(emails: readonly string[]): Promise<RpcResult<readonly PersonReference[]>> {
+    return runRpc(
+      this.#runtime,
+      Effect.flatMap(JotApplication, (application) => application.resolvePeople(emails)),
     );
   }
 
@@ -434,7 +441,10 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
       requestCredentials,
       documentId,
     ) => callRpc(workspaceStub(this.#environment).authorize(requestCredentials, documentId));
+    const peopleResolver: NonNullable<LocalApplicationOptions["peopleResolver"]> = (emails) =>
+      callRpc(workspaceStub(this.#environment).resolvePeople(emails));
     const runtime = createApplicationRuntime(this.#state, this.#environment, {
+      peopleResolver,
       principalResolver: resolver,
       workspaceId: configuration.workspaceId,
     });

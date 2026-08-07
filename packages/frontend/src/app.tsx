@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Effect } from "effect";
 
-import type { CatalogResponse, DocumentResponse, PresenceDto } from "@earendil-works/jot-protocol";
+import type {
+  CatalogResponse,
+  DocumentResponse,
+  PersonDto,
+  PresenceDto,
+} from "@earendil-works/jot-protocol";
 
 import { ApiError, makeApiClient } from "./api.ts";
 import type { ApiClientService } from "./api.ts";
@@ -210,7 +215,11 @@ function loadDocumentRoute(
           api,
           capabilityToken,
           document,
-          frontmatterVocabulary: collectFrontmatterVocabulary(document, catalog),
+          frontmatterVocabulary: collectFrontmatterVocabulary(
+            document,
+            catalog,
+            accountPerson(authentication.principal),
+          ),
           screen,
           shared,
         })),
@@ -219,18 +228,43 @@ function loadDocumentRoute(
   );
 }
 
+function accountPerson(
+  person:
+    | {
+        readonly displayName: string;
+        readonly email?: string | undefined;
+        readonly id: string;
+      }
+    | undefined,
+): readonly PersonDto[] {
+  return person?.email === undefined
+    ? []
+    : [{ displayName: person.displayName, email: person.email, id: person.id }];
+}
+
 function collectFrontmatterVocabulary(
   document: DocumentResponse,
   catalog: CatalogResponse | undefined,
+  accountPeople: readonly PersonDto[],
 ): FrontmatterVocabulary {
   const metadata = [
     document.metadata,
     ...(catalog?.documents.map((summary) => summary.metadata) ?? []),
   ];
+  const people = [
+    ...accountPeople,
+    ...(catalog?.people ?? []),
+    ...metadata.flatMap((item) => [...item.authors, ...item.reviewers, ...item.approvers]),
+  ];
   return {
     labels: [...new Set(metadata.flatMap((item) => item.labels))].toSorted((left, right) =>
       left.localeCompare(right),
     ),
+    people: [
+      ...new Map(
+        people.map((person) => [person.email.toLocaleLowerCase("en"), person] as const),
+      ).values(),
+    ],
     states: [...new Set(metadata.map((item) => item.lifecycleState))].toSorted((left, right) =>
       left.localeCompare(right),
     ),

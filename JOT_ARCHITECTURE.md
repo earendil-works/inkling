@@ -68,7 +68,7 @@ Markdown exports, rendered HTML, search indexes, snippets, state indexes, keywor
 
 Visibility, sharing, publication, and permissions are not inferred from collaborative Markdown alone. They are structured fields changed through validated commands.
 
-Collaborative frontmatter may propose publication state, visibility, sensitivity, and labels. Those values drive the live publication preview, but they do not change authorization while editing. The document title is the first top-level Markdown heading and is cached in structured state only as a derived projection. An authorized, explicit publish command validates and promotes frontmatter values into the structured metadata stored with the published revision. Sharing, RFC allocation, and publication state are never controlled by frontmatter.
+Collaborative frontmatter may propose authors by email address, publication state, visibility, sensitivity, and labels. Those values drive the live publication preview, but they do not change authorization while editing. Known author emails resolve through the workspace people directory so rendered metadata uses the account’s display name; unknown emails render as themselves. The document title is the first top-level Markdown heading and is cached in structured state only as a derived projection. An authorized, explicit publish command validates and promotes frontmatter values into the structured metadata stored with the published revision. Sharing, RFC allocation, and publication state are never controlled by frontmatter.
 
 ### 4.6 Local and Cloudflare are adapters around the same core
 
@@ -337,13 +337,13 @@ A document carries structured fields for:
 - Optional published revision.
 - Sharing policy.
 
-Authoritative metadata is changed by explicit document commands. The cached title is refreshed from accepted body updates. The collaborative body cannot alter permissions or publication state.
+Authoritative metadata is changed by explicit document commands. The cached title is refreshed from accepted body updates, and author email identifiers are promoted from validated frontmatter during publication. The collaborative body cannot alter permissions or publication state.
 
 ### 7.3 Collaborative body
 
 The body is a Yjs text value containing Markdown and optional publication frontmatter. It is the only directly collaborative field in the initial design. Its first top-level heading is the document title. Renderers present that heading in the document hero rather than duplicating it in prose, and catalog metadata caches its plain-text value as a rebuildable projection.
 
-Publication frontmatter contains collaboratively edited presentation values such as lifecycle state, intended visibility, sensitivity, and labels. Renderers omit it from prose and use it for live preview. Structured metadata remains authoritative for authorization until an explicit publish command validates and promotes the frontmatter values. Metadata outside the title heading and publication frontmatter is changed through serialized server commands rather than opaque collaborative changes.
+Publication frontmatter contains collaboratively edited presentation values such as author email addresses, lifecycle state, intended visibility, sensitivity, and labels. Renderers omit it from prose and use it for live preview. Author entries use normalized email addresses as stable identifiers and resolve display names from the workspace people directory when known. Structured metadata remains authoritative for authorization until an explicit publish command validates and promotes the frontmatter values. Metadata outside the title heading and publication frontmatter is changed through serialized server commands rather than opaque collaborative changes.
 
 ### 7.4 Comments
 
@@ -734,7 +734,7 @@ Raw HTML is disabled by default. If later enabled for trusted workspaces, it mus
 
 ### 15.2 Editor preview
 
-Preview rendering is debounced and must not block typing or collaboration. It parses publication frontmatter, omits it from rendered prose, and reflects valid draft metadata immediately without changing authorization. Mermaid diagram rendering is separately debounced and preserves pan and zoom state for unchanged diagrams where practical.
+Preview rendering is debounced and must not block typing or collaboration. It parses publication frontmatter, omits it from rendered prose, and reflects valid draft metadata immediately without changing authorization. Author email identifiers display the corresponding workspace account name when the people directory knows it and otherwise display the email address. Mermaid diagram rendering is separately debounced and preserves pan and zoom state for unchanged diagrams where practical.
 
 Comments are overlaid using resolved anchor positions after rendering. Rendered HTML never becomes authoritative document state.
 

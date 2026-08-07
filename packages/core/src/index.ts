@@ -32,6 +32,7 @@ export {
   nextDocumentRevision,
   personId,
   requireRevision,
+  resolveAuthorsByEmail,
   updateDocumentMetadata,
   updateSharingPolicy,
   validatePerson,

@@ -120,6 +120,7 @@ export type DocumentSummary = typeof DocumentSummarySchema.Type;
 
 export const CatalogResponseSchema = Schema.Struct({
   documents: Schema.Array(DocumentSummarySchema),
+  people: Schema.optional(Schema.Array(PersonSchema)),
 });
 export type CatalogResponse = typeof CatalogResponseSchema.Type;
 

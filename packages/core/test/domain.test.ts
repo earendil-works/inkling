@@ -22,6 +22,7 @@ import {
   parseCatalogSearchQuery,
   personId,
   reserveDocument,
+  resolveAuthorsByEmail,
   searchCatalog,
   SecretHasher,
   SecureToken,
@@ -106,6 +107,24 @@ test("document titles come from the first top-level Markdown heading", () => {
   );
   assert.equal(documentTitleFromMarkdown("Setext title\n===\n\nBody"), "Setext title");
   assert.equal(documentTitleFromMarkdown("## Section only"), undefined);
+});
+
+test("author email identifiers resolve known display names", async () => {
+  const knownId = await Effect.runPromise(personId("ada@example.com"));
+  const authors = await Effect.runPromise(
+    resolveAuthorsByEmail(
+      ["Ada@Example.com", "unknown@example.com", "ada@example.com"],
+      [{ displayName: "Ada Lovelace", email: "ada@example.com", id: knownId }],
+    ),
+  );
+  assert.deepEqual(authors, [
+    { displayName: "Ada Lovelace", email: "ada@example.com", id: "ada@example.com" },
+    {
+      displayName: "unknown@example.com",
+      email: "unknown@example.com",
+      id: "unknown@example.com",
+    },
+  ]);
 });
 
 test("workspace identity sessions retain their verified principal", async () => {

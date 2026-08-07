@@ -73,6 +73,7 @@ test(
         body: JSON.stringify({
           edits: [
             { newText: "durable", oldText: "initial" },
+            { newText: "authors:\n  - admin@example.com", oldText: "authors: []" },
             { newText: "labels:\n  - working", oldText: "labels: []" },
           ],
           expectedRevision: first.metadata.headRevision,
@@ -117,6 +118,19 @@ test(
       const searchResult = (await search.json()) as { documents: readonly DocumentWire[] };
       assert.equal(searchResult.documents[0]?.metadata.id, first.metadata.id);
       assert.deepEqual(searchResult.documents[0]?.metadata.labels, ["working"]);
+      const publication = await fetch(
+        `${running.baseUrl}/api/documents/${first.metadata.id}/publish`,
+        { headers: authorization, method: "POST" },
+      );
+      assert.equal(publication.status, 200);
+      const publicationMetadata = (await publication.json()) as DocumentWire["metadata"];
+      assert.deepEqual(publicationMetadata.authors, [
+        {
+          displayName: "Cloudflare Tester",
+          email: "admin@example.com",
+          id: "admin@example.com",
+        },
+      ]);
       const backup = await fetch(`${running.baseUrl}/api/admin/backup`, {
         headers: authorization,
       });
@@ -153,6 +167,11 @@ test(
 interface DocumentWire {
   readonly body: string;
   readonly metadata: {
+    readonly authors: readonly {
+      readonly displayName: string;
+      readonly email: string;
+      readonly id: string;
+    }[];
     readonly headRevision: number;
     readonly id: string;
     readonly labels: readonly string[];

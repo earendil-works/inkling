@@ -190,6 +190,10 @@ test(
         const frontmatter = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/edits`, {
           body: JSON.stringify({
             edits: [
+              {
+                newText: "authors:\n  - ada@example.com",
+                oldText: "authors: []",
+              },
               { newText: "visibility: public", oldText: "visibility: workspace" },
               {
                 newText: "labels:\n  - architecture\n  - platform",

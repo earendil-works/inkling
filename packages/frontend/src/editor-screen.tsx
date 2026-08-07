@@ -5,7 +5,7 @@ import type { AuthenticationStatus, DocumentResponse } from "@earendil-works/jot
 import type { ApiClientService } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
 import type { ConnectionState } from "./collaboration.ts";
-import { metadataWithFrontmatter } from "./components/document-page.tsx";
+import { metadataWithFrontmatter } from "./components/document-metadata.ts";
 import { EditorComments } from "./components/editor-comments.tsx";
 import type { EditorCommentsHandle } from "./components/editor-comments.tsx";
 import { EditorToolbar } from "./components/editor-toolbar.tsx";
@@ -80,7 +80,12 @@ export function EditorScreen({
   const canComment = permissions?.includes("comment") ?? false;
   const canEditMetadata = permissions?.includes("edit-metadata") ?? !shared;
   const rendered = useRenderedMarkdown(body, true);
-  const previewMetadata = metadataWithFrontmatter(metadata, rendered.frontmatter, rendered.title);
+  const previewMetadata = metadataWithFrontmatter(
+    metadata,
+    rendered.frontmatter,
+    rendered.title,
+    frontmatterVocabulary.people,
+  );
 
   const openCount = comments.threads.filter((thread) => !thread.resolved).length;
   const layoutClass = `editor-layout ${canEdit ? "is-editable" : "is-reader"}${previewOpen ? " preview-open" : ""}`;
