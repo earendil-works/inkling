@@ -71,7 +71,10 @@ test(
       );
       const edited = await fetch(`${running.baseUrl}/api/documents/${first.metadata.id}/edits`, {
         body: JSON.stringify({
-          edits: [{ newText: "durable", oldText: "initial" }],
+          edits: [
+            { newText: "durable", oldText: "initial" },
+            { newText: "labels:\n  - working", oldText: "labels: []" },
+          ],
           expectedRevision: first.metadata.headRevision,
         }),
         headers: { ...authorization, "Content-Type": "application/json" },
@@ -105,14 +108,13 @@ test(
         "Newest projected title",
       );
       const search = await fetch(
-        `${running.baseUrl}/api/documents?q=${encodeURIComponent("rfc:1 durable")}`,
+        `${running.baseUrl}/api/documents?q=${encodeURIComponent("rfc:1 label:working durable")}`,
         { headers: authorization },
       );
       assert.equal(search.status, 200);
-      assert.equal(
-        ((await search.json()) as { documents: readonly DocumentWire[] }).documents[0]?.metadata.id,
-        first.metadata.id,
-      );
+      const searchResult = (await search.json()) as { documents: readonly DocumentWire[] };
+      assert.equal(searchResult.documents[0]?.metadata.id, first.metadata.id);
+      assert.deepEqual(searchResult.documents[0]?.metadata.labels, ["working"]);
       const backup = await fetch(`${running.baseUrl}/api/admin/backup`, {
         headers: authorization,
       });
@@ -151,6 +153,7 @@ interface DocumentWire {
   readonly metadata: {
     readonly headRevision: number;
     readonly id: string;
+    readonly labels: readonly string[];
     readonly rfcNumber?: number | undefined;
   };
 }

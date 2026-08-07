@@ -143,6 +143,16 @@ export function nextDocumentRevision(value: DocumentRevision): DocumentRevision 
   return (value + 1) as DocumentRevision;
 }
 
+export function hasPendingPublicationChanges(metadata: {
+  readonly headRevision: number;
+  readonly publishedRevision?: number | undefined;
+}): boolean {
+  return (
+    metadata.publishedRevision === undefined ||
+    metadata.headRevision > metadata.publishedRevision + 1
+  );
+}
+
 export function validatePerson(person: PersonReference): Effect.Effect<void, DomainError> {
   if (person.displayName.trim().length === 0 || person.displayName.length > 200) {
     return fail("invalid_person", "A person must have a display name.");

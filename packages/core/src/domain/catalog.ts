@@ -22,6 +22,8 @@ export interface CatalogSummary {
   readonly visibility: Visibility;
   readonly sensitivity: Sensitivity;
   readonly labels: readonly string[];
+  /** Valid labels proposed by the current working frontmatter. */
+  readonly workingLabels?: readonly string[] | undefined;
   readonly authors: readonly PersonReference[];
   readonly reviewers: readonly PersonReference[];
   readonly approvers: readonly PersonReference[];
@@ -354,7 +356,7 @@ function indexSummary(
   const authors = personText(summary.authors);
   const reviewers = personText(summary.reviewers);
   const approvers = personText(summary.approvers);
-  const labels = summary.labels.map(normalizeSearchText);
+  const labels = (summary.workingLabels ?? summary.labels).map(normalizeSearchText);
   const rfc =
     summary.rfcNumber === undefined
       ? ""

@@ -134,10 +134,7 @@ export function makeCollaborationClient(
             yield* Effect.sync(() => callbacks.onPresence(message.presence));
             break;
           case "resynchronize":
-            yield* Effect.sync(() => {
-              callbacks.onError(message.reason);
-              socket?.close(4010, "resynchronize");
-            });
+            yield* Effect.sync(() => socket?.close(4010, "resynchronize"));
             break;
           case "error":
             yield* Effect.sync(() => callbacks.onError(message.error.message));

@@ -26,6 +26,7 @@ import {
   SecureToken,
   emptyAuthenticationState,
   emptyWorkspaceCatalog,
+  hasPendingPublicationChanges,
   taggedId,
   updateDocumentMetadata,
   updateSharingPolicy,
@@ -259,7 +260,10 @@ test("catalog search covers full bodies and Gmail-style metadata filters", async
         creationKey: "search-note",
         documentId: noteMetadata.id,
         status: "active",
-        summary: catalogSummary(noteMetadata, "confidential budget planning"),
+        summary: {
+          ...catalogSummary(noteMetadata, "confidential budget planning"),
+          workingLabels: ["planning"],
+        },
       },
     ],
     nextRfcNumber: 43,
@@ -281,7 +285,14 @@ test("catalog search covers full bodies and Gmail-style metadata filters", async
   );
   assert.equal(searchCatalog(state, "author:mitsuhiko")[0]?.documentId, rfcMetadata.id);
   assert.equal(searchCatalog(state, "rfc:0042")[0]?.documentId, rfcMetadata.id);
+  assert.equal(searchCatalog(state, "label:planning")[0]?.documentId, noteMetadata.id);
   assert.equal(searchCatalog(state, "is:note")[0]?.documentId, noteMetadata.id);
+});
+
+test("publication changes exclude the publication bookkeeping revision", () => {
+  assert.equal(hasPendingPublicationChanges({ headRevision: 0 }), true);
+  assert.equal(hasPendingPublicationChanges({ headRevision: 5, publishedRevision: 4 }), false);
+  assert.equal(hasPendingPublicationChanges({ headRevision: 6, publishedRevision: 4 }), true);
 });
 
 test("comment authors may edit their messages while stable anchors remain structured", async () => {

@@ -104,6 +104,29 @@ test(
           .textContent(),
         "platform",
       );
+      await first.waitForFunction(async () => {
+        const response = await fetch(`/api/documents?q=${encodeURIComponent("label:platform")}`);
+        const catalog = (await response.json()) as {
+          documents: readonly { metadata: { title: string } }[];
+        };
+        return catalog.documents.some(
+          (document) => document.metadata.title === "Browser collaboration",
+        );
+      });
+      await first.locator(".wordmark").click();
+      await first.waitForSelector("[data-document-search]");
+      await first.getByRole("link", { name: "Browse labels" }).click();
+      await first.getByRole("link", { name: /platform/u }).click();
+      const workingLabelRow = first.locator(".catalog-row", { hasText: "Browser collaboration" });
+      assert.equal(
+        await workingLabelRow.locator("[data-pending-edits]").textContent(),
+        "Pending edits",
+      );
+      await workingLabelRow.click();
+      await first.locator("[data-open-editor]").click();
+      await first.waitForFunction(
+        () => document.querySelector("[data-save-state]")?.textContent === "Saved",
+      );
       await first.locator(".cm-content").click();
       await first.keyboard.press("ControlOrMeta+End");
       await first.keyboard.insertText(
@@ -176,6 +199,7 @@ test(
       await first.getByRole("link", { name: /platform/u }).click();
       assert.equal(new URL(first.url()).searchParams.get("label"), "platform");
       assert.match(await first.locator("[data-catalog]").innerText(), /Browser collaboration/u);
+      assert.equal(await first.locator("[data-pending-edits]").count(), 0);
       await first.getByRole("link", { name: "All notes and RFCs" }).click();
       await first.waitForSelector("[data-document-search]");
       await first.keyboard.press("/");

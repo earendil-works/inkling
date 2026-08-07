@@ -179,7 +179,6 @@ test(
               },
             ],
             expectedRevision: document.metadata.headRevision,
-            labels: ["architecture", "platform"],
             targetDecisionDate: "2026-09-01",
             visibility: "public",
           }),
@@ -203,6 +202,19 @@ test(
           method: "POST",
         });
         assert.equal(frontmatter.status, 200);
+        const workingLabels = await fetch(
+          `${baseUrl}/api/documents?q=${encodeURIComponent("label:architecture")}`,
+          { headers: authorization },
+        );
+        assert.equal(workingLabels.status, 200);
+        const workingLabelDocuments = (await workingLabels.json()) as {
+          documents: readonly { metadata: { id: string; labels: readonly string[] } }[];
+        };
+        assert.equal(workingLabelDocuments.documents[0]?.metadata.id, document.metadata.id);
+        assert.deepEqual(workingLabelDocuments.documents[0]?.metadata.labels, [
+          "architecture",
+          "platform",
+        ]);
         assert.equal((await fetch(`${baseUrl}/rfc/0001`)).status, 404);
         const publish = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/publish`, {
           headers: authorization,

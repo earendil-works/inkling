@@ -1,3 +1,4 @@
+import { hasPendingPublicationChanges } from "@earendil-works/jot-core";
 import type { CatalogResponse } from "@earendil-works/jot-protocol";
 
 import { formatDate } from "../ui.ts";
@@ -21,7 +22,14 @@ export function DocumentCatalogRow({
     <a className="catalog-row" href={`/documents/${encodeURIComponent(metadata.id)}`}>
       <span className="catalog-row__index">{String(index + 1).padStart(2, "0")}</span>
       <span className="catalog-row__main">
-        <strong>{metadata.title}</strong>
+        <span className="catalog-row__title">
+          <strong>{metadata.title}</strong>
+          {hasPendingPublicationChanges(metadata) ? (
+            <span className="catalog-row__pending" data-pending-edits="">
+              Pending edits
+            </span>
+          ) : null}
+        </span>
         <small>{excerpt || "No body text yet"}</small>
       </span>
       <span className="catalog-row__meta">

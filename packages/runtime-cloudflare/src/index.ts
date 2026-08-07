@@ -352,19 +352,30 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
 
     const response = await app.fetch(request);
     if (isMutation(request) && response.ok) {
-      const pending =
+      if (
         request.method === "DELETE" &&
         url.pathname === `/api/documents/${encodeURIComponent(configuration.documentId)}`
-          ? this.#queueDeletion(configuration.documentId)
-          : runtime
-              .runPromise(
-                Effect.flatMap(JotApplication, (application) =>
-                  application.currentDocumentProjection(configuration.documentId),
-                ),
-              )
-              .then((projection) => this.#queueProjection(projection));
-      this.#state.waitUntil(pending);
-      await this.#requestResynchronization();
+      ) {
+        this.#state.waitUntil(this.#queueDeletion(configuration.documentId));
+        await this.#requestResynchronization();
+      } else {
+        const projection = runtime.runPromise(
+          Effect.flatMap(JotApplication, (application) =>
+            application.currentDocumentProjection(configuration.documentId),
+          ),
+        );
+        this.#state.waitUntil(projection.then((document) => this.#queueProjection(document)));
+        if (isPublicationMutation(url.pathname, configuration.documentId)) {
+          const document = await projection;
+          await Effect.runPromise(
+            this.#broadcast({ metadata: document.metadata, type: "metadata-changed" }).pipe(
+              Effect.catchAll(() => Effect.void),
+            ),
+          );
+        } else {
+          await this.#requestResynchronization();
+        }
+      }
     }
     return response;
   }
@@ -1341,6 +1352,11 @@ function isSameOrigin(origin: string | null, requestUrl: string): boolean {
 
 function isMutation(request: Request): boolean {
   return request.method !== "GET" && request.method !== "HEAD" && request.method !== "OPTIONS";
+}
+
+function isPublicationMutation(pathname: string, documentId: string): boolean {
+  const base = `/api/documents/${encodeURIComponent(documentId)}`;
+  return pathname === `${base}/publish` || pathname === `${base}/unpublish`;
 }
 
 function mutationProtectionError(request: Request): RpcError | undefined {

@@ -23,6 +23,7 @@ export {
   documentId,
   documentRevision,
   DomainError,
+  hasPendingPublicationChanges,
   knownLifecycleStates,
   markDeleted,
   markPublished,

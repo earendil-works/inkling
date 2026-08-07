@@ -388,9 +388,10 @@ export function makeLocalJotApplication(
     ): Effect.Effect<void, ApplicationError> =>
       room.snapshot(ownerPrincipal, new Date().toISOString()).pipe(
         Effect.mapError(toApplicationError),
-        Effect.flatMap((snapshot) =>
+        Effect.flatMap(summaryFromSnapshot),
+        Effect.flatMap((summary) =>
           withState(
-            applyCatalogSummary(state.catalog, summaryFromSnapshot(snapshot)).pipe(
+            applyCatalogSummary(state.catalog, summary).pipe(
               Effect.mapError(toApplicationError),
               Effect.flatMap((catalog) =>
                 saveState({ ...state, catalog }).pipe(Effect.mapError(toApplicationError)),
@@ -507,11 +508,15 @@ export function makeLocalJotApplication(
       currentDocumentProjection: (rawDocumentId) =>
         getRoom(rawDocumentId).pipe(Effect.flatMap((room) => snapshotFor(room, ownerPrincipal))),
       applyDocumentProjection: (document) =>
-        withState(
-          applyCatalogSummary(state.catalog, summaryFromDocument(document)).pipe(
-            Effect.mapError(toApplicationError),
-            Effect.flatMap((catalog) =>
-              saveState({ ...state, catalog }).pipe(Effect.mapError(toApplicationError)),
+        summaryFromDocument(document).pipe(
+          Effect.flatMap((summary) =>
+            withState(
+              applyCatalogSummary(state.catalog, summary).pipe(
+                Effect.mapError(toApplicationError),
+                Effect.flatMap((catalog) =>
+                  saveState({ ...state, catalog }).pipe(Effect.mapError(toApplicationError)),
+                ),
+              ),
             ),
           ),
         ),
@@ -673,7 +678,9 @@ export function makeLocalJotApplication(
             }).pipe(Effect.mapError(toApplicationError));
             rebuilt = yield* activateDocument(reserved.state, room.documentId).pipe(
               Effect.flatMap((catalog) =>
-                applyCatalogSummary(catalog, summaryFromSnapshot(snapshot)),
+                summaryFromSnapshot(snapshot).pipe(
+                  Effect.flatMap((summary) => applyCatalogSummary(catalog, summary)),
+                ),
               ),
               Effect.mapError(toApplicationError),
             );
@@ -1132,7 +1139,9 @@ export function makeLocalJotApplication(
           yield* withState(
             activateDocument(state.catalog, room.documentId).pipe(
               Effect.flatMap((catalog) =>
-                applyCatalogSummary(catalog, summaryFromSnapshot(snapshot)),
+                summaryFromSnapshot(snapshot).pipe(
+                  Effect.flatMap((summary) => applyCatalogSummary(catalog, summary)),
+                ),
               ),
               Effect.mapError(toApplicationError),
               Effect.flatMap((catalog) =>
@@ -1287,7 +1296,9 @@ export function makeLocalJotApplication(
           yield* withState(
             activateDocument(state.catalog, room.documentId).pipe(
               Effect.flatMap((catalog) =>
-                applyCatalogSummary(catalog, summaryFromSnapshot(snapshot)),
+                summaryFromSnapshot(snapshot).pipe(
+                  Effect.flatMap((summary) => applyCatalogSummary(catalog, summary)),
+                ),
               ),
               Effect.map((catalog) => directoryEntries.reduce(upsertPerson, catalog)),
               Effect.mapError(toApplicationError),
@@ -1469,7 +1480,10 @@ export function makeLocalJotApplication(
                 )
               : Effect.succeed({
                   excerpt: summary.excerpt,
-                  metadata: summary.metadata as DocumentMetadataDto,
+                  metadata: {
+                    ...summary.metadata,
+                    labels: summary.workingLabels ?? summary.metadata.labels,
+                  } as DocumentMetadataDto,
                 }),
           );
           return { documents } satisfies CatalogResponse;
@@ -2047,30 +2061,35 @@ function allowedActions(
   );
 }
 
-function summaryFromSnapshot(snapshot: DocumentSnapshot): CatalogSummary {
+function summaryFromSnapshot(snapshot: DocumentSnapshot): Effect.Effect<CatalogSummary> {
   return summaryFromDocument(toDocumentResponse(snapshot));
 }
 
-function summaryFromDocument(document: DocumentResponse): CatalogSummary {
+function summaryFromDocument(document: DocumentResponse): Effect.Effect<CatalogSummary> {
   const body = normalizeSearchText(document.body);
-  return {
-    approvers: document.metadata.approvers as readonly PersonReference[],
-    authors: document.metadata.authors as readonly PersonReference[],
-    documentId: document.metadata.id as DocumentMetadata["id"],
-    excerpt: excerpt(document.body),
-    labels: document.metadata.labels,
-    metadata: document.metadata as DocumentMetadata,
-    normalizedBody: body,
-    publishedRevision: document.metadata.publishedRevision as DocumentRevision | undefined,
-    revision: document.metadata.headRevision as DocumentRevision,
-    reviewers: document.metadata.reviewers as readonly PersonReference[],
-    rfcNumber: document.metadata.rfcNumber,
-    sensitivity: document.metadata.sensitivity,
-    state: document.metadata.lifecycleState,
-    title: document.metadata.title,
-    updatedAt: document.metadata.updatedAt,
-    visibility: document.metadata.visibility,
-  };
+  return parseDocumentSource(document.body).pipe(
+    Effect.map((source) => source.frontmatter?.labels ?? document.metadata.labels),
+    Effect.catchAll(() => Effect.succeed(document.metadata.labels)),
+    Effect.map((workingLabels) => ({
+      approvers: document.metadata.approvers as readonly PersonReference[],
+      authors: document.metadata.authors as readonly PersonReference[],
+      documentId: document.metadata.id as DocumentMetadata["id"],
+      excerpt: excerpt(document.body),
+      labels: document.metadata.labels,
+      metadata: document.metadata as DocumentMetadata,
+      normalizedBody: body,
+      publishedRevision: document.metadata.publishedRevision as DocumentRevision | undefined,
+      revision: document.metadata.headRevision as DocumentRevision,
+      reviewers: document.metadata.reviewers as readonly PersonReference[],
+      rfcNumber: document.metadata.rfcNumber,
+      sensitivity: document.metadata.sensitivity,
+      state: document.metadata.lifecycleState,
+      title: document.metadata.title,
+      updatedAt: document.metadata.updatedAt,
+      visibility: document.metadata.visibility,
+      workingLabels,
+    })),
+  );
 }
 
 function importedCommentRange(

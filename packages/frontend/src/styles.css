@@ -769,6 +769,13 @@ select:disabled {
   gap: 0.35rem;
 }
 
+.catalog-row__title {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
 .catalog-row__main strong,
 .catalog-row__main small {
   overflow: hidden;
@@ -780,6 +787,16 @@ select:disabled {
   font-size: 1.15rem;
   font-style: italic;
   font-weight: 500;
+}
+
+.catalog-row__pending {
+  flex: none;
+  padding: 0.08rem 0.3rem;
+  border: 1px solid var(--border-strong);
+  color: var(--muted);
+  font: 0.56rem/1.3 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .catalog-row__meta {
