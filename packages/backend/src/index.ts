@@ -19,7 +19,7 @@ import {
   ResolutionRequestSchema,
   ShareUpdateRequestSchema,
 } from "@earendil-works/jot-protocol";
-import { taggedId } from "@earendil-works/jot-core";
+import { taggedId, uuidV7Bytes } from "@earendil-works/jot-core";
 import type {
   CatalogResponse,
   DocumentMetadataDto,
@@ -56,7 +56,10 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
 
   app.use("*", async (context, next) => {
     const startedAt = Date.now();
-    const requestId = taggedId("request", crypto.getRandomValues(new Uint8Array(16)));
+    const requestId = taggedId(
+      "request",
+      uuidV7Bytes(startedAt, crypto.getRandomValues(new Uint8Array(10))),
+    );
     await next();
     context.header("X-Request-Id", requestId);
     console.log(

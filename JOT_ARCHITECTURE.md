@@ -314,7 +314,7 @@ The bucket is private. Public access always passes through the Jot HTTP runtime 
 
 A document has an opaque immutable identifier. RFC number is a separate optional presentation identifier.
 
-Opaque identifiers are used for storage, Durable Object routing, API references, and internal links. RFC numbers are used for canonical public routes and display.
+Opaque identifiers are used for storage, Durable Object routing, API references, and internal links. New identifiers retain their readable type tag and base62 representation, but encode UUIDv7 bytes so their source carries creation time rather than being purely random. Existing opaque identifiers remain valid. Secret session, API-key, and capability tokens remain independently generated cryptographic random values. RFC numbers are used for canonical public routes and display.
 
 RFC numbers are allocated monotonically within a workspace and are never reused, including after deletion.
 

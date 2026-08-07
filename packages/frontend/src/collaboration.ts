@@ -1,7 +1,7 @@
 import { Data, Effect } from "effect";
 import * as Y from "yjs";
 
-import { taggedId } from "@earendil-works/jot-core";
+import { taggedId, uuidV7Bytes } from "@earendil-works/jot-core";
 
 import { browserRuntime } from "./effect-runtime.ts";
 
@@ -205,7 +205,10 @@ export function makeCollaborationClient(
       if (origin === remoteOrigin) {
         return;
       }
-      const clientUpdateId = taggedId("update", crypto.getRandomValues(new Uint8Array(16)));
+      const clientUpdateId = taggedId(
+        "update",
+        uuidV7Bytes(Date.now(), crypto.getRandomValues(new Uint8Array(10))),
+      );
       unacknowledged.set(clientUpdateId, update);
       callbacks.onState(socket?.readyState === WebSocket.OPEN ? "saving" : "disconnected");
       sendMessage({ clientUpdateId, type: "body-update", update: encodeBase64(update) });

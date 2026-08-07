@@ -1,7 +1,7 @@
-import { taggedId } from "@earendil-works/jot-core";
+import { taggedId, uuidV7Bytes } from "@earendil-works/jot-core";
 
 export function randomId(tag: string): string {
-  return taggedId(tag, crypto.getRandomValues(new Uint8Array(16)));
+  return taggedId(tag, uuidV7Bytes(Date.now(), crypto.getRandomValues(new Uint8Array(10))));
 }
 
 export function documentHref(

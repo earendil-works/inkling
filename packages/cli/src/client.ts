@@ -1,6 +1,6 @@
 import { Data, Effect, Schema } from "effect";
 
-import { taggedId } from "@earendil-works/jot-core";
+import { taggedId, uuidV7Bytes } from "@earendil-works/jot-core";
 import {
   AttachmentListResponseSchema,
   AttachmentMetadataSchema,
@@ -348,7 +348,10 @@ export function makeCliClient(instance: Instance): CliClient {
       mutate("/api/documents", DocumentResponseSchema, "POST", {
         allocateRfc,
         body,
-        creationKey: taggedId("request", crypto.getRandomValues(new Uint8Array(16))),
+        creationKey: taggedId(
+          "request",
+          uuidV7Bytes(Date.now(), crypto.getRandomValues(new Uint8Array(10))),
+        ),
         title,
       }),
     replaceBody: (documentId, body, expectedRevision) =>

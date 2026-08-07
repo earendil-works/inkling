@@ -32,6 +32,7 @@ import {
   taggedId,
   updateDocumentMetadata,
   updateSharingPolicy,
+  uuidV7Bytes,
 } from "../src/index.ts";
 import type {
   CatalogSummary,
@@ -64,11 +65,23 @@ function catalogSummary(metadata: DocumentMetadata, body: string): CatalogSummar
   };
 }
 
-test("identifiers use the canonical base62 alphabet", () => {
+test("identifiers use UUIDv7 bytes and the canonical base62 alphabet", () => {
   assert.equal(encodeBase62(Uint8Array.of(0)), "0");
   assert.equal(encodeBase62(Uint8Array.of(61)), "Z");
   assert.equal(encodeBase62(Uint8Array.of(62)), "10");
   assert.equal(taggedId("doc", Uint8Array.of(62)), "doc_10");
+
+  const bytes = uuidV7Bytes(
+    0x0123_4567_89ab,
+    Uint8Array.of(0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99),
+  );
+  assert.deepEqual(
+    [...bytes],
+    [
+      0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0x70, 0x11, 0xa2, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
+      0x99,
+    ],
+  );
 });
 
 test("metadata revisions reject stale commands and confidential public transitions", async () => {

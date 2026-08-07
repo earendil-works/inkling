@@ -7,6 +7,7 @@ import {
   SecureToken,
   StorageError,
   taggedId,
+  uuidV7Bytes,
 } from "@earendil-works/jot-core";
 import type {
   DigestService,
@@ -36,7 +37,9 @@ export const SecureTokenLive = Layer.succeed(SecureToken, {
 
 export const IdGeneratorLive = Layer.succeed(IdGenerator, {
   generate: (purpose) =>
-    Effect.sync(() => taggedId(purpose, crypto.getRandomValues(new Uint8Array(16)))),
+    Effect.sync(() =>
+      taggedId(purpose, uuidV7Bytes(Date.now(), crypto.getRandomValues(new Uint8Array(10)))),
+    ),
 } satisfies IdGeneratorService);
 
 export const SecretHasherLive = Layer.succeed(SecretHasher, makeSecretHasher());
