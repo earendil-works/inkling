@@ -87,6 +87,10 @@ export function EditorScreen({
     frontmatterVocabulary.people,
   );
 
+  useEffect(() => {
+    document.title = previewMetadata.title;
+  }, [previewMetadata.title]);
+
   const openCount = comments.threads.filter((thread) => !thread.resolved).length;
   const layoutClass = `editor-layout ${canEdit ? "is-editable" : "is-reader"}${previewOpen ? " preview-open" : ""}`;
 

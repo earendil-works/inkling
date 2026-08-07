@@ -71,7 +71,14 @@ export function App(): React.JSX.Element {
     `${locationState.url.href}:${locationState.generation}`,
   );
   const navigating = route.state.status === "loading";
+  const pageTitle =
+    route.state.data?.screen === "editor" || route.state.data?.screen === "reader"
+      ? route.state.data.document.metadata.title
+      : "Notes and RFCs";
 
+  useEffect(() => {
+    document.title = pageTitle;
+  }, [pageTitle]);
   useEffect(() => {
     if (status === undefined) {
       delete document.documentElement.dataset["api"];

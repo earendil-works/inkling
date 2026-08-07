@@ -771,7 +771,7 @@ Primary surfaces are:
 
 CodeMirror owns text editing, selection, composition, the title heading, and local undo. Application state owns structured metadata, comments, permissions, connection status, and preview state.
 
-Accessibility requirements include keyboard navigation, visible focus, semantic controls, dialog focus management, reduced-motion support, and non-color-only presence indicators.
+Accessibility requirements include keyboard navigation, visible focus, semantic controls, dialog focus management, reduced-motion support, and non-color-only presence indicators. The browser page title is the current note or RFC title on document routes and `Notes and RFCs` on workspace-level routes.
 
 ## 17. CLI architecture
 

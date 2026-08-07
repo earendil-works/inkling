@@ -38,6 +38,7 @@ test(
         .locator("[data-auth-form]")
         .evaluate((form: HTMLFormElement) => form.requestSubmit());
       await first.waitForSelector("[data-new-document]");
+      assert.equal(await first.title(), "Notes and RFCs");
       assert.equal(await first.locator(".workspace-heading h1").textContent(), "Notes and RFCs");
       assert.equal(await first.locator(".wordmark").textContent(), "Notes and RFCs");
       assert.equal(await first.locator("[data-account-name]").textContent(), "Owner");
@@ -58,6 +59,24 @@ test(
       await first.waitForURL(/\/documents\/[^/]+\/edit$/u);
       const documentId = first.url().split("/").at(-2);
       assert.ok(documentId);
+      await first.waitForFunction(
+        () => document.querySelector("[data-save-state]")?.textContent === "Saved",
+      );
+      assert.equal(await first.title(), "Browser collaboration");
+      const titleLine = first.locator(".cm-line").filter({ hasText: "# Browser collaboration" });
+      await titleLine.click();
+      await first.keyboard.press("End");
+      await first.keyboard.press("Shift+Home");
+      await first.keyboard.insertText("# Temporary browser title");
+      await first.waitForFunction(() => document.title === "Temporary browser title");
+      const temporaryTitleLine = first
+        .locator(".cm-line")
+        .filter({ hasText: "# Temporary browser title" });
+      await temporaryTitleLine.click();
+      await first.keyboard.press("End");
+      await first.keyboard.press("Shift+Home");
+      await first.keyboard.insertText("# Browser collaboration");
+      await first.waitForFunction(() => document.title === "Browser collaboration");
       await first.waitForFunction(
         () => document.querySelector("[data-save-state]")?.textContent === "Saved",
       );
@@ -128,6 +147,7 @@ test(
       });
       await first.locator(".wordmark").click();
       await first.waitForSelector("[data-document-search]");
+      assert.equal(await first.title(), "Notes and RFCs");
       await first.getByRole("link", { name: "Browse labels" }).click();
       await first.getByRole("link", { name: /platform/u }).click();
       const workingLabelRow = first.locator(".catalog-row", { hasText: "Browser collaboration" });
@@ -137,6 +157,7 @@ test(
       );
       await workingLabelRow.click();
       await first.waitForSelector("[data-unpublished]");
+      assert.equal(await first.title(), "Browser collaboration");
       assert.doesNotMatch(await first.locator("[data-reader]").innerText(), /architecture/u);
       await first.locator("[data-open-editor]").click();
       await first.waitForFunction(

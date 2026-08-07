@@ -233,6 +233,7 @@ test(
         assert.doesNotMatch(publishedCsp, /style-src 'unsafe-inline'/u);
         const publishedHtml = await published.text();
         assert.match(publishedHtml, /Integrated RFC/u);
+        assert.match(publishedHtml, /<title>Integrated RFC<\/title>/u);
         assert.match(publishedHtml, /class="public-hero"/u);
         assert.match(publishedHtml, /class="public-metadata"/u);
         assert.match(publishedHtml, /mailto:ada@example\.com/u);
@@ -244,6 +245,9 @@ test(
         assert.match(publishedHtml, /<link rel="stylesheet" href="\/fonts\.css">/u);
         assert.match(publishedHtml, /<link rel="stylesheet" href="\/public\.css">/u);
         assert.doesNotMatch(publishedHtml, /<style>/u);
+        const statePage = await fetch(`${baseUrl}/state/draft`);
+        assert.equal(statePage.status, 200);
+        assert.match(await statePage.text(), /<title>Notes and RFCs<\/title>/u);
         const fontStylesheet = await fetch(`${baseUrl}/fonts.css`);
         assert.equal(fontStylesheet.status, 200);
         const fontStyles = await fontStylesheet.text();
