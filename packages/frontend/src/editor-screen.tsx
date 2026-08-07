@@ -79,10 +79,6 @@ export function EditorScreen({
   const rendered = useRenderedMarkdown(body, true);
   const previewMetadata = metadataWithFrontmatter(metadata, rendered.frontmatter);
 
-  useEffect(() => {
-    if (rendered.error !== undefined) showToast(`Preview failed: ${rendered.error}`, "error");
-  }, [rendered.error, showToast]);
-
   const metadataAction = useEffectAction<
     Readonly<Record<string, unknown>>,
     DocumentMetadataDto,

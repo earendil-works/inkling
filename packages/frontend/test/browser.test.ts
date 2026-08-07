@@ -77,6 +77,17 @@ test(
       await labelsLine.click();
       await first.keyboard.press("End");
       await first.keyboard.press("Shift+Home");
+      await first.keyboard.insertText("labels: [] invalid");
+      await first.waitForTimeout(100);
+      assert.equal(await first.locator("[data-toasts] .toast").count(), 0);
+      assert.equal(
+        await first.locator(".editor-preview-page [data-document-page] h1").textContent(),
+        "Browser collaboration",
+      );
+      const invalidLabelsLine = first.locator(".cm-line").filter({ hasText: "labels: [] invalid" });
+      await invalidLabelsLine.click();
+      await first.keyboard.press("End");
+      await first.keyboard.press("Shift+Home");
       await first.keyboard.insertText("labels:\n  - architecture\n  - platform");
       assert.equal(
         await first.locator(".editor-preview-page [data-document-page] h1").textContent(),
