@@ -27,6 +27,12 @@ import {
   makeFrontmatterCompletionSource,
 } from "./frontmatter-completion.ts";
 import type { FrontmatterVocabulary } from "./frontmatter-completion.ts";
+import {
+  clearRemotePresence,
+  remotePresenceExtension,
+  removeRemotePresence,
+  setRemotePresence,
+} from "./remote-presence.ts";
 import { colorFor, randomId } from "./ui.ts";
 
 export interface EditorSession {
@@ -54,6 +60,7 @@ interface UseEditorSessionOptions extends EditorSessionCallbacks {
   readonly frontmatterVocabulary: FrontmatterVocabulary;
   readonly initialBody: string;
   readonly initiallyEditable: boolean;
+  readonly identityId: string | undefined;
   readonly shared: boolean;
 }
 
@@ -73,6 +80,7 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
     frontmatterVocabulary,
     initialBody,
     initiallyEditable,
+    identityId,
     shared,
     ...callbacks
   } = options;
@@ -93,7 +101,7 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
     const editable = new Compartment();
     const theme = new Compartment();
     const participantId = randomId("participant");
-    const participantColor = colorFor(participantId);
+    const participantColor = colorFor(identityId ?? participantId);
     const participantMap = new Map<string, PresenceDto>();
     const frontmatterCompletion = makeFrontmatterCompletionSource(frontmatterVocabulary);
     let client: CollaborationClient | undefined;
@@ -112,20 +120,21 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
               completion.detail === frontmatterFieldCompletionDetail,
           }),
           yCollab(yBody, awareness),
+          remotePresenceExtension,
           commentDecorationsExtension,
           editable.of(EditorView.editable.of(initiallyEditable)),
           theme.of(document.documentElement.dataset["theme"] === "dark" ? oneDarkTheme : []),
           EditorView.lineWrapping,
           EditorView.updateListener.of((update) => {
-            if (!update.selectionSet || client === undefined) return;
-            const selection = update.state.selection.main;
+            if ((!update.selectionSet && !update.focusChanged) || client === undefined) return;
+            const selection = update.view.hasFocus ? update.state.selection.main : undefined;
             browserRuntime.runFork(
               client.sendPresence({
                 color: participantColor,
                 displayName,
                 participantId,
-                selectionEnd: selection.to,
-                selectionStart: selection.from,
+                selectionEnd: selection?.head,
+                selectionStart: selection?.anchor,
               }),
             );
           }),
@@ -171,10 +180,34 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
           },
           onPresence: (presence) => {
             participantMap.set(presence.participantId, presence);
+            editor.dispatch({ effects: setRemotePresence(presence) });
+            callbacksRef.current.onParticipants([...participantMap.values()].slice(0, 6));
+          },
+          onPresenceLeft: (departedParticipantId) => {
+            participantMap.delete(departedParticipantId);
+            editor.dispatch({ effects: removeRemotePresence(departedParticipantId) });
             callbacksRef.current.onParticipants([...participantMap.values()].slice(0, 6));
           },
           onRevision: (revision) => callbacksRef.current.onRevision(revision),
-          onState: (state) => callbacksRef.current.onState(state),
+          onState: (state) => {
+            callbacksRef.current.onState(state);
+            if (state === "connecting" || state === "disconnected") {
+              participantMap.clear();
+              editor.dispatch({ effects: clearRemotePresence() });
+              callbacksRef.current.onParticipants([]);
+            } else if (client !== undefined) {
+              const selection = editor.hasFocus ? editor.state.selection.main : undefined;
+              browserRuntime.runFork(
+                client.sendPresence({
+                  color: participantColor,
+                  displayName,
+                  participantId,
+                  selectionEnd: selection?.head,
+                  selectionStart: selection?.anchor,
+                }),
+              );
+            }
+          },
         },
       ).pipe(
         Effect.tap((created) =>
@@ -198,7 +231,15 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
       sessionRef.current = undefined;
       callbacksRef.current.onParticipants([]);
     };
-  }, [capabilityToken, displayName, documentId, frontmatterVocabulary, initiallyEditable, shared]);
+  }, [
+    capabilityToken,
+    displayName,
+    documentId,
+    frontmatterVocabulary,
+    identityId,
+    initiallyEditable,
+    shared,
+  ]);
 
   return { body, editorHostRef, sessionRef, sessionRevision, yRevision };
 }

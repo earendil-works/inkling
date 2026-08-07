@@ -431,7 +431,7 @@ Persistence occurs before acknowledgement and broadcast. A process failure may c
 
 ### 8.4 Presence
 
-Presence includes participant identifier, display name, color, cursor or selection, and last activity time.
+Presence includes participant identifier, display name, color, cursor or selection, and last activity time. Editor sessions render remote selections and labeled cursors, with stable per-identity colors generated in OKLCH and translucent selection treatment mixed in Oklab.
 
 Presence is ephemeral:
 

@@ -1458,6 +1458,34 @@ select:disabled {
   color: var(--muted);
 }
 
+.cm-remote-selection {
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--remote-color) 28%, transparent);
+  box-shadow: inset 0 -1px color-mix(in oklab, var(--remote-color) 72%, transparent);
+}
+
+.cm-remote-cursor {
+  position: relative;
+  display: inline;
+  margin-inline: -1px;
+  border-left: 2px solid var(--remote-color);
+  pointer-events: none;
+}
+
+.cm-remote-cursor__label {
+  position: absolute;
+  z-index: 20;
+  bottom: calc(100% + 0.2rem);
+  left: -2px;
+  padding: 0.2rem 0.35rem;
+  border-radius: 2px 2px 2px 0;
+  background: var(--remote-color);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 18%);
+  color: oklch(18% 0.02 260);
+  font: 650 var(--font-caption)/1.15 var(--mono);
+  white-space: nowrap;
+}
+
 .is-reader {
   height: auto;
   min-height: calc(100dvh - var(--masthead-height));
@@ -1913,7 +1941,7 @@ select:disabled {
   border: 2px solid var(--surface);
   border-radius: 50%;
   background: var(--participant);
-  color: white;
+  color: oklch(18% 0.02 260);
   font: var(--font-caption) var(--mono);
 }
 

@@ -28,6 +28,7 @@ export interface CollaborationCallbacks {
   readonly onMetadata: (metadata: DocumentMetadataDto) => void;
   readonly onPermissions: (actions: readonly string[]) => void;
   readonly onPresence: (presence: PresenceDto) => void;
+  readonly onPresenceLeft: (participantId: string) => void;
   readonly onRevision: (revision: number) => void;
   readonly onState: (state: ConnectionState) => void;
   readonly onError: (message: string) => void;
@@ -134,6 +135,9 @@ export function makeCollaborationClient(
             break;
           case "presence":
             yield* Effect.sync(() => callbacks.onPresence(message.presence));
+            break;
+          case "presence-left":
+            yield* Effect.sync(() => callbacks.onPresenceLeft(message.participantId));
             break;
           case "resynchronize":
             yield* Effect.sync(() => socket?.close(4010, "resynchronize"));

@@ -379,6 +379,10 @@ export const ServerCollaborationMessageSchema = Schema.Union(
   }),
   Schema.Struct({ presence: PresenceSchema, type: Schema.Literal("presence") }),
   Schema.Struct({
+    participantId: NonEmptyString.pipe(Schema.maxLength(128)),
+    type: Schema.Literal("presence-left"),
+  }),
+  Schema.Struct({
     comments: CommentStateSchema,
     revision: Revision,
     type: Schema.Literal("comments-changed"),

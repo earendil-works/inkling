@@ -53,6 +53,7 @@ export function EditorScreen({
     frontmatterVocabulary,
     initialBody: initial.body,
     initiallyEditable,
+    identityId: account?.id,
     onComments: setComments,
     onError: (message) => showToast(message, "error"),
     onMetadata: setMetadata,

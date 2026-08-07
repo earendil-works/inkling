@@ -19,6 +19,7 @@ import {
 } from "@earendil-works/jot-protocol";
 import type {
   ClientCollaborationMessage,
+  PresenceDto,
   ServerCollaborationMessage,
 } from "@earendil-works/jot-protocol";
 import { decodeBase64 } from "@earendil-works/jot-collaboration";
@@ -26,6 +27,7 @@ import type { ServerType } from "@hono/node-server";
 
 interface ConnectedClient {
   readonly documentId: string;
+  presence?: PresenceDto | undefined;
   readonly socket: WebSocket;
   readonly updateTimes: number[];
 }
@@ -136,6 +138,18 @@ export function installWebSocketServer(
                 connection = established;
                 initialized = true;
                 yield* send(socket, established.welcome);
+                const existingPresences = [...clients].flatMap((other) =>
+                  other !== client &&
+                  other.documentId === documentId &&
+                  other.presence !== undefined
+                    ? [other.presence]
+                    : [],
+                );
+                yield* Effect.forEach(
+                  existingPresences,
+                  (presence) => send(socket, { presence, type: "presence" }),
+                  { discard: true },
+                );
                 eventsFiber = yield* Stream.runForEach(established.events, (event) =>
                   send(socket, event).pipe(
                     Effect.tap(() =>
@@ -185,6 +199,7 @@ export function installWebSocketServer(
                 return;
               }
               if (message.type === "presence") {
+                client.presence = message.presence;
                 const wire: ServerCollaborationMessage = {
                   presence: message.presence,
                   type: "presence",
@@ -201,19 +216,33 @@ export function installWebSocketServer(
           ),
         );
 
-      socket.on("message", (data) => {
-        runtime.runFork(processMessage(data).pipe(Effect.catchAll(fail)));
-      });
-
-      socket.on("close", () => {
+      let disconnected = false;
+      const disconnect = (): void => {
+        if (disconnected) return;
+        disconnected = true;
         clients.delete(client);
+        const participantId = client.presence?.participantId;
+        client.presence = undefined;
+        if (participantId !== undefined) {
+          runtime.runFork(
+            Effect.forEach(
+              [...clients].filter((other) => other.documentId === documentId),
+              (other) =>
+                send(other.socket, { participantId, type: "presence-left" }).pipe(Effect.ignore),
+              { concurrency: "unbounded", discard: true },
+            ),
+          );
+        }
         if (eventsFiber !== undefined) {
           runtime.runFork(Fiber.interrupt(eventsFiber));
         }
+      };
+
+      socket.on("message", (data) => {
+        runtime.runFork(processMessage(data).pipe(Effect.catchAll(fail)));
       });
-      socket.on("error", () => {
-        clients.delete(client);
-      });
+      socket.on("close", disconnect);
+      socket.on("error", disconnect);
     },
   );
 

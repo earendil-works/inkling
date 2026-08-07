@@ -353,6 +353,21 @@ test(
       await second.waitForSelector(".cm-content");
       await first.locator(".cm-content").click();
       await first.keyboard.press("ControlOrMeta+End");
+      const ownerCursor = second.locator('.cm-remote-cursor[data-remote-name="Owner"]');
+      await ownerCursor.waitFor();
+      const ownerPresenceColor = await ownerCursor.evaluate((cursor) =>
+        getComputedStyle(cursor).getPropertyValue("--remote-color").trim(),
+      );
+      assert.match(ownerPresenceColor, /^oklch\(/u);
+      await first.keyboard.press("Shift+Home");
+      const ownerSelection = second.locator('.cm-remote-selection[data-remote-name="Owner"]');
+      await ownerSelection.waitFor();
+      assert.match(
+        await ownerSelection.evaluate((selection) => getComputedStyle(selection).backgroundColor),
+        /^oklab\(|^oklch\(/u,
+      );
+      await first.keyboard.press("ArrowRight");
+      await first.keyboard.press("ControlOrMeta+End");
       await first.keyboard.insertText(" from first");
       await second.locator(".cm-content").click();
       await second.keyboard.press("ControlOrMeta+End");
@@ -517,6 +532,11 @@ test(
       assert.equal(layout.hasHorizontalOverflow, false);
       assert.ok(Math.abs(layout.sourceWidth - layout.previewWidth) < 2);
 
+      await second.close();
+      await first.waitForFunction(
+        () => document.querySelectorAll("[data-participants] .participant").length === 0,
+      );
+
       const capabilityUrl = await first.evaluate(async (id) => {
         const csrf = document.cookie
           .split(";")
@@ -545,6 +565,15 @@ test(
       await shared.waitForFunction(
         () => document.querySelector(".cm-content")?.getAttribute("contenteditable") === "true",
       );
+      await shared.locator(".cm-content").click();
+      await shared.keyboard.press("ControlOrMeta+End");
+      const guestCursor = first.locator('.cm-remote-cursor[data-remote-name="Browser reviewer"]');
+      await guestCursor.waitFor();
+      const guestPresenceColor = await guestCursor.evaluate((cursor) =>
+        getComputedStyle(cursor).getPropertyValue("--remote-color").trim(),
+      );
+      assert.match(guestPresenceColor, /^oklch\(/u);
+      assert.notEqual(guestPresenceColor, ownerPresenceColor);
       await first.evaluate(async (id) => {
         const csrf = document.cookie
           .split(";")

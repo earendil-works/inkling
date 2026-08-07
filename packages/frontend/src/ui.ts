@@ -21,11 +21,13 @@ export function formatDate(value: string): string {
 }
 
 export function colorFor(value: string): string {
-  let hash = 0;
+  let hash = 2_166_136_261;
   for (const character of value) {
-    hash = (hash * 31 + (character.codePointAt(0) ?? 0)) | 0;
+    hash ^= character.codePointAt(0) ?? 0;
+    hash = Math.imul(hash, 16_777_619) >>> 0;
   }
-  return `hsl(${Math.abs(hash) % 360} 58% 46%)`;
+  const hue = ((hash / 0xffff_ffff) * 360).toFixed(2);
+  return `oklch(68% 0.16 ${hue})`;
 }
 
 export function storedGuestName(): string | undefined {

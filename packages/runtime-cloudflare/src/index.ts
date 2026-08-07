@@ -42,6 +42,7 @@ import type {
   ClientCollaborationMessage,
   DocumentMetadataDto,
   DocumentResponse,
+  PresenceDto,
   ServerCollaborationMessage,
 } from "@earendil-works/jot-protocol";
 import { MarkdownRendererLive } from "@earendil-works/jot-renderer";
@@ -75,6 +76,7 @@ interface SocketAttachment {
   readonly credentials: RequestCredentials;
   readonly documentId: string;
   readonly initialized: boolean;
+  readonly presence?: PresenceDto | undefined;
   readonly principal?: Principal | undefined;
   readonly updateTimes: readonly number[];
 }
@@ -454,9 +456,13 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
     await runtime.runPromise(processed);
   }
 
-  override webSocketClose(): void {}
+  override async webSocketClose(socket: WebSocket): Promise<void> {
+    await this.#removePresence(socket);
+  }
 
-  override webSocketError(): void {}
+  override async webSocketError(socket: WebSocket): Promise<void> {
+    await this.#removePresence(socket);
+  }
 
   async #loadConfiguration(): Promise<DocumentRuntimeConfiguration | undefined> {
     if (this.#configuration !== undefined) return this.#configuration;
@@ -533,6 +539,18 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
           stateVector,
         );
         yield* send(socket, connection.welcome);
+        const existingPresences = this.#state
+          .getWebSockets(attachment.documentId)
+          .flatMap((other) => {
+            if (other === socket) return [];
+            const otherAttachment = other.deserializeAttachment() as SocketAttachment | null;
+            return otherAttachment?.presence === undefined ? [] : [otherAttachment.presence];
+          });
+        yield* Effect.forEach(
+          existingPresences,
+          (presence) => send(socket, { presence, type: "presence" }),
+          { discard: true },
+        );
         socket.serializeAttachment({
           ...attachment,
           initialized: true,
@@ -581,9 +599,23 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
       }
 
       if (message.type === "presence") {
+        socket.serializeAttachment({ ...attachment, presence: message.presence });
         yield* this.#broadcast({ presence: message.presence, type: "presence" }, socket);
       }
     });
+  }
+
+  async #removePresence(socket: WebSocket): Promise<void> {
+    const attachment = socket.deserializeAttachment() as SocketAttachment | null;
+    if (attachment?.presence === undefined) return;
+    const { presence, ...remaining } = attachment;
+    socket.serializeAttachment(remaining);
+    await Effect.runPromise(
+      this.#broadcast(
+        { participantId: presence.participantId, type: "presence-left" },
+        socket,
+      ).pipe(Effect.ignore),
+    );
   }
 
   async #queueProjection(projection: DocumentResponse): Promise<void> {
