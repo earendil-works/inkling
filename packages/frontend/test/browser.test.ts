@@ -66,6 +66,19 @@ test(
         await first.locator(".cm-content").innerText(),
         /---\s+state: draft\s+visibility: workspace\s+sensitivity: normal\s+labels: \[\]\s+---/u,
       );
+      const stateLine = first.locator(".cm-line").filter({ hasText: "state: draft" });
+      await stateLine.click();
+      await first.keyboard.press("End");
+      await first.keyboard.press("Shift+Home");
+      await first.keyboard.insertText("state: a");
+      await first.waitForSelector(".cm-tooltip-autocomplete");
+      const stateCompletions = await first.locator(".cm-completionLabel").allTextContents();
+      assert.ok(stateCompletions.includes("accepted"));
+      assert.ok(stateCompletions.includes("abandoned"));
+      await first.keyboard.press("Escape");
+      await first.keyboard.press("End");
+      await first.keyboard.press("Shift+Home");
+      await first.keyboard.insertText("state: draft");
       assert.equal(await first.locator("[data-document-details]").count(), 0);
       await first.locator("[data-allocate-rfc]").click();
       await first.waitForFunction(

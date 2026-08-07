@@ -18,6 +18,7 @@ import { GuestIdentityDialog } from "./components/guest-identity-dialog.tsx";
 import { useEffectAction } from "./effect-hooks.ts";
 import { useRenderedMarkdown } from "./markdown.tsx";
 import { documentHref, storedGuestName, storeGuestName } from "./ui.ts";
+import type { FrontmatterVocabulary } from "./frontmatter-completion.ts";
 import { useEditorSession } from "./use-editor-session.ts";
 
 export interface EditorScreenProps {
@@ -25,6 +26,7 @@ export interface EditorScreenProps {
   readonly api: ApiClientService;
   readonly capabilityToken: string | undefined;
   readonly document: DocumentResponse;
+  readonly frontmatterVocabulary: FrontmatterVocabulary;
   readonly shared: boolean;
 }
 
@@ -33,6 +35,7 @@ export function EditorScreen({
   api,
   capabilityToken,
   document: initial,
+  frontmatterVocabulary,
   shared,
 }: EditorScreenProps): React.JSX.Element {
   const { navigate, setParticipants, setStatus, showToast } = useAppContext();
@@ -52,6 +55,7 @@ export function EditorScreen({
     capabilityToken,
     displayName,
     documentId: initial.metadata.id,
+    frontmatterVocabulary,
     initialBody: initial.body,
     initiallyEditable,
     onComments: setComments,

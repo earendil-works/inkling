@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { autocompletion } from "@codemirror/autocomplete";
 import { markdown } from "@codemirror/lang-markdown";
+import { yamlFrontmatter, yamlLanguage } from "@codemirror/lang-yaml";
 import { syntaxHighlighting } from "@codemirror/language";
 import { Compartment, EditorState } from "@codemirror/state";
 import { oneDarkTheme } from "@codemirror/theme-one-dark";
@@ -20,6 +22,11 @@ import { makeCollaborationClient } from "./collaboration.ts";
 import type { CollaborationClient, ConnectionState } from "./collaboration.ts";
 import { commentDecorationsExtension } from "./comments.ts";
 import { browserRuntime } from "./effect-runtime.ts";
+import {
+  frontmatterFieldCompletionDetail,
+  makeFrontmatterCompletionSource,
+} from "./frontmatter-completion.ts";
+import type { FrontmatterVocabulary } from "./frontmatter-completion.ts";
 import { colorFor, randomId } from "./ui.ts";
 
 export interface EditorSession {
@@ -43,6 +50,7 @@ interface UseEditorSessionOptions extends EditorSessionCallbacks {
   readonly capabilityToken: string | undefined;
   readonly displayName: string | undefined;
   readonly documentId: string;
+  readonly frontmatterVocabulary: FrontmatterVocabulary;
   readonly initialBody: string;
   readonly initiallyEditable: boolean;
   readonly shared: boolean;
@@ -61,6 +69,7 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
     capabilityToken,
     displayName,
     documentId,
+    frontmatterVocabulary,
     initialBody,
     initiallyEditable,
     shared,
@@ -85,6 +94,7 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
     const participantId = randomId("participant");
     const participantColor = colorFor(participantId);
     const participantMap = new Map<string, PresenceDto>();
+    const frontmatterCompletion = makeFrontmatterCompletionSource(frontmatterVocabulary);
     let client: CollaborationClient | undefined;
     const editor = new EditorView({
       parent,
@@ -92,7 +102,14 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
         extensions: [
           basicSetup,
           syntaxHighlighting(jotSyntaxHighlighter),
-          markdown({ codeLanguages: findJotCodeLanguage }),
+          yamlFrontmatter({
+            content: markdown({ codeLanguages: findJotCodeLanguage }),
+          }),
+          yamlLanguage.data.of({ autocomplete: frontmatterCompletion }),
+          autocompletion({
+            activateOnCompletion: (completion) =>
+              completion.detail === frontmatterFieldCompletionDetail,
+          }),
           yCollab(yBody, awareness),
           commentDecorationsExtension,
           editable.of(EditorView.editable.of(initiallyEditable)),
@@ -179,7 +196,7 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
       sessionRef.current = undefined;
       callbacksRef.current.onParticipants([]);
     };
-  }, [capabilityToken, displayName, documentId, initiallyEditable, shared]);
+  }, [capabilityToken, displayName, documentId, frontmatterVocabulary, initiallyEditable, shared]);
 
   return { body, editorHostRef, sessionRef, sessionRevision, yRevision };
 }

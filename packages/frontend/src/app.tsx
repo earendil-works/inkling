@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Effect } from "effect";
 
-import type { PresenceDto } from "@earendil-works/jot-protocol";
+import type { CatalogResponse, DocumentResponse, PresenceDto } from "@earendil-works/jot-protocol";
 
 import { ApiError, makeApiClient } from "./api.ts";
 import type { ApiClientService } from "./api.ts";
@@ -13,6 +13,7 @@ import type { RouteModel } from "./components/route-view.tsx";
 import { ToastRegion } from "./components/toast-region.tsx";
 import type { ToastController } from "./components/toast-region.tsx";
 import { useEffectQuery } from "./effect-hooks.ts";
+import type { FrontmatterVocabulary } from "./frontmatter-completion.ts";
 import { installClientRouter } from "./navigation.ts";
 import type { ClientRouter, NavigateOptions } from "./navigation.ts";
 
@@ -196,15 +197,41 @@ function loadDocumentRoute(
   return Effect.all([api.readDocument(documentId), api.authenticationStatus, preload], {
     concurrency: "unbounded",
   }).pipe(
-    Effect.map(([document, authentication]): RouteModel => ({
-      account: authentication.authenticated ? authentication.principal : undefined,
-      api,
-      capabilityToken,
-      document,
-      screen,
-      shared,
-    })),
+    Effect.flatMap(([document, authentication]) =>
+      (screen === "editor" && !shared && authentication.authenticated
+        ? api.listDocuments().pipe(Effect.catchAll(() => Effect.succeed(undefined)))
+        : Effect.succeed(undefined)
+      ).pipe(
+        Effect.map((catalog): RouteModel => ({
+          account: authentication.authenticated ? authentication.principal : undefined,
+          api,
+          capabilityToken,
+          document,
+          frontmatterVocabulary: collectFrontmatterVocabulary(document, catalog),
+          screen,
+          shared,
+        })),
+      ),
+    ),
   );
+}
+
+function collectFrontmatterVocabulary(
+  document: DocumentResponse,
+  catalog: CatalogResponse | undefined,
+): FrontmatterVocabulary {
+  const metadata = [
+    document.metadata,
+    ...(catalog?.documents.map((summary) => summary.metadata) ?? []),
+  ];
+  return {
+    labels: [...new Set(metadata.flatMap((item) => item.labels))].toSorted((left, right) =>
+      left.localeCompare(right),
+    ),
+    states: [...new Set(metadata.map((item) => item.lifecycleState))].toSorted((left, right) =>
+      left.localeCompare(right),
+    ),
+  };
 }
 
 function isApplicationUrl(url: URL): boolean {

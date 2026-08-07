@@ -1,0 +1,69 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { CompletionContext } from "@codemirror/autocomplete";
+import { EditorState } from "@codemirror/state";
+
+import { makeFrontmatterCompletionSource } from "../src/frontmatter-completion.ts";
+
+const source = makeFrontmatterCompletionSource({
+  labels: ["architecture", "platform", "needs:quotes"],
+  states: ["under-review"],
+});
+
+test("frontmatter completion offers missing fields", async () => {
+  const result = await complete("---\nstate: draft\n|\n---\nBody");
+
+  assert.deepEqual(
+    result?.options.map((option) => option.label),
+    ["visibility", "sensitivity", "labels"],
+  );
+});
+
+test("frontmatter completion offers enum and workspace state values", async () => {
+  const state = await complete("---\nstate: a|\n---\nBody");
+  assert.ok(state?.options.some((option) => option.label === "accepted"));
+  assert.ok(state?.options.some((option) => option.label === "abandoned"));
+  assert.ok(state?.options.some((option) => option.label === "under-review"));
+
+  const visibility = await complete("---\nvisibility: |\n---\nBody");
+  assert.deepEqual(
+    visibility?.options.map((option) => option.label),
+    ["workspace", "public"],
+  );
+
+  const sensitivity = await complete("---\nsensitivity: con|\n---\nBody");
+  assert.deepEqual(
+    sensitivity?.options.map((option) => option.label),
+    ["normal", "confidential"],
+  );
+});
+
+test("frontmatter completion offers known labels in block and flow lists", async () => {
+  const block = await complete("---\nlabels:\n  - pla|\n---\nBody");
+  assert.deepEqual(
+    block?.options.map((option) => option.label),
+    ["architecture", "platform", "needs:quotes"],
+  );
+  assert.equal(block?.options.find((option) => option.label === "platform")?.apply, "platform");
+  assert.equal(
+    block?.options.find((option) => option.label === "needs:quotes")?.apply,
+    '"needs:quotes"',
+  );
+
+  const flow = await complete("---\nlabels: [architecture, pla|]\n---\nBody");
+  assert.equal(flow?.from, "---\nlabels: [architecture, ".length);
+  assert.equal(flow?.to, "---\nlabels: [architecture, pla".length);
+});
+
+test("frontmatter completion stays out of Markdown content", async () => {
+  assert.equal(await complete("---\nstate: draft\n---\n# pla|"), null);
+  assert.equal(await complete("# state: a|"), null);
+});
+
+async function complete(sourceText: string) {
+  const cursor = sourceText.indexOf("|");
+  assert.notEqual(cursor, -1);
+  const state = EditorState.create({ doc: sourceText.replace("|", "") });
+  return await source(new CompletionContext(state, cursor, true));
+}

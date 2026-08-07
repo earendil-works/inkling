@@ -8,6 +8,7 @@ import type {
 
 import type { ApiClientService, ApiError } from "../api.ts";
 import { AuthenticationScreen } from "../auth-screen.tsx";
+import type { FrontmatterVocabulary } from "../frontmatter-completion.ts";
 import type { EffectQueryState } from "../effect-hooks.ts";
 import { LabelsScreen } from "../labels-screen.tsx";
 import { WorkspaceScreen } from "../workspace-screen.tsx";
@@ -34,6 +35,7 @@ export type RouteModel =
     })
   | (RouteBase & {
       readonly document: DocumentResponse;
+      readonly frontmatterVocabulary: FrontmatterVocabulary;
       readonly screen: "editor" | "reader";
       readonly shared: boolean;
     })
@@ -90,6 +92,7 @@ export function RouteView({ refresh, state }: RouteViewProps): React.JSX.Element
             api={model.api}
             capabilityToken={model.capabilityToken}
             document={model.document}
+            frontmatterVocabulary={model.frontmatterVocabulary}
             key={`${model.document.metadata.id}:${model.shared ? "shared" : "workspace"}`}
             shared={model.shared}
           />
