@@ -8,4 +8,7 @@
 :root {
   --serif: "Newsreader", Georgia, "Times New Roman", serif;
   --mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  --font-caption: 0.75rem;
+  --font-small: 0.825rem;
+  --font-ui: 0.875rem;
 }
