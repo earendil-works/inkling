@@ -67,6 +67,10 @@ test(
       await titleLine.click();
       await first.keyboard.press("End");
       await first.keyboard.press("Shift+Home");
+      await first.keyboard.press("Tab");
+      assert.match((await titleLine.textContent()) ?? "", /^\s+# Browser collaboration$/u);
+      await first.keyboard.press("Shift+Tab");
+      assert.equal(await titleLine.textContent(), "# Browser collaboration");
       await first.keyboard.insertText("# Temporary browser title");
       await first.waitForFunction(() => document.title === "Temporary browser title");
       const temporaryTitleLine = first

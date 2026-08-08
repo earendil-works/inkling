@@ -33,6 +33,7 @@ import {
   removeRemotePresence,
   setRemotePresence,
 } from "./remote-presence.ts";
+import { selectionIndentationExtension } from "./selection-indentation.ts";
 import { colorFor, randomId } from "./ui.ts";
 
 export interface EditorSession {
@@ -127,6 +128,7 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
           yCollab(yBody, awareness),
           remotePresenceExtension,
           commentDecorationsExtension,
+          selectionIndentationExtension,
           editable.of(EditorView.editable.of(initiallyEditable)),
           theme.of(document.documentElement.dataset["theme"] === "dark" ? oneDarkTheme : []),
           EditorView.lineWrapping,
