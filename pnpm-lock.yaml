@@ -11,6 +11,9 @@ importers:
       '@types/node':
         specifier: 25.0.3
         version: 25.0.3
+      effect:
+        specifier: 3.22.1
+        version: 3.22.1
       husky:
         specifier: 9.1.7
         version: 9.1.7

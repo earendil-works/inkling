@@ -1,7 +1,7 @@
 import { Data, Effect, Predicate, Schema } from "effect";
 import YAML from "yaml";
 
-import { personId } from "@earendil-works/jot-core";
+import { personId, validatePerson } from "@earendil-works/jot-core";
 import type {
   CapabilityAccess,
   CreateMetadataInput,
@@ -91,21 +91,22 @@ export function importEarendilRfc(
     const parsed = yield* parseFrontmatter(markdown, context.sourcePath);
     const frontmatter = parsed.frontmatter;
     const warnings: string[] = [];
-    const headingTitle = firstHeading(parsed.body);
-    const title = headingTitle ?? firstString(frontmatter, ["title", "name"]);
-    if (title === undefined) {
-      return yield* importFailure(
-        "invalid_metadata",
-        "The RFC has neither a title field nor a top-level heading.",
-        context.sourcePath,
-      );
-    }
     const number = parsePositiveInteger(
       firstValue(frontmatter, ["rfc", "rfc_number", "number"]) ??
         numberFromPath(context.sourcePath),
     );
     if (number === undefined) {
       warnings.push("RFC number was not found and must be allocated during import.");
+    }
+    const headingTitle = firstHeading(parsed.body);
+    const title =
+      normalizedRfcTitle(headingTitle, number) ?? firstString(frontmatter, ["title", "name"]);
+    if (title === undefined) {
+      return yield* importFailure(
+        "invalid_metadata",
+        "The RFC has neither a title field nor a top-level heading.",
+        context.sourcePath,
+      );
     }
     const people = context.people ?? [];
     const authors = yield* normalizePeople(firstValue(frontmatter, ["authors", "author"]), people);
@@ -118,17 +119,20 @@ export function importEarendilRfc(
       people,
     );
     const rawVisibility = firstString(frontmatter, ["visibility", "access"]);
-    const visibility: Visibility =
-      rawVisibility?.toLocaleLowerCase("en") === "public" ? "public" : "workspace";
+    const normalizedVisibility = rawVisibility?.toLocaleLowerCase("en");
+    const visibility: Visibility = normalizedVisibility === "public" ? "public" : "workspace";
     if (
       rawVisibility !== undefined &&
-      !["public", "workspace", "internal", "private"].includes(
-        rawVisibility.toLocaleLowerCase("en"),
+      !["public", "workspace", "internal", "private", "confidential"].includes(
+        normalizedVisibility ?? "",
       )
     ) {
       warnings.push(`Unknown visibility ${rawVisibility} was imported as workspace-only.`);
     }
-    const sensitivity: Sensitivity = parseConfidential(frontmatter) ? "confidential" : "normal";
+    const sensitivity: Sensitivity =
+      parseConfidential(frontmatter) || normalizedVisibility === "confidential"
+        ? "confidential"
+        : "normal";
     const createdAt = normalizeDate(firstString(frontmatter, ["created", "created_at", "date"]));
     const updatedAt = normalizeDate(
       firstString(frontmatter, ["updated", "updated_at", "last_modified"]),
@@ -145,7 +149,10 @@ export function importEarendilRfc(
     const targetDecisionDate = normalizeDate(
       firstString(frontmatter, ["target_decision_date", "decision_date"]),
     );
-    const body = ensureTitleHeading(rewriteLegacyRfcLinks(parsed.body), title);
+    const body = ensureTitleHeading(
+      normalizeRfcTitleHeading(rewriteLegacyRfcLinks(parsed.body), title, number),
+      title,
+    );
     const metadata: ImportedMetadataInput = {
       approvers,
       authors,
@@ -214,9 +221,34 @@ export function importExistingJot(
 
 export function rewriteLegacyRfcLinks(markdown: string): string {
   return markdown.replace(
-    /\((?:\.\.\/|\.\/)?(?:rfcs?\/)?(?:rfc[-_ ]?)?(\d+)(?:-[^)#]*)?\.md(#[^)]+)?\)/giu,
+    /\((?:https?:\/\/rfcs\/|(?:\.\.\/|\.\/)?(?:rfcs?\/)?)(?:rfc[-_ ]?)?(\d+)(?:-[^)#]*)?\.md(#[^)]+)?\)/giu,
     (_match, rfcDigits: string, fragment: string | undefined) =>
-      `(/rfc/${String(Number(rfcDigits)).padStart(4, "0")}${fragment ?? ""})`,
+      `(/rfcs/${String(Number(rfcDigits)).padStart(4, "0")}${fragment ?? ""})`,
+  );
+}
+
+/** Rewrites links to known legacy source documents to canonical Jot RFC routes. */
+export function rewriteKnownRfcSourceLinks(
+  markdown: string,
+  rfcs: readonly {
+    readonly legacySourceUrl?: string | undefined;
+    readonly rfcNumber?: number | undefined;
+  }[],
+): string {
+  const routes = new Map<string, string>();
+  for (const rfc of rfcs) {
+    if (rfc.legacySourceUrl === undefined || rfc.rfcNumber === undefined) continue;
+    const key = legacySourceKey(rfc.legacySourceUrl);
+    if (key !== undefined) {
+      routes.set(key, `/rfcs/${String(rfc.rfcNumber).padStart(4, "0")}`);
+    }
+  }
+  return markdown.replace(
+    /(\]\(\s*<?)(https?:\/\/[^\s)>]+)(>?[^)]*\))/giu,
+    (match, prefix: string, target: string, suffix: string) => {
+      const route = routes.get(legacySourceKey(target) ?? "");
+      return route === undefined ? match : `${prefix}${route}${suffix}`;
+    },
   );
 }
 
@@ -265,18 +297,33 @@ function normalizePeople(
   input: unknown,
   directory: readonly PeopleDirectoryRecord[],
 ): Effect.Effect<readonly PersonReference[], ImportError> {
-  return Effect.forEach(stringList(input), (raw) => {
-    const normalized = raw.toLocaleLowerCase("en").trim();
-    const known = directory.find(
-      (person) =>
-        person.displayName.toLocaleLowerCase("en") === normalized ||
-        person.email.toLocaleLowerCase("en") === normalized ||
-        person.aliases?.some((alias) => alias.toLocaleLowerCase("en") === normalized) === true,
-    );
-    const displayName = known?.displayName ?? raw.trim();
-    const email = known?.email ?? (raw.includes("@") ? raw.trim() : `${slug(raw)}@import.invalid`);
-    return personId(email.toLocaleLowerCase("en")).pipe(
-      Effect.map((id) => ({ displayName, email, id })),
+  return Effect.forEach(stringList(input), (raw) =>
+    Effect.gen(function* () {
+      const parsed = parseImportedPerson(raw);
+      const identities = [parsed.displayName, parsed.email]
+        .filter((value): value is string => value !== undefined)
+        .map((value) => value.toLocaleLowerCase("en").trim());
+      const known = directory.find((person) => {
+        const aliases = new Set(
+          [person.displayName, person.email, ...(person.aliases ?? [])].map((value) =>
+            value.toLocaleLowerCase("en").trim(),
+          ),
+        );
+        return identities.some((identity) => aliases.has(identity));
+      });
+      const email = (
+        known?.email ??
+        parsed.email ??
+        `${slug(parsed.displayName ?? raw)}@import.invalid`
+      ).toLocaleLowerCase("en");
+      const reference: PersonReference = {
+        displayName: known?.displayName ?? parsed.displayName ?? email,
+        email,
+        id: yield* personId(email),
+      };
+      yield* validatePerson(reference);
+      return reference;
+    }).pipe(
       Effect.mapError(
         (cause) =>
           new ImportError({
@@ -286,8 +333,8 @@ function normalizePeople(
             sourcePath: "people-directory",
           }),
       ),
-    );
-  });
+    ),
+  );
 }
 
 function decodeLegacyComments(
@@ -334,6 +381,25 @@ function decodeLegacyComments(
 
 function firstHeading(markdown: string): string | undefined {
   return /^#\s+(.+)$/mu.exec(markdown)?.[1]?.trim();
+}
+
+function normalizedRfcTitle(
+  title: string | undefined,
+  number: number | undefined,
+): string | undefined {
+  if (title === undefined || number === undefined) return title;
+  const match = /^RFC\s+0*(\d+)\s*(?:[-:—]\s*)?(.+)$/iu.exec(title);
+  return match?.[1] !== undefined && Number(match[1]) === number ? match[2]?.trim() : title;
+}
+
+function normalizeRfcTitleHeading(
+  markdown: string,
+  title: string,
+  number: number | undefined,
+): string {
+  const heading = firstHeading(markdown);
+  if (heading === undefined || normalizedRfcTitle(heading, number) === heading) return markdown;
+  return markdown.replace(/^#\s+.+$/mu, `# ${title}`);
 }
 
 function ensureTitleHeading(markdown: string, title: string): string {
@@ -386,6 +452,38 @@ function parsePositiveInteger(value: unknown): number | undefined {
 function normalizeDate(value: string | undefined): string | undefined {
   if (value === undefined || !Number.isFinite(Date.parse(value))) return undefined;
   return new Date(value).toISOString();
+}
+
+function parseImportedPerson(value: string): {
+  readonly displayName?: string | undefined;
+  readonly email?: string | undefined;
+} {
+  const normalized = value.replace(/\s+/gu, " ").trim();
+  const bracketed = /^(.*?)\s*<([^>]+)>$/u.exec(normalized);
+  if (bracketed !== null) {
+    const displayName = bracketed[1]?.trim();
+    const email = bracketed[2]?.trim();
+    return {
+      displayName: displayName === "" ? undefined : displayName,
+      email: email === "" ? undefined : email,
+    };
+  }
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(normalized)
+    ? { email: normalized }
+    : { displayName: normalized };
+}
+
+function legacySourceKey(value: string): string | undefined {
+  try {
+    const url = new URL(value);
+    if (url.hostname.toLocaleLowerCase("en") === "docs.google.com") {
+      const documentId = /^\/document\/(?:u\/\d+\/)?d\/([^/]+)/u.exec(url.pathname)?.[1];
+      if (documentId !== undefined) return `google-document:${documentId}`;
+    }
+    return `${url.protocol}//${url.host}${url.pathname.replace(/\/$/u, "")}`;
+  } catch {
+    return undefined;
+  }
 }
 
 function parseConfidential(frontmatter: Readonly<Record<string, unknown>>): boolean {
