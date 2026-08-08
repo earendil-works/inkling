@@ -39,6 +39,7 @@ interface CommandOptions {
   readonly baseUrl: string;
   readonly dryRun: boolean;
   readonly help: boolean;
+  readonly publishAll: boolean;
   readonly sourceDirectory: string;
 }
 
@@ -100,6 +101,7 @@ function run(arguments_: readonly string[]): Effect.Effect<void, ImportCommandEr
     const publicCount = prepared.filter(
       (rfc) => rfc.imported.metadata.visibility === "public",
     ).length;
+    const publicationCount = options.publishAll ? prepared.length : publicCount;
     for (const rfc of prepared) {
       for (const warning of rfc.imported.warnings) {
         console.error(`warning: RFC ${formatRfcNumber(rfc.number)}: ${warning}`);
@@ -108,7 +110,7 @@ function run(arguments_: readonly string[]): Effect.Effect<void, ImportCommandEr
 
     if (options.dryRun) {
       console.log(
-        `Validated ${prepared.length} RFCs and ${attachmentCount} attachments (${publicCount} public RFCs).`,
+        `Validated ${prepared.length} RFCs and ${attachmentCount} attachments (${publicCount} public RFCs, ${publicationCount} marked for publication).`,
       );
       return;
     }
@@ -149,7 +151,9 @@ function run(arguments_: readonly string[]): Effect.Effect<void, ImportCommandEr
 
     for (const rfc of prepared) {
       const existing = existingByNumber.has(rfc.number);
-      const outcome = yield* syncRfc(client, rfc, documentIds, existing).pipe(Effect.either);
+      const outcome = yield* syncRfc(client, rfc, documentIds, existing, options.publishAll).pipe(
+        Effect.either,
+      );
       if (Either.isLeft(outcome)) {
         failed += 1;
         console.error(`failed RFC ${formatRfcNumber(rfc.number)}: ${errorMessage(outcome.left)}`);
@@ -252,6 +256,7 @@ function syncRfc(
   rfc: PreparedRfc,
   documentIds: ReadonlyMap<number, string>,
   existing: boolean,
+  publishAll: boolean,
 ): Effect.Effect<SyncResult, unknown> {
   return Effect.gen(function* () {
     const documentId = documentIds.get(rfc.number);
@@ -297,12 +302,13 @@ function syncRfc(
       bodyChanged = true;
     }
 
+    const shouldPublish = publishAll || desiredMetadata.visibility === "public";
     let publicationChanged = false;
-    if (desiredMetadata.visibility === "public") {
+    if (shouldPublish) {
       if (current.metadata.publishedRevision === undefined || metadataChanged || bodyChanged) {
         const metadata = yield* client.publish(
           documentId,
-          desiredMetadata.sensitivity === "confidential",
+          desiredMetadata.sensitivity === "confidential" && desiredMetadata.visibility === "public",
         );
         current = { ...current, metadata };
         publicationChanged = true;
@@ -318,7 +324,7 @@ function syncRfc(
     return {
       attachmentUploads: attachmentResult.uploaded,
       kind: existing ? (changed ? "updated" : "unchanged") : "created",
-      published: publicationChanged && desiredMetadata.visibility === "public",
+      published: publicationChanged && shouldPublish,
     };
   });
 }
@@ -520,12 +526,14 @@ function parseOptions(
   let baseUrl = process.env["INKLING_URL"] ?? "http://localhost:5173";
   let dryRun = false;
   let help = false;
+  let publishAll = false;
   let sourceDirectory = defaultSourceDirectory;
 
   for (let index = 0; index < arguments_.length; index += 1) {
     const argument = arguments_[index];
     if (argument === "--dry-run") dryRun = true;
     else if (argument === "--help" || argument === "-h") help = true;
+    else if (argument === "--publish") publishAll = true;
     else if (argument === "--api-key") {
       apiKey = arguments_[index + 1];
       index += 1;
@@ -559,6 +567,7 @@ function parseOptions(
     baseUrl,
     dryRun,
     help,
+    publishAll,
     sourceDirectory: path.resolve(sourceDirectory),
   });
 }
@@ -612,12 +621,12 @@ function printHelp(): void {
   console.log(`Import Earendil RFCs into Inkling
 
 Usage:
-  pnpm import-rfcs [--source PATH] [--url URL] [--api-key KEY] [--dry-run]
+  pnpm import-rfcs [--source PATH] [--url URL] [--api-key KEY] [--publish] [--dry-run]
 
 Defaults:
   --source  ~/Development/earendil-rfcs
   --url     INKLING_URL or http://localhost:5173
   API key   INKLING_API_KEY
 
-The command is incremental: existing RFC numbers are updated, unchanged attachments are reused by digest, and public RFCs are republished only after changes.`);
+By default, public RFCs receive published revisions. Pass --publish to publish workspace-only RFCs too. The command is incremental: existing RFC numbers are updated, unchanged attachments are reused by digest, and RFCs are republished only after changes.`);
 }
