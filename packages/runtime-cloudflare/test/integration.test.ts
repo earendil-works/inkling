@@ -170,6 +170,37 @@ test(
       assert.match(publicHtml, />Armin Ronacher<\/a>/u);
       assert.match(publicHtml, />Colin Hanna<\/a>/u);
       assert.match(publicHtml, /mailto:alphatest0@earendil\.com/u);
+
+      const lateNumbered = await readDocument(running.baseUrl, second.metadata.id, authorization);
+      const publicSecond = await fetch(
+        `${running.baseUrl}/api/documents/${second.metadata.id}/edits`,
+        {
+          body: JSON.stringify({
+            edits: [{ newText: "visibility: public", oldText: "visibility: workspace" }],
+            expectedRevision: lateNumbered.metadata.headRevision,
+          }),
+          headers: { ...authorization, "Content-Type": "application/json" },
+          method: "POST",
+        },
+      );
+      assert.equal(publicSecond.status, 200);
+      const publicSecondDocument = (await publicSecond.json()) as DocumentWire;
+      const secondPublication = await fetch(
+        `${running.baseUrl}/api/documents/${second.metadata.id}/publish`,
+        { headers: authorization, method: "POST" },
+      );
+      assert.equal(secondPublication.status, 200);
+      const lateAllocatedRfc = await fetch(`${running.baseUrl}/api/public/rfc/2`);
+      assert.equal(lateAllocatedRfc.status, 200);
+      assert.equal(
+        ((await lateAllocatedRfc.json()) as { canonicalPath: string }).canonicalPath,
+        "/rfcs/0002",
+      );
+      const anonymousSecond = await fetch(
+        `${running.baseUrl}/api/documents/${publicSecondDocument.metadata.id}?published=true`,
+      );
+      assert.equal(anonymousSecond.status, 200);
+
       const backup = await fetch(`${running.baseUrl}/api/admin/backup`, {
         headers: authorization,
       });

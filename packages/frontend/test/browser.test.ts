@@ -236,12 +236,34 @@ test(
       const editorKeyword = first.locator(".cm-content .tok-keyword").last();
       assert.equal(await editorKeyword.textContent(), "const");
       const editorKeywordClass = await editorKeyword.getAttribute("class");
+      const visibilityLine = first.locator(".cm-line", { hasText: "visibility: workspace" });
+      await visibilityLine.click();
+      await first.keyboard.press("End");
+      await first.keyboard.press("Shift+Home");
+      await first.keyboard.insertText("visibility: publi");
+      await first.waitForFunction(
+        () => document.querySelector("[data-save-state]")?.textContent === "Saved",
+      );
+      await first.waitForFunction(
+        () => document.querySelector("[data-publish]")?.textContent === "Fix frontmatter",
+      );
+      assert.equal(await first.locator("[data-publish]").isDisabled(), true);
+      await first.locator(".cm-line", { hasText: "visibility: publi" }).click();
+      await first.keyboard.press("End");
+      await first.keyboard.insertText("c");
+      await first.waitForFunction(
+        () => document.querySelector(".reader-visibility-note span")?.textContent === "public",
+      );
       assert.equal(await first.locator("[data-publish]").textContent(), "Publish");
+      assert.equal(await first.locator("[data-publish]").isEnabled(), true);
       const publication = first.waitForResponse(
         (response) => response.request().method() === "POST" && response.url().endsWith("/publish"),
       );
       await first.locator("[data-publish]").click();
       assert.equal((await publication).status(), 200);
+      await first.waitForFunction(
+        () => document.querySelector("[data-save-state]")?.textContent === "Saved",
+      );
       await first.waitForFunction(
         () => document.querySelector("[data-publish]")?.textContent === "Publish",
       );

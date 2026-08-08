@@ -199,7 +199,7 @@ export function applyCatalogSummary(
   return updateEntry(state, summary.documentId, (entry) =>
     entry.summary !== undefined && entry.summary.revision >= summary.revision
       ? entry
-      : { ...entry, summary },
+      : { ...entry, rfcNumber: summary.rfcNumber ?? entry.rfcNumber, summary },
   );
 }
 

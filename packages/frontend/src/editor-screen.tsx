@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { Effect } from "effect";
 
 import type { AuthenticationStatus, DocumentResponse } from "@earendil-works/jot-protocol";
 
 import type { ApiClientService } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
+import { CollaborationClientError } from "./collaboration.ts";
 import type { ConnectionState } from "./collaboration.ts";
 import { metadataWithFrontmatter } from "./components/document-metadata.ts";
 import { EditorComments } from "./components/editor-comments.tsx";
@@ -81,6 +83,23 @@ export function EditorScreen({
   const canComment = permissions?.includes("comment") ?? false;
   const canEditMetadata = permissions?.includes("edit-metadata") ?? !shared;
   const rendered = useRenderedMarkdown(body, true);
+  const publishDisabledLabel =
+    connectionState === "connecting"
+      ? "Connecting…"
+      : connectionState === "disconnected"
+        ? "Offline"
+        : rendered.loading
+          ? "Checking…"
+          : rendered.error === undefined
+            ? undefined
+            : "Fix frontmatter";
+  const saveBeforePublish = (): Effect.Effect<void, CollaborationClientError> =>
+    sessionRef.current?.client?.flush ??
+    Effect.fail(
+      new CollaborationClientError({
+        message: "Jot cannot publish until the editor is connected.",
+      }),
+    );
   const previewMetadata = metadataWithFrontmatter(
     metadata,
     rendered.frontmatter,
@@ -104,6 +123,7 @@ export function EditorScreen({
     >
       <EditorToolbar
         api={api}
+        beforePublish={saveBeforePublish}
         canEdit={canEdit}
         canEditMetadata={canEditMetadata}
         metadata={metadata}
@@ -132,6 +152,8 @@ export function EditorScreen({
         onTogglePreview={() => setPreviewOpen((open) => !open)}
         openCommentCount={openCount}
         previewOpen={previewOpen}
+        publishDisabled={publishDisabledLabel !== undefined}
+        publishDisabledLabel={publishDisabledLabel}
         publicationMetadata={previewMetadata}
         shared={shared}
         title={previewMetadata.title}

@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { Effect } from "effect";
 
 import { hasPendingPublicationChanges } from "@earendil-works/jot-core";
 import type { DocumentMetadataDto } from "@earendil-works/jot-protocol";
 
 import type { ApiClientService, ApiError } from "../api.ts";
+import type { CollaborationClientError } from "../collaboration.ts";
 import { useAppContext } from "../app-context.tsx";
 import { useEffectAction } from "../effect-hooks.ts";
 import { Button } from "./button.tsx";
@@ -11,6 +13,9 @@ import { ConfirmationDialog } from "./confirmation-dialog.tsx";
 
 export interface PublishButtonProps {
   readonly api: ApiClientService;
+  readonly beforePublish: () => Effect.Effect<void, CollaborationClientError>;
+  readonly disabled?: boolean | undefined;
+  readonly disabledLabel?: string | undefined;
   readonly metadata: DocumentMetadataDto;
   readonly onPublished: (metadata: DocumentMetadataDto) => void;
   readonly published: boolean;
@@ -18,15 +23,20 @@ export interface PublishButtonProps {
 
 export function PublishButton({
   api,
+  beforePublish,
+  disabled = false,
+  disabledLabel,
   metadata,
   onPublished,
   published,
 }: PublishButtonProps): React.JSX.Element {
   const { showToast } = useAppContext();
   const [confirmConfidential, setConfirmConfidential] = useState(false);
-  const publish = useEffectAction<boolean, DocumentMetadataDto, ApiError>((confirm) =>
-    api.publish(metadata.id, confirm),
-  );
+  const publish = useEffectAction<
+    boolean,
+    DocumentMetadataDto,
+    ApiError | CollaborationClientError
+  >((confirm) => beforePublish().pipe(Effect.zipRight(api.publish(metadata.id, confirm))));
   const label = published && hasPendingPublicationChanges(metadata) ? "Publish Changes" : "Publish";
   const execute = (confirmConfidentialPublic: boolean): void => {
     publish.execute(confirmConfidentialPublic, {
@@ -44,7 +54,7 @@ export function PublishButton({
         size="small"
         variant="primary"
         data-publish=""
-        disabled={publish.state.pending}
+        disabled={disabled || publish.state.pending}
         onClick={() => {
           if (metadata.visibility === "public" && metadata.sensitivity === "confidential") {
             setConfirmConfidential(true);
@@ -53,7 +63,7 @@ export function PublishButton({
           }
         }}
       >
-        {publish.state.pending ? "Publishing…" : label}
+        {publish.state.pending ? "Saving & publishing…" : (disabledLabel ?? label)}
       </Button>
       <ConfirmationDialog
         confirmLabel="Publish confidential revision"

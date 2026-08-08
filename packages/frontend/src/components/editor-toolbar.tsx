@@ -12,10 +12,12 @@ import { ButtonLink } from "./button-link.tsx";
 import { Button } from "./button.tsx";
 import { DocumentIdentity } from "./document-identity.tsx";
 import { PublishButton } from "./publish-button.tsx";
+import type { PublishButtonProps } from "./publish-button.tsx";
 import { SharingControl } from "./sharing-control.tsx";
 
 export interface EditorToolbarProps {
   readonly api: ApiClientService;
+  readonly beforePublish: PublishButtonProps["beforePublish"];
   readonly canEdit: boolean;
   readonly canEditMetadata: boolean;
   readonly metadata: DocumentMetadataDto;
@@ -26,6 +28,8 @@ export interface EditorToolbarProps {
   readonly onTogglePreview: () => void;
   readonly openCommentCount: number;
   readonly previewOpen: boolean;
+  readonly publishDisabled: boolean;
+  readonly publishDisabledLabel?: string | undefined;
   readonly publicationMetadata: DocumentMetadataDto;
   readonly shared: boolean;
   readonly title: string;
@@ -33,6 +37,7 @@ export interface EditorToolbarProps {
 
 export function EditorToolbar({
   api,
+  beforePublish,
   canEdit,
   canEditMetadata,
   metadata,
@@ -43,6 +48,8 @@ export function EditorToolbar({
   onTogglePreview,
   openCommentCount,
   previewOpen,
+  publishDisabled,
+  publishDisabledLabel,
   publicationMetadata,
   shared,
   title,
@@ -97,6 +104,9 @@ export function EditorToolbar({
         {shared ? null : (
           <PublishButton
             api={api}
+            beforePublish={beforePublish}
+            disabled={publishDisabled}
+            disabledLabel={publishDisabledLabel}
             metadata={publicationMetadata}
             onPublished={onMetadataChanged}
             published={metadata.publishedRevision !== undefined}

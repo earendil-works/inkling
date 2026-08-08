@@ -36,6 +36,8 @@ export interface CollaborationCallbacks {
 
 export interface CollaborationClient {
   readonly close: Effect.Effect<void>;
+  /** Waits until every local update has been durably accepted by the document authority. */
+  readonly flush: Effect.Effect<void, CollaborationClientError>;
   readonly sendPresence: (presence: PresenceDto) => Effect.Effect<void>;
 }
 
@@ -57,6 +59,63 @@ export function makeCollaborationClient(
     let stopped = false;
     let welcomed = false;
     const unacknowledged = new Map<string, Uint8Array>();
+    const flushWaiters = new Set<{
+      readonly fail: (error: CollaborationClientError) => void;
+      readonly succeed: () => void;
+    }>();
+
+    const settleFlushWaiters = (): void => {
+      if (!welcomed || unacknowledged.size !== 0) return;
+      for (const waiter of flushWaiters) waiter.succeed();
+    };
+
+    const failFlushWaiters = (message: string): void => {
+      const error = new CollaborationClientError({ message });
+      for (const waiter of flushWaiters) waiter.fail(error);
+    };
+
+    const flush = Effect.async<void, CollaborationClientError>((resume) => {
+      if (stopped) {
+        resume(
+          Effect.fail(
+            new CollaborationClientError({ message: "The editor connection is closed." }),
+          ),
+        );
+        return;
+      }
+      if (welcomed && unacknowledged.size === 0) {
+        resume(Effect.void);
+        return;
+      }
+      let settled = false;
+      let timeout: number | undefined;
+      const finish = (effect: Effect.Effect<void, CollaborationClientError>): void => {
+        if (settled) return;
+        settled = true;
+        if (timeout !== undefined) window.clearTimeout(timeout);
+        flushWaiters.delete(waiter);
+        resume(effect);
+      };
+      const waiter = {
+        fail: (error: CollaborationClientError) => finish(Effect.fail(error)),
+        succeed: () => finish(Effect.void),
+      };
+      flushWaiters.add(waiter);
+      timeout = window.setTimeout(
+        () =>
+          waiter.fail(
+            new CollaborationClientError({
+              message: "Jot could not save the document before publishing.",
+            }),
+          ),
+        30_000,
+      );
+      return Effect.sync(() => {
+        settled = true;
+        if (timeout !== undefined) window.clearTimeout(timeout);
+        flushWaiters.delete(waiter);
+      });
+    });
 
     const sendMessage = (message: typeof ClientCollaborationMessageSchema.Type): void => {
       const current = socket;
@@ -101,6 +160,7 @@ export function makeCollaborationClient(
                   update: encodeBase64(pending),
                 });
               }
+              settleFlushWaiters();
             });
             break;
           }
@@ -121,6 +181,7 @@ export function makeCollaborationClient(
               unacknowledged.delete(message.clientUpdateId);
               callbacks.onRevision(message.documentRevision);
               callbacks.onState(unacknowledged.size === 0 ? "ready" : "saving");
+              settleFlushWaiters();
             });
             break;
           }
@@ -223,12 +284,14 @@ export function makeCollaborationClient(
     return {
       close: Effect.sync(() => {
         stopped = true;
+        failFlushWaiters("The editor connection closed before the document was saved.");
         if (reconnectTimer !== undefined) {
           window.clearTimeout(reconnectTimer);
         }
         document.off("update", updateHandler);
         socket?.close(1000, "editor_closed");
       }),
+      flush,
       sendPresence: (presence) => Effect.sync(() => sendMessage({ presence, type: "presence" })),
     };
   });

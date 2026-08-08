@@ -7,8 +7,9 @@ import {
   activateDocument,
   allocateRfcNumber,
   apiKeyBelongsTo,
-  authenticateApiKey,
+  applyCatalogSummary,
   applyUniqueTextReplacements,
+  authenticateApiKey,
   assignRfcNumber,
   authorizeDocument,
   createApiKey,
@@ -348,6 +349,11 @@ test("RFC reservations are idempotent and numbers are never reused", async () =>
   assert.equal(numbered.rfcNumber, 2);
   assert.equal(numbered.headRevision, 1);
   assert.equal(await Effect.runPromise(assignRfcNumber(numbered, 2, now)), numbered);
+
+  const projected = await Effect.runPromise(
+    applyCatalogSummary(active, catalogSummary(numbered, "Later RFC body")),
+  );
+  assert.equal(projected.entries.find((entry) => entry.documentId === numbered.id)?.rfcNumber, 2);
 });
 
 test("catalog search covers full bodies and Gmail-style metadata filters", async () => {

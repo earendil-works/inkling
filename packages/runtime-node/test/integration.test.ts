@@ -305,6 +305,14 @@ test(
         assert.equal(publishedDocumentBody.metadata.title, "Integrated RFC");
         assert.match(publishedDocumentBody.body, /# Integrated RFC/u);
         assert.doesNotMatch(publishedDocumentBody.body, /Unpublished working title/u);
+        const anonymousPublishedDocument = await fetch(
+          `${baseUrl}/api/documents/${document.metadata.id}?published=true`,
+        );
+        assert.equal(anonymousPublishedDocument.status, 200);
+        const anonymousPublishedBody = (await anonymousPublishedDocument.json()) as DocumentWire;
+        assert.equal(anonymousPublishedBody.metadata.title, "Integrated RFC");
+        assert.match(anonymousPublishedBody.body, /# Integrated RFC/u);
+        assert.doesNotMatch(anonymousPublishedBody.body, /Unpublished working title/u);
         const isolatedPublication = await (await fetch(`${baseUrl}/rfcs/0001`)).text();
         assert.match(isolatedPublication, /Integrated RFC/u);
         assert.doesNotMatch(isolatedPublication, /Unpublished working title/u);

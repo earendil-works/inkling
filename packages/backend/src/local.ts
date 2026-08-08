@@ -385,9 +385,16 @@ export function makeLocalJotApplication(
       endLine?: number,
     ): Effect.Effect<DocumentResponse, ApplicationError> =>
       Effect.gen(function* () {
+        const now = new Date().toISOString();
         const current = yield* room
-          .snapshot(principal, new Date().toISOString())
+          .snapshot(systemPrincipal, now)
           .pipe(Effect.mapError(toApplicationError));
+        yield* authorizeDocument(
+          principal,
+          principal.kind === "anonymous" ? "read-published" : "read-working",
+          current.metadata,
+          now,
+        ).pipe(Effect.mapError(toApplicationError));
         const publishedRevision = current.metadata.publishedRevision;
         if (publishedRevision === undefined) {
           return {
@@ -1671,7 +1678,7 @@ export function makeLocalJotApplication(
           const entry = state.catalog.entries.find(
             (item) =>
               item.status === "active" &&
-              item.rfcNumber === rfcNumber &&
+              (item.rfcNumber === rfcNumber || item.summary?.rfcNumber === rfcNumber) &&
               item.summary?.visibility === "public" &&
               item.summary.publishedRevision !== undefined,
           );
