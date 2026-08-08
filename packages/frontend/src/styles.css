@@ -1073,7 +1073,7 @@ select:disabled {
 
 .api-key-create h3,
 .api-key-list h3,
-.agent-instructions h3 {
+.api-key-reveal h3 {
   margin: 0;
   font-size: 1.05rem;
   font-weight: 650;
@@ -1081,8 +1081,8 @@ select:disabled {
 
 .api-key-create p,
 .api-key-list__empty,
-.agent-instructions p,
-.agent-instructions small {
+.api-key-reveal p,
+.api-key-reveal small {
   color: var(--muted);
   font-size: var(--font-small);
   line-height: 1.45;
@@ -1142,7 +1142,7 @@ select:disabled {
   font-family: var(--mono);
 }
 
-.agent-instructions {
+.api-key-reveal {
   display: grid;
   gap: 0.65rem;
   padding: 1rem;
@@ -1150,11 +1150,11 @@ select:disabled {
   background: var(--accent-soft);
 }
 
-.agent-instructions .eyebrow {
+.api-key-reveal .eyebrow {
   color: var(--text);
 }
 
-.agent-instructions pre {
+.api-key-reveal pre {
   margin: 0;
   overflow: auto;
   padding: 0.75rem;
@@ -1165,14 +1165,14 @@ select:disabled {
   word-break: break-all;
 }
 
-.agent-instructions__action {
+.api-key-reveal__action {
   display: flex;
   min-height: 1.75rem;
   align-items: center;
   gap: 0.75rem;
 }
 
-.agent-instructions__action span {
+.api-key-reveal__action span {
   color: var(--muted);
   font: var(--font-caption)/1 var(--mono);
 }

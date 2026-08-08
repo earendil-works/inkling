@@ -625,10 +625,15 @@ If this server is not configured, ask the user to connect it:
 
 1. Open ${baseUrl} and sign in.
 2. Open the account menu in the top-right corner and choose **API keys**.
-3. Create a personal key and copy the one-time setup command.
-4. Run that command in the agent's terminal. Do not paste the key into source files, chat transcripts, AGENTS.md, or skills.
+3. Create a personal key and copy it when it is revealed. The secret is shown only once.
+4. In the agent's terminal, substitute the copied key for \`API_KEY\` and run:
 
-The setup command registers this URL and stores the key in Inkling's user-only CLI configuration. API keys belong to the user who created them and have that user's workspace permissions. If a key is lost, revoke it and create another one.
+\`\`\`sh
+inkling instance add workspace ${baseUrl} API_KEY
+inkling use workspace
+\`\`\`
+
+Do not paste the key into source files, chat transcripts, AGENTS.md, or skills. The command stores it in Inkling's user-only CLI configuration. API keys belong to the user who created them and have that user's workspace permissions. If a key is lost, revoke it and create another one.
 
 Select the instance when necessary:
 

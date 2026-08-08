@@ -25,18 +25,18 @@ export function SettingsDialog({
 }: SettingsDialogProps): React.JSX.Element {
   const [label, setLabel] = useState("My agent");
   const [keys, setKeys] = useState<readonly ApiKeyDto[]>([]);
-  const [agentCommand, setAgentCommand] = useState<string>();
-  const [commandCopied, setCommandCopied] = useState(false);
+  const [revealedKey, setRevealedKey] = useState<string>();
+  const [keyCopied, setKeyCopied] = useState(false);
   const [keyToRevoke, setKeyToRevoke] = useState<ApiKeyDto>();
   const keyQuery = useEffectQuery(api.listApiKeys, "api-keys");
   const createKey = useEffectAction<string, ApiKeyCreated, ApiError>((value) =>
     api.createApiKey(value),
   );
   const revokeKey = useEffectAction<string, void, ApiError>((keyId) => api.revokeApiKey(keyId));
-  const copyCommand = useEffectAction<string, void, never>((command) =>
+  const copyKey = useEffectAction<string, void, never>((key) =>
     Effect.tryPromise({
       catch: () => undefined,
-      try: () => navigator.clipboard.writeText(command),
+      try: () => navigator.clipboard.writeText(key),
     }).pipe(Effect.ignore),
   );
 
@@ -52,10 +52,8 @@ export function SettingsDialog({
     createKey.execute(normalizedLabel, {
       onSuccess: (created) => {
         setKeys((current) => [created.metadata, ...current]);
-        setAgentCommand(
-          `inkling instance add workspace ${location.origin} ${created.key} && inkling use workspace`,
-        );
-        setCommandCopied(false);
+        setRevealedKey(created.key);
+        setKeyCopied(false);
         setLabel("My agent");
       },
     });
@@ -91,31 +89,31 @@ export function SettingsDialog({
             connect the Inkling CLI or a coding agent.
           </p>
 
-          {agentCommand === undefined ? null : (
-            <section className="agent-instructions" data-agent-instructions="">
-              <p className="eyebrow">Ready to connect</p>
-              <h3>Run this once</h3>
-              <p>Paste this command into the terminal where your agent works.</p>
-              <pre data-agent-command="">
-                <code>{agentCommand}</code>
+          {revealedKey === undefined ? null : (
+            <section className="api-key-reveal" data-api-key-reveal="">
+              <p className="eyebrow">API key created</p>
+              <h3>Copy this key now</h3>
+              <p>The secret is shown only once.</p>
+              <pre data-api-key-secret="">
+                <code>{revealedKey}</code>
               </pre>
-              <div className="agent-instructions__action">
+              <div className="api-key-reveal__action">
                 <Button
-                  data-copy-agent=""
+                  data-copy-api-key=""
                   onClick={() =>
-                    copyCommand.execute(agentCommand, {
-                      onSuccess: () => setCommandCopied(true),
+                    copyKey.execute(revealedKey, {
+                      onSuccess: () => setKeyCopied(true),
                     })
                   }
                   variant="text"
                 >
-                  {commandCopied ? "Copied" : "Copy setup command"}
+                  {keyCopied ? "Copied" : "Copy API key"}
                 </Button>
-                <span aria-live="polite">{commandCopied ? "Command copied." : ""}</span>
+                <span aria-live="polite">{keyCopied ? "API key copied." : ""}</span>
               </div>
               <small>
-                The secret is shown only now. The CLI stores it in your user-only config; never put
-                it in AGENTS.md or an agent skill. Run <code>inkling --help</code> next.
+                Store it in Inkling's user-only CLI configuration or a password manager. Never put
+                it in AGENTS.md, an agent skill, or source control.
               </small>
             </section>
           )}

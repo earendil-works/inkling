@@ -211,7 +211,7 @@ The command-line executable is named `inkling`. Run it directly from a checkout 
 node packages/cli/src/main.ts --help
 ```
 
-Open the account menu and choose **API keys**. Create a personal key, then copy the one-time setup command. It registers the workspace without putting the key in project files:
+Open the account menu and choose **API keys**. Create and copy a personal key; it is revealed only once. Then register the workspace without putting the key in project files:
 
 ```sh
 inkling instance add workspace https://rfcs.example.com API_KEY
@@ -257,7 +257,13 @@ INKLING_API_KEY=secret \
 pnpm import-rfcs --source /path/to/source
 ```
 
-The importer preserves RFC numbers and metadata, rewrites known RFC links to canonical routes, uploads media, reuses attachments by digest, and publishes public RFCs after their updates complete. It is incremental: rerunning it updates matching RFC numbers and leaves unchanged documents alone.
+The importer preserves RFC numbers and metadata, rewrites known RFC links to canonical routes, uploads media, reuses attachments by digest, and publishes public RFCs after their updates complete. Pass `--publish` to also give workspace-only RFCs a published revision:
+
+```sh
+node scripts/import-rfcs.ts --source ~/Development/earendil-rfcs --publish
+```
+
+The importer is incremental: rerunning it updates matching RFC numbers and leaves unchanged documents alone.
 
 The CLI also provides `inkling import-rfc` for a single legacy RFC and `inkling import-jot` for a Markdown file plus a legacy Jot metadata sidecar.
 

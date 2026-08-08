@@ -74,6 +74,15 @@ test(
         (await first.locator("[data-settings-dialog] .dialog-note").textContent()) ?? "",
         /belong to your account/u,
       );
+      await first.getByLabel("Key name").fill("Browser agent");
+      await first.getByRole("button", { name: "Create API key" }).click();
+      const revealedKey = (await first.locator("[data-api-key-secret]").textContent()) ?? "";
+      assert.match(revealedKey, /^inkling_key_/u);
+      assert.doesNotMatch(
+        (await first.locator("[data-api-key-reveal]").textContent()) ?? "",
+        /inkling instance add/u,
+      );
+      assert.equal(await first.locator("[data-copy-api-key]").textContent(), "Copy API key");
       await first.getByLabel("Close API keys").click();
       const initialTheme = await first.locator("html").getAttribute("data-theme");
       await first.locator("[data-theme-toggle]").dblclick();

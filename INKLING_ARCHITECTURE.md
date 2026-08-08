@@ -152,7 +152,7 @@ This section describes behavioral requirements, not implementation guidance.
 - Large documents can be read by line range.
 - Agent text edits identify unique existing text and replace it; ambiguous or missing text is rejected rather than guessed.
 - Read output includes comment thread and message identifiers so agents can reply precisely.
-- The browser can display a copyable, one-time CLI setup command for an agent.
+- The browser reveals a newly created API key once and provides a direct copy action.
 - Every deployment serves public, origin-aware CLI and skill instructions at `/AGENTS.md` so a user can point an agent at the workspace itself.
 
 #### Local operation
@@ -767,7 +767,7 @@ Primary surfaces are:
 - Sharing controls.
 - An account-name dropdown with personal API key management and sign out.
 - Import, export, and administrative repair status.
-- A personal-key dialog with a one-time agent setup command.
+- A personal-key dialog that reveals each newly created API key once.
 - Public agent instructions at `/AGENTS.md` covering the CLI and reusable Agent Skills.
 
 CodeMirror owns text editing, selection, composition, the title heading, and local undo. Application state owns structured metadata, comments, permissions, connection status, and preview state.
@@ -778,7 +778,7 @@ Accessibility requirements include keyboard navigation, visible focus, semantic 
 
 The CLI is an API client and local server launcher; it does not access server storage directly.
 
-It retains named instance registration for personal API keys and shared capability URLs. Credentials are stored in a user-only configuration file and are never printed except in the one-time setup command created for the key.
+It retains named instance registration for personal API keys and shared capability URLs. Credentials are stored in a user-only configuration file. A newly created API key is revealed once in the browser and is never printed by later CLI operations.
 
 The CLI supports:
 
