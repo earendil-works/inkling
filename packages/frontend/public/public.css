@@ -303,8 +303,8 @@ body {
   min-width: 0;
   max-width: 47rem;
   padding-bottom: 2.5rem;
-  font-size: 1rem;
-  line-height: 1.7;
+  font-size: clamp(1.0625rem, 1rem + 0.18vw, 1.1875rem);
+  line-height: 1.62;
 }
 
 .public-prose > :first-child {
@@ -315,7 +315,7 @@ body {
 .public-prose h2,
 .public-prose h3,
 .public-prose h4 {
-  margin: 1.8em 0 0.65em;
+  margin: 0.9em 0 0.35em;
   font-weight: 600;
   letter-spacing: -0.035em;
   line-height: 1.15;
@@ -397,12 +397,13 @@ body {
   padding-left: 1rem;
   border-left: 1px solid var(--public-border);
   color: var(--public-muted);
-  font: var(--font-small)/1.42 var(--mono);
+  font: 0.95rem/1.42 var(--serif);
 }
 
 .public-toc > p {
   margin: 0 0 0.75rem;
   font-size: var(--font-caption);
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
