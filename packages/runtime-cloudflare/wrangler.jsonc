@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "inkling",
+  // Keep pre-Inkling Cloudflare resource identities so branding changes do not orphan data.
+  "name": "jot",
   "main": "src/index.ts",
   "compatibility_date": "2026-03-27",
   "durable_objects": {
@@ -28,8 +29,8 @@
   "r2_buckets": [
     {
       "binding": "INKLING_OBJECTS",
-      "bucket_name": "inkling-objects",
-      "preview_bucket_name": "inkling-objects-preview",
+      "bucket_name": "jot-objects",
+      "preview_bucket_name": "jot-objects-preview",
     },
   ],
   "assets": {
