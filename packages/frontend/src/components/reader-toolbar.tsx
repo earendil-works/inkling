@@ -5,11 +5,16 @@ import { ButtonLink } from "./button-link.tsx";
 
 export interface ReaderToolbarProps {
   readonly metadata: DocumentMetadataDto;
+  readonly publicDocument?: boolean | undefined;
   readonly shared: boolean;
 }
 
-export function ReaderToolbar({ metadata, shared }: ReaderToolbarProps): React.JSX.Element {
-  const canEdit = !shared || metadata.sharing.access === "edit";
+export function ReaderToolbar({
+  metadata,
+  publicDocument = false,
+  shared,
+}: ReaderToolbarProps): React.JSX.Element {
+  const canEdit = !publicDocument && (!shared || metadata.sharing.access === "edit");
 
   return (
     <nav className="document-bar reader-toolbar" aria-label="Document navigation">

@@ -1,17 +1,19 @@
 import { hasPendingPublicationChanges } from "@earendil-works/jot-core";
 import type { CatalogResponse } from "@earendil-works/jot-protocol";
 
-import { documentHref, formatDate } from "../ui.ts";
+import { documentHref, formatDate, publicDocumentHref } from "../ui.ts";
 import { LifecycleStateChip } from "./lifecycle-state-chip.tsx";
 
 export interface DocumentCatalogRowProps {
   readonly document: CatalogResponse["documents"][number];
   readonly index: number;
+  readonly publicDocument?: boolean | undefined;
 }
 
 export function DocumentCatalogRow({
   document,
   index,
+  publicDocument = false,
 }: DocumentCatalogRowProps): React.JSX.Element {
   const { excerpt, metadata } = document;
   const number =
@@ -22,13 +24,18 @@ export function DocumentCatalogRow({
   return (
     <a
       className="catalog-row"
-      href={documentHref(metadata.id, metadata.rfcNumber, false, "read", "")}
+      data-native-navigation={publicDocument ? "" : undefined}
+      href={
+        publicDocument
+          ? publicDocumentHref(metadata.id, metadata.rfcNumber)
+          : documentHref(metadata.id, metadata.rfcNumber, false, "read", "")
+      }
     >
       <span className="catalog-row__index">{String(index + 1).padStart(2, "0")}</span>
       <span className="catalog-row__main">
         <span className="catalog-row__title">
           <strong>{metadata.title}</strong>
-          {hasPendingPublicationChanges(metadata) ? (
+          {!publicDocument && hasPendingPublicationChanges(metadata) ? (
             <span className="catalog-row__pending" data-pending-edits="">
               Pending edits
             </span>

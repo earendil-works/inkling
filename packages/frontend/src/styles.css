@@ -480,26 +480,11 @@ select:disabled {
   text-transform: uppercase;
 }
 
-/* Authentication */
-.auth-layout {
-  display: grid;
-  min-height: calc(100vh - var(--masthead-height));
-  grid-template-columns: minmax(0, 1fr) minmax(20rem, 28rem);
+.masthead-sign-in {
+  flex: none;
+  text-decoration: none;
 }
 
-.auth-copy,
-.auth-panel {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: clamp(3rem, 9vw, 8rem) var(--page-padding);
-}
-
-.auth-copy {
-  gap: 1.5rem;
-}
-
-.auth-copy h1,
 .fatal-layout h1 {
   max-width: 11ch;
   font-size: clamp(3rem, 7vw, 6.5rem);
@@ -508,26 +493,6 @@ select:disabled {
   line-height: 0.95;
 }
 
-.auth-copy > p:last-child {
-  max-width: 35rem;
-  color: var(--muted);
-  font-size: 1.05rem;
-  line-height: 1.6;
-}
-
-.auth-panel {
-  border-left: 1px solid var(--border);
-  background: var(--surface);
-}
-
-.auth-panel h2 {
-  margin: 1.5rem 0 2.5rem;
-  font-size: 2.25rem;
-  font-weight: 500;
-  letter-spacing: -0.04em;
-}
-
-.auth-panel form,
 .new-document form,
 .settings-dialog form,
 .sharing-dialog form,
@@ -535,12 +500,6 @@ select:disabled {
 .confirmation-dialog form {
   display: grid;
   gap: 1rem;
-}
-
-.google-button {
-  display: block;
-  text-align: center;
-  text-decoration: none;
 }
 
 .form-error {
@@ -2449,20 +2408,6 @@ select:disabled {
 
   .reader-body.markdown-body {
     padding-bottom: 1.5rem;
-  }
-
-  .auth-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .auth-copy,
-  .auth-panel {
-    padding-block: 4rem;
-  }
-
-  .auth-panel {
-    border-top: 1px solid var(--border);
-    border-left: 0;
   }
 
   .catalog-row {

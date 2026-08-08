@@ -86,7 +86,7 @@ This section describes behavioral requirements, not implementation guidance.
 
 #### Workspace and note management
 
-- A landing page lists documents ordered by recent activity.
+- The landing page lists public published notes and RFCs for anonymous visitors, and the complete workspace ordered by recent activity for authenticated users.
 - Users can create, open, rename, search, and delete documents.
 - Search matches titles and document content and returns useful snippets.
 - Documents have stable opaque identifiers, creation timestamps, and update timestamps.
@@ -191,7 +191,7 @@ Expected RFC states include draft, discussion, published, accepted, implemented,
 - The index is ordered by RFC number and exposes state, update date, visibility, and labels.
 - State and keyword index pages are available.
 - Search matches number, title, authors, reviewers, approvers, labels, visibility, state, and summary text.
-- Public visitors see only public, published material.
+- Public visitors see only public, published material, including the anonymous landing-page catalog.
 - Authenticated workspace members can see internal material.
 - Confidential material is visibly marked even when its access policy is the same as other workspace material.
 - Public pages can be cached aggressively without leaking internal metadata.
@@ -757,6 +757,7 @@ The browser application is authored in TypeScript and built as modules. It does 
 
 Primary surfaces are:
 
+- Public published-document index and search without an authentication gate.
 - Workspace document index and search.
 - Collaborative editor with metadata controls.
 - Rendered reader.

@@ -7,7 +7,6 @@ import type {
 } from "@earendil-works/jot-protocol";
 
 import type { ApiClientService, ApiError } from "../api.ts";
-import { AuthenticationScreen } from "../auth-screen.tsx";
 import type { FrontmatterVocabulary } from "../frontmatter-completion.ts";
 import type { EffectQueryState } from "../effect-hooks.ts";
 import { LabelsScreen } from "../labels-screen.tsx";
@@ -28,19 +27,24 @@ interface RouteBase {
 }
 
 export type RouteModel =
-  | (RouteBase & { readonly screen: "authentication" })
   | (RouteBase & {
       readonly document: DocumentResponse;
       readonly frontmatterVocabulary: FrontmatterVocabulary;
+      readonly publicDocument: boolean;
       readonly screen: "editor" | "reader";
       readonly shared: boolean;
     })
   | (RouteBase & {
       readonly catalog: CatalogResponse;
+      readonly publicCatalog: boolean;
       readonly screen: "labels";
       readonly selectedLabel: string | undefined;
     })
-  | (RouteBase & { readonly catalog: CatalogResponse; readonly screen: "workspace" });
+  | (RouteBase & {
+      readonly catalog: CatalogResponse;
+      readonly publicCatalog: boolean;
+      readonly screen: "workspace";
+    });
 
 export interface RouteViewProps {
   readonly refresh: () => void;
@@ -68,16 +72,30 @@ export function RouteView({ refresh, state }: RouteViewProps): React.JSX.Element
   }
 
   switch (model.screen) {
-    case "authentication":
-      return <AuthenticationScreen />;
     case "workspace":
-      return <WorkspaceScreen api={model.api} initialCatalog={model.catalog} />;
+      return (
+        <WorkspaceScreen
+          api={model.api}
+          initialCatalog={model.catalog}
+          publicCatalog={model.publicCatalog}
+        />
+      );
     case "labels":
-      return <LabelsScreen catalog={model.catalog} selectedLabel={model.selectedLabel} />;
+      return (
+        <LabelsScreen
+          catalog={model.catalog}
+          publicCatalog={model.publicCatalog}
+          selectedLabel={model.selectedLabel}
+        />
+      );
     case "reader":
       return (
         <Suspense fallback={<main aria-busy="true" className="route-loading" id="app" />}>
-          <ReaderScreen document={model.document} shared={model.shared} />
+          <ReaderScreen
+            document={model.document}
+            publicDocument={model.publicDocument}
+            shared={model.shared}
+          />
         </Suspense>
       );
     case "editor":

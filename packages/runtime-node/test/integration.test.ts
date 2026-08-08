@@ -231,6 +231,15 @@ test(
         assert.equal(publish.status, 200);
         const published = await fetch(`${baseUrl}/rfcs/0001`);
         assert.equal(published.status, 200);
+        const anonymousCatalog = await fetch(`${baseUrl}/api/public/documents`);
+        assert.equal(anonymousCatalog.status, 200);
+        assert.match(anonymousCatalog.headers.get("cache-control") ?? "", /s-maxage=60/u);
+        const anonymousDocuments = (await anonymousCatalog.json()) as {
+          documents: readonly { metadata: { id: string; title: string } }[];
+        };
+        assert.equal(anonymousDocuments.documents.length, 1);
+        assert.equal(anonymousDocuments.documents[0]?.metadata.id, document.metadata.id);
+        assert.equal(anonymousDocuments.documents[0]?.metadata.title, "Integrated RFC");
         const legacyRfc = await fetch(`${baseUrl}/rfc/0001`, { redirect: "manual" });
         assert.equal(legacyRfc.status, 308);
         assert.equal(legacyRfc.headers.get("location"), "/rfcs/0001");

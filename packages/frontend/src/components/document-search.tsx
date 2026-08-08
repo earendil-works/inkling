@@ -5,7 +5,7 @@ import type { CatalogResponse } from "@earendil-works/jot-protocol";
 import type { ApiClientService } from "../api.ts";
 import { useAppContext } from "../app-context.tsx";
 import { useEffectQuery } from "../effect-hooks.ts";
-import { documentHref } from "../ui.ts";
+import { documentHref, publicDocumentHref } from "../ui.ts";
 import { LifecycleStateChip } from "./lifecycle-state-chip.tsx";
 
 interface SearchCompletion {
@@ -27,12 +27,14 @@ export interface DocumentSearchProps {
   readonly api: ApiClientService;
   readonly initialCatalog: CatalogResponse;
   readonly onResultsChange: (catalog: CatalogResponse) => void;
+  readonly publicCatalog?: boolean | undefined;
 }
 
 export function DocumentSearch({
   api,
   initialCatalog,
   onResultsChange,
+  publicCatalog = false,
 }: DocumentSearchProps): React.JSX.Element {
   const { navigate } = useAppContext();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -41,8 +43,8 @@ export function DocumentSearch({
   const [activeResult, setActiveResult] = useState(-1);
   const deferredQuery = useDeferredValue(query);
   const search = useEffectQuery(
-    api.listDocuments(deferredQuery),
-    `document-search:${deferredQuery}`,
+    publicCatalog ? api.listPublicDocuments(deferredQuery) : api.listDocuments(deferredQuery),
+    `document-search:${publicCatalog ? "public" : "workspace"}:${deferredQuery}`,
   );
   const inputId = useId();
   const listboxId = `${inputId}-results`;
@@ -53,8 +55,8 @@ export function DocumentSearch({
     [displayedCatalog.documents],
   );
   const completions = useMemo(
-    () => searchCompletions(query, initialCatalog),
-    [initialCatalog, query],
+    () => (publicCatalog ? [] : searchCompletions(query, initialCatalog)),
+    [initialCatalog, publicCatalog, query],
   );
   const panelOpen = focused && (query.trim() !== "" || completions.length > 0);
 
@@ -97,10 +99,17 @@ export function DocumentSearch({
     requestAnimationFrame(() => inputRef.current?.focus());
   };
 
+  const resultHref = (document: CatalogResponse["documents"][number]): string =>
+    publicCatalog
+      ? publicDocumentHref(document.metadata.id, document.metadata.rfcNumber)
+      : documentHref(document.metadata.id, document.metadata.rfcNumber, false, "read", "");
+
   const openResult = (index: number): void => {
     const result = topResults[index];
     if (result === undefined) return;
-    navigate(documentHref(result.metadata.id, result.metadata.rfcNumber, false, "read", ""));
+    const href = resultHref(result);
+    if (publicCatalog) location.assign(href);
+    else navigate(href);
   };
 
   return (
@@ -159,7 +168,11 @@ export function DocumentSearch({
                   : topResults.length - 1,
             );
           }}
-          placeholder="Search text, or try label:platform -state:abandoned"
+          placeholder={
+            publicCatalog
+              ? "Search published notes and RFCs"
+              : "Search text, or try label:platform -state:abandoned"
+          }
           ref={inputRef}
           role="combobox"
           spellCheck={false}
@@ -208,7 +221,9 @@ export function DocumentSearch({
             ) : topResults.length === 0 ? (
               <p aria-live="polite" className="document-search__message">
                 {pending
-                  ? "Searching titles, metadata, and complete working heads…"
+                  ? publicCatalog
+                    ? "Searching published notes and RFCs…"
+                    : "Searching titles, metadata, and complete working heads…"
                   : "No document matches this query."}
               </p>
             ) : (
@@ -227,8 +242,9 @@ export function DocumentSearch({
                     <a
                       aria-selected={activeResult === index}
                       className="document-search__result"
+                      data-native-navigation={publicCatalog ? "" : undefined}
                       data-search-result=""
-                      href={documentHref(metadata.id, metadata.rfcNumber, false, "read", "")}
+                      href={resultHref(document)}
                       id={`${listboxId}-result-${index}`}
                       key={metadata.id}
                       onPointerMove={() => setActiveResult(index)}
@@ -253,10 +269,12 @@ export function DocumentSearch({
               </>
             )}
           </div>
-          <p className="document-search__syntax-hint">
-            Combine filters with spaces. Quote phrases. Prefix any term with <code>-</code> to
-            exclude it.
-          </p>
+          {publicCatalog ? null : (
+            <p className="document-search__syntax-hint">
+              Combine filters with spaces. Quote phrases. Prefix any term with <code>-</code> to
+              exclude it.
+            </p>
+          )}
         </div>
       ) : null}
     </div>

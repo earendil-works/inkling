@@ -157,32 +157,28 @@ function loadRoute(url: URL): Effect.Effect<RouteModel, ApiError> {
   }
   return api.authenticationStatus.pipe(
     Effect.flatMap((authentication) => {
-      if (!authentication.authenticated) {
-        const model: RouteModel = {
-          api,
-          capabilityToken,
-          screen: "authentication",
-        };
-        return Effect.succeed(model);
-      }
+      const publicCatalog = !authentication.authenticated;
+      const loadCatalog = publicCatalog ? api.listPublicDocuments : api.listDocuments;
       if (url.pathname === "/labels") {
-        return api.listDocuments().pipe(
+        return loadCatalog().pipe(
           Effect.map((catalog): RouteModel => ({
             account: authentication.principal,
             api,
             capabilityToken,
             catalog,
+            publicCatalog,
             screen: "labels",
             selectedLabel: url.searchParams.get("label") ?? undefined,
           })),
         );
       }
-      return api.listDocuments(url.searchParams.get("q") ?? "").pipe(
+      return loadCatalog(url.searchParams.get("q") ?? "").pipe(
         Effect.map((catalog): RouteModel => ({
           account: authentication.principal,
           api,
           capabilityToken,
           catalog,
+          publicCatalog,
           screen: "workspace",
         })),
       );
@@ -199,12 +195,23 @@ function loadRfcRoute(
   return api.authenticationStatus.pipe(
     Effect.flatMap((authentication): Effect.Effect<RouteModel, ApiError> => {
       if (!authentication.authenticated) {
-        const model: RouteModel = {
-          api,
-          capabilityToken,
-          screen: "authentication",
-        };
-        return Effect.succeed(model);
+        return api.listPublicDocuments(String(number)).pipe(
+          Effect.flatMap((catalog) => {
+            const document = catalog.documents.find(
+              (candidate) => candidate.metadata.rfcNumber === number,
+            );
+            return document === undefined
+              ? Effect.fail(
+                  new ApiError({
+                    code: "not_found",
+                    message: `RFC ${String(number).padStart(4, "0")} does not exist.`,
+                    retryable: false,
+                    status: 404,
+                  }),
+                )
+              : loadDocumentRoute(api, capabilityToken, document.metadata.id, screen, false);
+          }),
+        );
       }
       return api.listDocuments(`rfc:${number}`).pipe(
         Effect.flatMap((catalog) => {
@@ -266,6 +273,7 @@ function loadDocumentRoute(
             catalog,
             accountPerson(authentication.principal),
           ),
+          publicDocument: !authentication.authenticated && !shared,
           screen,
           shared,
         })),

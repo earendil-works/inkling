@@ -425,12 +425,22 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
   );
 
   app.get("/api/public/documents", (context) =>
-    execute(context, options, (service) =>
-      service.listPublicDocuments(
-        context.req.query("q") ?? "",
-        context.req.query("state"),
-        context.req.query("label"),
-      ),
+    execute(
+      context,
+      options,
+      (service) =>
+        service.listPublicDocuments(
+          context.req.query("q") ?? "",
+          context.req.query("state"),
+          context.req.query("label"),
+        ),
+      (catalog) => {
+        context.header(
+          "Cache-Control",
+          "public, max-age=0, s-maxage=60, stale-while-revalidate=300",
+        );
+        return context.json(catalog);
+      },
     ),
   );
 

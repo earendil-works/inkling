@@ -10,22 +10,39 @@ import { NewDocumentControl } from "./components/new-document-control.tsx";
 export interface WorkspaceScreenProps {
   readonly api: ApiClientService;
   readonly initialCatalog: CatalogResponse;
+  readonly publicCatalog?: boolean | undefined;
 }
 
-export function WorkspaceScreen({ api, initialCatalog }: WorkspaceScreenProps): React.JSX.Element {
+export function WorkspaceScreen({
+  api,
+  initialCatalog,
+  publicCatalog = false,
+}: WorkspaceScreenProps): React.JSX.Element {
   const [catalog, setCatalog] = useState(initialCatalog);
 
   return (
-    <main className="workspace-layout" id="app" tabIndex={-1}>
+    <main
+      className="workspace-layout"
+      data-public-catalog={publicCatalog ? "" : undefined}
+      id="app"
+      tabIndex={-1}
+    >
       <section className="workspace-heading">
         <div>
-          <p className="eyebrow">Workspace / recent activity</p>
+          <p className="eyebrow">
+            {publicCatalog ? "Public archive / published revisions" : "Workspace / recent activity"}
+          </p>
           <h1>Notes and RFCs</h1>
         </div>
-        <NewDocumentControl api={api} />
+        {publicCatalog ? null : <NewDocumentControl api={api} />}
       </section>
-      <CatalogControls api={api} initialCatalog={initialCatalog} onResultsChange={setCatalog} />
-      <DocumentCatalog catalog={catalog} />
+      <CatalogControls
+        api={api}
+        initialCatalog={initialCatalog}
+        onResultsChange={setCatalog}
+        publicCatalog={publicCatalog}
+      />
+      <DocumentCatalog catalog={catalog} publicCatalog={publicCatalog} />
     </main>
   );
 }

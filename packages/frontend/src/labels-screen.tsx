@@ -7,6 +7,7 @@ import { DocumentCatalog } from "./components/document-catalog.tsx";
 
 export interface LabelsScreenProps {
   readonly catalog: CatalogResponse;
+  readonly publicCatalog?: boolean | undefined;
   readonly selectedLabel: string | undefined;
 }
 
@@ -15,7 +16,11 @@ interface LabelGroup {
   readonly label: string;
 }
 
-export function LabelsScreen({ catalog, selectedLabel }: LabelsScreenProps): React.JSX.Element {
+export function LabelsScreen({
+  catalog,
+  publicCatalog = false,
+  selectedLabel,
+}: LabelsScreenProps): React.JSX.Element {
   const groups = useMemo(() => groupDocumentsByLabel(catalog), [catalog]);
   const selected =
     selectedLabel === undefined ? undefined : groups.find((group) => group.label === selectedLabel);
@@ -25,7 +30,7 @@ export function LabelsScreen({ catalog, selectedLabel }: LabelsScreenProps): Rea
       <section className="workspace-heading labels-heading">
         <div>
           <p className="eyebrow">
-            <a href="/">Notes and RFCs</a> / Labels
+            <a href="/">{publicCatalog ? "Published notes and RFCs" : "Notes and RFCs"}</a> / Labels
           </p>
           <h1>{selectedLabel ?? "Labels"}</h1>
         </div>
@@ -47,7 +52,10 @@ export function LabelsScreen({ catalog, selectedLabel }: LabelsScreenProps): Rea
               Browse all labels
             </ButtonLink>
           </div>
-          <DocumentCatalog catalog={{ documents: selected?.documents ?? [] }} />
+          <DocumentCatalog
+            catalog={{ documents: selected?.documents ?? [] }}
+            publicCatalog={publicCatalog}
+          />
         </section>
       )}
     </main>

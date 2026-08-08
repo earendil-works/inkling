@@ -8,6 +8,7 @@ import type { AppStatus } from "../app-context.tsx";
 import { AccountControl } from "./account-control.tsx";
 import type { AccountControlProps } from "./account-control.tsx";
 import { Button } from "./button.tsx";
+import { ButtonLink } from "./button-link.tsx";
 
 export interface AppHeaderProps {
   readonly account: AccountControlProps["account"] | undefined;
@@ -78,7 +79,19 @@ export function AppHeader({
             <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" strokeWidth="1.5" />
           </svg>
         </Button>
-        {account === undefined || api === undefined ? null : (
+        {account === undefined ? (
+          api === undefined ? null : (
+            <ButtonLink
+              className="masthead-sign-in"
+              data-sign-in=""
+              href="/api/auth/google/start"
+              size="small"
+              variant="primary"
+            >
+              Sign in
+            </ButtonLink>
+          )
+        ) : api === undefined ? null : (
           <AccountControl account={account} api={api} />
         )}
       </div>

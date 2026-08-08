@@ -43,6 +43,7 @@ export interface ApiClientService {
   readonly revokeApiKey: (keyId: string) => Effect.Effect<void, ApiError>;
   readonly logout: Effect.Effect<void, ApiError>;
   readonly listDocuments: (query?: string) => Effect.Effect<CatalogResponse, ApiError>;
+  readonly listPublicDocuments: (query?: string) => Effect.Effect<CatalogResponse, ApiError>;
   readonly createDocument: (
     request: CreateDocumentRequest,
   ) => Effect.Effect<DocumentResponse, ApiError>;
@@ -256,6 +257,8 @@ export function makeApiClient(capabilityToken?: string): ApiClientService {
     listApiKeys: request("/api/api-keys", Schema.Array(ApiKeySchema)),
     listDocuments: (query = "") =>
       request(`/api/documents?q=${encodeURIComponent(query)}`, CatalogResponseSchema),
+    listPublicDocuments: (query = "") =>
+      request(`/api/public/documents?q=${encodeURIComponent(query)}`, CatalogResponseSchema),
     logout: mutation("/api/auth/logout", Schema.Unknown, "POST").pipe(Effect.asVoid),
     publish: (documentId, confirmConfidentialPublic = false) =>
       mutation(

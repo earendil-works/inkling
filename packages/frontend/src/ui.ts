@@ -19,6 +19,12 @@ export function documentHref(
   return `${base}${mode === "edit" ? "/edit" : ""}${search}`;
 }
 
+export function publicDocumentHref(documentId: string, rfcNumber: number | undefined): string {
+  return rfcNumber === undefined
+    ? `/public/documents/${encodeURIComponent(documentId)}`
+    : `/rfcs/${String(rfcNumber).padStart(4, "0")}`;
+}
+
 export function formatDate(value: string): string {
   return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "UTC" }).format(
     new Date(value),

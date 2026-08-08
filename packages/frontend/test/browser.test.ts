@@ -45,7 +45,16 @@ test(
       const context = await browser.newContext();
       const first = await context.newPage();
       await first.goto(baseUrl);
-      await first.getByRole("link", { name: "Continue with Google" }).click();
+      await first.waitForSelector("[data-public-catalog]");
+      assert.equal(
+        await first.locator(".workspace-heading .eyebrow").textContent(),
+        "Public archive / published revisions",
+      );
+      assert.match(
+        (await first.locator(".empty-state").textContent()) ?? "",
+        /No public revisions have been published yet/u,
+      );
+      await first.getByRole("link", { name: "Sign in" }).click();
       await first.waitForSelector("[data-new-document]");
       assert.equal(await first.title(), "Notes and RFCs");
       assert.equal(await first.locator(".workspace-heading h1").textContent(), "Notes and RFCs");
@@ -671,15 +680,60 @@ test(
         true,
       );
       await sharedContext.close();
+      const publicNote = await first.evaluate(async () => {
+        const csrf = document.cookie
+          .split(";")
+          .map((part) => part.trim())
+          .find((part) => part.startsWith("jot_csrf="))
+          ?.slice("jot_csrf=".length);
+        const createdResponse = await fetch("/api/documents", {
+          body: JSON.stringify({
+            body: "---\nauthors: []\nstate: published\nvisibility: public\nsensitivity: normal\nlabels:\n  - public\n---\n# Public browser note\n\nVisible without signing in.",
+            creationKey: "browser-public-note",
+            title: "Public browser note",
+          }),
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf ?? "" },
+          method: "POST",
+        });
+        const created = (await createdResponse.json()) as { metadata: { id: string } };
+        const publishedResponse = await fetch(`/api/documents/${created.metadata.id}/publish`, {
+          headers: { "X-CSRF-Token": csrf ?? "" },
+          method: "POST",
+        });
+        return {
+          createdStatus: createdResponse.status,
+          documentId: created.metadata.id,
+          publishedStatus: publishedResponse.status,
+        };
+      });
+      assert.deepEqual(
+        { createdStatus: publicNote.createdStatus, publishedStatus: publicNote.publishedStatus },
+        { createdStatus: 200, publishedStatus: 200 },
+      );
       const logoutResponse = first.waitForResponse((response) =>
         response.url().endsWith("/api/auth/logout"),
       );
       await first.locator(".account-control__trigger").click();
       await first.locator("[data-logout]").click();
       assert.equal((await logoutResponse).status(), 200);
-      await first.getByRole("link", { name: "Continue with Google" }).waitFor();
+      await first.waitForSelector("[data-public-catalog]");
+      await first.getByRole("link", { name: "Sign in" }).waitFor();
       assert.equal(await first.locator("[data-account]").count(), 0);
       assert.equal(await first.locator("[data-api-status]").count(), 0);
+      const publicNoteLink = first.locator(".catalog-row", { hasText: "Public browser note" });
+      assert.equal(await publicNoteLink.getAttribute("data-native-navigation"), "");
+      await publicNoteLink.click();
+      await first.waitForURL(
+        new RegExp(
+          `/public/documents/${publicNote.documentId.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}$`,
+          "u",
+        ),
+      );
+      await first.waitForSelector(".public-document");
+      assert.match(
+        await first.locator(".public-document").innerText(),
+        /Visible without signing in/u,
+      );
       await context.close();
     } finally {
       await browser.close();

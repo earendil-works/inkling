@@ -10,7 +10,7 @@ RFC Editor is based on the earlier **Jot** tool. Existing package names, the `jo
 - Inline threaded comments anchored to collaborative text positions.
 - Explicit publication of immutable revisions, separate from the live working head.
 - Monotonic RFC number allocation and canonical routes such as `/rfcs/0042`.
-- Public, workspace, confidential, and capability-shared documents.
+- A public landing page for published notes and RFCs, with workspace, confidential, and capability-shared documents kept behind their respective access policies.
 - Markdown preview and publication with tables, task lists, syntax highlighting, Mermaid diagrams, stable heading links, and tables of contents.
 - Search across complete document bodies, RFC metadata, labels, lifecycle states, and people.
 - API keys and a CLI for people, coding agents, imports, backups, verification, and repair.
@@ -177,7 +177,7 @@ The editor omits frontmatter and the title heading from rendered prose and refle
 
 Frontmatter does not itself change authorization or publish a working draft. An authorized user must explicitly publish, which validates the frontmatter and promotes it into the structured metadata of an immutable published revision. RFC allocation, sharing, and publication remain explicit controls.
 
-Public numbered RFCs use zero-padded canonical routes such as `/rfcs/0042`. Legacy `/rfc/...` routes and old slugged routes redirect to the canonical route. Anonymous readers can access only public, published revisions; editing always uses the authorized working head.
+Public numbered RFCs use zero-padded canonical routes such as `/rfcs/0042`. Legacy `/rfc/...` routes and old slugged routes redirect to the canonical route. The landing page lists every public published RFC and unnumbered note without requiring sign-in. Anonymous readers can access only those published revisions; editing always uses the authorized working head.
 
 ## Search
 

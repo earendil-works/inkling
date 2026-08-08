@@ -8,10 +8,15 @@ import { ReaderToolbar } from "./components/reader-toolbar.tsx";
 
 export interface ReaderScreenProps {
   readonly document: DocumentResponse;
+  readonly publicDocument?: boolean | undefined;
   readonly shared: boolean;
 }
 
-export function ReaderScreen({ document, shared }: ReaderScreenProps): React.JSX.Element {
+export function ReaderScreen({
+  document,
+  publicDocument = false,
+  shared,
+}: ReaderScreenProps): React.JSX.Element {
   const { setParticipants } = useAppContext();
   useEffect(() => {
     setParticipants([]);
@@ -20,7 +25,11 @@ export function ReaderScreen({ document, shared }: ReaderScreenProps): React.JSX
   return (
     <main className="reader-layout" id="app" tabIndex={-1}>
       <div className="reader-paper">
-        <ReaderToolbar metadata={document.metadata} shared={shared} />
+        <ReaderToolbar
+          metadata={document.metadata}
+          publicDocument={publicDocument}
+          shared={shared}
+        />
         <ReaderDocument document={document} />
       </div>
     </main>
