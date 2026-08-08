@@ -163,8 +163,6 @@ export interface JotApplicationService {
   readonly authenticationStatus: (
     credentials: RequestCredentials,
   ) => Effect.Effect<AuthenticationStatus, ApplicationError>;
-  readonly setupOwner: (password: string) => Effect.Effect<SessionResult, ApplicationError>;
-  readonly login: (password: string) => Effect.Effect<SessionResult, ApplicationError>;
   readonly loginWorkspaceIdentity: (
     identity: WorkspaceIdentity,
     people?: readonly PeopleDirectoryEntry[],

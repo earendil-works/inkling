@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { generateKeyPairSync, sign } from "node:crypto";
 import { access, mkdtemp, rm } from "node:fs/promises";
+import { createServer as createHttpServer } from "node:http";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -17,33 +19,53 @@ test(
     assert.ok(browserExecutable);
     const directory = await mkdtemp(path.join(tmpdir(), "jot-browser-"));
     const port = await availablePort();
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const google = await startGoogleOAuthMock();
     const server = spawn("node", ["../runtime-node/src/main.ts"], {
       cwd: path.resolve(import.meta.dirname, ".."),
       env: {
         ...process.env,
+        GOOGLE_ADMIN_EMAILS: "browser@example.com",
+        GOOGLE_ALLOWED_DOMAINS: "example.com",
+        GOOGLE_CLIENT_ID: "jot-browser-client",
+        GOOGLE_CLIENT_SECRET: "jot-browser-secret",
+        GOOGLE_REDIRECT_URI: `${baseUrl}/api/auth/google/callback`,
         JOT_DATA_DIR: directory,
+        JOT_GOOGLE_AUTHORIZATION_ENDPOINT: `${google.origin}/authorize`,
+        JOT_GOOGLE_CERTIFICATES_ENDPOINT: `${google.origin}/certificates`,
+        JOT_GOOGLE_TOKEN_ENDPOINT: `${google.origin}/token`,
+        JOT_OAUTH_STATE_SECRET: "jot-browser-state-secret",
         PORT: String(port),
       },
       stdio: "ignore",
     });
     const browser = await chromium.launch({ executablePath: browserExecutable, headless: true });
     try {
-      const baseUrl = `http://127.0.0.1:${port}`;
       await waitForServer(baseUrl);
       const context = await browser.newContext();
       const first = await context.newPage();
       await first.goto(baseUrl);
-      await first.locator('input[name="password"]').fill("correct horse battery staple");
-      await first
-        .locator("[data-auth-form]")
-        .evaluate((form: HTMLFormElement) => form.requestSubmit());
+      await first.getByRole("link", { name: "Continue with Google" }).click();
       await first.waitForSelector("[data-new-document]");
       assert.equal(await first.title(), "Notes and RFCs");
       assert.equal(await first.locator(".workspace-heading h1").textContent(), "Notes and RFCs");
       assert.equal(await first.locator(".wordmark").textContent(), "Notes and RFCs");
-      assert.equal(await first.locator("[data-account-name]").textContent(), "Owner");
+      assert.equal(await first.locator("[data-account-name]").textContent(), "Browser Admin");
       assert.equal(await first.locator("[data-api-status]").count(), 0);
       assert.equal(await first.locator(".catalog-tools [data-logout]").count(), 0);
+      assert.equal(await first.locator("[data-account-menu]").isVisible(), false);
+      await first.locator(".account-control__trigger").click();
+      assert.deepEqual(await first.locator("[data-account-menu] button").allTextContents(), [
+        "API keys",
+        "Sign out",
+      ]);
+      await first.locator("[data-open-api-keys]").click();
+      assert.equal(await first.locator("[data-settings-dialog] h2").textContent(), "API keys");
+      assert.match(
+        (await first.locator("[data-settings-dialog] .dialog-note").textContent()) ?? "",
+        /belong to your account/u,
+      );
+      await first.getByLabel("Close API keys").click();
       const initialTheme = await first.locator("html").getAttribute("data-theme");
       await first.locator("[data-theme-toggle]").dblclick();
       assert.notEqual(await first.locator("html").getAttribute("data-theme"), initialTheme);
@@ -384,18 +406,20 @@ test(
       await second.waitForSelector(".cm-content");
       await first.locator(".cm-content").click();
       await first.keyboard.press("ControlOrMeta+End");
-      const ownerCursor = second.locator('.cm-remote-cursor[data-remote-name="Owner"]');
-      await ownerCursor.waitFor();
-      const ownerPresenceColor = await ownerCursor.evaluate((cursor) =>
+      const adminCursor = second.locator('.cm-remote-cursor[data-remote-name="Browser Admin"]');
+      await adminCursor.waitFor();
+      const adminPresenceColor = await adminCursor.evaluate((cursor) =>
         getComputedStyle(cursor).getPropertyValue("--remote-color").trim(),
       );
-      assert.match(ownerPresenceColor, /^oklch\(/u);
+      assert.match(adminPresenceColor, /^oklch\(/u);
       await first.keyboard.press("Shift+Home");
       await second.bringToFront();
-      const ownerSelection = second.locator('.cm-remote-selection[data-remote-name="Owner"]');
-      await ownerSelection.waitFor();
+      const adminSelection = second.locator(
+        '.cm-remote-selection[data-remote-name="Browser Admin"]',
+      );
+      await adminSelection.waitFor();
       assert.match(
-        await ownerSelection.evaluate((selection) => getComputedStyle(selection).backgroundColor),
+        await adminSelection.evaluate((selection) => getComputedStyle(selection).backgroundColor),
         /^oklab\(|^oklch\(/u,
       );
       await first.bringToFront();
@@ -432,7 +456,7 @@ test(
         const start = source.body.indexOf("Shared starting body");
         await fetch(`/api/documents/${id}/comments`, {
           body: JSON.stringify({
-            authorDisplayName: "Browser owner",
+            authorDisplayName: "Browser Admin",
             body: "Browser comment",
             // Browser line selections commonly include the trailing newline.
             selection: { end: start + "Shared starting body\n".length, start },
@@ -606,7 +630,7 @@ test(
         getComputedStyle(cursor).getPropertyValue("--remote-color").trim(),
       );
       assert.match(guestPresenceColor, /^oklch\(/u);
-      assert.notEqual(guestPresenceColor, ownerPresenceColor);
+      assert.notEqual(guestPresenceColor, adminPresenceColor);
       await first.evaluate(async (id) => {
         const csrf = document.cookie
           .split(";")
@@ -650,19 +674,101 @@ test(
       const logoutResponse = first.waitForResponse((response) =>
         response.url().endsWith("/api/auth/logout"),
       );
+      await first.locator(".account-control__trigger").click();
       await first.locator("[data-logout]").click();
       assert.equal((await logoutResponse).status(), 200);
-      await first.waitForSelector("[data-auth-form]");
+      await first.getByRole("link", { name: "Continue with Google" }).waitFor();
       assert.equal(await first.locator("[data-account]").count(), 0);
       assert.equal(await first.locator("[data-api-status]").count(), 0);
       await context.close();
     } finally {
       await browser.close();
       await stopProcess(server);
+      await google.stop();
       await rm(directory, { force: true, recursive: true });
     }
   },
 );
+
+interface RunningGoogleOAuthMock {
+  readonly origin: string;
+  readonly stop: () => Promise<void>;
+}
+
+async function startGoogleOAuthMock(): Promise<RunningGoogleOAuthMock> {
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const verificationKey = {
+    ...publicKey.export({ format: "jwk" }),
+    alg: "RS256",
+    kid: "jot-browser-key",
+    use: "sig",
+  };
+  let nonce: string | undefined;
+  const server = createHttpServer((request, response) => {
+    const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "127.0.0.1"}`);
+    if (url.pathname === "/authorize") {
+      nonce = url.searchParams.get("nonce") ?? undefined;
+      const redirectUri = url.searchParams.get("redirect_uri");
+      const state = url.searchParams.get("state");
+      assert.ok(nonce);
+      assert.ok(redirectUri);
+      assert.ok(state);
+      const callback = new URL(redirectUri);
+      callback.searchParams.set("code", "browser-authorization-code");
+      callback.searchParams.set("state", state);
+      response.writeHead(302, { Location: callback.href }).end();
+      return;
+    }
+    if (url.pathname === "/token") {
+      assert.ok(nonce);
+      const header = base64UrlJson({ alg: "RS256", kid: "jot-browser-key", typ: "JWT" });
+      const claims = base64UrlJson({
+        aud: "jot-browser-client",
+        email: "browser@example.com",
+        email_verified: true,
+        exp: Math.floor(Date.now() / 1_000) + 300,
+        hd: "example.com",
+        iss: "https://accounts.google.com",
+        name: "Browser Admin",
+        nonce,
+        sub: "browser-user",
+      });
+      const unsigned = `${header}.${claims}`;
+      const signature = sign("RSA-SHA256", Buffer.from(unsigned), privateKey).toString("base64url");
+      response
+        .writeHead(200, { "Content-Type": "application/json" })
+        .end(JSON.stringify({ id_token: `${unsigned}.${signature}` }));
+      return;
+    }
+    if (url.pathname === "/certificates") {
+      response
+        .writeHead(200, { "Content-Type": "application/json" })
+        .end(JSON.stringify({ keys: [verificationKey] }));
+      return;
+    }
+    response.writeHead(404).end();
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    server.close();
+    throw new Error("Could not start the browser OAuth server.");
+  }
+  return {
+    origin: `http://127.0.0.1:${address.port}`,
+    stop: () =>
+      new Promise((resolve, reject) => {
+        server.close((error) => (error === undefined ? resolve() : reject(error)));
+      }),
+  };
+}
+
+function base64UrlJson(value: unknown): string {
+  return Buffer.from(JSON.stringify(value)).toString("base64url");
+}
 
 function stopProcess(child: ReturnType<typeof spawn>): Promise<void> {
   if (child.exitCode !== null) return Promise.resolve();

@@ -115,11 +115,15 @@ function memoryStorage(): {
 async function fixture() {
   const storage = memoryStorage();
   const id = await Effect.runPromise(documentId("document_123456789"));
-  const ownerId = await Effect.runPromise(personId("owner@example.com"));
+  const administratorId = await Effect.runPromise(personId("admin@example.com"));
   const metadata = await Effect.runPromise(
     createDocumentMetadata({ id, title: "Durability" }, now),
   );
-  const principal: Principal = { kind: "workspace", personId: ownerId, role: "owner" };
+  const principal: Principal = {
+    kind: "workspace",
+    personId: administratorId,
+    role: "administrator",
+  };
   const make = (initial = true) =>
     Effect.runPromise(
       makeDocumentAuthority({

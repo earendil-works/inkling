@@ -1,7 +1,24 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { isGoogleEmailAllowed, parseAllowedGoogleDomains } from "../src/google-auth.ts";
+import {
+  isGoogleEmailAllowed,
+  parseAllowedGoogleDomains,
+  startGoogleAuthentication,
+} from "../src/google-auth.ts";
+
+test("Google sign-in fails closed when allowed-domain configuration is absent", async () => {
+  const response = await startGoogleAuthentication(
+    new Request("https://rfcs.example.com/api/auth/google/start"),
+    {},
+  );
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), {
+    code: "oauth_unavailable",
+    message: "Google authentication is not configured.",
+    retryable: false,
+  });
+});
 
 test("Google sign-in domain allowlists are normalized and matched exactly", () => {
   const domains = parseAllowedGoogleDomains(

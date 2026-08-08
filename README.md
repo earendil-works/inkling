@@ -60,7 +60,7 @@ Open <http://localhost:5173>. Vite proxies API and WebSocket traffic to the Work
 
 - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` identify the Google OAuth web client.
 - `GOOGLE_ALLOWED_DOMAINS` is a comma-separated allowlist. RFC Editor checks the exact domain of Google's verified email claim; Google's hosted-domain hint is not treated as authorization.
-- `GOOGLE_ADMIN_EMAILS` is a comma-separated list of allowed users who may administer the workspace and API keys. Other allowed users become workspace members.
+- `GOOGLE_ADMIN_EMAILS` is a comma-separated list of allowed users who may administer the workspace. Other allowed users become workspace members. Every user manages their own API keys, which inherit that user's role.
 - `GOOGLE_REDIRECT_URI` must exactly match an authorized redirect URI on the OAuth client.
 - `JOT_OAUTH_STATE_SECRET` signs short-lived OAuth state. It is optional and falls back to `GOOGLE_CLIENT_SECRET`, but a separate value generated with `openssl rand -base64 48` is recommended.
 
@@ -98,7 +98,7 @@ Official references:
 
 ## Local Node.js runtime
 
-The Node.js runtime uses a filesystem data directory and local owner-password authentication; it does not require Cloudflare or Google OAuth.
+The Node.js runtime uses a filesystem data directory and the same allowed-domain Google authentication as the Cloudflare deployment. It does not require Cloudflare.
 
 Build the frontend and start the server:
 
@@ -107,7 +107,7 @@ pnpm --filter @earendil-works/jot-frontend build
 pnpm --filter @earendil-works/jot-runtime-node start
 ```
 
-Open <http://localhost:8787> and create the owner password on first use. The server stores its data in `.jot` by default and permits only one process to own a data directory at a time.
+Configure the Google OAuth environment variables described above, including `GOOGLE_REDIRECT_URI=http://localhost:8787/api/auth/google/callback`, then open <http://localhost:8787> and sign in. The server stores its data in `.jot` by default and permits only one process to use a data directory at a time.
 
 Configure it with:
 
@@ -211,7 +211,7 @@ The command is still named `jot` for compatibility. Run it directly from a check
 node packages/cli/src/main.ts --help
 ```
 
-Create an API key under **Workspace settings**, then register the workspace and use the CLI:
+Open the account menu and choose **API keys**. Create a personal key, then copy the one-time setup command. It registers the workspace without putting the key in project files:
 
 ```sh
 jot instance add workspace https://rfcs.example.com API_KEY
@@ -223,6 +223,8 @@ jot create 'New proposal' --rfc
 ```
 
 The CLI supports safe unique-text edits, line-range reads, metadata and publication commands, sharing, threaded comments, attachments, imports, backups, restore, verification, and catalog repair. Capability URLs can be registered with `jot share-instance` for document-scoped access.
+
+Each deployment also serves an origin-aware [`/AGENTS.md`](http://localhost:8787/AGENTS.md). Point a coding agent at that URL for current CLI setup, safe editing guidance, and a reusable Agent Skills template. The served instructions never contain credentials.
 
 Set `JOT_CONFIG` to override the CLI configuration path, `JOT_INSTANCE` to override the active instance, and `JOT_AUTHOR` to set the guest comment name.
 
@@ -247,7 +249,7 @@ Validate an import without changing the target workspace:
 pnpm import-rfcs --source /path/to/source --dry-run
 ```
 
-Create an administrator API key and run the import:
+Sign in with an administrator account, create its personal API key, and run the import:
 
 ```sh
 JOT_URL=https://rfcs.example.com \

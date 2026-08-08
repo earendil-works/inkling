@@ -8,7 +8,10 @@ import { NodeFileSystem } from "@effect/platform-node";
 import { Effect, Layer, ManagedRuntime, type Scope } from "effect";
 
 import { createBackendApp } from "@earendil-works/jot-backend";
-import type { JotApplicationService } from "@earendil-works/jot-backend";
+import type {
+  GoogleAuthenticationEnvironment,
+  JotApplicationService,
+} from "@earendil-works/jot-backend";
 import { MarkdownRendererLive } from "@earendil-works/jot-renderer";
 
 import { localApplicationLayer } from "./application.ts";
@@ -21,6 +24,7 @@ export interface StartServerOptions {
   readonly port: number;
   readonly dataDirectory: string;
   readonly version?: string | undefined;
+  readonly googleAuthentication?: GoogleAuthenticationEnvironment | undefined;
   readonly onListen?: ((port: number) => void) | undefined;
 }
 
@@ -59,7 +63,11 @@ export function startServer(
       try: () => runtime.runtime(),
     });
 
-    const app = createBackendApp({ runtime, version: options.version });
+    const app = createBackendApp({
+      googleAuthentication: options.googleAuthentication ?? googleAuthenticationFromEnvironment(),
+      runtime,
+      version: options.version,
+    });
     const frontendRoot = path.resolve(
       path.dirname(fileURLToPath(import.meta.url)),
       "../../frontend/dist",
@@ -88,6 +96,24 @@ export function startServer(
     yield* Effect.addFinalizer(() => Effect.sync(removeWebSockets));
     return { runtime, server };
   }).pipe(Effect.provide(NodeFileSystem.layer));
+}
+
+export function googleAuthenticationFromEnvironment(
+  environment: NodeJS.ProcessEnv = process.env,
+): GoogleAuthenticationEnvironment {
+  return {
+    GOOGLE_ADMIN_EMAILS: environment["GOOGLE_ADMIN_EMAILS"],
+    GOOGLE_ALLOWED_DOMAIN: environment["GOOGLE_ALLOWED_DOMAIN"],
+    GOOGLE_ALLOWED_DOMAINS: environment["GOOGLE_ALLOWED_DOMAINS"],
+    GOOGLE_CLIENT_ID: environment["GOOGLE_CLIENT_ID"],
+    GOOGLE_CLIENT_SECRET: environment["GOOGLE_CLIENT_SECRET"],
+    GOOGLE_REDIRECT_URI: environment["GOOGLE_REDIRECT_URI"],
+    JOT_GOOGLE_AUTHORIZATION_ENDPOINT: environment["JOT_GOOGLE_AUTHORIZATION_ENDPOINT"],
+    JOT_GOOGLE_CERTIFICATES_ENDPOINT: environment["JOT_GOOGLE_CERTIFICATES_ENDPOINT"],
+    JOT_GOOGLE_DIRECTORY_ENDPOINT: environment["JOT_GOOGLE_DIRECTORY_ENDPOINT"],
+    JOT_GOOGLE_TOKEN_ENDPOINT: environment["JOT_GOOGLE_TOKEN_ENDPOINT"],
+    JOT_OAUTH_STATE_SECRET: environment["JOT_OAUTH_STATE_SECRET"],
+  };
 }
 
 function createRuntime(

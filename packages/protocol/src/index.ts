@@ -302,24 +302,17 @@ export const ResolutionRequestSchema = Schema.Struct({ resolved: Schema.Boolean 
 export type ResolutionRequest = typeof ResolutionRequestSchema.Type;
 
 export const AuthenticationStatusSchema = Schema.Struct({
-  authenticationMethods: Schema.Array(Schema.Literal("password", "google")),
   authenticated: Schema.Boolean,
-  needsSetup: Schema.Boolean,
   principal: Schema.optional(
     Schema.Struct({
       displayName: Schema.String,
       email: Schema.optional(Schema.String),
       id: Schema.String,
-      role: Schema.String,
+      role: Schema.Literal("member", "administrator"),
     }),
   ),
 });
 export type AuthenticationStatus = typeof AuthenticationStatusSchema.Type;
-
-export const PasswordRequestSchema = Schema.Struct({
-  password: Schema.String.pipe(Schema.minLength(12)),
-});
-export type PasswordRequest = typeof PasswordRequestSchema.Type;
 
 export const ApiKeyCreateRequestSchema = Schema.Struct({ label: NonEmptyString });
 export type ApiKeyCreateRequest = typeof ApiKeyCreateRequestSchema.Type;
@@ -329,6 +322,7 @@ export const ApiKeySchema = Schema.Struct({
   id: Schema.String,
   label: Schema.String,
   lastUsedAt: Schema.optional(Schema.String),
+  personId: Schema.String,
   revokedAt: Schema.optional(Schema.String),
 });
 export type ApiKeyDto = typeof ApiKeySchema.Type;

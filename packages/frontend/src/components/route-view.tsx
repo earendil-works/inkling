@@ -28,11 +28,7 @@ interface RouteBase {
 }
 
 export type RouteModel =
-  | (RouteBase & {
-      readonly methods: AuthenticationStatus["authenticationMethods"];
-      readonly mode: "login" | "setup";
-      readonly screen: "authentication";
-    })
+  | (RouteBase & { readonly screen: "authentication" })
   | (RouteBase & {
       readonly document: DocumentResponse;
       readonly frontmatterVocabulary: FrontmatterVocabulary;
@@ -73,7 +69,7 @@ export function RouteView({ refresh, state }: RouteViewProps): React.JSX.Element
 
   switch (model.screen) {
     case "authentication":
-      return <AuthenticationScreen api={model.api} methods={model.methods} mode={model.mode} />;
+      return <AuthenticationScreen />;
     case "workspace":
       return <WorkspaceScreen api={model.api} initialCatalog={model.catalog} />;
     case "labels":

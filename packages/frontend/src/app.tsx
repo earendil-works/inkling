@@ -157,22 +157,10 @@ function loadRoute(url: URL): Effect.Effect<RouteModel, ApiError> {
   }
   return api.authenticationStatus.pipe(
     Effect.flatMap((authentication) => {
-      if (authentication.needsSetup) {
-        const model: RouteModel = {
-          api,
-          capabilityToken,
-          methods: authentication.authenticationMethods,
-          mode: "setup",
-          screen: "authentication",
-        };
-        return Effect.succeed(model);
-      }
       if (!authentication.authenticated) {
         const model: RouteModel = {
           api,
           capabilityToken,
-          methods: authentication.authenticationMethods,
-          mode: "login",
           screen: "authentication",
         };
         return Effect.succeed(model);
@@ -210,12 +198,10 @@ function loadRfcRoute(
 ): Effect.Effect<RouteModel, ApiError> {
   return api.authenticationStatus.pipe(
     Effect.flatMap((authentication): Effect.Effect<RouteModel, ApiError> => {
-      if (authentication.needsSetup || !authentication.authenticated) {
+      if (!authentication.authenticated) {
         const model: RouteModel = {
           api,
           capabilityToken,
-          methods: authentication.authenticationMethods,
-          mode: authentication.needsSetup ? "setup" : "login",
           screen: "authentication",
         };
         return Effect.succeed(model);

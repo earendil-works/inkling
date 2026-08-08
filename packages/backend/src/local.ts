@@ -1,9 +1,10 @@
-import { Effect, Either, Fiber, Layer, Schema, Stream } from "effect";
+import { Effect, Either, Fiber, Layer, Predicate, Schema, Stream } from "effect";
 
 import {
   activateDocument,
   allocateRfcNumber,
   applyCatalogSummary,
+  apiKeyBelongsTo,
   authenticateApiKey,
   authorizeDocument,
   authorizeWorkspace,
@@ -34,12 +35,10 @@ import {
   searchCatalog,
   SecretHasher,
   SecureToken,
-  setupOwner,
   StorageError,
   tombstoneDocument,
   upsertPerson,
   WorkspaceStateStore,
-  loginOwner,
   logoutSession,
   normalizeSearchText,
 } from "@earendil-works/jot-core";
@@ -55,6 +54,7 @@ import type {
   PersonReference,
   Principal,
   RelatedDocumentReference,
+  SessionRecord,
   WorkspaceCatalogState,
 } from "@earendil-works/jot-core";
 import {
@@ -165,8 +165,6 @@ const persistedStateSchema = Schema.Struct({
 });
 
 export interface LocalApplicationOptions {
-  readonly allowOwnerSetup?: boolean | undefined;
-  readonly authenticationMethods?: readonly ("password" | "google")[] | undefined;
   readonly workspaceId?: string | undefined;
   readonly ownsDocumentPrivateState?: boolean | undefined;
   readonly principalResolver?:
@@ -210,10 +208,12 @@ export function makeLocalJotApplication(
     const dirtySince = new Map<string, number>();
     let state = yield* loadWorkspaceState(stateStore, options.workspaceId ?? "local");
     state = yield* hydratePrivateDocumentState(state, objectStore);
-    const ownerId = yield* personId("owner@local").pipe(Effect.mapError(toStorageError));
-    const ownerPrincipal: Principal = { kind: "workspace", personId: ownerId, role: "owner" };
-    const authenticationMethods = options.authenticationMethods ?? ["password"];
-    const passwordAuthenticationEnabled = authenticationMethods.includes("password");
+    const systemId = yield* personId("system@internal").pipe(Effect.mapError(toStorageError));
+    const systemPrincipal: Principal = {
+      kind: "workspace",
+      personId: systemId,
+      role: "administrator",
+    };
 
     const saveState = (next: LocalWorkspaceState): Effect.Effect<void, StorageError> =>
       stateStore.save(next).pipe(
@@ -257,12 +257,12 @@ export function makeLocalJotApplication(
           ).pipe(Effect.mapError(toApplicationError));
           const now = new Date().toISOString();
           const current = yield* room
-            .snapshot(ownerPrincipal, now)
+            .snapshot(systemPrincipal, now)
             .pipe(Effect.mapError(toApplicationError));
           const scaffoldedBody = withMetadataFrontmatter(current.body, current.metadata);
           if (scaffoldedBody !== current.body) {
             yield* room
-              .replaceBody(ownerPrincipal, scaffoldedBody, current.metadata.headRevision, now)
+              .replaceBody(systemPrincipal, scaffoldedBody, current.metadata.headRevision, now)
               .pipe(Effect.mapError(toApplicationError));
             yield* room.checkpoint(now).pipe(Effect.mapError(toApplicationError));
           }
@@ -317,17 +317,6 @@ export function makeLocalJotApplication(
             return authenticated.principal;
           }
           if (credentials.sessionToken !== undefined) {
-            const sessionId = credentials.sessionToken.split(".")[0];
-            const session = state.authentication.sessions.find(
-              (candidate) => candidate.id === sessionId,
-            );
-            if (!passwordAuthenticationEnabled && session?.personId === undefined) {
-              return yield* applicationFailure(
-                "invalid_token",
-                "The session token is invalid or expired.",
-                401,
-              );
-            }
             return yield* authenticateSession(
               state.authentication,
               credentials.sessionToken,
@@ -431,7 +420,7 @@ export function makeLocalJotApplication(
     const projectDocument = (
       room: DocumentAuthorityService,
     ): Effect.Effect<void, ApplicationError> =>
-      room.snapshot(ownerPrincipal, new Date().toISOString()).pipe(
+      room.snapshot(systemPrincipal, new Date().toISOString()).pipe(
         Effect.mapError(toApplicationError),
         Effect.flatMap(summaryFromSnapshot),
         Effect.flatMap((summary) =>
@@ -452,7 +441,7 @@ export function makeLocalJotApplication(
       Effect.gen(function* () {
         yield* projectDocument(room);
         yield* scheduleCheckpoint(room);
-        return yield* snapshotFor(room, ownerPrincipal);
+        return yield* snapshotFor(room, systemPrincipal);
       });
 
     const commentActor = (
@@ -462,13 +451,17 @@ export function makeLocalJotApplication(
       Effect.gen(function* () {
         if (principal.kind === "workspace") {
           return {
-            displayName: principal.displayName ?? "Owner",
+            displayName: principal.displayName ?? "Workspace user",
             id: principal.personId,
-            manageAll: true,
+            manageAll: principal.role === "administrator",
           };
         }
         if (principal.kind === "api-key") {
-          return { displayName: "API key", id: principal.personId, manageAll: true };
+          return {
+            displayName: principal.displayName ?? "API key",
+            id: principal.personId,
+            manageAll: principal.role === "administrator",
+          };
         }
         if (principal.kind === "capability" && principal.guestId !== undefined) {
           const displayName = guestName?.trim();
@@ -542,7 +535,7 @@ export function makeLocalJotApplication(
       Effect.gen(function* () {
         const room = yield* getRoom(rawDocumentId);
         const current = yield* room
-          .snapshot(ownerPrincipal, new Date().toISOString())
+          .snapshot(systemPrincipal, new Date().toISOString())
           .pipe(Effect.mapError(toApplicationError));
         const publishedRevision = current.metadata.publishedRevision;
         if (current.metadata.visibility !== "public" || publishedRevision === undefined) {
@@ -583,7 +576,7 @@ export function makeLocalJotApplication(
           (entry) => runtimeConfiguration(entry.documentId),
         ),
       currentDocumentProjection: (rawDocumentId) =>
-        getRoom(rawDocumentId).pipe(Effect.flatMap((room) => snapshotFor(room, ownerPrincipal))),
+        getRoom(rawDocumentId).pipe(Effect.flatMap((room) => snapshotFor(room, systemPrincipal))),
       applyDocumentProjection: (document) =>
         summaryFromDocument(document).pipe(
           Effect.flatMap((summary) =>
@@ -623,7 +616,7 @@ export function makeLocalJotApplication(
       diagnostics: (credentials) =>
         Effect.gen(function* () {
           const principal = yield* resolvePrincipal(credentials);
-          yield* requireOwner(principal);
+          yield* requireAdministrator(principal);
           return {
             activeDocumentRooms: rooms.size,
             dirtyDocuments: checkpointFibers.size,
@@ -633,7 +626,7 @@ export function makeLocalJotApplication(
       exportWorkspace: (credentials) =>
         Effect.gen(function* () {
           const principal = yield* resolvePrincipal(credentials);
-          yield* requireOwner(principal);
+          yield* requireAdministrator(principal);
           yield* Effect.forEach(rooms.values(), (room) =>
             room.checkpoint(new Date().toISOString()).pipe(Effect.mapError(toApplicationError)),
           );
@@ -702,7 +695,7 @@ export function makeLocalJotApplication(
       repairCatalog: (credentials) =>
         Effect.gen(function* () {
           const principal = yield* resolvePrincipal(credentials);
-          yield* requireOwner(principal);
+          yield* requireAdministrator(principal);
           const prefix = `workspaces/${state.workspaceId}/documents/`;
           const keys = yield* objectStore.list(prefix).pipe(Effect.mapError(toApplicationError));
           const documentIds = [
@@ -737,7 +730,7 @@ export function makeLocalJotApplication(
             ).pipe(
               Effect.flatMap((room) =>
                 room
-                  .snapshot(ownerPrincipal, new Date().toISOString())
+                  .snapshot(systemPrincipal, new Date().toISOString())
                   .pipe(Effect.map((snapshot) => ({ room, snapshot }))),
               ),
               Effect.mapError(toApplicationError),
@@ -774,7 +767,7 @@ export function makeLocalJotApplication(
       restoreWorkspace: (credentials, archive) =>
         Effect.gen(function* () {
           const principal = yield* resolvePrincipal(credentials);
-          yield* requireOwner(principal);
+          yield* requireAdministrator(principal);
           if (archive.byteLength === 0 || archive.byteLength > 250_000_000) {
             return yield* applicationFailure(
               "backup_size",
@@ -854,7 +847,7 @@ export function makeLocalJotApplication(
           rooms.clear();
           const restored: LocalWorkspaceState = {
             ...decodedState,
-            authentication: decodedState.authentication as AuthenticationState,
+            authentication: normalizeAuthenticationState(decodedState.authentication),
             attachments: Object.fromEntries(
               Object.entries(decodedState.attachments ?? {}).map(([documentKey, attachments]) => [
                 documentKey,
@@ -869,7 +862,7 @@ export function makeLocalJotApplication(
       verifyWorkspace: (credentials) =>
         Effect.gen(function* () {
           const principal = yield* resolvePrincipal(credentials);
-          yield* requireOwner(principal);
+          yield* requireAdministrator(principal);
           const keys = yield* objectStore.list("").pipe(Effect.mapError(toApplicationError));
           const errors = yield* Effect.forEach(keys, (key) =>
             objectStore.get(key).pipe(
@@ -940,8 +933,8 @@ export function makeLocalJotApplication(
               principal.kind === "workspace" || principal.kind === "api-key"
                 ? principal.personId
                 : principal.kind === "capability"
-                  ? (principal.guestId ?? ownerId)
-                  : ownerId,
+                  ? (principal.guestId ?? systemId)
+                  : systemId,
             url: `/api/documents/${encodeURIComponent(room.documentId)}/attachments/${encodeURIComponent(attachmentId)}`,
           };
           yield* objectStore
@@ -981,7 +974,7 @@ export function makeLocalJotApplication(
           const authorizedMetadata = yield* room.snapshot(principal, attachmentReadAt).pipe(
             Effect.map((snapshot) => snapshot.metadata),
             Effect.catchAll(() =>
-              room.snapshot(ownerPrincipal, attachmentReadAt).pipe(
+              room.snapshot(systemPrincipal, attachmentReadAt).pipe(
                 Effect.tap((snapshot) =>
                   authorizeDocument(
                     principal,
@@ -1101,16 +1094,6 @@ export function makeLocalJotApplication(
         }),
       authenticationStatus: (credentials) =>
         Effect.gen(function* () {
-          const needsSetup =
-            options.allowOwnerSetup !== false &&
-            state.authentication.ownerPasswordHash === undefined;
-          if (needsSetup) {
-            return {
-              authenticated: false,
-              authenticationMethods,
-              needsSetup: true,
-            };
-          }
           const principal = yield* resolvePrincipal(credentials).pipe(
             Effect.catchAll(() => Effect.succeed({ kind: "anonymous" } as const)),
           );
@@ -1120,31 +1103,22 @@ export function makeLocalJotApplication(
             );
             return {
               authenticated: true,
-              authenticationMethods,
-              needsSetup: false,
               principal: {
-                displayName:
-                  principal.kind === "workspace"
-                    ? (principal.displayName ?? session?.displayName ?? "Owner")
-                    : "API key",
+                displayName: principal.displayName ?? session?.displayName ?? "Workspace user",
                 email: session?.email,
                 id: principal.personId,
                 role: principal.role,
               },
             };
           }
-          return {
-            authenticated: false,
-            authenticationMethods,
-            needsSetup: false,
-          };
+          return { authenticated: false };
         }),
       createApiKey: (credentials, label) =>
         Effect.gen(function* () {
           const principal = yield* resolvePrincipal(credentials);
-          yield* requireOwner(principal);
+          const account = yield* requireAccount(principal);
           return yield* withState(
-            createApiKey(state.authentication, label, new Date().toISOString()).pipe(
+            createApiKey(state.authentication, account, label, new Date().toISOString()).pipe(
               Effect.provideService(IdGenerator, ids),
               Effect.provideService(SecretHasher, hasher),
               Effect.provideService(SecureToken, tokens),
@@ -1154,7 +1128,7 @@ export function makeLocalJotApplication(
                   Effect.mapError(toApplicationError),
                   Effect.as({
                     key: created.token,
-                    metadata: apiKeyDto(created.record),
+                    metadata: apiKeyDto(created.record, account.personId),
                   } satisfies ApiKeyCreated),
                 ),
               ),
@@ -1212,7 +1186,7 @@ export function makeLocalJotApplication(
           rooms.set(room.documentId, room);
           yield* room.checkpoint(now).pipe(Effect.mapError(toApplicationError));
           const snapshot = yield* room
-            .snapshot(ownerPrincipal, now)
+            .snapshot(systemPrincipal, now)
             .pipe(Effect.mapError(toApplicationError));
           yield* withState(
             activateDocument(state.catalog, room.documentId).pipe(
@@ -1232,7 +1206,7 @@ export function makeLocalJotApplication(
       importDocument: (credentials, request: ImportDocumentRequest) =>
         Effect.gen(function* () {
           const principal = yield* resolvePrincipal(credentials);
-          yield* requireOwner(principal);
+          yield* requireAdministrator(principal);
           const generatedId = yield* ids.generate("doc");
           const importedId = request.metadata.id ?? generatedId;
           const reservation = yield* withState(
@@ -1250,7 +1224,7 @@ export function makeLocalJotApplication(
           );
           if (reservation.entry.status === "active") {
             const existing = yield* getRoom(reservation.entry.documentId);
-            return yield* snapshotFor(existing, ownerPrincipal);
+            return yield* snapshotFor(existing, systemPrincipal);
           }
           const importedAt = request.metadata.updatedAt ?? new Date().toISOString();
           const metadata = yield* createDocumentMetadata(
@@ -1290,12 +1264,12 @@ export function makeLocalJotApplication(
             const rootId = yield* ids.generate("message");
             const actor: CommentActor = {
               displayName: root.authorDisplayName,
-              id: ownerId,
+              id: systemId,
               manageAll: true,
             };
             yield* room
               .createThreadAtOffsets(
-                ownerPrincipal,
+                systemPrincipal,
                 {
                   body: root.body,
                   end: range.end,
@@ -1318,14 +1292,14 @@ export function makeLocalJotApplication(
                   : messageIds.get(importedMessage.parentLegacyId)) ?? lastMessageId;
               yield* room
                 .reply(
-                  ownerPrincipal,
+                  systemPrincipal,
                   threadId,
                   messageId,
                   parentId,
                   importedMessage.body,
                   {
                     displayName: importedMessage.authorDisplayName,
-                    id: ownerId,
+                    id: systemId,
                     manageAll: true,
                   },
                   importedMessage.createdAt ?? importedAt,
@@ -1338,17 +1312,17 @@ export function makeLocalJotApplication(
             }
             if (importedThread.resolved) {
               yield* room
-                .setThreadResolution(ownerPrincipal, threadId, true, importedAt)
+                .setThreadResolution(systemPrincipal, threadId, true, importedAt)
                 .pipe(Effect.mapError(toApplicationError));
             }
           }
           yield* room.checkpoint(importedAt).pipe(Effect.mapError(toApplicationError));
           if (request.publish === true) {
             yield* room
-              .publish(ownerPrincipal, importedAt)
+              .publish(systemPrincipal, importedAt)
               .pipe(Effect.mapError(toApplicationError));
             const published = yield* room
-              .snapshot(ownerPrincipal, importedAt)
+              .snapshot(systemPrincipal, importedAt)
               .pipe(Effect.mapError(toApplicationError));
             yield* writePublishedArtifact(
               state.workspaceId,
@@ -1360,7 +1334,7 @@ export function makeLocalJotApplication(
             yield* room.checkpoint(importedAt).pipe(Effect.mapError(toApplicationError));
           }
           const snapshot = yield* room
-            .snapshot(ownerPrincipal, importedAt)
+            .snapshot(systemPrincipal, importedAt)
             .pipe(Effect.mapError(toApplicationError));
           const directoryEntries = yield* Effect.forEach(request.people ?? [], (entry) =>
             personId(entry.email.toLocaleLowerCase("en")).pipe(
@@ -1497,8 +1471,11 @@ export function makeLocalJotApplication(
         }),
       listApiKeys: (credentials) =>
         Effect.gen(function* () {
-          yield* resolvePrincipal(credentials).pipe(Effect.flatMap(requireOwner));
-          return state.authentication.apiKeys.map(apiKeyDto);
+          const principal = yield* resolvePrincipal(credentials);
+          const account = yield* requireAccount(principal);
+          return state.authentication.apiKeys
+            .filter((record) => apiKeyBelongsTo(record, account.personId))
+            .map((record) => apiKeyDto(record, account.personId));
         }),
       listPublicDocuments: (query, lifecycleState, label) =>
         Effect.gen(function* () {
@@ -1553,7 +1530,9 @@ export function makeLocalJotApplication(
           const documents = yield* Effect.forEach(summaries, (summary) =>
             summary.metadata === undefined
               ? getRoom(summary.documentId).pipe(
-                  Effect.flatMap((room) => room.snapshot(ownerPrincipal, new Date().toISOString())),
+                  Effect.flatMap((room) =>
+                    room.snapshot(systemPrincipal, new Date().toISOString()),
+                  ),
                   Effect.mapError(toApplicationError),
                   Effect.map((snapshot) => ({
                     excerpt: summary.excerpt,
@@ -1575,36 +1554,6 @@ export function makeLocalJotApplication(
             ),
           } satisfies CatalogResponse;
         }),
-      login: (password) =>
-        passwordAuthenticationEnabled
-          ? withState(
-              loginOwner(state.authentication, password, new Date().toISOString()).pipe(
-                Effect.provideService(IdGenerator, ids),
-                Effect.provideService(SecretHasher, hasher),
-                Effect.provideService(SecureToken, tokens),
-                Effect.mapError(toApplicationError),
-                Effect.flatMap((created) =>
-                  tokens.generate(24).pipe(
-                    Effect.mapError(toApplicationError),
-                    Effect.flatMap((csrfToken) =>
-                      saveState({ ...state, authentication: created.state }).pipe(
-                        Effect.mapError(toApplicationError),
-                        Effect.as({
-                          csrfToken,
-                          expiresAt: created.expiresAt,
-                          sessionToken: created.token,
-                        }),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            )
-          : applicationFailure(
-              "password_authentication_disabled",
-              "Password authentication is disabled for this deployment.",
-              403,
-            ),
       loginWorkspaceIdentity: (identity, directoryPeople = []) =>
         withState(
           createWorkspaceSession(state.authentication, identity, new Date().toISOString()).pipe(
@@ -1693,7 +1642,7 @@ export function makeLocalJotApplication(
             .publish(principal, now)
             .pipe(Effect.mapError(toApplicationError));
           const published = yield* room
-            .snapshot(ownerPrincipal, new Date().toISOString())
+            .snapshot(systemPrincipal, new Date().toISOString())
             .pipe(Effect.mapError(toApplicationError));
           yield* writePublishedArtifact(
             state.workspaceId,
@@ -1798,9 +1747,15 @@ export function makeLocalJotApplication(
         }),
       revokeApiKey: (credentials, keyId) =>
         Effect.gen(function* () {
-          yield* resolvePrincipal(credentials).pipe(Effect.flatMap(requireOwner));
+          const principal = yield* resolvePrincipal(credentials);
+          const account = yield* requireAccount(principal);
           yield* withState(
-            revokeApiKey(state.authentication, keyId, new Date().toISOString()).pipe(
+            revokeApiKey(
+              state.authentication,
+              keyId,
+              account.personId,
+              new Date().toISOString(),
+            ).pipe(
               Effect.mapError(toApplicationError),
               Effect.flatMap((authentication) =>
                 saveState({ ...state, authentication }).pipe(Effect.mapError(toApplicationError)),
@@ -1808,42 +1763,6 @@ export function makeLocalJotApplication(
             ),
           );
         }),
-      setupOwner: (password) =>
-        options.allowOwnerSetup === false
-          ? applicationFailure(
-              "owner_setup_disabled",
-              "Local owner setup is disabled for this deployment.",
-              403,
-            )
-          : withState(
-              setupOwner(state.authentication, password).pipe(
-                Effect.provideService(SecretHasher, hasher),
-                Effect.mapError(toApplicationError),
-                Effect.flatMap((authentication) =>
-                  loginOwner(authentication, password, new Date().toISOString()).pipe(
-                    Effect.provideService(IdGenerator, ids),
-                    Effect.provideService(SecretHasher, hasher),
-                    Effect.provideService(SecureToken, tokens),
-                    Effect.mapError(toApplicationError),
-                  ),
-                ),
-                Effect.flatMap((created) =>
-                  tokens.generate(24).pipe(
-                    Effect.mapError(toApplicationError),
-                    Effect.flatMap((csrfToken) =>
-                      saveState({ ...state, authentication: created.state }).pipe(
-                        Effect.mapError(toApplicationError),
-                        Effect.as({
-                          csrfToken,
-                          expiresAt: created.expiresAt,
-                          sessionToken: created.token,
-                        }),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
       unpublish: (credentials, rawDocumentId) =>
         Effect.gen(function* () {
           const room = yield* getRoom(rawDocumentId);
@@ -2106,7 +2025,7 @@ function loadWorkspaceState(
         ),
         Effect.map((decoded) => ({
           ...decoded,
-          authentication: decoded.authentication as AuthenticationState,
+          authentication: normalizeAuthenticationState(decoded.authentication),
           attachments: Object.fromEntries(
             Object.entries(decoded.attachments ?? {}).map(([documentKey, attachments]) => [
               documentKey,
@@ -2118,6 +2037,27 @@ function loadWorkspaceState(
       );
     }),
   );
+}
+
+function normalizeAuthenticationState(value: unknown): AuthenticationState {
+  if (!Predicate.isReadonlyRecord(value)) return emptyAuthenticationState();
+  const sessions = Array.isArray(value["sessions"])
+    ? value["sessions"].filter(
+        (session): session is SessionRecord =>
+          Predicate.isReadonlyRecord(session) &&
+          typeof session["personId"] === "string" &&
+          (session["role"] === "member" || session["role"] === "administrator"),
+      )
+    : [];
+  const apiKeys = Array.isArray(value["apiKeys"])
+    ? value["apiKeys"].filter(
+        (key): key is ApiKeyRecord =>
+          Predicate.isReadonlyRecord(key) &&
+          typeof key["personId"] === "string" &&
+          (key["role"] === "member" || key["role"] === "administrator"),
+      )
+    : [];
+  return { apiKeys, sessions };
 }
 
 function resolveCapability(
@@ -2413,21 +2353,40 @@ function toDocumentResponse(snapshot: DocumentSnapshot): DocumentResponse {
   };
 }
 
-function apiKeyDto(record: ApiKeyRecord): ApiKeyDto {
+function apiKeyDto(record: ApiKeyRecord, fallbackPersonId: PersonReference["id"]): ApiKeyDto {
   return {
     createdAt: record.createdAt,
     id: record.id,
     label: record.label,
     lastUsedAt: record.lastUsedAt,
+    personId: record.personId ?? fallbackPersonId,
     revokedAt: record.revokedAt,
   };
 }
 
-function requireOwner(principal: Principal): Effect.Effect<void, ApplicationError> {
+function requireAccount(principal: Principal): Effect.Effect<
+  {
+    readonly displayName?: string | undefined;
+    readonly personId: PersonReference["id"];
+    readonly role: "member" | "administrator";
+  },
+  ApplicationError
+> {
+  if (principal.kind !== "workspace" && principal.kind !== "api-key") {
+    return applicationFailure("forbidden", "Workspace account access is required.", 403);
+  }
+  return Effect.succeed({
+    displayName: principal.displayName,
+    personId: principal.personId,
+    role: principal.role,
+  });
+}
+
+function requireAdministrator(principal: Principal): Effect.Effect<void, ApplicationError> {
   return (principal.kind === "workspace" || principal.kind === "api-key") &&
-    (principal.role === "owner" || principal.role === "administrator")
+    principal.role === "administrator"
     ? Effect.void
-    : applicationFailure("forbidden", "Workspace owner access is required.", 403);
+    : applicationFailure("forbidden", "Workspace administrator access is required.", 403);
 }
 
 function metadataPatch(
@@ -2536,7 +2495,7 @@ function toApplicationError(error: unknown): ApplicationError {
       code: error.code,
       message: error.message,
       retryable: false,
-      status: error.code === "already_initialized" ? 409 : 401,
+      status: 401,
     });
   }
   if (error instanceof AuthorizationError) {

@@ -68,10 +68,10 @@ function makeSecretHasher(): SecretHasherService {
           return false;
         }
         const salt = yield* decodeBase64(saltValue).pipe(
-          Effect.mapError((cause) => cryptoFailure("decode a password hash", cause)),
+          Effect.mapError((cause) => cryptoFailure("decode a secret hash", cause)),
         );
         const expected = yield* decodeBase64(hashValue).pipe(
-          Effect.mapError((cause) => cryptoFailure("decode a password hash", cause)),
+          Effect.mapError((cause) => cryptoFailure("decode a secret hash", cause)),
         );
         const actual = yield* derive(secret, salt, iterations);
         return constantTimeEqual(actual, expected);

@@ -6,9 +6,12 @@ import { Effect, Either } from "effect";
 import {
   activateDocument,
   allocateRfcNumber,
+  apiKeyBelongsTo,
+  authenticateApiKey,
   applyUniqueTextReplacements,
   assignRfcNumber,
   authorizeDocument,
+  createApiKey,
   createCommentThread,
   createDocumentMetadata,
   createWorkspaceSession,
@@ -23,6 +26,7 @@ import {
   personId,
   reserveDocument,
   resolveAuthorsByEmail,
+  revokeApiKey,
   searchCatalog,
   SecretHasher,
   SecureToken,
@@ -175,6 +179,92 @@ test("workspace identity sessions retain their verified principal", async () => 
     personId: id,
     role: "member",
   });
+});
+
+test("legacy credentials without a domain identity are rejected", async () => {
+  const hasher = {
+    hash: (secret: string) => Effect.succeed(`hashed:${secret}`),
+    verify: (secret: string, hash: string) => Effect.succeed(hash === `hashed:${secret}`),
+  };
+  const state = {
+    apiKeys: [
+      {
+        createdAt: now,
+        id: "legacy-key",
+        label: "Legacy key",
+        tokenHash: "hashed:key-secret",
+      },
+    ],
+    sessions: [
+      {
+        createdAt: now,
+        expiresAt: "2099-01-01T00:00:00.000Z",
+        id: "legacy-session",
+        tokenHash: "hashed:session-secret",
+      },
+    ],
+  };
+  const session = await Effect.runPromise(
+    authenticateSession(state, "legacy-session.session-secret", now).pipe(
+      Effect.provideService(SecretHasher, hasher),
+      Effect.either,
+    ),
+  );
+  const apiKey = await Effect.runPromise(
+    authenticateApiKey(state, "jot_legacy-key.key-secret", now).pipe(
+      Effect.provideService(SecretHasher, hasher),
+      Effect.either,
+    ),
+  );
+  assert.equal(Either.isLeft(session), true);
+  assert.equal(Either.isLeft(apiKey), true);
+});
+
+test("API keys belong to their creator and retain that user's role", async () => {
+  const accountId = await Effect.runPromise(personId("writer@example.com"));
+  const otherId = await Effect.runPromise(personId("other@example.com"));
+  const hasher = {
+    hash: (secret: string) => Effect.succeed(`hashed:${secret}`),
+    verify: (secret: string, hash: string) => Effect.succeed(hash === `hashed:${secret}`),
+  };
+  const created = await Effect.runPromise(
+    createApiKey(
+      emptyAuthenticationState(),
+      { displayName: "Example Writer", personId: accountId, role: "member" },
+      "Coding agent",
+      now,
+    ).pipe(
+      Effect.provideService(IdGenerator, {
+        generate: () => Effect.succeed("key_12345678"),
+      }),
+      Effect.provideService(SecretHasher, hasher),
+      Effect.provideService(SecureToken, { generate: () => Effect.succeed("key-secret") }),
+    ),
+  );
+
+  assert.equal(apiKeyBelongsTo(created.record, accountId), true);
+  assert.equal(apiKeyBelongsTo(created.record, otherId), false);
+  const authenticated = await Effect.runPromise(
+    authenticateApiKey(created.state, created.token, now).pipe(
+      Effect.provideService(SecretHasher, hasher),
+    ),
+  );
+  assert.deepEqual(authenticated.principal, {
+    displayName: "Example Writer",
+    keyId: "key_12345678",
+    kind: "api-key",
+    personId: accountId,
+    role: "member",
+  });
+
+  const otherUserRevocation = await Effect.runPromise(
+    revokeApiKey(created.state, created.record.id, otherId, now).pipe(Effect.either),
+  );
+  assert.equal(Either.isLeft(otherUserRevocation), true);
+  const revoked = await Effect.runPromise(
+    revokeApiKey(created.state, created.record.id, accountId, now),
+  );
+  assert.equal(revoked.apiKeys[0]?.revokedAt, now);
 });
 
 test("capability generations revoke existing principals", async () => {

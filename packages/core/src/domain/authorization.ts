@@ -2,7 +2,7 @@ import { Data, Effect } from "effect";
 
 import type { CapabilityAccess, DocumentMetadata, PersonId } from "./document.ts";
 
-export type WorkspaceRole = "member" | "administrator" | "owner";
+export type WorkspaceRole = "member" | "administrator";
 
 export type Principal =
   | { readonly kind: "anonymous" }
@@ -13,6 +13,7 @@ export type Principal =
       readonly role: WorkspaceRole;
     }
   | {
+      readonly displayName?: string | undefined;
       readonly kind: "api-key";
       readonly keyId: string;
       readonly personId: PersonId;
@@ -71,9 +72,7 @@ export function authorizeWorkspace(
 ): Effect.Effect<void, AuthorizationError> {
   const allowed =
     principal.kind === "workspace" || principal.kind === "api-key"
-      ? action !== "administer-workspace" ||
-        principal.role === "administrator" ||
-        principal.role === "owner"
+      ? action !== "administer-workspace" || principal.role === "administrator"
       : false;
   return allowed
     ? Effect.void
@@ -102,7 +101,7 @@ export function isDocumentActionAllowed(
       action === "delete" ||
       action === "restore"
     ) {
-      return principal.role === "owner" || principal.role === "administrator";
+      return principal.role === "administrator";
     }
     return true;
   }
@@ -149,6 +148,6 @@ export function isDocumentActionAllowed(
 export function isAdministrator(principal: Principal): boolean {
   return (
     (principal.kind === "workspace" || principal.kind === "api-key") &&
-    (principal.role === "administrator" || principal.role === "owner")
+    principal.role === "administrator"
   );
 }

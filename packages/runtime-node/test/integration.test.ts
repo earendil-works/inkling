@@ -8,6 +8,9 @@ import { Effect } from "effect";
 import { WebSocket } from "ws";
 import * as Y from "yjs";
 
+import { JotApplication } from "@earendil-works/jot-backend";
+import { personId } from "@earendil-works/jot-core";
+
 import { startServer } from "../src/server.ts";
 
 test(
@@ -16,17 +19,13 @@ test(
   async () => {
     const directory = await mkdtemp(path.join(tmpdir(), "jot-integration-"));
     try {
-      const first = await withServer(directory, async (baseUrl) => {
-        const setup = await fetch(`${baseUrl}/api/auth/setup`, {
-          body: JSON.stringify({ password: "correct horse battery staple" }),
-          headers: { "Content-Type": "application/json" },
-          method: "POST",
-        });
-        assert.equal(setup.status, 200);
-        const cookies = setup.headers.getSetCookie();
-        const cookieHeader = cookies.map((value) => value.split(";")[0]).join("; ");
-        const csrf = cookieValue(cookieHeader, "jot_csrf");
-        assert.ok(csrf);
+      const first = await withServer(directory, async (baseUrl, session) => {
+        const agentInstructions = await fetch(`${baseUrl}/AGENTS.md`);
+        assert.equal(agentInstructions.status, 200);
+        assert.match(agentInstructions.headers.get("content-type") ?? "", /^text\/markdown/u);
+        assert.ok((await agentInstructions.text()).includes(`base URL is ${baseUrl}`));
+
+        const { cookieHeader, csrf } = session;
 
         const keyResponse = await fetch(`${baseUrl}/api/api-keys`, {
           body: JSON.stringify({ label: "integration" }),
@@ -39,7 +38,12 @@ test(
           method: "POST",
         });
         assert.equal(keyResponse.status, 200);
-        const apiKey = ((await keyResponse.json()) as { key: string }).key;
+        const createdKey = (await keyResponse.json()) as {
+          key: string;
+          metadata: { personId: string };
+        };
+        assert.equal(createdKey.metadata.personId, "admin@example.com");
+        const apiKey = createdKey.key;
         const authorization = { Authorization: `Bearer ${apiKey}` };
 
         const create = await fetch(`${baseUrl}/api/documents`, {
@@ -121,7 +125,7 @@ test(
 
         const comment = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/comments`, {
           body: JSON.stringify({
-            authorDisplayName: "Integration owner",
+            authorDisplayName: "Integration Admin",
             body: "Keep this decision explicit.",
             selection: { end: 7, start: 0 },
           }),
@@ -377,8 +381,8 @@ test("backup corruption is rejected and a fresh installation restores portably",
   const sourceDirectory = await mkdtemp(path.join(tmpdir(), "jot-backup-source-"));
   const targetDirectory = await mkdtemp(path.join(tmpdir(), "jot-backup-target-"));
   try {
-    const source = await withServer(sourceDirectory, async (baseUrl) => {
-      const authorization = await setupApiKey(baseUrl, "source backup");
+    const source = await withServer(sourceDirectory, async (baseUrl, session) => {
+      const authorization = await setupApiKey(baseUrl, "source backup", session);
       const created = await fetch(`${baseUrl}/api/documents`, {
         body: JSON.stringify({
           body: "Portable recovery body",
@@ -399,8 +403,8 @@ test("backup corruption is rejected and a fresh installation restores portably",
       };
     });
 
-    await withServer(targetDirectory, async (baseUrl) => {
-      const targetAuthorization = await setupApiKey(baseUrl, "restore operator");
+    await withServer(targetDirectory, async (baseUrl, session) => {
+      const targetAuthorization = await setupApiKey(baseUrl, "restore operator", session);
       const decoded = JSON.parse(new TextDecoder().decode(source.archive)) as {
         objects: { digest: string }[];
       };
@@ -453,9 +457,14 @@ interface DocumentWire {
   };
 }
 
+interface TestSession {
+  readonly cookieHeader: string;
+  readonly csrf: string;
+}
+
 async function withServer<A>(
   directory: string,
-  callback: (baseUrl: string) => Promise<A>,
+  callback: (baseUrl: string, session: TestSession) => Promise<A>,
 ): Promise<A> {
   return Effect.runPromise(
     Effect.scoped(
@@ -465,9 +474,26 @@ async function withServer<A>(
         if (address === null || typeof address === "string") {
           return yield* Effect.die("The integration server did not expose a TCP address.");
         }
+        const accountId = yield* personId("admin@example.com");
+        const session = yield* Effect.promise(() =>
+          running.runtime.runPromise(
+            Effect.flatMap(JotApplication, (application) =>
+              application.loginWorkspaceIdentity({
+                displayName: "Integration Admin",
+                email: "admin@example.com",
+                personId: accountId,
+                role: "administrator",
+              }),
+            ),
+          ),
+        );
         return yield* Effect.tryPromise({
           catch: (cause) => cause,
-          try: () => callback(`http://127.0.0.1:${address.port}`),
+          try: () =>
+            callback(`http://127.0.0.1:${address.port}`, {
+              cookieHeader: `jot_session=${session.sessionToken}; jot_csrf=${session.csrfToken}`,
+              csrf: session.csrfToken,
+            }),
         });
       }),
     ),
@@ -477,26 +503,15 @@ async function withServer<A>(
 async function setupApiKey(
   baseUrl: string,
   label: string,
+  session: TestSession,
 ): Promise<Readonly<Record<string, string>>> {
-  const setup = await fetch(`${baseUrl}/api/auth/setup`, {
-    body: JSON.stringify({ password: "correct horse battery staple" }),
-    headers: { "Content-Type": "application/json" },
-    method: "POST",
-  });
-  assert.equal(setup.status, 200);
-  const cookie = setup.headers
-    .getSetCookie()
-    .map((value) => value.split(";")[0])
-    .join("; ");
-  const csrf = cookieValue(cookie, "jot_csrf");
-  assert.ok(csrf);
   const keyResponse = await fetch(`${baseUrl}/api/api-keys`, {
     body: JSON.stringify({ label }),
     headers: {
       "Content-Type": "application/json",
-      Cookie: cookie,
+      Cookie: session.cookieHeader,
       Origin: baseUrl,
-      "X-CSRF-Token": csrf,
+      "X-CSRF-Token": session.csrf,
     },
     method: "POST",
   });
@@ -568,12 +583,4 @@ function nextSocketMessage(socket: WebSocket): Promise<Record<string, unknown>> 
     });
     socket.once("error", reject);
   });
-}
-
-function cookieValue(cookies: string, name: string): string | undefined {
-  return cookies
-    .split(";")
-    .map((part) => part.trim())
-    .find((part) => part.startsWith(`${name}=`))
-    ?.slice(name.length + 1);
 }

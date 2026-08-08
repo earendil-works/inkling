@@ -28,18 +28,11 @@ test(
     try {
       google = await startGoogleOAuthMock();
       running = await startWrangler(directory, google.origin);
-      const setup = await fetch(`${running.baseUrl}/api/auth/setup`, {
-        body: JSON.stringify({ password: "correct horse battery staple" }),
-        headers: { "Content-Type": "application/json" },
-        method: "POST",
-      });
-      assert.equal(setup.status, 403);
-      const passwordLogin = await fetch(`${running.baseUrl}/api/auth/login`, {
-        body: JSON.stringify({ password: "correct horse battery staple" }),
-        headers: { "Content-Type": "application/json" },
-        method: "POST",
-      });
-      assert.equal(passwordLogin.status, 403);
+      const agentInstructions = await fetch(`${running.baseUrl}/AGENTS.md`);
+      assert.equal(agentInstructions.status, 200);
+      assert.match(agentInstructions.headers.get("content-type") ?? "", /^text\/markdown/u);
+      assert.ok((await agentInstructions.text()).includes(`base URL is ${running.baseUrl}`));
+
       const cookie = await loginWithGoogle(running.baseUrl);
       const csrf = cookieValue(cookie, "jot_csrf");
       assert.ok(csrf);
@@ -53,8 +46,12 @@ test(
         },
         method: "POST",
       });
-      const apiKey = ((await keyResponse.json()) as { key: string }).key;
-      const authorization = { Authorization: `Bearer ${apiKey}` };
+      const createdKey = (await keyResponse.json()) as {
+        key: string;
+        metadata: { personId: string };
+      };
+      assert.equal(createdKey.metadata.personId, "armin@earendil.com");
+      const authorization = { Authorization: `Bearer ${createdKey.key}` };
 
       // Simulate a workspace created before authenticated accounts were copied into the people
       // directory. The active OAuth session still carries Armin's canonical display name, while
@@ -300,11 +297,7 @@ async function waitForCatalog(
 
 async function loginWithGoogle(baseUrl: string): Promise<string> {
   const status = await fetch(`${baseUrl}/api/auth/status`);
-  assert.deepEqual(await status.json(), {
-    authenticated: false,
-    authenticationMethods: ["google"],
-    needsSetup: false,
-  });
+  assert.deepEqual(await status.json(), { authenticated: false });
 
   const start = await fetch(`${baseUrl}/api/auth/google/start`, { redirect: "manual" });
   assert.equal(start.status, 302);

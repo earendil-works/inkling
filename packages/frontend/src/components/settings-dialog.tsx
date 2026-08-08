@@ -13,14 +13,20 @@ import { ModalDialog } from "./modal-dialog.tsx";
 import { TextField } from "./text-field.tsx";
 
 export interface SettingsDialogProps {
+  readonly accountName: string;
   readonly api: ApiClientService;
   readonly onClose: () => void;
 }
 
-export function SettingsDialog({ api, onClose }: SettingsDialogProps): React.JSX.Element {
-  const [label, setLabel] = useState("");
+export function SettingsDialog({
+  accountName,
+  api,
+  onClose,
+}: SettingsDialogProps): React.JSX.Element {
+  const [label, setLabel] = useState("My agent");
   const [keys, setKeys] = useState<readonly ApiKeyDto[]>([]);
   const [agentCommand, setAgentCommand] = useState<string>();
+  const [commandCopied, setCommandCopied] = useState(false);
   const [keyToRevoke, setKeyToRevoke] = useState<ApiKeyDto>();
   const keyQuery = useEffectQuery(api.listApiKeys, "api-keys");
   const createKey = useEffectAction<string, ApiKeyCreated, ApiError>((value) =>
@@ -38,17 +44,30 @@ export function SettingsDialog({ api, onClose }: SettingsDialogProps): React.JSX
     if (keyQuery.state.data !== undefined) setKeys(keyQuery.state.data);
   }, [keyQuery.state.data]);
 
+  const activeKeys = keys.filter((key) => key.revokedAt === undefined);
   const submit = (event: React.FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
-    if (label.trim() === "") return;
-    createKey.execute(label, {
+    const normalizedLabel = label.trim();
+    if (normalizedLabel === "") return;
+    createKey.execute(normalizedLabel, {
       onSuccess: (created) => {
         setKeys((current) => [created.metadata, ...current]);
-        setAgentCommand(`jot instance add workspace ${location.origin} ${created.key}`);
-        setLabel("");
+        setAgentCommand(
+          `jot instance add workspace ${location.origin} ${created.key} && jot use workspace`,
+        );
+        setCommandCopied(false);
+        setLabel("My agent");
       },
     });
   };
+
+  const errors = [
+    keyQuery.state.status === "failure" ? keyQuery.state.error.message : undefined,
+    createKey.state.error?.message,
+    revokeKey.state.error?.message,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <>
@@ -61,64 +80,88 @@ export function SettingsDialog({ api, onClose }: SettingsDialogProps): React.JSX
       >
         <form data-settings-form="" onSubmit={submit}>
           <DialogHeader
-            closeLabel="Close settings"
-            eyebrow="API keys / agent access"
+            closeLabel="Close API keys"
+            eyebrow={`${accountName} / personal access`}
             onClose={onClose}
-            title="Workspace settings"
+            title="API keys"
             titleId="settings-dialog-title"
           />
-          <div data-api-keys="">
+          <p className="dialog-note">
+            Keys belong to your account and have the same workspace permissions you do. Use one to
+            connect the Jot CLI or a coding agent.
+          </p>
+
+          {agentCommand === undefined ? null : (
+            <section className="agent-instructions" data-agent-instructions="">
+              <p className="eyebrow">Ready to connect</p>
+              <h3>Run this once</h3>
+              <p>Paste this command into the terminal where your agent works.</p>
+              <pre data-agent-command="">
+                <code>{agentCommand}</code>
+              </pre>
+              <div className="agent-instructions__action">
+                <Button
+                  data-copy-agent=""
+                  onClick={() =>
+                    copyCommand.execute(agentCommand, {
+                      onSuccess: () => setCommandCopied(true),
+                    })
+                  }
+                  variant="text"
+                >
+                  {commandCopied ? "Copied" : "Copy setup command"}
+                </Button>
+                <span aria-live="polite">{commandCopied ? "Command copied." : ""}</span>
+              </div>
+              <small>
+                The secret is shown only now. The CLI stores it in your user-only config; never put
+                it in AGENTS.md or an agent skill. Run <code>jot --help</code> next.
+              </small>
+            </section>
+          )}
+
+          <section className="api-key-create" aria-labelledby="api-key-create-title">
+            <div>
+              <h3 id="api-key-create-title">Create a personal key</h3>
+              <p>Name the device or agent so it is easy to revoke later.</p>
+            </div>
+            <div className="api-key-create__controls">
+              <TextField
+                label="Key name"
+                maxLength={200}
+                name="api-key-label"
+                onChange={(event) => setLabel(event.currentTarget.value)}
+                placeholder="My agent"
+                value={label}
+              />
+              <Button disabled={createKey.state.pending} type="submit" variant="primary">
+                {createKey.state.pending ? "Creating…" : "Create API key"}
+              </Button>
+            </div>
+          </section>
+
+          <section className="api-key-list" aria-labelledby="api-key-list-title" data-api-keys="">
+            <div className="api-key-list__heading">
+              <h3 id="api-key-list-title">Active keys</h3>
+              <span>{activeKeys.length}</span>
+            </div>
             {keyQuery.state.status === "loading" && keys.length === 0 ? <p>Loading keys…</p> : null}
-            {keys.length === 0 && keyQuery.state.status !== "loading" ? (
-              <p>No API keys created.</p>
+            {activeKeys.length === 0 && keyQuery.state.status !== "loading" ? (
+              <p className="api-key-list__empty">No active API keys.</p>
             ) : null}
-            {keys.map((key) => (
+            {activeKeys.map((key) => (
               <div className="api-key-row" key={key.id}>
                 <span>
                   <b>{key.label}</b>
-                  <small>{key.revokedAt === undefined ? "Active" : "Revoked"}</small>
+                  <small>{keyActivity(key)}</small>
                 </span>
-                {key.revokedAt === undefined ? (
-                  <Button
-                    data-revoke-key={key.id}
-                    onClick={() => setKeyToRevoke(key)}
-                    variant="text"
-                  >
-                    Revoke
-                  </Button>
-                ) : null}
+                <Button data-revoke-key={key.id} onClick={() => setKeyToRevoke(key)} variant="text">
+                  Revoke
+                </Button>
               </div>
             ))}
-          </div>
-          <TextField
-            label="New key label"
-            maxLength={200}
-            name="api-key-label"
-            onChange={(event) => setLabel(event.currentTarget.value)}
-            placeholder="Laptop agent"
-            value={label}
-          />
-          <Button disabled={createKey.state.pending} type="submit" variant="primary">
-            {createKey.state.pending ? "Creating…" : "Create API key"}
-          </Button>
-          {agentCommand === undefined ? null : (
-            <section className="agent-instructions" data-agent-instructions="">
-              <b>Copy this now — the key is shown once.</b>
-              <pre data-agent-command="">{agentCommand}</pre>
-              <Button
-                data-copy-agent=""
-                onClick={() => copyCommand.execute(agentCommand)}
-                variant="text"
-              >
-                Copy setup command
-              </Button>
-            </section>
-          )}
-          <FormError data-settings-error="">
-            {keyQuery.state.status === "failure" ? keyQuery.state.error.message : null}
-            {createKey.state.error?.message}
-            {revokeKey.state.error?.message}
-          </FormError>
+          </section>
+          <FormError data-settings-error="">{errors}</FormError>
         </form>
       </ModalDialog>
       <ConfirmationDialog
@@ -134,13 +177,7 @@ export function SettingsDialog({ api, onClose }: SettingsDialogProps): React.JSX
           revokeKey.execute(keyToRevoke.id, {
             onFailure: () => setKeyToRevoke(undefined),
             onSuccess: () => {
-              setKeys((current) =>
-                current.map((item) =>
-                  item.id === keyToRevoke.id
-                    ? { ...item, revokedAt: new Date().toISOString() }
-                    : item,
-                ),
-              );
+              setKeys((current) => current.filter((item) => item.id !== keyToRevoke.id));
               setKeyToRevoke(undefined);
             },
           });
@@ -152,4 +189,14 @@ export function SettingsDialog({ api, onClose }: SettingsDialogProps): React.JSX
       />
     </>
   );
+}
+
+function keyActivity(key: ApiKeyDto): string {
+  return key.lastUsedAt === undefined
+    ? `Created ${formatDate(key.createdAt)} · Never used`
+    : `Last used ${formatDate(key.lastUsedAt)}`;
+}
+
+function formatDate(value: string): string {
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(value));
 }

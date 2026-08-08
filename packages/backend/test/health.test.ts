@@ -8,6 +8,21 @@ import type { HealthResponse } from "@earendil-works/jot-protocol";
 
 import { createBackendApp, IdGeneratorLive } from "../src/index.ts";
 
+test("served agent instructions explain personal API keys and safe CLI use", async () => {
+  const response = await createBackendApp({ version: "test" }).request(
+    "https://rfcs.example.com/AGENTS.md",
+  );
+  const body = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/markdown/u);
+  assert.match(body, /base URL is https:\/\/rfcs\.example\.com/u);
+  assert.match(body, /account menu.*API keys/su);
+  assert.match(body, /API keys belong to the user who created them/u);
+  assert.match(body, /\.agents\/skills\/jot\/SKILL\.md/u);
+  assert.match(body, /never contain an API key/u);
+});
+
 test("health identifies the service and protocol", async () => {
   const response = await createBackendApp({ version: "test" }).request("/api/health");
   const body = (await response.json()) as HealthResponse;

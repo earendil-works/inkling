@@ -190,7 +190,7 @@ export function deleteCommentThread(
   actor: CommentActor,
 ): Effect.Effect<CommentState, DomainError> {
   if (!actor.manageAll) {
-    return fail("comment_forbidden", "Only owners and administrators may delete threads.");
+    return fail("comment_forbidden", "Only administrators may delete threads.");
   }
   const threads = state.threads.filter((thread) => thread.id !== threadId);
   return threads.length === state.threads.length

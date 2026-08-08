@@ -118,7 +118,7 @@ This section describes behavioral requirements, not implementation guidance.
 - A thread has one root message and threaded replies with explicit parent relationships.
 - Messages record author, creation time, update time, and body.
 - Authorized users can edit and delete their own messages.
-- Owners or administrators can manage all messages and delete whole threads.
+- Administrators can manage all messages and delete whole threads.
 - Threads can be resolved and reopened.
 - Resolved threads can be hidden or shown.
 - Comment anchors are highlighted in the rendered preview and associated with a side rail or mobile dialog.
@@ -136,22 +136,24 @@ This section describes behavioral requirements, not implementation guidance.
 
 #### Authentication and API keys
 
-- A local installation can bootstrap a single owner password on first run.
+- Workspace access uses verified Google identities from configured email domains in every runtime.
 - Browser sessions survive normal restarts and can be revoked by logout.
-- Administrators can create labeled API keys, see their metadata, and revoke them.
-- Raw passwords, session tokens, capability tokens, and API keys are never stored in plaintext.
+- Every authenticated user can create labeled personal API keys, see only their own key metadata, and revoke their own keys.
+- An API key retains its creator's identity and workspace role rather than becoming a workspace-wide administrator credential.
+- Raw session tokens, capability tokens, and API keys are never stored in plaintext.
 - Bearer API keys provide non-browser access.
 
 #### CLI and agent use
 
 - The CLI can register named Jot installations with an API key.
 - The CLI can register a shared document directly from its capability URL.
-- Owner commands include list, search, read, create, update, edit, delete, share, comment, reply, resolve, reopen, and comment management.
+- Authenticated commands include list, search, read, create, update, edit, delete, share, comment, reply, resolve, reopen, and comment management according to the user's role.
 - Shared commands include read and the operations allowed by the capability.
 - Large documents can be read by line range.
 - Agent text edits identify unique existing text and replace it; ambiguous or missing text is rejected rather than guessed.
 - Read output includes comment thread and message identifiers so agents can reply precisely.
-- The browser can display copyable setup instructions for an agent.
+- The browser can display a copyable, one-time CLI setup command for an agent.
+- Every deployment serves public, origin-aware CLI and skill instructions at `/AGENTS.md` so a user can point an agent at the workspace itself.
 
 #### Local operation
 
@@ -605,11 +607,12 @@ Previously published objects may remain in private object storage for history, b
 Every request resolves to one principal:
 
 - Anonymous visitor.
-- Local owner session.
 - Workspace member session.
 - Workspace administrator session.
 - API key principal.
 - Document capability principal.
+
+An API key principal is bound to the person who created it and carries that person's workspace role. Key creation, listing, and revocation are scoped to that person; administrators do not receive a global list of other users' keys.
 
 A guest commenter identity supplements a capability principal; it is not by itself a permission grant.
 
@@ -653,13 +656,9 @@ Capability secrets are random, unguessable, and stored only as hashes where look
 
 The document authority validates current capability state on connection and on privileged commands. Downgrading or revoking access closes or restricts existing live connections.
 
-### 13.5 Local owner authentication
+### 13.5 Domain-based authentication
 
-Local mode retains first-run owner password setup, durable sessions, API key administration, and logout. Password and token hashing uses a runtime-portable, deliberately expensive password derivation mechanism and constant-time comparison.
-
-### 13.6 Google OAuth
-
-Google OAuth is an identity adapter added to the request entry point. It produces verified workspace principals and does not change document state or collaboration protocols.
+All runtimes use Google OAuth with configured allowed email domains. There is no bootstrap account, shared credential, or privileged local user identity. Google OAuth is an identity adapter at the request entry point; it produces verified member or administrator principals and does not change document state or collaboration protocols.
 
 Allowed-domain checks use verified email addresses. OAuth state and sessions are signed, time-limited, secure, HTTP-only, and same-site cookies. Cloudflare requests the read-only Admin Directory user scope and, when the signed-in account is permitted to use it, refreshes the workspace people directory during login. The access token is used transiently and is never persisted; directory failure does not prevent authentication.
 
@@ -667,7 +666,7 @@ Allowed-domain checks use verified email addresses. OAuth state and sessions are
 
 ### 14.1 API organization
 
-The new API is resource-oriented and uses one set of document operations for owners, members, API keys, and capabilities. It must not duplicate every operation under separate owner and share route implementations.
+The new API is resource-oriented and uses one set of document operations for members, administrators, API keys, and capabilities. It must not duplicate every operation under separate authenticated and share route implementations.
 
 The principal and authorization policy determine the result.
 
@@ -765,9 +764,10 @@ Primary surfaces are:
 - Capability-shared reader, commenter, and editor.
 - Comment rail and mobile comment dialog.
 - Sharing controls.
-- Settings and API key management.
+- An account-name dropdown with personal API key management and sign out.
 - Import, export, and administrative repair status.
-- Agent setup instructions.
+- A personal-key dialog with a one-time agent setup command.
+- Public agent instructions at `/AGENTS.md` covering the CLI and reusable Agent Skills.
 
 CodeMirror owns text editing, selection, composition, the title heading, and local undo. Application state owns structured metadata, comments, permissions, connection status, and preview state.
 
@@ -777,7 +777,7 @@ Accessibility requirements include keyboard navigation, visible focus, semantic 
 
 The CLI is an API client and local server launcher; it does not access server storage directly.
 
-It retains named instance registration for API keys and shared capability URLs. Credentials are stored in a user-only configuration file and are never printed except when explicitly created or requested.
+It retains named instance registration for personal API keys and shared capability URLs. Credentials are stored in a user-only configuration file and are never printed except in the one-time setup command created for the key.
 
 The CLI supports:
 
@@ -810,7 +810,7 @@ The runtime provides:
 - Durable append-only per-document journals.
 - Atomic checkpoint writes using temporary files and rename.
 - Static web assets.
-- Local password authentication.
+- The same domain-restricted Google authentication used by hosted deployments.
 
 ### 18.2 Single-writer rule
 
@@ -916,7 +916,6 @@ Cookie-authenticated mutations require same-origin requests and CSRF protection.
 
 ### 21.4 Secret handling
 
-- Passwords use slow salted hashes.
 - API keys, session tokens, and capabilities are random and stored as hashes where possible.
 - OAuth client secrets and signing keys use runtime secret configuration, not R2 or checked-in files. Google OAuth access tokens used for directory refresh are never persisted.
 - Logs never contain document bodies, raw credentials, capability URLs, or OAuth tokens.
@@ -1067,7 +1066,7 @@ The existing implementation is used only to:
 The clean-room implementation should not:
 
 - Add Cloudflare conditionals throughout the existing monolithic server.
-- Preserve separate owner and shared copies of every route.
+- Preserve separate authenticated and shared copies of every route.
 - Preserve the current server/browser collaborative algorithms.
 - Treat filesystem calls as the domain persistence API.
 - Treat Markdown exports as authoritative collaborative state.
@@ -1122,7 +1121,7 @@ Suggested source boundaries are domain, collaboration, application services, sto
 
 - Add Google OAuth and allowed-domain workspace membership.
 - Migrate production internal access from bootstrap authentication.
-- Retain local owner authentication for self-hosted installations.
+- Use the same allowed-domain authentication policy for self-hosted installations.
 
 ## 27. Initial acceptance criteria
 

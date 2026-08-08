@@ -74,6 +74,7 @@ export {
   isDocumentActionAllowed,
 } from "./domain/authorization.ts";
 export type {
+  ApiKeyIdentity,
   ApiKeyRecord,
   AuthenticationState,
   CreatedApiKey,
@@ -82,16 +83,15 @@ export type {
   WorkspaceIdentity,
 } from "./domain/authentication.ts";
 export {
+  apiKeyBelongsTo,
   authenticateApiKey,
   authenticateSession,
   AuthenticationError,
   createApiKey,
   createWorkspaceSession,
   emptyAuthenticationState,
-  loginOwner,
   logoutSession,
   revokeApiKey,
-  setupOwner,
 } from "./domain/authentication.ts";
 export type { LineRange, TextReplacement } from "./domain/body.ts";
 export { applyUniqueTextReplacements, BodyEditError, readLineRange } from "./domain/body.ts";

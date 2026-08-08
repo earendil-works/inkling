@@ -1,7 +1,7 @@
 import { Effect, Either, type ManagedRuntime, type Schema } from "effect";
 import { Hono } from "hono";
 import type { Context as HonoContext } from "hono";
-import { deleteCookie, getCookie, setCookie } from "hono/cookie";
+import { deleteCookie, getCookie } from "hono/cookie";
 
 import {
   ApiKeyCreateRequestSchema,
@@ -12,7 +12,6 @@ import {
   EditMessageRequestSchema,
   ImportDocumentRequestSchema,
   MetadataPatchRequestSchema,
-  PasswordRequestSchema,
   protocolVersion,
   ReplaceBodyRequestSchema,
   ReplyRequestSchema,
@@ -28,7 +27,9 @@ import type {
 } from "@earendil-works/jot-protocol";
 
 import { ApplicationError, JotApplication } from "./application.ts";
-import type { JotApplicationService, RequestCredentials, SessionResult } from "./application.ts";
+import type { JotApplicationService, RequestCredentials } from "./application.ts";
+import { finishGoogleAuthentication, startGoogleAuthentication } from "./google-auth.ts";
+import type { GoogleAuthenticationEnvironment } from "./google-auth.ts";
 
 export type {
   ApplicationDiagnostics,
@@ -44,8 +45,16 @@ export { ApplicationError, JotApplication } from "./application.ts";
 export { localApplicationLayer, makeLocalJotApplication } from "./local.ts";
 export type { LocalApplicationOptions } from "./local.ts";
 export { DigestLive, IdGeneratorLive, SecretHasherLive, SecureTokenLive } from "./crypto.ts";
+export {
+  finishGoogleAuthentication,
+  isGoogleEmailAllowed,
+  parseAllowedGoogleDomains,
+  startGoogleAuthentication,
+} from "./google-auth.ts";
+export type { GoogleAuthenticationEnvironment, GoogleIdentityLogin } from "./google-auth.ts";
 
 export interface BackendOptions {
+  readonly googleAuthentication?: GoogleAuthenticationEnvironment | undefined;
   readonly version?: string | undefined;
   readonly runtime?: ManagedRuntime.ManagedRuntime<JotApplicationService, never> | undefined;
 }
@@ -80,6 +89,12 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
     }
   });
 
+  app.get("/AGENTS.md", (context) => {
+    context.header("Cache-Control", "public, max-age=300");
+    context.header("Content-Type", "text/markdown; charset=UTF-8");
+    return context.body(agentInstructions(new URL(context.req.url).origin));
+  });
+
   app.get("/api/health", (context) => {
     const response: HealthResponse = {
       protocolVersion,
@@ -95,29 +110,33 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
     execute(context, options, (service) => service.authenticationStatus(credentials(context))),
   );
 
-  app.post("/api/auth/setup", (context) =>
-    execute(
-      context,
-      options,
-      (service) =>
-        readJson(context, PasswordRequestSchema).pipe(
-          Effect.flatMap(({ password }) => service.setupOwner(password)),
-        ),
-      (result) => setSession(context, result),
-    ),
+  app.get("/api/auth/google/start", (context) =>
+    startGoogleAuthentication(context.req.raw, options.googleAuthentication ?? {}),
   );
 
-  app.post("/api/auth/login", (context) =>
-    execute(
-      context,
-      options,
-      (service) =>
-        readJson(context, PasswordRequestSchema).pipe(
-          Effect.flatMap(({ password }) => service.login(password)),
+  app.get("/api/auth/google/callback", async (context) => {
+    const runtime = options.runtime;
+    if (runtime === undefined) {
+      return context.json(
+        {
+          code: "service_unavailable",
+          message: "The Jot application runtime is not configured.",
+          retryable: true,
+        } satisfies ProtocolError,
+        503,
+      );
+    }
+    return finishGoogleAuthentication(
+      context.req.raw,
+      options.googleAuthentication ?? {},
+      (identity, people) =>
+        runtime.runPromise(
+          Effect.flatMap(JotApplication, (service) =>
+            service.loginWorkspaceIdentity(identity, people),
+          ),
         ),
-      (result) => setSession(context, result),
-    ),
-  );
+    );
+  });
 
   app.post("/api/auth/logout", (context) =>
     execute(
@@ -575,6 +594,89 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
 
 const inlineAttachmentTypes = new Set(["image/gif", "image/jpeg", "image/png", "image/webp"]);
 
+function agentInstructions(baseUrl: string): string {
+  return `# Jot agent instructions
+
+This server is a Jot workspace for collaborative Markdown notes and RFCs.
+Its base URL is ${baseUrl}.
+
+Use the \`jot\` command-line client for workspace operations. Do not scrape the browser UI or call private storage directly.
+
+## Connect your CLI
+
+First check whether a workspace is already configured:
+
+\`\`\`sh
+jot instance list
+jot --help
+\`\`\`
+
+If this server is not configured, ask the user to connect it:
+
+1. Open ${baseUrl} and sign in.
+2. Open the account menu in the top-right corner and choose **API keys**.
+3. Create a personal key and copy the one-time setup command.
+4. Run that command in the agent's terminal. Do not paste the key into source files, chat transcripts, AGENTS.md, or skills.
+
+The setup command registers this URL and stores the key in Jot's user-only CLI configuration. API keys belong to the user who created them and have that user's workspace permissions. If a key is lost, revoke it and create another one.
+
+Select the instance when necessary:
+
+\`\`\`sh
+jot use workspace
+# Alternatively, set JOT_INSTANCE for one command.
+JOT_INSTANCE=workspace jot list
+\`\`\`
+
+If \`jot\` is not on \`PATH\`, ask the user how the Jot CLI is installed in their environment. In a Jot source checkout it can be run as \`node packages/cli/src/main.ts\`.
+
+## Safe command-line workflow
+
+Run \`jot --help\` for the complete, current command list. Common operations include:
+
+\`\`\`sh
+jot list
+jot search 'state:discussion label:platform'
+jot read DOCUMENT_ID
+jot read DOCUMENT_ID --lines 1:120
+jot create 'Proposal title' --rfc
+jot edit DOCUMENT_ID 'unique old text' 'replacement text'
+jot comment DOCUMENT_ID START_OFFSET END_OFFSET 'Review comment'
+jot publish DOCUMENT_ID
+\`\`\`
+
+Follow these rules:
+
+- Read a document before changing it. Use line ranges for large documents.
+- Prefer \`jot edit\`, which replaces unique existing text and rejects missing or ambiguous matches. Re-read and retry after a concurrent revision conflict.
+- Use \`jot replace\` only when the user explicitly wants a full-body replacement.
+- Preserve the frontmatter and top-level title conventions shown in the document.
+- Use thread and message IDs printed by \`jot read\` for replies and comment management.
+- Never print, commit, log, or embed API keys or capability URLs.
+
+## Create a reusable agent skill
+
+If the user asks for reusable Jot support, create an [Agent Skills](https://agentskills.io/) skill rather than editing a project's AGENTS.md. Prefer \`~/.agents/skills/jot/SKILL.md\` for a user-wide skill or \`.agents/skills/jot/SKILL.md\` when the user requests a project-local skill. Use this minimal shape:
+
+\`\`\`markdown
+---
+name: jot
+description: Work with Jot Markdown workspaces through the jot CLI. Use when reading, searching, editing, commenting on, or publishing Jot notes and RFCs.
+---
+
+# Jot
+
+- Run \`jot --help\` for the current CLI contract.
+- Run \`jot instance list\` before work and select the intended instance.
+- Read before editing; use unique-text edits and re-read after conflicts.
+- Keep credentials only in Jot's CLI config, never in this skill.
+- Workspace agent instructions: ${baseUrl}/AGENTS.md
+\`\`\`
+
+The skill may record the non-secret base URL and preferred instance name, but it must never contain an API key. Keep detailed command documentation here at ${baseUrl}/AGENTS.md so the skill does not become stale.
+`;
+}
+
 function redirectLegacyRfc(context: HonoContext): Response | Promise<Response> {
   const number = Number(context.req.param("number"));
   return Number.isSafeInteger(number)
@@ -773,26 +875,6 @@ function requireMutationProtection(context: HonoContext): Effect.Effect<void, Ap
           status: 403,
         }),
       );
-}
-
-function setSession(context: HonoContext, result: SessionResult): Response {
-  const secure = new URL(context.req.url).protocol === "https:";
-  setCookie(context, "jot_session", result.sessionToken, {
-    expires: new Date(result.expiresAt),
-    httpOnly: true,
-    path: "/",
-    sameSite: "Strict",
-    secure,
-  });
-  setCookie(context, "jot_csrf", result.csrfToken, {
-    expires: new Date(result.expiresAt),
-    httpOnly: false,
-    path: "/",
-    sameSite: "Strict",
-    secure,
-  });
-  context.header("Cache-Control", "no-store");
-  return context.json({ expiresAt: result.expiresAt });
 }
 
 function errorResponse(context: HonoContext, error: ApplicationError): Response {

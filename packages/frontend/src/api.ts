@@ -41,8 +41,6 @@ export interface ApiClientService {
   readonly createApiKey: (label: string) => Effect.Effect<ApiKeyCreated, ApiError>;
   readonly listApiKeys: Effect.Effect<readonly ApiKeyDto[], ApiError>;
   readonly revokeApiKey: (keyId: string) => Effect.Effect<void, ApiError>;
-  readonly setup: (password: string) => Effect.Effect<void, ApiError>;
-  readonly login: (password: string) => Effect.Effect<void, ApiError>;
   readonly logout: Effect.Effect<void, ApiError>;
   readonly listDocuments: (query?: string) => Effect.Effect<CatalogResponse, ApiError>;
   readonly createDocument: (
@@ -258,8 +256,6 @@ export function makeApiClient(capabilityToken?: string): ApiClientService {
     listApiKeys: request("/api/api-keys", Schema.Array(ApiKeySchema)),
     listDocuments: (query = "") =>
       request(`/api/documents?q=${encodeURIComponent(query)}`, CatalogResponseSchema),
-    login: (password) =>
-      mutation("/api/auth/login", Schema.Unknown, "POST", { password }).pipe(Effect.asVoid),
     logout: mutation("/api/auth/logout", Schema.Unknown, "POST").pipe(Effect.asVoid),
     publish: (documentId, confirmConfidentialPublic = false) =>
       mutation(
@@ -291,8 +287,6 @@ export function makeApiClient(capabilityToken?: string): ApiClientService {
         "PATCH",
         { resolved },
       ),
-    setup: (password) =>
-      mutation("/api/auth/setup", Schema.Unknown, "POST", { password }).pipe(Effect.asVoid),
     unpublish: (documentId) =>
       mutation(
         `/api/documents/${encodeURIComponent(documentId)}/unpublish`,
