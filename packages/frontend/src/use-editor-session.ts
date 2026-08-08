@@ -11,6 +11,7 @@ import { Awareness } from "y-protocols/awareness";
 import { yCollab } from "y-codemirror.next";
 import * as Y from "yjs";
 
+import { identifierTag } from "@earendil-works/inkling-core";
 import type {
   CommentStateDto,
   DocumentMetadataDto,
@@ -109,7 +110,7 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
     const awareness = new Awareness(yDocument);
     const editable = new Compartment();
     const theme = new Compartment();
-    const participantId = randomId("participant");
+    const participantId = randomId(identifierTag.participant);
     const participantColor = colorFor(identityId ?? participantId);
     const participantMap = new Map<string, PresenceDto>();
     const frontmatterCompletion = makeFrontmatterCompletionSource(frontmatterVocabulary);

@@ -18,7 +18,7 @@ import {
   ResolutionRequestSchema,
   ShareUpdateRequestSchema,
 } from "@earendil-works/inkling-protocol";
-import { taggedId, uuidV7Bytes } from "@earendil-works/inkling-core";
+import { identifierTag, taggedId, uuidV7Bytes } from "@earendil-works/inkling-core";
 import type {
   CatalogResponse,
   DocumentMetadataDto,
@@ -66,7 +66,7 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
   app.use("*", async (context, next) => {
     const startedAt = Date.now();
     const requestId = taggedId(
-      "request",
+      identifierTag.request,
       uuidV7Bytes(startedAt, crypto.getRandomValues(new Uint8Array(10))),
     );
     await next();

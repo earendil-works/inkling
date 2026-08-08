@@ -34,6 +34,7 @@ import {
   emptyAuthenticationState,
   emptyWorkspaceCatalog,
   hasPendingPublicationChanges,
+  identifierTag,
   taggedId,
   updateDocumentMetadata,
   updateSharingPolicy,
@@ -70,11 +71,16 @@ function catalogSummary(metadata: DocumentMetadata, body: string): CatalogSummar
   };
 }
 
-test("identifiers use UUIDv7 bytes and the canonical base62 alphabet", () => {
+test("identifiers use compact UUIDv7 tags and the canonical base62 alphabet", () => {
   assert.equal(encodeBase62(Uint8Array.of(0)), "0");
   assert.equal(encodeBase62(Uint8Array.of(61)), "Z");
   assert.equal(encodeBase62(Uint8Array.of(62)), "10");
-  assert.equal(taggedId("doc", Uint8Array.of(62)), "doc_10");
+  assert.equal(taggedId(identifierTag.document, Uint8Array.of(62)), "doc_10");
+  const tags = Object.values(identifierTag);
+  assert.equal(new Set(tags).size, tags.length);
+  for (const tag of tags) {
+    assert.match(tag, /^[a-z][a-z0-9]{1,2}$/u);
+  }
 
   const bytes = uuidV7Bytes(
     0x0123_4567_89ab,
@@ -243,6 +249,7 @@ test("API keys belong to their creator and retain that user's role", async () =>
     ),
   );
 
+  assert.equal(created.token, "key_12345678.key-secret");
   assert.equal(apiKeyBelongsTo(created.record, accountId), true);
   assert.equal(apiKeyBelongsTo(created.record, otherId), false);
   const authenticated = await Effect.runPromise(
@@ -257,6 +264,12 @@ test("API keys belong to their creator and retain that user's role", async () =>
     personId: accountId,
     role: "member",
   });
+  const legacyToken = await Effect.runPromise(
+    authenticateApiKey(created.state, `inkling_${created.token}`, now).pipe(
+      Effect.provideService(SecretHasher, hasher),
+    ),
+  );
+  assert.deepEqual(legacyToken.principal, authenticated.principal);
 
   const otherUserRevocation = await Effect.runPromise(
     revokeApiKey(created.state, created.record.id, otherId, now).pipe(Effect.either),
@@ -456,7 +469,7 @@ test("catalogs keep RFC number order while interleaving notes by activity", asyn
   );
   const state: WorkspaceCatalogState = {
     entries: [earlierRfc, olderNote, newerNote, latestRfc, middleNote].map((metadata) => ({
-      creationKey: `catalog-order:${metadata.id}`,
+      creationKey: `cat:${metadata.id}`,
       documentId: metadata.id,
       rfcNumber: metadata.rfcNumber,
       status: "active" as const,

@@ -1,5 +1,6 @@
 import { Data, Effect } from "effect";
 
+import { identifierTag } from "../application/identifiers.ts";
 import { IdGenerator, SecretHasher, SecureToken } from "../application/ports.ts";
 import type { StorageError } from "../application/ports.ts";
 import type { PersonId } from "./document.ts";
@@ -115,7 +116,7 @@ export function createWorkspaceSession(
     const hasher = yield* SecretHasher;
     const ids = yield* IdGenerator;
     const tokens = yield* SecureToken;
-    const id = yield* ids.generate("session");
+    const id = yield* ids.generate(identifierTag.session);
     const secret = yield* tokens.generate(32);
     const tokenHash = yield* hasher.hash(secret);
     const expiresAt = new Date(Date.parse(now) + sessionLifetimeMilliseconds).toISOString();
@@ -179,7 +180,7 @@ export function createApiKey(
     const hasher = yield* SecretHasher;
     const ids = yield* IdGenerator;
     const tokens = yield* SecureToken;
-    const id = yield* ids.generate("key");
+    const id = yield* ids.generate(identifierTag.apiKey);
     const secret = yield* tokens.generate(32);
     const record: ApiKeyRecord = {
       createdAt: now,
@@ -193,7 +194,7 @@ export function createApiKey(
     return {
       record,
       state: { ...state, apiKeys: [...state.apiKeys, record] },
-      token: `inkling_${id}.${secret}`,
+      token: `${id}.${secret}`,
     };
   });
 }
@@ -208,7 +209,8 @@ export function authenticateApiKey(
   typeof SecretHasher.Service
 > {
   return Effect.gen(function* () {
-    const match = /^inkling_([^.]+)\.(.+)$/u.exec(token);
+    // Keys issued before compact prefixes used an additional `inkling_` marker.
+    const match = /^(?:inkling_)?(key_[^.]+)\.(.+)$/u.exec(token);
     if (match === null) {
       return yield* authenticationFailure("invalid_token", "The API key is invalid.");
     }

@@ -2,6 +2,26 @@ const base62Alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRST
 const base = BigInt(base62Alphabet.length);
 const maximumUuidV7Timestamp = 0xffff_ffff_ffff;
 
+export const identifierTag = {
+  apiKey: "key",
+  attachment: "att",
+  capability: "cap",
+  clientUpdate: "upd",
+  commentMessage: "msg",
+  commentThread: "thr",
+  document: "doc",
+  googleDocument: "gdo",
+  guest: "gst",
+  import: "imp",
+  participant: "par",
+  repair: "rep",
+  request: "req",
+  session: "ses",
+  temporaryFile: "tmp",
+} as const;
+
+export type IdentifierTag = (typeof identifierTag)[keyof typeof identifierTag];
+
 /** Encodes bytes as an unsigned base62 value using Inkling's canonical alphabet. */
 export function encodeBase62(bytes: ArrayLike<number>): string {
   let value = 0n;
@@ -53,7 +73,10 @@ export function uuidV7Bytes(unixMilliseconds: number, randomness: ArrayLike<numb
   return bytes;
 }
 
-/** Adds a readable type tag to base62-encoded identifier bytes. */
-export function taggedId(tag: string, bytes: ArrayLike<number>): string {
+/** Adds a two- or three-character type tag to base62-encoded identifier bytes. */
+export function taggedId(tag: IdentifierTag, bytes: ArrayLike<number>): string {
+  if (!/^[a-z][a-z0-9]{1,2}$/u.test(tag)) {
+    throw new RangeError("Identifier tags must contain two or three lowercase characters.");
+  }
   return `${tag}_${encodeBase62(bytes)}`;
 }

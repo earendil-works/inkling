@@ -24,6 +24,7 @@ import {
   emptyAuthenticationState,
   emptyWorkspaceCatalog,
   IdGenerator,
+  identifierTag,
   isDocumentActionAllowed,
   ObjectStore,
   personId,
@@ -753,7 +754,7 @@ export function makeLocalInklingApplication(
             const { room, snapshot } = recovered.right;
             const reserved = yield* reserveDocument(rebuilt, {
               allocateRfc: false,
-              creationKey: `repair:${rawDocumentId}`,
+              creationKey: `${identifierTag.repair}:${rawDocumentId}`,
               documentId: rawDocumentId,
               requestedRfcNumber: snapshot.metadata.rfcNumber,
             }).pipe(Effect.mapError(toApplicationError));
@@ -926,7 +927,7 @@ export function makeLocalInklingApplication(
           yield* authorizeDocument(principal, "edit-body", snapshot.metadata, now).pipe(
             Effect.mapError(toApplicationError),
           );
-          const attachmentId = yield* ids.generate("attachment");
+          const attachmentId = yield* ids.generate(identifierTag.attachment);
           const contentDigest = yield* digest
             .sha256(bytes)
             .pipe(Effect.mapError(toApplicationError));
@@ -1163,7 +1164,7 @@ export function makeLocalInklingApplication(
             Effect.mapError(toApplicationError),
           );
           const now = new Date().toISOString();
-          const generatedId = yield* ids.generate("doc");
+          const generatedId = yield* ids.generate(identifierTag.document);
           const reservation = yield* withState(
             reserveDocument(state.catalog, {
               allocateRfc: request.allocateRfc ?? false,
@@ -1217,12 +1218,12 @@ export function makeLocalInklingApplication(
         Effect.gen(function* () {
           const principal = yield* resolvePrincipal(credentials);
           yield* requireAdministrator(principal);
-          const generatedId = yield* ids.generate("doc");
+          const generatedId = yield* ids.generate(identifierTag.document);
           const importedId = request.metadata.id ?? generatedId;
           const reservation = yield* withState(
             reserveDocument(state.catalog, {
               allocateRfc: false,
-              creationKey: `import:${importedId}`,
+              creationKey: `${identifierTag.import}:${importedId}`,
               documentId: importedId,
               requestedRfcNumber: request.metadata.rfcNumber,
             }).pipe(
@@ -1270,8 +1271,8 @@ export function makeLocalInklingApplication(
             if (range === undefined) continue;
             const root = importedThread.messages[0];
             if (root === undefined) continue;
-            const threadId = yield* ids.generate("thread");
-            const rootId = yield* ids.generate("message");
+            const threadId = yield* ids.generate(identifierTag.commentThread);
+            const rootId = yield* ids.generate(identifierTag.commentMessage);
             const actor: CommentActor = {
               displayName: root.authorDisplayName,
               id: systemId,
@@ -1295,7 +1296,7 @@ export function makeLocalInklingApplication(
             if (root.legacyId !== undefined) messageIds.set(root.legacyId, rootId);
             let lastMessageId = rootId;
             for (const importedMessage of importedThread.messages.slice(1)) {
-              const messageId = yield* ids.generate("message");
+              const messageId = yield* ids.generate(identifierTag.commentMessage);
               const parentId =
                 (importedMessage.parentLegacyId === undefined
                   ? undefined
@@ -1376,8 +1377,8 @@ export function makeLocalInklingApplication(
           const room = yield* getRoom(rawDocumentId);
           const principal = yield* resolvePrincipal(credentials, rawDocumentId);
           const actor = yield* commentActor(principal, request.authorDisplayName);
-          const threadId = yield* ids.generate("thread");
-          const messageId = yield* ids.generate("message");
+          const threadId = yield* ids.generate(identifierTag.commentThread);
+          const messageId = yield* ids.generate(identifierTag.commentMessage);
           const comments = yield* (
             "anchor" in request
               ? room.createThread(
@@ -1728,7 +1729,7 @@ export function makeLocalInklingApplication(
           const room = yield* getRoom(rawDocumentId);
           const principal = yield* resolvePrincipal(credentials, rawDocumentId);
           const actor = yield* commentActor(principal, request.authorDisplayName);
-          const messageId = yield* ids.generate("message");
+          const messageId = yield* ids.generate(identifierTag.commentMessage);
           const comments = yield* room
             .reply(
               principal,
@@ -1823,7 +1824,7 @@ export function makeLocalInklingApplication(
               let capabilityUrl: string | undefined;
               let capability: CapabilityRecord;
               if (existing === undefined) {
-                const id = yield* ids.generate("capability");
+                const id = yield* ids.generate(identifierTag.capability);
                 const secret = yield* tokens.generate(32).pipe(Effect.mapError(toApplicationError));
                 const tokenHash = yield* hasher
                   .hash(secret)
@@ -2103,7 +2104,7 @@ function resolveCapability(
     const guestId =
       guestName === undefined
         ? undefined
-        : yield* personId(`guest_${id}`).pipe(Effect.mapError(toApplicationError));
+        : yield* personId(`${identifierTag.guest}_${id}`).pipe(Effect.mapError(toApplicationError));
     return {
       access: record.access,
       documentId: targetDocumentId,

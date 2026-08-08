@@ -123,7 +123,8 @@ export {
   tombstoneDocument,
   upsertPerson,
 } from "./domain/catalog.ts";
-export { encodeBase62, taggedId, uuidV7Bytes } from "./application/identifiers.ts";
+export { encodeBase62, identifierTag, taggedId, uuidV7Bytes } from "./application/identifiers.ts";
+export type { IdentifierTag } from "./application/identifiers.ts";
 export type {
   DigestService,
   DurableDocumentJournalService,

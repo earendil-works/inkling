@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { Effect } from "effect";
 
-import { IdGenerator } from "@earendil-works/inkling-core";
+import { IdGenerator, identifierTag } from "@earendil-works/inkling-core";
 import type { HealthResponse } from "@earendil-works/inkling-protocol";
 
 import { createBackendApp, IdGeneratorLive } from "../src/index.ts";
@@ -29,7 +29,7 @@ test("health identifies the service and protocol", async () => {
 
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("cache-control"), "no-store");
-  assert.match(response.headers.get("x-request-id") ?? "", /^request_[0-9A-Za-z]+$/u);
+  assert.match(response.headers.get("x-request-id") ?? "", /^req_[0-9A-Za-z]+$/u);
   assert.deepEqual(body, {
     protocolVersion: 1,
     service: "inkling",
@@ -41,7 +41,7 @@ test("health identifies the service and protocol", async () => {
 test("generated identifiers have tagged base62 values", async () => {
   const id = await Effect.runPromise(
     IdGenerator.pipe(
-      Effect.flatMap((identifiers) => identifiers.generate("doc")),
+      Effect.flatMap((identifiers) => identifiers.generate(identifierTag.document)),
       Effect.provide(IdGeneratorLive),
     ),
   );

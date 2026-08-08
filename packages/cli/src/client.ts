@@ -1,6 +1,6 @@
 import { Data, Effect, Schema } from "effect";
 
-import { taggedId, uuidV7Bytes } from "@earendil-works/inkling-core";
+import { identifierTag, taggedId, uuidV7Bytes } from "@earendil-works/inkling-core";
 import {
   AttachmentListResponseSchema,
   AttachmentMetadataSchema,
@@ -352,7 +352,7 @@ export function makeCliClient(instance: Instance): CliClient {
         allocateRfc,
         body,
         creationKey: taggedId(
-          "request",
+          identifierTag.request,
           uuidV7Bytes(Date.now(), crypto.getRandomValues(new Uint8Array(10))),
         ),
         title,

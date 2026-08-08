@@ -6,6 +6,7 @@ import { Effect, Layer, Schema } from "effect";
 import {
   Digest,
   DurableDocumentJournal,
+  identifierTag,
   ObjectStore,
   StorageError,
   taggedId,
@@ -427,7 +428,7 @@ function atomicWrite(
       .makeDirectory(path.dirname(filePath), { recursive: true })
       .pipe(Effect.mapError((cause) => storageFailure("create storage directory", cause)));
     const temporary = `${filePath}.tmp-${taggedId(
-      "write",
+      identifierTag.temporaryFile,
       uuidV7Bytes(Date.now(), crypto.getRandomValues(new Uint8Array(10))),
     )}`;
     yield* Effect.scoped(

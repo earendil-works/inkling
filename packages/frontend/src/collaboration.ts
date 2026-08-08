@@ -1,7 +1,7 @@
 import { Data, Effect } from "effect";
 import * as Y from "yjs";
 
-import { taggedId, uuidV7Bytes } from "@earendil-works/inkling-core";
+import { identifierTag, taggedId, uuidV7Bytes } from "@earendil-works/inkling-core";
 
 import { browserRuntime } from "./effect-runtime.ts";
 
@@ -275,7 +275,7 @@ export function makeCollaborationClient(
         return;
       }
       const clientUpdateId = taggedId(
-        "update",
+        identifierTag.clientUpdate,
         uuidV7Bytes(Date.now(), crypto.getRandomValues(new Uint8Array(10))),
       );
       unacknowledged.set(clientUpdateId, update);

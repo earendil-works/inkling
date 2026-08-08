@@ -1,7 +1,7 @@
 import { Data, Effect, Predicate, Schema } from "effect";
 import YAML from "yaml";
 
-import { personId, validatePerson } from "@earendil-works/inkling-core";
+import { identifierTag, personId, validatePerson } from "@earendil-works/inkling-core";
 import type {
   CapabilityAccess,
   CreateMetadataInput,
@@ -478,7 +478,7 @@ function legacySourceKey(value: string): string | undefined {
     const url = new URL(value);
     if (url.hostname.toLocaleLowerCase("en") === "docs.google.com") {
       const documentId = /^\/document\/(?:u\/\d+\/)?d\/([^/]+)/u.exec(url.pathname)?.[1];
-      if (documentId !== undefined) return `google-document:${documentId}`;
+      if (documentId !== undefined) return `${identifierTag.googleDocument}:${documentId}`;
     }
     return `${url.protocol}//${url.host}${url.pathname.replace(/\/$/u, "")}`;
   } catch {

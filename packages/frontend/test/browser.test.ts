@@ -77,7 +77,7 @@ test(
       await first.getByLabel("Key name").fill("Browser agent");
       await first.getByRole("button", { name: "Create API key" }).click();
       const revealedKey = (await first.locator("[data-api-key-secret]").textContent()) ?? "";
-      assert.match(revealedKey, /^inkling_key_/u);
+      assert.match(revealedKey, /^key_[0-9A-Za-z]+\./u);
       assert.doesNotMatch(
         (await first.locator("[data-api-key-reveal]").textContent()) ?? "",
         /inkling instance add/u,
@@ -99,6 +99,7 @@ test(
       await first.waitForURL(/\/documents\/[^/]+\/edit$/u);
       const documentId = first.url().split("/").at(-2);
       assert.ok(documentId);
+      assert.match(documentId, /^doc_[0-9A-Za-z]+$/u);
       await first.waitForFunction(
         () => document.querySelector("[data-save-state]")?.textContent === "Saved",
       );

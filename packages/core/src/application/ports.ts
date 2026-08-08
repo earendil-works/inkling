@@ -1,6 +1,7 @@
 import { Context, Data, type Effect } from "effect";
 
 import type { DocumentId, DocumentRevision } from "../domain/document.ts";
+import type { IdentifierTag } from "./identifiers.ts";
 
 export class StorageError extends Data.TaggedError("StorageError")<{
   readonly operation: string;
@@ -83,7 +84,7 @@ export const WorkspaceStateStore = Context.GenericTag<WorkspaceStateStoreService
 );
 
 export interface IdGeneratorService {
-  readonly generate: (purpose: string) => Effect.Effect<string>;
+  readonly generate: (purpose: IdentifierTag) => Effect.Effect<string>;
 }
 
 export const IdGenerator = Context.GenericTag<IdGeneratorService>(

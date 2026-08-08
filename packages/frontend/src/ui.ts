@@ -1,6 +1,7 @@
 import { taggedId, uuidV7Bytes } from "@earendil-works/inkling-core";
+import type { IdentifierTag } from "@earendil-works/inkling-core";
 
-export function randomId(tag: string): string {
+export function randomId(tag: IdentifierTag): string {
   return taggedId(tag, uuidV7Bytes(Date.now(), crypto.getRandomValues(new Uint8Array(10))));
 }
 
