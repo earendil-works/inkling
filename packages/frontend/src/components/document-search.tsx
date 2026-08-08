@@ -5,6 +5,7 @@ import type { CatalogResponse } from "@earendil-works/jot-protocol";
 import type { ApiClientService } from "../api.ts";
 import { useAppContext } from "../app-context.tsx";
 import { useEffectQuery } from "../effect-hooks.ts";
+import { LifecycleStateChip } from "./lifecycle-state-chip.tsx";
 
 interface SearchCompletion {
   readonly complete: boolean;
@@ -240,7 +241,7 @@ export function DocumentSearch({
                         {document.excerpt || "No body text yet"}
                       </span>
                       <span className="document-search__result-meta">
-                        <i>{metadata.lifecycleState}</i>
+                        <LifecycleStateChip state={metadata.lifecycleState} />
                         {metadata.labels.slice(0, 3).map((label) => (
                           <i key={label}>{label}</i>
                         ))}

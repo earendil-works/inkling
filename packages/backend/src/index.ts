@@ -857,7 +857,8 @@ function publicCatalogHtml(titleValue: string, catalog: CatalogResponse): string
       const labels = metadata.labels
         .map((label) => `<a href="/keyword/${encodeURIComponent(label)}">${escapeHtml(label)}</a>`)
         .join(" ");
-      return `<li><a class="title" href="${href}">${metadata.rfcNumber === undefined ? "Note" : `RFC ${String(metadata.rfcNumber).padStart(4, "0")}`} — ${escapeHtml(metadata.title)}</a><p>${escapeHtml(excerpt)}</p><small><a href="/state/${encodeURIComponent(metadata.lifecycleState)}">${escapeHtml(metadata.lifecycleState)}</a> · ${escapeHtml(metadata.updatedAt.slice(0, 10))} ${labels}</small></li>`;
+      const state = publicStateLink(metadata.lifecycleState, "public-catalog-state");
+      return `<li><a class="title" href="${href}">${metadata.rfcNumber === undefined ? "Note" : `RFC ${String(metadata.rfcNumber).padStart(4, "0")}`} — ${escapeHtml(metadata.title)}</a><p>${escapeHtml(excerpt)}</p><small>${state} · ${escapeHtml(metadata.updatedAt.slice(0, 10))} ${labels}</small></li>`;
     })
     .join("");
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Published notes and RFCs"><title>Notes and RFCs</title><link rel="stylesheet" href="/fonts.css"><link rel="stylesheet" href="/public.css"></head><body><header class="public-masthead"><a href="/">JOT</a><span>NOTES AND RFCS</span></header><main class="public-catalog-shell"><article class="public-paper public-catalog-paper"><h1>${title}</h1><ol class="catalog">${rows || "<li>No published notes or RFCs.</li>"}</ol></article></main></body></html>`;
@@ -896,7 +897,14 @@ function publicDocumentHtml(document: {
       : `<aside class="public-toc" aria-label="On this page"><p>On this page</p><ol>${toc}</ol></aside>`;
   const sensitivityClass = metadata.sensitivity === "confidential" ? " is-confidential" : "";
   const sensitivityLabel = metadata.sensitivity === "confidential" ? "Confidential" : "Visibility";
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${description}"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><link rel="canonical" href="${escapeHtml(document.canonicalPath)}"><title>${title}</title><link rel="stylesheet" href="/fonts.css"><link rel="stylesheet" href="/public.css"></head><body><header class="public-masthead"><a href="/">JOT</a><span>${folio}</span></header><main class="public-page-shell"><article class="public-paper public-document"><div class="public-topline"><a href="/">All notes and RFCs</a></div><header class="public-hero"><p class="public-folio">${folio}</p><div class="public-hero-main"><a class="public-state" href="/state/${encodeURIComponent(metadata.lifecycleState)}">${escapeHtml(metadata.lifecycleState)}</a><h1>${title}</h1><div class="public-visibility${sensitivityClass}"><strong>${sensitivityLabel}</strong><span>${escapeHtml(metadata.visibility)}</span></div>${labels === "" ? "" : `<div class="public-labels" aria-label="Labels">${labels}</div>`}</div></header>${publicMetadataHtml(metadata)}<div class="public-content-grid"><div class="public-prose">${document.html}</div>${tocHtml}</div></article></main></body></html>`;
+  const state = publicStateLink(metadata.lifecycleState);
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${description}"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><link rel="canonical" href="${escapeHtml(document.canonicalPath)}"><title>${title}</title><link rel="stylesheet" href="/fonts.css"><link rel="stylesheet" href="/public.css"></head><body><header class="public-masthead"><a href="/">JOT</a><span>${folio}</span></header><main class="public-page-shell"><article class="public-paper public-document"><div class="public-topline"><a href="/">All notes and RFCs</a></div><header class="public-hero"><p class="public-folio">${folio}</p><div class="public-hero-main">${state}<h1>${title}</h1><div class="public-visibility${sensitivityClass}"><strong>${sensitivityLabel}</strong><span>${escapeHtml(metadata.visibility)}</span></div>${labels === "" ? "" : `<div class="public-labels" aria-label="Labels">${labels}</div>`}</div></header>${publicMetadataHtml(metadata)}<div class="public-content-grid"><div class="public-prose">${document.html}</div>${tocHtml}</div></article></main></body></html>`;
+}
+
+function publicStateLink(state: string, className?: string | undefined): string {
+  const classes = ["public-state", className].filter(Boolean).join(" ");
+  const tone = state.trim().toLocaleLowerCase("en");
+  return `<a class="${classes}" data-lifecycle-state="${escapeHtml(tone)}" href="/state/${encodeURIComponent(state)}">${escapeHtml(state)}</a>`;
 }
 
 function publicMetadataHtml(metadata: DocumentMetadataDto): string {

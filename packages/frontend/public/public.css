@@ -9,7 +9,27 @@
   --public-muted: #74716c;
   --public-border: #d8d5cf;
   --public-border-strong: #bcb8b1;
-  --public-danger: #a44335;
+  --state-draft-bg: light-dark(#ece7de, #28251f);
+  --state-draft-border: light-dark(#d9cfc0, #454036);
+  --state-draft-text: light-dark(#6f665b, #c8bdad);
+  --state-discussion-bg: light-dark(#e1e9d6, #1f3021);
+  --state-discussion-border: light-dark(#c8d5b6, #3e5a3c);
+  --state-discussion-text: light-dark(#4f6540, #b9d6a8);
+  --state-published-bg: light-dark(#dce7f1, #1c2a36);
+  --state-published-border: light-dark(#c2d3e4, #38506a);
+  --state-published-text: light-dark(#3f5e7a, #b9d4ee);
+  --state-accepted-bg: light-dark(#d9e9df, #1d3024);
+  --state-accepted-border: light-dark(#bad2c2, #3c6047);
+  --state-accepted-text: light-dark(#3f654c, #b8ddc1);
+  --state-implemented-bg: light-dark(#5c765f, #2f5b39);
+  --state-implemented-border: light-dark(#4b6550, #4a8256);
+  --state-implemented-text: light-dark(#eef4ea, #eff8ed);
+  --state-abandoned-bg: light-dark(#efdcd5, #341f20);
+  --state-abandoned-border: light-dark(#e0c2b8, #673f3f);
+  --state-abandoned-text: light-dark(#8a4a42, #efb9b5);
+  --visibility-bg: light-dark(#f7f0dd, #2a2517);
+  --visibility-border: light-dark(#e3d7b5, #5b4f2e);
+  --visibility-text: light-dark(#6e5b34, #e1cc83);
   font-family: var(--serif);
   line-height: 1.65;
 }
@@ -23,7 +43,6 @@
     --public-muted: #aaa7a1;
     --public-border: #4a4844;
     --public-border-strong: #66635d;
-    --public-danger: #ef806c;
   }
 }
 
@@ -141,6 +160,46 @@ body {
   text-transform: uppercase;
 }
 
+.public-state[data-lifecycle-state="draft"] {
+  border-color: var(--state-draft-border);
+  background: var(--state-draft-bg);
+  color: var(--state-draft-text);
+}
+
+.public-state[data-lifecycle-state="discussion"] {
+  border-color: var(--state-discussion-border);
+  background: var(--state-discussion-bg);
+  color: var(--state-discussion-text);
+}
+
+.public-state[data-lifecycle-state="published"] {
+  border-color: var(--state-published-border);
+  background: var(--state-published-bg);
+  color: var(--state-published-text);
+}
+
+.public-state[data-lifecycle-state="accepted"] {
+  border-color: var(--state-accepted-border);
+  background: var(--state-accepted-bg);
+  color: var(--state-accepted-text);
+}
+
+.public-state[data-lifecycle-state="implemented"] {
+  border-color: var(--state-implemented-border);
+  background: var(--state-implemented-bg);
+  color: var(--state-implemented-text);
+}
+
+.public-state[data-lifecycle-state="abandoned"] {
+  border-color: var(--state-abandoned-border);
+  background: var(--state-abandoned-bg);
+  color: var(--state-abandoned-text);
+}
+
+.public-catalog-state {
+  padding: 0.2rem 0.38rem;
+}
+
 .public-hero h1 {
   max-width: 19ch;
   margin: 0.65rem 0 0;
@@ -158,25 +217,23 @@ body {
   gap: 0.15rem;
   margin-top: 1rem;
   padding: 0.45rem 0.65rem;
-  border-left: 2px solid var(--public-text);
-  background: var(--public-muted-surface);
-  color: var(--public-muted);
+  border-left: 2px solid var(--visibility-border);
+  background: var(--visibility-bg);
+  color: var(--visibility-text);
   font: var(--font-caption)/1.35 var(--mono);
   text-transform: uppercase;
 }
 
 .public-visibility strong {
-  color: var(--public-text);
+  color: inherit;
   font-size: var(--font-caption);
   letter-spacing: 0.08em;
 }
 
 .public-visibility.is-confidential {
-  border-left-color: var(--public-danger);
-}
-
-.public-visibility.is-confidential strong {
-  color: var(--public-danger);
+  border-left-color: var(--state-abandoned-border);
+  background: var(--state-abandoned-bg);
+  color: var(--state-abandoned-text);
 }
 
 .public-labels {

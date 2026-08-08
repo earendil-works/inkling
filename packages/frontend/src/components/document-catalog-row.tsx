@@ -2,6 +2,7 @@ import { hasPendingPublicationChanges } from "@earendil-works/jot-core";
 import type { CatalogResponse } from "@earendil-works/jot-protocol";
 
 import { formatDate } from "../ui.ts";
+import { LifecycleStateChip } from "./lifecycle-state-chip.tsx";
 
 export interface DocumentCatalogRowProps {
   readonly document: CatalogResponse["documents"][number];
@@ -34,7 +35,7 @@ export function DocumentCatalogRow({
       </span>
       <span className="catalog-row__meta">
         <b>{number}</b>
-        <span>{metadata.lifecycleState}</span>
+        <LifecycleStateChip className="catalog-row__state" state={metadata.lifecycleState} />
         <time dateTime={metadata.updatedAt}>{formatDate(metadata.updatedAt)}</time>
       </span>
     </a>

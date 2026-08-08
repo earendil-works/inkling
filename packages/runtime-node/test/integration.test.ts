@@ -235,6 +235,7 @@ test(
         assert.match(publishedHtml, /Integrated RFC/u);
         assert.match(publishedHtml, /<title>Integrated RFC<\/title>/u);
         assert.match(publishedHtml, /class="public-hero"/u);
+        assert.match(publishedHtml, /class="public-state" data-lifecycle-state="draft"/u);
         assert.match(publishedHtml, /class="public-metadata"/u);
         assert.match(publishedHtml, /mailto:ada@example\.com/u);
         assert.match(publishedHtml, />Ada Lovelace<\/a>/u);

@@ -89,6 +89,12 @@ test(
         await first.locator(".cm-content").innerText(),
         /---\s+authors: \[\]\s+state: draft\s+visibility: workspace\s+sensitivity: normal\s+labels: \[\]\s+---/u,
       );
+      const draftStateChip = first.locator(".editor-preview-page .reader-state-chip");
+      await draftStateChip.waitFor();
+      assert.equal(await draftStateChip.getAttribute("data-lifecycle-state"), "draft");
+      const draftStateBackground = await draftStateChip.evaluate(
+        (chip) => getComputedStyle(chip).backgroundColor,
+      );
       const stateLine = first.locator(".cm-line").filter({ hasText: "state: draft" });
       await stateLine.click();
       await first.keyboard.press("End");
@@ -99,6 +105,17 @@ test(
       assert.ok(stateCompletions.includes("accepted"));
       assert.ok(stateCompletions.includes("abandoned"));
       await first.keyboard.press("Escape");
+      await first.keyboard.press("End");
+      await first.keyboard.press("Shift+Home");
+      await first.keyboard.insertText("state: accepted");
+      const acceptedStateChip = first.locator(
+        '.editor-preview-page .reader-state-chip[data-lifecycle-state="accepted"]',
+      );
+      await acceptedStateChip.waitFor();
+      assert.notEqual(
+        await acceptedStateChip.evaluate((chip) => getComputedStyle(chip).backgroundColor),
+        draftStateBackground,
+      );
       await first.keyboard.press("End");
       await first.keyboard.press("Shift+Home");
       await first.keyboard.insertText("state: draft");

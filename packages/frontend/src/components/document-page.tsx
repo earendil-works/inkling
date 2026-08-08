@@ -5,6 +5,7 @@ import type { RenderHeading } from "@earendil-works/jot-renderer";
 
 import { formatDate } from "../ui.ts";
 import { DocumentTableOfContents } from "./document-table-of-contents.tsx";
+import { LifecycleStateChip } from "./lifecycle-state-chip.tsx";
 
 export interface DocumentPageProps {
   readonly children: ReactNode;
@@ -27,7 +28,7 @@ export function DocumentPage({
       <header className="reader-heading">
         <p className="reader-folio">{folio}</p>
         <div className="reader-heading__main">
-          <span className="reader-state-chip">{metadata.lifecycleState}</span>
+          <LifecycleStateChip className="reader-state-chip" state={metadata.lifecycleState} />
           <h1>{metadata.title}</h1>
           <a
             className={`reader-visibility-note${metadata.sensitivity === "confidential" ? " is-confidential" : ""}`}
