@@ -369,12 +369,14 @@ test(
       );
       assert.match(ownerPresenceColor, /^oklch\(/u);
       await first.keyboard.press("Shift+Home");
+      await second.bringToFront();
       const ownerSelection = second.locator('.cm-remote-selection[data-remote-name="Owner"]');
       await ownerSelection.waitFor();
       assert.match(
         await ownerSelection.evaluate((selection) => getComputedStyle(selection).backgroundColor),
         /^oklab\(|^oklch\(/u,
       );
+      await first.bringToFront();
       await first.keyboard.press("ArrowRight");
       await first.keyboard.press("ControlOrMeta+End");
       await first.keyboard.insertText(" from first");

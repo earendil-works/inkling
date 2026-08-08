@@ -53,6 +53,11 @@ interface EditorSessionCallbacks {
   readonly onState: (state: ConnectionState) => void;
 }
 
+interface PresenceSelection {
+  readonly anchor: number;
+  readonly head: number;
+}
+
 interface UseEditorSessionOptions extends EditorSessionCallbacks {
   readonly capabilityToken: string | undefined;
   readonly displayName: string | undefined;
@@ -127,7 +132,7 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
           EditorView.lineWrapping,
           EditorView.updateListener.of((update) => {
             if ((!update.selectionSet && !update.focusChanged) || client === undefined) return;
-            const selection = update.view.hasFocus ? update.state.selection.main : undefined;
+            const selection = selectionForPresence(update.view);
             browserRuntime.runFork(
               client.sendPresence({
                 color: participantColor,
@@ -196,7 +201,7 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
               editor.dispatch({ effects: clearRemotePresence() });
               callbacksRef.current.onParticipants([]);
             } else if (client !== undefined) {
-              const selection = editor.hasFocus ? editor.state.selection.main : undefined;
+              const selection = selectionForPresence(editor);
               browserRuntime.runFork(
                 client.sendPresence({
                   color: participantColor,
@@ -242,4 +247,9 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
   ]);
 
   return { body, editorHostRef, sessionRef, sessionRevision, yRevision };
+}
+
+function selectionForPresence(editor: EditorView): PresenceSelection | undefined {
+  const selection = editor.state.selection.main;
+  return editor.hasFocus || !selection.empty ? selection : undefined;
 }
