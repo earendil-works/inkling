@@ -1,17 +1,41 @@
-# Jot
+# RFC Editor
 
-Jot is a collaborative Markdown workspace. The current development and hosted configuration uses mandatory Google sign-in on the Cloudflare runtime.
+RFC Editor is a collaborative Markdown workspace for drafting, reviewing, and publishing RFCs. It supports numbered RFCs as well as unnumbered notes, with multiplayer editing, threaded comments, capability sharing, full-text search, and an agent-friendly CLI.
 
-## Development
+RFC Editor is based on the earlier **Jot** tool. Existing package names, the `jot` CLI command, `JOT_*` environment variables, API headers, and on-disk paths retain that name for compatibility.
 
-Install dependencies and create the local Cloudflare configuration:
+## Features
+
+- CodeMirror and Yjs-based collaborative Markdown editing with participant cursors and selections.
+- Inline threaded comments anchored to collaborative text positions.
+- Explicit publication of immutable revisions, separate from the live working head.
+- Monotonic RFC number allocation and canonical routes such as `/rfcs/0042`.
+- Public, workspace, confidential, and capability-shared documents.
+- Markdown preview and publication with tables, task lists, syntax highlighting, Mermaid diagrams, stable heading links, and tables of contents.
+- Search across complete document bodies, RFC metadata, labels, lifecycle states, and people.
+- API keys and a CLI for people, coding agents, imports, backups, verification, and repair.
+- A self-contained Node.js runtime backed by the filesystem and a Cloudflare runtime backed by Durable Objects and R2.
+
+## Requirements
+
+- Node.js 24 or newer
+- pnpm 10 or newer
+
+Install dependencies with:
 
 ```sh
 pnpm install
+```
+
+## Cloudflare development
+
+The primary development setup runs Vite on port 5173 and the Cloudflare Worker on port 8787. Copy the example OAuth configuration first:
+
+```sh
 cp packages/runtime-cloudflare/.dev.vars.example packages/runtime-cloudflare/.dev.vars
 ```
 
-Fill in `packages/runtime-cloudflare/.dev.vars`:
+Configure `packages/runtime-cloudflare/.dev.vars`:
 
 ```dotenv
 GOOGLE_CLIENT_ID=your-web-client-id
@@ -22,49 +46,49 @@ GOOGLE_REDIRECT_URI=http://localhost:5173/api/auth/google/callback
 JOT_OAUTH_STATE_SECRET=a-long-random-value
 ```
 
-Then start Vite and the Cloudflare development runtime:
+Then start both processes:
 
 ```sh
 pnpm dev
 ```
 
-Open <http://localhost:5173>. Google authentication is mandatory: the Cloudflare runtime does not offer password setup or password sign-in, and it fails closed when OAuth is not configured.
+Open <http://localhost:5173>. Vite proxies API and WebSocket traffic to the Worker. Google authentication is mandatory in the Cloudflare runtime; it fails closed when OAuth is not configured.
 
-`.dev.vars` is ignored by Git. Never commit OAuth client secrets or the state-signing secret.
+`.dev.vars` is ignored by Git. Never commit OAuth client secrets or state-signing secrets.
 
 ### Authentication settings
 
 - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` identify the Google OAuth web client.
-- `GOOGLE_ALLOWED_DOMAINS` is a comma-separated allowlist. Jot checks the exact domain of Google's verified email claim; Google's hosted-domain hint is not treated as authorization.
+- `GOOGLE_ALLOWED_DOMAINS` is a comma-separated allowlist. RFC Editor checks the exact domain of Google's verified email claim; Google's hosted-domain hint is not treated as authorization.
 - `GOOGLE_ADMIN_EMAILS` is a comma-separated list of allowed users who may administer the workspace and API keys. Other allowed users become workspace members.
 - `GOOGLE_REDIRECT_URI` must exactly match an authorized redirect URI on the OAuth client.
-- `JOT_OAUTH_STATE_SECRET` signs short-lived OAuth state. Generate an independent value with `openssl rand -base64 48`.
+- `JOT_OAUTH_STATE_SECRET` signs short-lived OAuth state. It is optional and falls back to `GOOGLE_CLIENT_SECRET`, but a separate value generated with `openssl rand -base64 48` is recommended.
 
-## Create Google OAuth credentials
+### Create Google OAuth credentials
 
 Google's current setup is under **Google Auth Platform** in the [Google Cloud Console](https://console.cloud.google.com/auth/overview):
 
 1. Select an existing Google Cloud project or create one.
 2. Open **Google Auth Platform → Branding** and configure the application name, support email, and developer contact information.
 3. Open **Audience**. For a Google Workspace organization, choose **Internal** when the app should only be available within that organization. Otherwise choose **External** and add test users while the app remains in testing.
-4. Review **Data Access**. Jot requests only `openid`, `email`, and `profile` for sign-in.
+4. Review **Data Access**. Sign-in requests `openid`, `email`, and `profile`. The server may also request read-only directory access to resolve workspace display names and aliases.
 5. Open **Clients**, choose **Create client**, and select **Web application**.
-6. Add the exact local redirect URI:
+6. Add the local redirect URI:
 
    ```text
    http://localhost:5173/api/auth/google/callback
    ```
 
-7. Add the production callback as another authorized redirect URI, replacing the hostname with the deployed Jot hostname:
+7. Add the production callback, replacing the hostname with the deployed RFC Editor hostname:
 
    ```text
-   https://jot.example.com/api/auth/google/callback
+   https://rfcs.example.com/api/auth/google/callback
    ```
 
-8. Create the client and immediately save its client ID and client secret. Google may show a newly created client secret only once.
+8. Create the client and save its client ID and client secret.
 9. Put those values in `.dev.vars` for local development or in Cloudflare Worker secrets for production.
 
-Jot uses a server-side authorization-code flow with PKCE, so no Authorized JavaScript Origin is required for its authentication flow. Redirect URI matching is exact, including scheme, host, port, path, and trailing slash.
+RFC Editor uses a server-side authorization-code flow with PKCE, so no Authorized JavaScript Origin is required for authentication. Redirect URI matching is exact, including scheme, host, port, path, and trailing slash.
 
 Official references:
 
@@ -72,9 +96,44 @@ Official references:
 - [Configure the OAuth consent screen](https://developers.google.com/workspace/guides/configure-oauth-consent)
 - [Manage OAuth clients](https://support.google.com/cloud/answer/15549257)
 
-## Production secrets
+## Local Node.js runtime
 
-Register the production callback in Google Cloud Console, then configure the Worker from `packages/runtime-cloudflare`:
+The Node.js runtime uses a filesystem data directory and local owner-password authentication; it does not require Cloudflare or Google OAuth.
+
+Build the frontend and start the server:
+
+```sh
+pnpm --filter @earendil-works/jot-frontend build
+pnpm --filter @earendil-works/jot-runtime-node start
+```
+
+Open <http://localhost:8787> and create the owner password on first use. The server stores its data in `.jot` by default and permits only one process to own a data directory at a time.
+
+Configure it with:
+
+- `PORT` — listening port, default `8787`.
+- `JOT_DATA_DIR` — data directory, default `.jot` in the current directory.
+
+The CLI can also launch the local runtime:
+
+```sh
+node packages/cli/src/main.ts serve --port 8787 --data-dir .jot
+```
+
+### Docker
+
+The Docker image runs the same local runtime. Mount the complete `/data` directory for persistence:
+
+```sh
+docker build -t rfc-editor .
+docker run --rm -p 8787:8787 -v rfc-editor-data:/data rfc-editor
+```
+
+## Cloudflare deployment
+
+The Cloudflare runtime uses one Durable Object per document, a workspace Durable Object for the catalog and RFC number allocation, and a private R2 bucket for checkpoints, publications, attachments, and exports.
+
+Register the production callback in Google Cloud Console, then configure secrets from `packages/runtime-cloudflare`:
 
 ```sh
 cd packages/runtime-cloudflare
@@ -85,21 +144,25 @@ pnpm exec wrangler secret put GOOGLE_ADMIN_EMAILS
 pnpm exec wrangler secret put JOT_OAUTH_STATE_SECRET
 ```
 
-`GOOGLE_REDIRECT_URI` is optional in production. When omitted, Jot derives it as `https://<request-host>/api/auth/google/callback`; that derived URI must be registered on the Google OAuth client. Set it explicitly with `wrangler secret put GOOGLE_REDIRECT_URI` when requests reach Jot through a different public origin.
+`GOOGLE_REDIRECT_URI` is optional in production. When omitted, RFC Editor derives it as `https://<request-host>/api/auth/google/callback`; that URI must be registered on the OAuth client. Set it explicitly with `wrangler secret put GOOGLE_REDIRECT_URI` when requests reach the Worker through a different public origin.
 
-Deploy with:
+Build and deploy from the repository root:
 
 ```sh
-pnpm run build
-pnpm --filter @earendil-works/jot-runtime-cloudflare run deploy
+pnpm build
+pnpm --filter @earendil-works/jot-runtime-cloudflare deploy
 ```
 
-## Document frontmatter
+The R2 bucket names and Durable Object bindings are declared in [`packages/runtime-cloudflare/wrangler.jsonc`](packages/runtime-cloudflare/wrangler.jsonc).
 
-Publication details live at the beginning of the collaborative Markdown source:
+## Writing and publishing RFCs
+
+The first top-level Markdown heading is the document title. Publication metadata lives in YAML frontmatter at the beginning of the collaborative source:
 
 ```yaml
 ---
+authors:
+  - author@example.com
 state: discussion
 visibility: workspace
 sensitivity: normal
@@ -107,11 +170,14 @@ labels:
   - architecture
   - platform
 ---
+# Durable document checkpoints
 ```
 
-The frontmatter is edited collaboratively, omitted from rendered prose, and reflected immediately in the live publication preview. Publishing validates these values and incorporates them into the structured published revision. Until an authorized member explicitly publishes, frontmatter changes do not alter document authorization or expose a working head. RFC allocation, sharing, and publication remain explicit controls.
+The editor omits frontmatter and the title heading from rendered prose and reflects valid frontmatter immediately in the live preview. Known author emails resolve through the workspace people directory; unknown addresses display as written.
 
-Existing documents without frontmatter are upgraded when their document authority next loads.
+Frontmatter does not itself change authorization or publish a working draft. An authorized user must explicitly publish, which validates the frontmatter and promotes it into the structured metadata of an immutable published revision. RFC allocation, sharing, and publication remain explicit controls.
+
+Public numbered RFCs use zero-padded canonical routes such as `/rfcs/0042`. Legacy `/rfc/...` routes and old slugged routes redirect to the canonical route. Anonymous readers can access only public, published revisions; editing always uses the authorized working head.
 
 ## Search
 
@@ -135,10 +201,80 @@ For example:
 label:platform state:discussion "durable checkpoint" -sensitivity:confidential
 ```
 
-Search reads the workspace's derived catalog projection, which indexes each complete normalized working head and its structured metadata. It does not load every document authority for each query, and the projection can be rebuilt from authoritative checkpoints.
+Search reads a derived workspace catalog rather than loading every document authority. The catalog can be rebuilt from authoritative checkpoints.
+
+## CLI and agent access
+
+The command is still named `jot` for compatibility. Run it directly from a checkout with:
+
+```sh
+node packages/cli/src/main.ts --help
+```
+
+Create an API key under **Workspace settings**, then register the workspace and use the CLI:
+
+```sh
+jot instance add workspace https://rfcs.example.com API_KEY
+jot use workspace
+jot list
+jot search 'state:discussion label:platform'
+jot read DOCUMENT_ID
+jot create 'New proposal' --rfc
+```
+
+The CLI supports safe unique-text edits, line-range reads, metadata and publication commands, sharing, threaded comments, attachments, imports, backups, restore, verification, and catalog repair. Capability URLs can be registered with `jot share-instance` for document-scoped access.
+
+Set `JOT_CONFIG` to override the CLI configuration path, `JOT_INSTANCE` to override the active instance, and `JOT_AUTHOR` to set the guest comment name.
+
+## Importing an existing RFC collection
+
+The repeatable Earendil RFC importer expects this layout:
+
+```text
+SOURCE/
+├── people.json
+└── rfcs/
+    ├── 0001.md
+    ├── 0002.md
+    └── .media/
+        ├── 0001/
+        └── 0002/
+```
+
+Validate an import without changing the target workspace:
+
+```sh
+pnpm import-rfcs --source /path/to/source --dry-run
+```
+
+Create an administrator API key and run the import:
+
+```sh
+JOT_URL=https://rfcs.example.com \
+JOT_API_KEY=secret \
+pnpm import-rfcs --source /path/to/source
+```
+
+The importer preserves RFC numbers and metadata, rewrites known RFC links to canonical routes, uploads media, reuses attachments by digest, and publishes public RFCs after their updates complete. It is incremental: rerunning it updates matching RFC numbers and leaves unchanged documents alone.
+
+The CLI also provides `jot import-rfc` for a single legacy RFC and `jot import-jot` for a Markdown file plus an earlier Jot metadata sidecar.
+
+## Architecture
+
+The implementation is split into runtime-independent domain, collaboration, protocol, rendering, backend, and import packages, with separate browser, Node.js, and Cloudflare adapters. Authoritative edits are journaled before acknowledgement, while rendered HTML, Markdown exports, search indexes, and catalogs remain rebuildable projections.
+
+See [`JOT_ARCHITECTURE.md`](JOT_ARCHITECTURE.md) for the complete design and invariants. That document and internal APIs still use the historical Jot name.
 
 ## Checks
 
+Run the full formatting, lint, typecheck, test, and build suite with:
+
 ```sh
 make check
+```
+
+Apply automatic formatting with:
+
+```sh
+make format
 ```
