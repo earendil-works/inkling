@@ -82,6 +82,13 @@ test(
       const first = await createDocument(running.baseUrl, authorization, "first", true);
       const second = await createDocument(running.baseUrl, authorization, "second", false);
       assert.equal(first.metadata.rfcNumber, 1);
+      assert.deepEqual(first.metadata.authors, [
+        {
+          displayName: "Armin Ronacher",
+          email: "armin@earendil.com",
+          id: "armin@earendil.com",
+        },
+      ]);
       assert.equal(second.metadata.rfcNumber, undefined);
       const allocation = await fetch(`${running.baseUrl}/api/documents/${second.metadata.id}/rfc`, {
         headers: authorization,
@@ -99,7 +106,7 @@ test(
             { newText: "durable", oldText: "initial" },
             {
               newText: "authors:\n  - armin@earendil.com\n  - alphatest0@earendil.com",
-              oldText: "authors: []",
+              oldText: "authors:\n  - armin@earendil.com",
             },
             { newText: "visibility: public", oldText: "visibility: private" },
             { newText: "labels:\n  - working", oldText: "labels: []" },

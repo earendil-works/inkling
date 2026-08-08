@@ -141,7 +141,7 @@ test(
       );
       assert.match(
         await first.locator(".cm-content").innerText(),
-        /---\s+authors: \[\]\s+state: draft\s+visibility: private\s+labels: \[\]\s+---/u,
+        /---\s+authors:\s+- browser@example\.com\s+state: draft\s+visibility: private\s+labels: \[\]\s+---/u,
       );
       const draftStateChip = first.locator(".editor-preview-page .reader-state-chip");
       await draftStateChip.waitFor();
@@ -204,7 +204,7 @@ test(
       );
       assert.match(
         await first.locator(".editor-preview-page [data-document-metadata]").innerText(),
-        /Authors\s+Not specified[\s\S]+Created[\s\S]+Updated/iu,
+        /Authors\s+Browser Admin[\s\S]+Created[\s\S]+Updated/iu,
       );
       assert.equal(
         await first
@@ -358,7 +358,7 @@ test(
       await first.waitForSelector("[data-reader-toc]");
       assert.match(
         await first.locator("[data-reader] [data-document-metadata]").innerText(),
-        /Authors\s+Not specified[\s\S]+Created[\s\S]+Updated/iu,
+        /Authors\s+Browser Admin[\s\S]+Created[\s\S]+Updated/iu,
       );
       assert.equal(
         await first.getByRole("navigation", { name: "On this page" }).locator("p").textContent(),

@@ -1179,8 +1179,15 @@ export function makeLocalInklingApplication(
               ),
             ),
           );
+          const author =
+            principal.kind === "workspace" || principal.kind === "api-key"
+              ? workspacePeople(state.catalog, state.authentication).find(
+                  (person) => person.id === principal.personId,
+                )
+              : undefined;
           const metadata = yield* createDocumentMetadata(
             {
+              authors: author === undefined ? [] : [author],
               id: reservation.entry.documentId,
               rfcNumber: reservation.entry.rfcNumber,
               title: documentTitleFromMarkdown(request.body ?? "") ?? request.title,

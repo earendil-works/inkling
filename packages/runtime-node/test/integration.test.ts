@@ -59,6 +59,13 @@ test(
         assert.equal(create.status, 200);
         let document = (await create.json()) as DocumentWire;
         assert.equal(document.metadata.rfcNumber, undefined);
+        assert.deepEqual(document.metadata.authors, [
+          {
+            displayName: "Integration Admin",
+            email: "admin@example.com",
+            id: "admin@example.com",
+          },
+        ]);
         const allocate = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/rfc`, {
           headers: authorization,
           method: "POST",
@@ -196,7 +203,7 @@ test(
             edits: [
               {
                 newText: "authors:\n  - ada@example.com",
-                oldText: "authors: []",
+                oldText: "authors:\n  - admin@example.com",
               },
               { newText: "visibility: public", oldText: "visibility: private" },
               {
@@ -471,6 +478,11 @@ interface DocumentWire {
   readonly body: string;
   readonly comments: { readonly threads: readonly unknown[] };
   readonly metadata: {
+    readonly authors: readonly {
+      readonly displayName: string;
+      readonly email: string;
+      readonly id: string;
+    }[];
     readonly headRevision: number;
     readonly id: string;
     readonly publishedRevision?: number | undefined;
