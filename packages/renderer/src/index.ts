@@ -145,7 +145,7 @@ async function renderMarkdown(
       return "";
     }
     const depth = Number(token.tag.slice(1));
-    const text = inline.content;
+    const text = inlineTokenText(inline) ?? inline.content;
     const base = slugify(text);
     const count = usedHeadingIds.get(base) ?? 0;
     usedHeadingIds.set(base, count + 1);

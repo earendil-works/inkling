@@ -81,6 +81,16 @@ test("the first top-level heading becomes the title instead of rendered body con
   assert.match(rendered.html, /<h2 id="same-title"/u);
 });
 
+test("table-of-contents headings use rendered text without Markdown escapes", async () => {
+  const rendered = await Effect.runPromise(
+    renderer.render("## Detailed plan\n\n### 1\\. Home\n\n### Escaped \\*label\\*"),
+  );
+  assert.deepEqual(
+    rendered.headings.map((heading) => heading.text),
+    ["Detailed plan", "1. Home", "Escaped *label*"],
+  );
+});
+
 test("interactive rendering annotates block elements with Markdown source ranges", async () => {
   const markdown = "# Heading\n\nParagraph with **strong text**.\n\n- list item\n";
   const rendered = await Effect.runPromise(renderer.render(markdown, { sourcePositions: true }));
