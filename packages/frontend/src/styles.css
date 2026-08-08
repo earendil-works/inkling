@@ -1604,19 +1604,43 @@ select:disabled {
 .editor-preview-page .reader-toc {
   position: static;
   order: -1;
-  padding: 0 0 1rem;
+  padding: 0.8rem 0 1rem;
+  overflow: hidden;
   border-bottom: 1px solid var(--border);
   border-left: 0;
 }
 
-.editor-preview-page .reader-toc ol {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
-  gap: 0.4rem 1rem;
+.editor-preview-page .reader-toc > p {
+  margin-bottom: 0.55rem;
 }
 
+.editor-preview-page .reader-toc ol {
+  display: flex;
+  gap: 0.4rem;
+  padding-bottom: 0.3rem;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+}
+
+.editor-preview-page .reader-toc li,
 .editor-preview-page .reader-toc li + li {
-  margin-top: 0;
+  flex: 0 0 auto;
+  margin: 0;
+  padding-left: 0;
+  scroll-snap-align: start;
+}
+
+.editor-preview-page .reader-toc a {
+  display: block;
+  max-width: 18rem;
+  padding: 0.35rem 0.5rem;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--surface-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .editor-preview-page .reader-body.markdown-body {
@@ -2379,19 +2403,43 @@ select:disabled {
     position: static;
     top: auto;
     order: -1;
-    padding: 0 0 1rem;
+    padding: 0.8rem 0 1rem;
+    overflow: hidden;
     border-bottom: 1px solid var(--border);
     border-left: 0;
   }
 
-  .reader-toc ol {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-    gap: 0.4rem 1rem;
+  .reader-toc > p {
+    margin-bottom: 0.55rem;
   }
 
+  .reader-toc ol {
+    display: flex;
+    gap: 0.4rem;
+    padding-bottom: 0.3rem;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+  }
+
+  .reader-toc li,
   .reader-toc li + li {
-    margin-top: 0;
+    flex: 0 0 auto;
+    margin: 0;
+    padding-left: 0;
+    scroll-snap-align: start;
+  }
+
+  .reader-toc a {
+    display: block;
+    max-width: 18rem;
+    padding: 0.35rem 0.5rem;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    background: var(--surface-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 

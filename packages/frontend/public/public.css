@@ -484,19 +484,43 @@ body {
   .public-toc {
     position: static;
     order: -1;
-    padding: 0 0 1rem;
+    padding: 0.8rem 0 1rem;
+    overflow: hidden;
     border-bottom: 1px solid var(--public-border);
     border-left: 0;
   }
 
-  .public-toc ol {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-    gap: 0.4rem 1rem;
+  .public-toc > p {
+    margin-bottom: 0.55rem;
   }
 
+  .public-toc ol {
+    display: flex;
+    gap: 0.4rem;
+    padding-bottom: 0.3rem;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+  }
+
+  .public-toc li,
   .public-toc li + li {
-    margin-top: 0;
+    flex: 0 0 auto;
+    margin: 0;
+    padding-left: 0;
+    scroll-snap-align: start;
+  }
+
+  .public-toc a {
+    display: block;
+    max-width: 18rem;
+    padding: 0.35rem 0.5rem;
+    overflow: hidden;
+    border: 1px solid var(--public-border);
+    border-radius: 2px;
+    background: var(--public-muted-surface);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 

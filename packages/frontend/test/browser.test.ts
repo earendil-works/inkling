@@ -458,6 +458,23 @@ test(
       assert.match(typography.prose, /Newsreader/u);
       assert.match(typography.editor, /JetBrains Mono/u);
       assert.equal(typography.code, typography.editor);
+      const compactToc = await first
+        .locator(".editor-preview-page [data-reader-toc]")
+        .evaluate((toc) => {
+          const list = toc.querySelector("ol");
+          const link = toc.querySelector("a");
+          if (list === null || link === null) throw new Error("Preview TOC is incomplete.");
+          return {
+            display: getComputedStyle(list).display,
+            overflowX: getComputedStyle(list).overflowX,
+            whiteSpace: getComputedStyle(link).whiteSpace,
+          };
+        });
+      assert.deepEqual(compactToc, {
+        display: "flex",
+        overflowX: "auto",
+        whiteSpace: "nowrap",
+      });
 
       await first.locator(".cm-content").click();
       await first.keyboard.press("ControlOrMeta+Home");
