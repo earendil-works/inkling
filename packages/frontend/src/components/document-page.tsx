@@ -30,7 +30,11 @@ export function DocumentPage({
         <p className="reader-folio">{folio}</p>
         <div className="reader-heading__main">
           <div className="reader-heading__badges">
-            <LifecycleStateChip className="reader-state-chip" state={metadata.lifecycleState} />
+            <LifecycleStateChip
+              className="reader-state-chip"
+              href={`/?q=${encodeURIComponent(`state:${metadata.lifecycleState}`)}`}
+              state={metadata.lifecycleState}
+            />
             <a
               className="reader-visibility-chip"
               data-document-visibility={metadata.visibility}

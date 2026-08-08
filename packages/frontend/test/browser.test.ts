@@ -380,8 +380,13 @@ test(
       const renderedKeyword = first.locator("[data-preview] .tok-keyword");
       assert.equal(await renderedKeyword.textContent(), "const");
       assert.equal(await renderedKeyword.getAttribute("class"), editorKeywordClass);
-      await first.locator(".reader-back-link").click();
+      assert.equal(await first.locator(".reader-back-link").count(), 0);
+      const readerState = first.locator(".reader-state-chip");
+      assert.equal(await readerState.getAttribute("href"), "/?q=state%3Adraft");
+      await readerState.click();
+      await first.waitForURL(/\?q=state%3Adraft$/u);
       await first.waitForSelector("[data-document-search]");
+      assert.equal(await first.locator("[data-search]").inputValue(), "state:draft");
       await first.getByRole("link", { name: "Browse labels" }).click();
       await first.waitForURL(/\/labels$/u);
       await first.waitForSelector("[data-label-index]");

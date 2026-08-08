@@ -13,25 +13,21 @@ export function ReaderToolbar({
   metadata,
   publicDocument = false,
   shared,
-}: ReaderToolbarProps): React.JSX.Element {
+}: ReaderToolbarProps): React.JSX.Element | null {
   const canEdit = !publicDocument && (!shared || metadata.sharing.access === "edit");
+  if (!canEdit) return null;
 
   return (
     <nav className="document-bar reader-toolbar" aria-label="Document navigation">
-      <ButtonLink className="reader-back-link" href="/" variant="text">
-        Inkling
+      <ButtonLink
+        className="document-mode-link"
+        data-open-editor=""
+        href={documentHref(metadata.id, metadata.rfcNumber, shared, "edit")}
+        size="small"
+        variant="primary"
+      >
+        Edit
       </ButtonLink>
-      {canEdit ? (
-        <ButtonLink
-          className="document-mode-link"
-          data-open-editor=""
-          href={documentHref(metadata.id, metadata.rfcNumber, shared, "edit")}
-          size="small"
-          variant="primary"
-        >
-          Edit
-        </ButtonLink>
-      ) : null}
     </nav>
   );
 }

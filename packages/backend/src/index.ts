@@ -1006,7 +1006,7 @@ function publicDocumentHtml(document: {
       : `<aside class="public-toc" aria-label="On this page"><p>On this page</p><ol>${toc}</ol></aside>`;
   const state = publicStateLink(metadata.lifecycleState);
   const visibility = publicVisibilityChip(metadata);
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${description}"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><link rel="canonical" href="${escapeHtml(document.canonicalPath)}"><title>${title}</title><link rel="stylesheet" href="/fonts.css"><link rel="stylesheet" href="/public.css"></head><body><header class="public-masthead"><a href="/">INKLING</a><span>${folio}</span></header><main class="public-page-shell"><article class="public-paper public-document"><div class="public-topline"><a href="/">Inkling</a></div><header class="public-hero"><p class="public-folio">${folio}</p><div class="public-hero-main"><div class="public-hero-badges">${state}${visibility}</div><h1>${title}</h1>${labels === "" ? "" : `<div class="public-labels" aria-label="Labels">${labels}</div>`}</div></header>${publicMetadataHtml(metadata)}<div class="public-content-grid"><div class="public-prose">${document.html}</div>${tocHtml}</div></article></main></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${description}"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><link rel="canonical" href="${escapeHtml(document.canonicalPath)}"><title>${title}</title><link rel="stylesheet" href="/fonts.css"><link rel="stylesheet" href="/public.css"></head><body><header class="public-masthead"><a href="/">INKLING</a><span>${folio}</span></header><main class="public-page-shell"><article class="public-paper public-document"><header class="public-hero"><p class="public-folio">${folio}</p><div class="public-hero-main"><div class="public-hero-badges">${state}${visibility}</div><h1>${title}</h1>${labels === "" ? "" : `<div class="public-labels" aria-label="Labels">${labels}</div>`}</div></header>${publicMetadataHtml(metadata)}<div class="public-content-grid"><div class="public-prose">${document.html}</div>${tocHtml}</div></article></main></body></html>`;
 }
 
 function publicVisibilityChip(metadata: DocumentMetadataDto): string {
@@ -1016,7 +1016,7 @@ function publicVisibilityChip(metadata: DocumentMetadataDto): string {
 function publicStateLink(state: string, className?: string | undefined): string {
   const classes = ["public-state", className].filter(Boolean).join(" ");
   const tone = state.trim().toLocaleLowerCase("en");
-  return `<a class="${classes}" data-lifecycle-state="${escapeHtml(tone)}" href="/state/${encodeURIComponent(state)}">${escapeHtml(state)}</a>`;
+  return `<a class="${classes}" data-lifecycle-state="${escapeHtml(tone)}" href="/?q=${encodeURIComponent(`state:${state}`)}">${escapeHtml(state)}</a>`;
 }
 
 function publicMetadataHtml(metadata: DocumentMetadataDto): string {

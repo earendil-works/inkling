@@ -258,8 +258,12 @@ test(
         assert.match(publishedHtml, /Integrated RFC/u);
         assert.match(publishedHtml, /<title>Integrated RFC<\/title>/u);
         assert.match(publishedHtml, /class="public-hero"/u);
-        assert.match(publishedHtml, /class="public-state" data-lifecycle-state="draft"/u);
+        assert.match(
+          publishedHtml,
+          /class="public-state" data-lifecycle-state="draft" href="\/\?q=state%3Adraft"/u,
+        );
         assert.match(publishedHtml, /class="public-hero-badges"/u);
+        assert.doesNotMatch(publishedHtml, /class="public-topline"/u);
         assert.match(
           publishedHtml,
           /class="public-visibility" data-document-visibility="public">public/u,

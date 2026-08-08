@@ -200,6 +200,7 @@ select:disabled {
   font: var(--font-caption)/1 var(--mono);
   letter-spacing: 0.08em;
   line-height: 1;
+  text-decoration: none;
   text-transform: uppercase;
 }
 
@@ -1233,21 +1234,11 @@ select:disabled {
 .document-bar.reader-toolbar {
   position: static;
   width: min(100%, 72rem);
+  justify-content: flex-end;
   margin: 0 auto 1.35rem;
   padding: 0 1.5rem;
   border: 0;
   background: transparent;
-}
-
-.reader-back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  text-decoration: none;
-}
-
-.reader-back-link::before {
-  content: "←";
 }
 
 .document-mode-link {

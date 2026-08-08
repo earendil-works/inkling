@@ -95,34 +95,12 @@ body {
   box-shadow: 0 10px 30px rgb(0 0 0 / 8%);
 }
 
-.public-topline,
 .public-hero,
 .public-metadata,
 .public-content-grid {
   width: min(100%, 72rem);
   margin-right: auto;
   margin-left: auto;
-}
-
-.public-topline {
-  margin-bottom: 1.35rem;
-  font: var(--font-caption)/1.3 var(--mono);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.public-topline a {
-  color: var(--public-muted);
-  text-decoration: none;
-}
-
-.public-topline a::before {
-  margin-right: 0.35rem;
-  content: "←";
-}
-
-.public-topline a:hover {
-  color: var(--public-text);
 }
 
 .public-hero {
@@ -531,10 +509,6 @@ body {
   .public-paper {
     padding: 1rem;
     box-shadow: none;
-  }
-
-  .public-topline {
-    margin-bottom: 1rem;
   }
 
   .public-hero {
