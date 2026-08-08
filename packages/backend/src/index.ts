@@ -1000,10 +1000,15 @@ function publicDocumentHtml(document: {
     toc === ""
       ? ""
       : `<aside class="public-toc" aria-label="On this page"><p>On this page</p><ol>${toc}</ol></aside>`;
-  const sensitivityClass = metadata.sensitivity === "confidential" ? " is-confidential" : "";
-  const sensitivityLabel = metadata.sensitivity === "confidential" ? "Confidential" : "Visibility";
   const state = publicStateLink(metadata.lifecycleState);
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${description}"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><link rel="canonical" href="${escapeHtml(document.canonicalPath)}"><title>${title}</title><link rel="stylesheet" href="/fonts.css"><link rel="stylesheet" href="/public.css"></head><body><header class="public-masthead"><a href="/">JOT</a><span>${folio}</span></header><main class="public-page-shell"><article class="public-paper public-document"><div class="public-topline"><a href="/">All notes and RFCs</a></div><header class="public-hero"><p class="public-folio">${folio}</p><div class="public-hero-main">${state}<h1>${title}</h1><div class="public-visibility${sensitivityClass}"><strong>${sensitivityLabel}</strong><span>${escapeHtml(metadata.visibility)}</span></div>${labels === "" ? "" : `<div class="public-labels" aria-label="Labels">${labels}</div>`}</div></header>${publicMetadataHtml(metadata)}<div class="public-content-grid"><div class="public-prose">${document.html}</div>${tocHtml}</div></article></main></body></html>`;
+  const classification = publicClassificationChip(metadata);
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${description}"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><link rel="canonical" href="${escapeHtml(document.canonicalPath)}"><title>${title}</title><link rel="stylesheet" href="/fonts.css"><link rel="stylesheet" href="/public.css"></head><body><header class="public-masthead"><a href="/">JOT</a><span>${folio}</span></header><main class="public-page-shell"><article class="public-paper public-document"><div class="public-topline"><a href="/">All notes and RFCs</a></div><header class="public-hero"><p class="public-folio">${folio}</p><div class="public-hero-main"><div class="public-hero-badges">${state}${classification}</div><h1>${title}</h1>${labels === "" ? "" : `<div class="public-labels" aria-label="Labels">${labels}</div>`}</div></header>${publicMetadataHtml(metadata)}<div class="public-content-grid"><div class="public-prose">${document.html}</div>${tocHtml}</div></article></main></body></html>`;
+}
+
+function publicClassificationChip(metadata: DocumentMetadataDto): string {
+  const classification =
+    metadata.sensitivity === "confidential" ? "confidential" : metadata.visibility;
+  return `<span class="public-classification" data-document-classification="${classification}">${classification}</span>`;
 }
 
 function publicStateLink(state: string, className?: string | undefined): string {

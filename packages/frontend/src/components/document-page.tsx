@@ -4,6 +4,7 @@ import type { DocumentMetadataDto } from "@earendil-works/jot-protocol";
 import type { RenderHeading } from "@earendil-works/jot-renderer";
 
 import { formatDate } from "../ui.ts";
+import { documentClassification } from "./document-metadata.ts";
 import { DocumentTableOfContents } from "./document-table-of-contents.tsx";
 import { LifecycleStateChip } from "./lifecycle-state-chip.tsx";
 
@@ -22,23 +23,26 @@ export function DocumentPage({
     metadata.rfcNumber === undefined
       ? "Note"
       : `RFC ${String(metadata.rfcNumber).padStart(4, "0")}`;
+  const classification = documentClassification(metadata);
+  const classificationQuery =
+    classification === "confidential" ? "sensitivity:confidential" : `visibility:${classification}`;
 
   return (
     <div className="document-page" data-document-page="">
       <header className="reader-heading">
         <p className="reader-folio">{folio}</p>
         <div className="reader-heading__main">
-          <LifecycleStateChip className="reader-state-chip" state={metadata.lifecycleState} />
+          <div className="reader-heading__badges">
+            <LifecycleStateChip className="reader-state-chip" state={metadata.lifecycleState} />
+            <a
+              className="reader-classification-chip"
+              data-document-classification={classification}
+              href={`/?q=${encodeURIComponent(classificationQuery)}`}
+            >
+              {classification}
+            </a>
+          </div>
           <h1>{metadata.title}</h1>
-          <a
-            className={`reader-visibility-note${metadata.sensitivity === "confidential" ? " is-confidential" : ""}`}
-            href={`/?q=${encodeURIComponent(`visibility:${metadata.visibility}`)}`}
-          >
-            <strong>
-              {metadata.sensitivity === "confidential" ? "Confidential" : "Visibility"}
-            </strong>
-            <span>{metadata.visibility}</span>
-          </a>
           {metadata.labels.length === 0 ? null : (
             <div className="reader-labels" aria-label="Labels">
               {metadata.labels.map((label) => (

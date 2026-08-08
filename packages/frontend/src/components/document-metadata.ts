@@ -1,6 +1,14 @@
 import type { DocumentMetadataDto } from "@earendil-works/jot-protocol";
 import type { DocumentFrontmatter } from "@earendil-works/jot-renderer";
 
+export type DocumentClassification = "confidential" | "public" | "workspace";
+
+export function documentClassification(
+  metadata: Pick<DocumentMetadataDto, "sensitivity" | "visibility">,
+): DocumentClassification {
+  return metadata.sensitivity === "confidential" ? "confidential" : metadata.visibility;
+}
+
 export function metadataWithFrontmatter(
   metadata: DocumentMetadataDto,
   frontmatter: DocumentFrontmatter | undefined,

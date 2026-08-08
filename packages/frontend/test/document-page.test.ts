@@ -3,7 +3,10 @@ import test from "node:test";
 
 import type { DocumentMetadataDto } from "@earendil-works/jot-protocol";
 
-import { metadataWithFrontmatter } from "../src/components/document-metadata.ts";
+import {
+  documentClassification,
+  metadataWithFrontmatter,
+} from "../src/components/document-metadata.ts";
 
 const metadata: DocumentMetadataDto = {
   approvers: [],
@@ -21,6 +24,15 @@ const metadata: DocumentMetadataDto = {
   updatedAt: "2026-01-01T00:00:00.000Z",
   visibility: "workspace",
 };
+
+test("document classification prioritizes confidentiality over visibility", () => {
+  assert.equal(documentClassification(metadata), "workspace");
+  assert.equal(documentClassification({ ...metadata, visibility: "public" }), "public");
+  assert.equal(
+    documentClassification({ ...metadata, sensitivity: "confidential", visibility: "public" }),
+    "confidential",
+  );
+});
 
 test("frontmatter authors render known account names and retain email identity", () => {
   const rendered = metadataWithFrontmatter(

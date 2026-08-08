@@ -146,7 +146,15 @@ body {
   min-width: 0;
 }
 
-.public-state {
+.public-hero-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.public-state,
+.public-classification {
   display: inline-flex;
   width: max-content;
   padding: 0.3rem 0.5rem;
@@ -196,6 +204,18 @@ body {
   color: var(--state-abandoned-text);
 }
 
+.public-classification[data-document-classification="public"] {
+  border-color: var(--visibility-border);
+  background: var(--visibility-bg);
+  color: var(--visibility-text);
+}
+
+.public-classification[data-document-classification="confidential"] {
+  border-color: var(--state-abandoned-border);
+  background: var(--state-abandoned-bg);
+  color: var(--state-abandoned-text);
+}
+
 .public-catalog-state {
   padding: 0.2rem 0.38rem;
 }
@@ -208,32 +228,6 @@ body {
   letter-spacing: -0.04em;
   line-height: 1.02;
   text-wrap: balance;
-}
-
-.public-visibility {
-  display: grid;
-  width: max-content;
-  min-width: 9rem;
-  gap: 0.15rem;
-  margin-top: 1rem;
-  padding: 0.45rem 0.65rem;
-  border-left: 2px solid var(--visibility-border);
-  background: var(--visibility-bg);
-  color: var(--visibility-text);
-  font: var(--font-caption)/1.35 var(--mono);
-  text-transform: uppercase;
-}
-
-.public-visibility strong {
-  color: inherit;
-  font-size: var(--font-caption);
-  letter-spacing: 0.08em;
-}
-
-.public-visibility.is-confidential {
-  border-left-color: var(--state-abandoned-border);
-  background: var(--state-abandoned-bg);
-  color: var(--state-abandoned-text);
 }
 
 .public-labels {

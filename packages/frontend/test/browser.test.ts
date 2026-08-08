@@ -252,7 +252,9 @@ test(
       await first.keyboard.press("End");
       await first.keyboard.insertText("c");
       await first.waitForFunction(
-        () => document.querySelector(".reader-visibility-note span")?.textContent === "public",
+        () =>
+          document.querySelector('[data-document-classification="public"]')?.textContent ===
+          "public",
       );
       assert.equal(await first.locator("[data-publish]").textContent(), "Publish");
       assert.equal(await first.locator("[data-publish]").isEnabled(), true);
