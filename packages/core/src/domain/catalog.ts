@@ -210,7 +210,7 @@ export function searchCatalog(
 ): readonly CatalogSummary[] {
   const parsed = parseCatalogSearchQuery(query);
   const limit = Math.max(1, Math.min(options.limit ?? 100, 500));
-  return state.entries
+  const matches = state.entries
     .filter((entry) => options.includeDeleted === true || entry.status === "active")
     .flatMap((entry) => (entry.summary === undefined ? [] : [entry.summary]))
     .filter(
@@ -221,14 +221,18 @@ export function searchCatalog(
     .flatMap((summary) => {
       const score = scoreSummary(summary, parsed, state.people);
       return score === undefined ? [] : [{ score, summary }];
-    })
-    .toSorted(
-      (left, right) =>
-        right.score - left.score ||
-        Date.parse(right.summary.updatedAt) - Date.parse(left.summary.updatedAt),
-    )
-    .slice(0, limit)
-    .map(({ summary }) => withMatchingExcerpt(summary, parsed));
+    });
+  const summaries =
+    parsed.terms.length === 0
+      ? orderCatalog(matches.map(({ summary }) => summary))
+      : matches
+          .toSorted(
+            (left, right) =>
+              right.score - left.score ||
+              Date.parse(right.summary.updatedAt) - Date.parse(left.summary.updatedAt),
+          )
+          .map(({ summary }) => summary);
+  return summaries.slice(0, limit).map((summary) => withMatchingExcerpt(summary, parsed));
 }
 
 export function parseCatalogSearchQuery(query: string): CatalogSearchQuery {
@@ -247,10 +251,33 @@ export function parseCatalogSearchQuery(query: string): CatalogSearchQuery {
 }
 
 export function publicCatalog(state: WorkspaceCatalogState): readonly CatalogSummary[] {
-  return searchCatalog(state, "", { publicOnly: true, limit: 500 }).toSorted(
-    (left, right) =>
-      (left.rfcNumber ?? Number.MAX_SAFE_INTEGER) - (right.rfcNumber ?? Number.MAX_SAFE_INTEGER),
-  );
+  return searchCatalog(state, "", { publicOnly: true, limit: 500 });
+}
+
+function orderCatalog(summaries: readonly CatalogSummary[]): readonly CatalogSummary[] {
+  const rfcs = summaries
+    .filter((summary) => summary.rfcNumber !== undefined)
+    .toSorted((left, right) => (right.rfcNumber ?? 0) - (left.rfcNumber ?? 0));
+  const notes = summaries
+    .filter((summary) => summary.rfcNumber === undefined)
+    .toSorted(
+      (left, right) =>
+        Date.parse(right.updatedAt) - Date.parse(left.updatedAt) ||
+        right.documentId.localeCompare(left.documentId),
+    );
+  const ordered: CatalogSummary[] = [];
+  let noteIndex = 0;
+  for (const rfc of rfcs) {
+    while (true) {
+      const note = notes[noteIndex];
+      if (note === undefined || Date.parse(note.updatedAt) <= Date.parse(rfc.updatedAt)) break;
+      ordered.push(note);
+      noteIndex += 1;
+    }
+    ordered.push(rfc);
+  }
+  ordered.push(...notes.slice(noteIndex));
+  return ordered;
 }
 
 export function upsertPerson(

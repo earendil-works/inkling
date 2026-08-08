@@ -30,7 +30,7 @@ export function WorkspaceScreen({
       <section className="workspace-heading">
         <div>
           <p className="eyebrow">
-            {publicCatalog ? "Public archive / published revisions" : "Workspace / recent activity"}
+            {publicCatalog ? "Public archive / published revisions" : "Workspace / notes & RFCs"}
           </p>
           <h1>Inkling</h1>
         </div>

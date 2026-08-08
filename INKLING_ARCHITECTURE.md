@@ -86,7 +86,7 @@ This section describes behavioral requirements, not implementation guidance.
 
 #### Workspace and note management
 
-- The landing page lists public published notes and RFCs for anonymous visitors, and the complete workspace ordered by recent activity for authenticated users.
+- The landing page lists public published notes and RFCs for anonymous visitors and the complete workspace for authenticated users. Numbered RFCs stay in descending RFC order; unnumbered notes stay in descending activity order and interleave with RFCs by update time.
 - Users can create, open, rename, search, and delete documents.
 - Search matches titles and document content and returns useful snippets.
 - Documents have stable opaque identifiers, creation timestamps, and update timestamps.
@@ -188,7 +188,7 @@ Expected RFC states include draft, discussion, published, accepted, implemented,
 
 - RFCs have zero-padded canonical number routes.
 - Legacy RFC routes redirect to canonical routes.
-- The index is ordered by RFC number and exposes state, update date, visibility, and labels.
+- The index keeps numbered RFCs in descending RFC order, interleaves unnumbered notes by update time, and exposes state, update date, visibility, and labels.
 - State and keyword index pages are available.
 - Search matches number, title, authors, reviewers, approvers, labels, visibility, state, and summary text.
 - Public visitors see only public, published material, including the anonymous landing-page catalog.

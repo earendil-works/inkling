@@ -429,6 +429,49 @@ test("catalog search covers full bodies and Gmail-style metadata filters", async
   assert.equal(searchCatalog(state, "is:note")[0]?.documentId, noteMetadata.id);
 });
 
+test("catalogs keep RFC number order while interleaving notes by activity", async () => {
+  const [newerNote, latestRfc, middleNote, earlierRfc, olderNote] = await Effect.runPromise(
+    Effect.all([
+      createDocumentMetadata(
+        { id: "document_newer_note", title: "Newer note" },
+        "2026-08-05T00:00:00.000Z",
+      ),
+      createDocumentMetadata(
+        { id: "document_rfc_54", rfcNumber: 54, title: "Latest RFC" },
+        "2026-08-04T00:00:00.000Z",
+      ),
+      createDocumentMetadata(
+        { id: "document_middle_note", title: "Middle note" },
+        "2026-08-02T00:00:00.000Z",
+      ),
+      createDocumentMetadata(
+        { id: "document_rfc_47", rfcNumber: 47, title: "Earlier RFC" },
+        "2026-08-01T00:00:00.000Z",
+      ),
+      createDocumentMetadata(
+        { id: "document_older_note", title: "Older note" },
+        "2026-07-31T00:00:00.000Z",
+      ),
+    ]),
+  );
+  const state: WorkspaceCatalogState = {
+    entries: [earlierRfc, olderNote, newerNote, latestRfc, middleNote].map((metadata) => ({
+      creationKey: `catalog-order:${metadata.id}`,
+      documentId: metadata.id,
+      rfcNumber: metadata.rfcNumber,
+      status: "active" as const,
+      summary: catalogSummary(metadata, metadata.title),
+    })),
+    nextRfcNumber: 55,
+    people: [],
+  };
+
+  assert.deepEqual(
+    searchCatalog(state, "").map((summary) => summary.title),
+    ["Newer note", "Latest RFC", "Middle note", "Earlier RFC", "Older note"],
+  );
+});
+
 test("publication changes exclude the publication bookkeeping revision", () => {
   assert.equal(hasPendingPublicationChanges({ headRevision: 0 }), true);
   assert.equal(hasPendingPublicationChanges({ headRevision: 5, publishedRevision: 4 }), false);
