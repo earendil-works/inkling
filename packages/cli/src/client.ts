@@ -84,10 +84,7 @@ export interface CliClient {
     documentId: string,
     expectedRevision: number,
   ) => Effect.Effect<void, ClientError>;
-  readonly publish: (
-    documentId: string,
-    confirmConfidentialPublic?: boolean,
-  ) => Effect.Effect<DocumentMetadataDto, ClientError>;
+  readonly publish: (documentId: string) => Effect.Effect<DocumentMetadataDto, ClientError>;
   readonly unpublish: (documentId: string) => Effect.Effect<DocumentMetadataDto, ClientError>;
   readonly share: (
     documentId: string,
@@ -393,9 +390,9 @@ export function makeCliClient(instance: Instance): CliClient {
           ),
         ),
       ),
-    publish: (documentId, confirmConfidentialPublic = false) =>
+    publish: (documentId) =>
       mutate(
-        `/api/documents/${encodeURIComponent(documentId)}/publish${confirmConfidentialPublic ? "?confirmConfidentialPublic=true" : ""}`,
+        `/api/documents/${encodeURIComponent(documentId)}/publish`,
         DocumentMetadataSchema,
         "POST",
       ),

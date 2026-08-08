@@ -6,13 +6,11 @@ import { LifecycleStateChip } from "./lifecycle-state-chip.tsx";
 
 export interface DocumentCatalogRowProps {
   readonly document: CatalogResponse["documents"][number];
-  readonly index: number;
   readonly publicDocument?: boolean | undefined;
 }
 
 export function DocumentCatalogRow({
   document,
-  index,
   publicDocument = false,
 }: DocumentCatalogRowProps): React.JSX.Element {
   const { excerpt, metadata } = document;
@@ -24,6 +22,7 @@ export function DocumentCatalogRow({
   return (
     <a
       className="catalog-row"
+      data-document-visibility={metadata.visibility}
       data-native-navigation={publicDocument ? "" : undefined}
       href={
         publicDocument
@@ -31,7 +30,7 @@ export function DocumentCatalogRow({
           : documentHref(metadata.id, metadata.rfcNumber, false, "read", "")
       }
     >
-      <span className="catalog-row__index">{String(index + 1).padStart(2, "0")}</span>
+      <span className="catalog-row__folio">{number}</span>
       <span className="catalog-row__main">
         <span className="catalog-row__title">
           <strong>{metadata.title}</strong>
@@ -44,7 +43,9 @@ export function DocumentCatalogRow({
         <small>{excerpt || "No body text yet"}</small>
       </span>
       <span className="catalog-row__meta">
-        <b>{number}</b>
+        <span className="catalog-row__visibility" data-document-visibility={metadata.visibility}>
+          {metadata.visibility}
+        </span>
         <LifecycleStateChip className="catalog-row__state" state={metadata.lifecycleState} />
         <time dateTime={metadata.updatedAt}>{formatDate(metadata.updatedAt)}</time>
       </span>

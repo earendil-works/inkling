@@ -12,7 +12,6 @@ export type {
   PersonId,
   PersonReference,
   RelatedDocumentReference,
-  Sensitivity,
   SharingPolicy,
   Visibility,
 } from "./domain/document.ts";
@@ -30,6 +29,7 @@ export {
   markPublished,
   markUnpublished,
   nextDocumentRevision,
+  normalizeDocumentMetadata,
   personId,
   requireRevision,
   resolveAuthorsByEmail,
@@ -116,6 +116,7 @@ export {
   emptyWorkspaceCatalog,
   findPerson,
   normalizeSearchText,
+  normalizeWorkspaceCatalog,
   parseCatalogSearchQuery,
   publicCatalog,
   reserveDocument,

@@ -17,6 +17,7 @@ import {
   markPublished,
   markUnpublished,
   nextDocumentRevision,
+  normalizeDocumentMetadata,
   ObjectStore,
   replaceCommentAnchor,
   replyToCommentThread,
@@ -167,7 +168,6 @@ export interface DocumentAuthorityService {
     patch: MetadataPatch,
     expectedRevision: number,
     now: string,
-    confirmConfidentialPublic?: boolean,
   ) => Effect.Effect<DocumentMetadata, AuthorityError>;
   readonly updateSharing: (
     principal: Principal,
@@ -610,7 +610,7 @@ export function makeDocumentAuthority(
             return metadata;
           }),
         ),
-      updateMetadata: (principal, patch, expectedRevision, now, confirm = false) =>
+      updateMetadata: (principal, patch, expectedRevision, now) =>
         withLock(
           Effect.gen(function* () {
             yield* authorizeDocument(principal, "edit-metadata", state.metadata, now);
@@ -619,7 +619,6 @@ export function makeDocumentAuthority(
               patch,
               expectedRevision,
               now,
-              confirm,
             );
             const entry = yield* persist("metadata-event", metadata, state.comments, undefined);
             state = { ...state, dirty: true, metadata, sequence: entry.sequence };
@@ -691,7 +690,7 @@ export function loadDocumentRevision(
       collaborative,
       comments: checkpoint.comments as CommentState,
       dirty: false,
-      metadata: checkpoint.metadata as DocumentMetadata,
+      metadata: normalizeDocumentMetadata(checkpoint.metadata as DocumentMetadata),
       sequence: checkpoint.sequence,
     };
     const snapshot = yield* makeSnapshot(state);
@@ -745,7 +744,7 @@ function recoverState(
           "The checkpoint belongs to another workspace or document.",
         );
       }
-      metadata = checkpoint.metadata as DocumentMetadata;
+      metadata = normalizeDocumentMetadata(checkpoint.metadata as DocumentMetadata);
       comments = checkpoint.comments as CommentState;
       sequence = checkpoint.sequence;
       const update = yield* decodeBase64(checkpoint.bodyUpdate).pipe(
@@ -760,7 +759,7 @@ function recoverState(
     const entries = yield* journal.entriesAfter(options.documentId, sequence);
     for (const entry of entries.toSorted((left, right) => left.sequence - right.sequence)) {
       const wire = yield* decodeJournalWire(entry.payload);
-      metadata = wire.metadata as DocumentMetadata;
+      metadata = normalizeDocumentMetadata(wire.metadata as DocumentMetadata);
       comments = (wire.comments ?? comments) as CommentState;
       if (wire.bodyUpdate !== undefined) {
         const update = yield* decodeBase64(wire.bodyUpdate).pipe(

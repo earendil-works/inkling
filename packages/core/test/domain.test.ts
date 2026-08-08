@@ -22,6 +22,8 @@ import {
   emptyCommentState,
   encodeBase62,
   IdGenerator,
+  markPublished,
+  normalizeDocumentMetadata,
   normalizeSearchText,
   parseCatalogSearchQuery,
   personId,
@@ -63,7 +65,6 @@ function catalogSummary(metadata: DocumentMetadata, body: string): CatalogSummar
     revision: metadata.headRevision,
     reviewers: metadata.reviewers,
     rfcNumber: metadata.rfcNumber,
-    sensitivity: metadata.sensitivity,
     state: metadata.lifecycleState,
     title: metadata.title,
     updatedAt: metadata.updatedAt,
@@ -95,31 +96,36 @@ test("identifiers use compact UUIDv7 tags and the canonical base62 alphabet", ()
   );
 });
 
-test("metadata revisions reject stale commands and confidential public transitions", async () => {
+test("metadata revisions reject stale commands and use one visibility field", async () => {
   const metadata = await Effect.runPromise(
     createDocumentMetadata({ id: "document_123456789", title: "Decision" }, now),
   );
+  assert.equal(metadata.visibility, "private");
+
   const updated = await Effect.runPromise(
-    updateDocumentMetadata(metadata, { lifecycleState: "custom imported state" }, 0, now),
+    updateDocumentMetadata(
+      metadata,
+      { lifecycleState: "custom imported state", visibility: "confidential" },
+      0,
+      now,
+    ),
   );
   assert.equal(updated.headRevision, 1);
   assert.equal(updated.lifecycleState, "custom imported state");
+  assert.equal(updated.visibility, "confidential");
 
   const stale = await Effect.runPromise(
     updateDocumentMetadata(updated, { lifecycleState: "stale" }, 0, now).pipe(Effect.either),
   );
   assert.equal(Either.isLeft(stale) && stale.left.code, "revision_conflict");
 
-  const confidential = await Effect.runPromise(
-    updateDocumentMetadata(updated, { sensitivity: "confidential" }, 1, now),
-  );
-  const unsafePublic = await Effect.runPromise(
-    updateDocumentMetadata(confidential, { visibility: "public" }, 2, now).pipe(Effect.either),
-  );
-  assert.equal(
-    Either.isLeft(unsafePublic) && unsafePublic.left.code,
-    "confidential_public_confirmation_required",
-  );
+  const legacy = normalizeDocumentMetadata({
+    ...updated,
+    sensitivity: "confidential",
+    visibility: "workspace",
+  } as DocumentMetadata);
+  assert.equal(legacy.visibility, "confidential");
+  assert.equal("sensitivity" in legacy, false);
 });
 
 test("document titles come from the first top-level Markdown heading", () => {
@@ -281,6 +287,32 @@ test("API keys belong to their creator and retain that user's role", async () =>
   assert.equal(revoked.apiKeys[0]?.revokedAt, now);
 });
 
+test("private and confidential visibility share workspace-only authorization", async () => {
+  const metadata = await Effect.runPromise(
+    createDocumentMetadata({ id: "document_visibility1", title: "Decision" }, now),
+  );
+  const published = await Effect.runPromise(markPublished(metadata, metadata.headRevision, now));
+  const anonymous: Principal = { kind: "anonymous" };
+
+  const privateRead = await Effect.runPromise(
+    authorizeDocument(anonymous, "read-published", published, now).pipe(Effect.either),
+  );
+  assert.equal(Either.isLeft(privateRead), true);
+
+  const confidential = await Effect.runPromise(
+    updateDocumentMetadata(published, { visibility: "confidential" }, 1, now),
+  );
+  const confidentialRead = await Effect.runPromise(
+    authorizeDocument(anonymous, "read-published", confidential, now).pipe(Effect.either),
+  );
+  assert.equal(Either.isLeft(confidentialRead), true);
+
+  const publicMetadata = await Effect.runPromise(
+    updateDocumentMetadata(confidential, { visibility: "public" }, 2, now),
+  );
+  await Effect.runPromise(authorizeDocument(anonymous, "read-published", publicMetadata, now));
+});
+
 test("capability generations revoke existing principals", async () => {
   const metadata = await Effect.runPromise(
     createDocumentMetadata({ id: "document_123456789", title: "Decision" }, now),
@@ -393,8 +425,8 @@ test("catalog search covers full bodies and Gmail-style metadata filters", async
       {
         id: "document_search_note",
         labels: ["platform"],
-        sensitivity: "confidential",
         title: "Private planning notes",
+        visibility: "confidential",
       },
       now,
     ),

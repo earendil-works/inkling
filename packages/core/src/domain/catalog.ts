@@ -1,13 +1,12 @@
 import { Effect } from "effect";
 
-import { DomainError, documentId } from "./document.ts";
+import { DomainError, documentId, normalizeDocumentMetadata } from "./document.ts";
 import type {
   DocumentId,
   DocumentMetadata,
   DocumentRevision,
   LifecycleState,
   PersonReference,
-  Sensitivity,
   Visibility,
 } from "./document.ts";
 
@@ -20,7 +19,6 @@ export interface CatalogSummary {
   readonly title: string;
   readonly state: LifecycleState;
   readonly visibility: Visibility;
-  readonly sensitivity: Sensitivity;
   readonly labels: readonly string[];
   /** Valid labels proposed by the current working frontmatter. */
   readonly workingLabels?: readonly string[] | undefined;
@@ -74,7 +72,6 @@ export const catalogSearchFields = [
   "label",
   "state",
   "visibility",
-  "sensitivity",
   "author",
   "reviewer",
   "approver",
@@ -98,6 +95,35 @@ export interface CatalogSearchQuery {
 
 export function emptyWorkspaceCatalog(startingRfcNumber = 1): WorkspaceCatalogState {
   return { entries: [], nextRfcNumber: startingRfcNumber, people: [] };
+}
+
+export function normalizeWorkspaceCatalog(state: WorkspaceCatalogState): WorkspaceCatalogState {
+  return {
+    ...state,
+    entries: state.entries.map((entry) => {
+      if (entry.summary === undefined) return entry;
+      const legacy = entry.summary as CatalogSummary & {
+        readonly sensitivity?: "confidential" | "normal" | undefined;
+        readonly visibility: Visibility | "workspace";
+      };
+      const { sensitivity, ...withoutSensitivity } = legacy;
+      const visibility =
+        sensitivity === "confidential" || legacy.visibility === "confidential"
+          ? "confidential"
+          : legacy.visibility === "public"
+            ? "public"
+            : "private";
+      return {
+        ...entry,
+        summary: {
+          ...withoutSensitivity,
+          metadata:
+            legacy.metadata === undefined ? undefined : normalizeDocumentMetadata(legacy.metadata),
+          visibility,
+        },
+      };
+    }),
+  };
 }
 
 export function reserveDocument(
@@ -327,7 +353,6 @@ interface IndexedCatalogSummary {
   readonly people: string;
   readonly reviewers: string;
   readonly rfc: string;
-  readonly sensitivity: string;
   readonly state: string;
   readonly title: string;
   readonly visibility: string;
@@ -343,7 +368,6 @@ const searchFieldAliases: Readonly<Record<string, CatalogSearchField | undefined
   person: "person",
   reviewer: "reviewer",
   rfc: "rfc",
-  sensitivity: "sensitivity",
   state: "state",
   status: "state",
   tag: "label",
@@ -401,7 +425,6 @@ function indexSummary(
   const title = normalizeSearchText(summary.title);
   const state = normalizeSearchText(summary.state);
   const visibility = normalizeSearchText(summary.visibility);
-  const sensitivity = normalizeSearchText(summary.sensitivity);
   const people = `${authors} ${reviewers} ${approvers}`.trim();
   return {
     all: [
@@ -411,7 +434,6 @@ function indexSummary(
       people,
       state,
       visibility,
-      sensitivity,
       summary.metadata?.relatedDocuments.map((related) => related.documentId).join(" ") ?? "",
       summary.normalizedBody,
     ]
@@ -424,7 +446,6 @@ function indexSummary(
     people,
     reviewers,
     rfc,
-    sensitivity,
     state,
     title,
     visibility,
@@ -444,8 +465,6 @@ function matchesSearchFilter(
       return indexed.state === value;
     case "visibility":
       return indexed.visibility === value;
-    case "sensitivity":
-      return indexed.sensitivity === value;
     case "author":
       return indexed.authors.includes(value);
     case "reviewer":
@@ -475,11 +494,11 @@ function matchesSearchFilter(
         case "unpublished":
           return summary.publishedRevision === undefined;
         case "confidential":
-          return summary.sensitivity === "confidential";
+          return summary.visibility === "confidential";
         case "public":
           return summary.visibility === "public";
-        case "workspace":
-          return summary.visibility === "workspace";
+        case "private":
+          return summary.visibility === "private";
         default:
           return false;
       }
@@ -502,7 +521,7 @@ function scoreFreeText(
   else if (indexed.labels.some((label) => label.includes(value))) score += 120;
   if (indexed.people.includes(value)) score += 100;
   if (indexed.state === value) score += 90;
-  if (indexed.visibility === value || indexed.sensitivity === value) score += 60;
+  if (indexed.visibility === value) score += 60;
   if (indexed.body.includes(value)) score += 20;
   return score + 1;
 }
@@ -523,7 +542,6 @@ function scoreFilter(field: CatalogSearchField): number {
     case "state":
       return 100;
     case "visibility":
-    case "sensitivity":
       return 80;
   }
 }

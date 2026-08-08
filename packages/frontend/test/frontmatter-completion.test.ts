@@ -20,11 +20,11 @@ test("frontmatter completion offers missing fields", async () => {
 
   assert.deepEqual(
     result?.options.map((option) => option.label),
-    ["authors", "visibility", "sensitivity", "labels"],
+    ["authors", "visibility", "labels"],
   );
 });
 
-test("frontmatter completion offers enum and workspace state values", async () => {
+test("frontmatter completion offers visibility and workspace state values", async () => {
   const state = await complete("---\nstate: a|\n---\nBody");
   assert.ok(state?.options.some((option) => option.label === "accepted"));
   assert.ok(state?.options.some((option) => option.label === "abandoned"));
@@ -33,13 +33,7 @@ test("frontmatter completion offers enum and workspace state values", async () =
   const visibility = await complete("---\nvisibility: |\n---\nBody");
   assert.deepEqual(
     visibility?.options.map((option) => option.label),
-    ["workspace", "public"],
-  );
-
-  const sensitivity = await complete("---\nsensitivity: con|\n---\nBody");
-  assert.deepEqual(
-    sensitivity?.options.map((option) => option.label),
-    ["normal", "confidential"],
+    ["public", "private", "confidential"],
   );
 });
 

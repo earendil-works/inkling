@@ -3,10 +3,7 @@ import test from "node:test";
 
 import type { DocumentMetadataDto } from "@earendil-works/inkling-protocol";
 
-import {
-  documentClassification,
-  metadataWithFrontmatter,
-} from "../src/components/document-metadata.ts";
+import { metadataWithFrontmatter } from "../src/components/document-metadata.ts";
 
 const metadata: DocumentMetadataDto = {
   approvers: [],
@@ -18,20 +15,18 @@ const metadata: DocumentMetadataDto = {
   lifecycleState: "draft",
   relatedDocuments: [],
   reviewers: [],
-  sensitivity: "normal",
   sharing: { access: "disabled", generation: 0 },
   title: "Title",
   updatedAt: "2026-01-01T00:00:00.000Z",
-  visibility: "workspace",
+  visibility: "private",
 };
 
-test("document classification prioritizes confidentiality over visibility", () => {
-  assert.equal(documentClassification(metadata), "workspace");
-  assert.equal(documentClassification({ ...metadata, visibility: "public" }), "public");
+test("frontmatter visibility directly previews public, private, or confidential state", () => {
   assert.equal(
-    documentClassification({ ...metadata, sensitivity: "confidential", visibility: "public" }),
+    metadataWithFrontmatter(metadata, { visibility: "confidential" }).visibility,
     "confidential",
   );
+  assert.equal(metadataWithFrontmatter(metadata, { visibility: "public" }).visibility, "public");
 });
 
 test("frontmatter authors render known account names and retain email identity", () => {

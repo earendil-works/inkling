@@ -30,16 +30,10 @@ const fieldCompletions: readonly Completion[] = [
     label: "state",
     type: "property",
   }),
-  snippetCompletion("visibility: ${workspace}", {
+  snippetCompletion("visibility: ${private}", {
     detail: frontmatterFieldCompletionDetail,
-    info: "Intended visibility after publication. This does not grant access while editing.",
+    info: "Public revisions are anonymous; private and confidential revisions require workspace access.",
     label: "visibility",
-    type: "property",
-  }),
-  snippetCompletion("sensitivity: ${normal}", {
-    detail: frontmatterFieldCompletionDetail,
-    info: "Marks the published revision as normal or confidential.",
-    label: "sensitivity",
     type: "property",
   }),
   snippetCompletion("labels:\n\t- ${}", {
@@ -50,10 +44,7 @@ const fieldCompletions: readonly Completion[] = [
   }),
 ];
 
-const staticValueCompletions = {
-  sensitivity: enumCompletions(["normal", "confidential"], "Sensitivity"),
-  visibility: enumCompletions(["workspace", "public"], "Visibility"),
-} as const;
+const visibilityCompletions = enumCompletions(["public", "private", "confidential"], "Visibility");
 
 export function makeFrontmatterCompletionSource(
   vocabulary: FrontmatterVocabulary,
@@ -88,8 +79,8 @@ export function makeFrontmatterCompletionSource(
       if (key === "state") {
         return valueResult(context, valueFrom, stateCompletions);
       }
-      if (key === "visibility" || key === "sensitivity") {
-        return valueResult(context, valueFrom, staticValueCompletions[key]);
+      if (key === "visibility") {
+        return valueResult(context, valueFrom, visibilityCompletions);
       }
       if (key === "labels") {
         return inlineListResult(context, valueFrom, value, labelCompletions);

@@ -29,10 +29,9 @@ export function DocumentCatalog({
 
   return (
     <section className="catalog" data-catalog="" aria-live="polite">
-      {catalog.documents.map((document, index) => (
+      {catalog.documents.map((document) => (
         <DocumentCatalogRow
           document={document}
-          index={index}
           key={document.metadata.id}
           publicDocument={publicCatalog}
         />

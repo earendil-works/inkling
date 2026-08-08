@@ -405,13 +405,7 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
   app.post("/api/documents/:documentId/publish", (context) =>
     execute(context, options, (service) =>
       mutation(context, Effect.void).pipe(
-        Effect.zipRight(
-          service.publish(
-            credentials(context),
-            context.req.param("documentId"),
-            context.req.query("confirmConfidentialPublic") === "true",
-          ),
-        ),
+        Effect.zipRight(service.publish(credentials(context), context.req.param("documentId"))),
       ),
     ),
   );
@@ -968,7 +962,12 @@ function publicCatalogHtml(titleValue: string, catalog: CatalogResponse): string
         .map((label) => `<a href="/keyword/${encodeURIComponent(label)}">${escapeHtml(label)}</a>`)
         .join(" ");
       const state = publicStateLink(metadata.lifecycleState, "public-catalog-state");
-      return `<li><a class="title" href="${href}">${metadata.rfcNumber === undefined ? "Note" : `RFC ${String(metadata.rfcNumber).padStart(4, "0")}`} — ${escapeHtml(metadata.title)}</a><p>${escapeHtml(excerpt)}</p><small>${state} · ${escapeHtml(metadata.updatedAt.slice(0, 10))} ${labels}</small></li>`;
+      const folio =
+        metadata.rfcNumber === undefined
+          ? "Note"
+          : `RFC ${String(metadata.rfcNumber).padStart(4, "0")}`;
+      const visibility = publicVisibilityChip(metadata);
+      return `<li data-document-visibility="${metadata.visibility}"><span class="catalog-folio">${folio}</span><div class="catalog-entry"><a class="title" href="${href}">${escapeHtml(metadata.title)}</a><p>${escapeHtml(excerpt)}</p><small>${visibility}${state}<time datetime="${escapeHtml(metadata.updatedAt)}">${escapeHtml(metadata.updatedAt.slice(0, 10))}</time>${labels}</small></div></li>`;
     })
     .join("");
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Published notes and RFCs"><title>Inkling</title><link rel="stylesheet" href="/fonts.css"><link rel="stylesheet" href="/public.css"></head><body><header class="public-masthead"><a href="/">INKLING</a><span>PUBLISHED</span></header><main class="public-catalog-shell"><article class="public-paper public-catalog-paper"><h1>${title}</h1><ol class="catalog">${rows || "<li>No published notes or RFCs.</li>"}</ol></article></main></body></html>`;
@@ -1006,14 +1005,12 @@ function publicDocumentHtml(document: {
       ? ""
       : `<aside class="public-toc" aria-label="On this page"><p>On this page</p><ol>${toc}</ol></aside>`;
   const state = publicStateLink(metadata.lifecycleState);
-  const classification = publicClassificationChip(metadata);
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${description}"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><link rel="canonical" href="${escapeHtml(document.canonicalPath)}"><title>${title}</title><link rel="stylesheet" href="/fonts.css"><link rel="stylesheet" href="/public.css"></head><body><header class="public-masthead"><a href="/">INKLING</a><span>${folio}</span></header><main class="public-page-shell"><article class="public-paper public-document"><div class="public-topline"><a href="/">Inkling</a></div><header class="public-hero"><p class="public-folio">${folio}</p><div class="public-hero-main"><div class="public-hero-badges">${state}${classification}</div><h1>${title}</h1>${labels === "" ? "" : `<div class="public-labels" aria-label="Labels">${labels}</div>`}</div></header>${publicMetadataHtml(metadata)}<div class="public-content-grid"><div class="public-prose">${document.html}</div>${tocHtml}</div></article></main></body></html>`;
+  const visibility = publicVisibilityChip(metadata);
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${description}"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><link rel="canonical" href="${escapeHtml(document.canonicalPath)}"><title>${title}</title><link rel="stylesheet" href="/fonts.css"><link rel="stylesheet" href="/public.css"></head><body><header class="public-masthead"><a href="/">INKLING</a><span>${folio}</span></header><main class="public-page-shell"><article class="public-paper public-document"><div class="public-topline"><a href="/">Inkling</a></div><header class="public-hero"><p class="public-folio">${folio}</p><div class="public-hero-main"><div class="public-hero-badges">${state}${visibility}</div><h1>${title}</h1>${labels === "" ? "" : `<div class="public-labels" aria-label="Labels">${labels}</div>`}</div></header>${publicMetadataHtml(metadata)}<div class="public-content-grid"><div class="public-prose">${document.html}</div>${tocHtml}</div></article></main></body></html>`;
 }
 
-function publicClassificationChip(metadata: DocumentMetadataDto): string {
-  const classification =
-    metadata.sensitivity === "confidential" ? "confidential" : metadata.visibility;
-  return `<span class="public-classification" data-document-classification="${classification}">${classification}</span>`;
+function publicVisibilityChip(metadata: DocumentMetadataDto): string {
+  return `<span class="public-visibility" data-document-visibility="${metadata.visibility}">${metadata.visibility}</span>`;
 }
 
 function publicStateLink(state: string, className?: string | undefined): string {

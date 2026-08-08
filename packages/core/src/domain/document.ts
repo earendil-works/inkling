@@ -21,8 +21,7 @@ export const knownLifecycleStates = [
 
 export type KnownLifecycleState = (typeof knownLifecycleStates)[number];
 export type LifecycleState = KnownLifecycleState | (string & {});
-export type Visibility = "public" | "workspace";
-export type Sensitivity = "normal" | "confidential";
+export type Visibility = "public" | "private" | "confidential";
 export type CapabilityAccess = "disabled" | "view" | "comment" | "edit";
 
 export interface PersonReference {
@@ -50,7 +49,6 @@ export interface DocumentMetadata {
   /** Unknown imported states are deliberately preserved. */
   readonly lifecycleState: LifecycleState;
   readonly visibility: Visibility;
-  readonly sensitivity: Sensitivity;
   readonly labels: readonly string[];
   readonly authors: readonly PersonReference[];
   readonly reviewers: readonly PersonReference[];
@@ -85,7 +83,6 @@ export interface CreateMetadataInput {
   readonly title: string;
   readonly lifecycleState?: string | undefined;
   readonly visibility?: Visibility | undefined;
-  readonly sensitivity?: Sensitivity | undefined;
   readonly labels?: readonly string[] | undefined;
   readonly authors?: readonly PersonReference[] | undefined;
   readonly reviewers?: readonly PersonReference[] | undefined;
@@ -99,7 +96,6 @@ export interface CreateMetadataInput {
 export interface MetadataPatch {
   readonly lifecycleState?: string | undefined;
   readonly visibility?: Visibility | undefined;
-  readonly sensitivity?: Sensitivity | undefined;
   readonly labels?: readonly string[] | undefined;
   readonly authors?: readonly PersonReference[] | undefined;
   readonly reviewers?: readonly PersonReference[] | undefined;
@@ -270,12 +266,11 @@ export function createDocumentMetadata(
       relatedDocuments,
       reviewers,
       rfcNumber: input.rfcNumber,
-      sensitivity: input.sensitivity ?? "normal",
       sharing: { access: "disabled", generation: 0 },
       targetDecisionDate,
       title,
       updatedAt: updatedDate,
-      visibility: input.visibility ?? "workspace",
+      visibility: input.visibility ?? "private",
     };
   });
 }
@@ -306,19 +301,10 @@ export function updateDocumentMetadata(
   patch: MetadataPatch,
   expectedRevision: number,
   now: string,
-  confirmConfidentialPublic = false,
 ): Effect.Effect<DocumentMetadata, DomainError> {
   return Effect.gen(function* () {
     yield* requireRevision(metadata, expectedRevision);
     const visibility = patch.visibility ?? metadata.visibility;
-    const sensitivity = patch.sensitivity ?? metadata.sensitivity;
-
-    if (visibility === "public" && sensitivity === "confidential" && !confirmConfidentialPublic) {
-      return yield* fail(
-        "confidential_public_confirmation_required",
-        "Publishing confidential metadata requires explicit confirmation.",
-      );
-    }
 
     const targetDecisionDate =
       patch.targetDecisionDate === undefined
@@ -355,12 +341,26 @@ export function updateDocumentMetadata(
           : yield* fromEither(validateRelatedDocuments(patch.relatedDocuments)),
       reviewers:
         patch.reviewers === undefined ? metadata.reviewers : yield* validatePeople(patch.reviewers),
-      sensitivity,
       targetDecisionDate,
       updatedAt: yield* fromEither(validateDate(now, "update date")),
       visibility,
     };
   });
+}
+
+export function normalizeDocumentMetadata(metadata: DocumentMetadata): DocumentMetadata {
+  const legacy = metadata as DocumentMetadata & {
+    readonly sensitivity?: "confidential" | "normal" | undefined;
+    readonly visibility: Visibility | "workspace";
+  };
+  const { sensitivity, ...withoutSensitivity } = legacy;
+  const visibility =
+    sensitivity === "confidential" || legacy.visibility === "confidential"
+      ? "confidential"
+      : legacy.visibility === "public"
+        ? "public"
+        : "private";
+  return { ...withoutSensitivity, visibility };
 }
 
 export function updateSharingPolicy(

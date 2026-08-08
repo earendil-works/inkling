@@ -6,7 +6,6 @@ import type {
   CapabilityAccess,
   CreateMetadataInput,
   PersonReference,
-  Sensitivity,
   Visibility,
 } from "@earendil-works/inkling-core";
 
@@ -120,19 +119,20 @@ export function importEarendilRfc(
     );
     const rawVisibility = firstString(frontmatter, ["visibility", "access"]);
     const normalizedVisibility = rawVisibility?.toLocaleLowerCase("en");
-    const visibility: Visibility = normalizedVisibility === "public" ? "public" : "workspace";
+    const visibility: Visibility =
+      parseConfidential(frontmatter) || normalizedVisibility === "confidential"
+        ? "confidential"
+        : normalizedVisibility === "public"
+          ? "public"
+          : "private";
     if (
       rawVisibility !== undefined &&
       !["public", "workspace", "internal", "private", "confidential"].includes(
         normalizedVisibility ?? "",
       )
     ) {
-      warnings.push(`Unknown visibility ${rawVisibility} was imported as workspace-only.`);
+      warnings.push(`Unknown visibility ${rawVisibility} was imported as private.`);
     }
-    const sensitivity: Sensitivity =
-      parseConfidential(frontmatter) || normalizedVisibility === "confidential"
-        ? "confidential"
-        : "normal";
     const createdAt = normalizeDate(firstString(frontmatter, ["created", "created_at", "date"]));
     const updatedAt = normalizeDate(
       firstString(frontmatter, ["updated", "updated_at", "last_modified"]),
@@ -162,7 +162,6 @@ export function importEarendilRfc(
       lifecycleState,
       reviewers,
       rfcNumber: number,
-      sensitivity,
       targetDecisionDate,
       title,
       updatedAt: updatedAt ?? createdAt ?? context.now,

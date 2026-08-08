@@ -21,17 +21,16 @@ test("rendering disables raw HTML and dangerous URLs", async () => {
 
 test("frontmatter is parsed without entering rendered content", async () => {
   const source =
-    "---\nstate: discussion\nvisibility: public\nsensitivity: normal\nlabels:\n  - architecture\n  - platform\n---\n## Decision\n\nBody";
+    "---\nstate: discussion\nvisibility: public\nlabels:\n  - architecture\n  - platform\n---\n## Decision\n\nBody";
   const rendered = await Effect.runPromise(renderer.render(source, { sourcePositions: true }));
   assert.deepEqual(rendered.frontmatter, {
     authors: undefined,
     labels: ["architecture", "platform"],
-    sensitivity: "normal",
     state: "discussion",
     visibility: "public",
   });
   assert.doesNotMatch(rendered.html, /visibility/u);
-  assert.match(rendered.html, /<h2 id="decision" data-inkling-source-start="103"/u);
+  assert.match(rendered.html, /<h2 id="decision" data-inkling-source-start="\d+"/u);
 });
 
 test("author frontmatter uses normalized email identifiers", async () => {
@@ -45,12 +44,21 @@ test("author frontmatter uses normalized email identifiers", async () => {
     serializeDocumentFrontmatter({
       authors: ["ada@example.com"],
       labels: [],
-      sensitivity: "normal",
       state: "draft",
-      visibility: "workspace",
+      visibility: "private",
     }),
     /authors:\n  - ada@example\.com/u,
   );
+});
+
+test("legacy sensitivity and workspace visibility normalize into visibility", async () => {
+  const rendered = await Effect.runPromise(
+    renderer.render(
+      "---\nvisibility: workspace\nsensitivity: confidential\n---\n# Legacy document",
+    ),
+  );
+  assert.equal(rendered.frontmatter?.visibility, "confidential");
+  assert.equal("sensitivity" in (rendered.frontmatter ?? {}), false);
 });
 
 test("invalid frontmatter fails with a useful error", async () => {

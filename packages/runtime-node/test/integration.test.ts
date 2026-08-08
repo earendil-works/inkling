@@ -198,7 +198,7 @@ test(
                 newText: "authors:\n  - ada@example.com",
                 oldText: "authors: []",
               },
-              { newText: "visibility: public", oldText: "visibility: workspace" },
+              { newText: "visibility: public", oldText: "visibility: private" },
               {
                 newText: "labels:\n  - architecture\n  - platform",
                 oldText: "labels: []",
@@ -255,9 +255,8 @@ test(
         assert.match(publishedHtml, /class="public-hero-badges"/u);
         assert.match(
           publishedHtml,
-          /class="public-classification" data-document-classification="public">public/u,
+          /class="public-visibility" data-document-visibility="public">public/u,
         );
-        assert.doesNotMatch(publishedHtml, /public-visibility/u);
         assert.match(publishedHtml, /class="public-metadata"/u);
         assert.match(publishedHtml, /mailto:ada@example\.com/u);
         assert.match(publishedHtml, />Ada Lovelace<\/a>/u);

@@ -10,7 +10,7 @@ Inkling was previously developed under the working name **Jot**. The Inkling nam
 - Inline threaded comments anchored to collaborative text positions.
 - Explicit publication of immutable revisions, separate from the live working head.
 - Monotonic RFC number allocation and canonical routes such as `/rfcs/0042`.
-- A public landing page for published notes and RFCs, with workspace, confidential, and capability-shared documents kept behind their respective access policies.
+- A public landing page for published notes and RFCs, with private, confidential, and capability-shared documents kept behind their respective access policies.
 - Markdown preview and publication with tables, task lists, syntax highlighting, Mermaid diagrams, stable heading links, and tables of contents.
 - Search across complete document bodies, RFC metadata, labels, lifecycle states, and people.
 - API keys and a CLI for people, coding agents, imports, backups, verification, and repair.
@@ -164,8 +164,7 @@ The first top-level Markdown heading is the document title. Publication metadata
 authors:
   - author@example.com
 state: discussion
-visibility: workspace
-sensitivity: normal
+visibility: private
 labels:
   - architecture
   - platform
@@ -185,20 +184,20 @@ Press `/` or <kbd>Cmd/Ctrl</kbd>+<kbd>K</kbd> from the workspace to focus search
 
 Search supports Gmail-style filters:
 
-| Filter                    | Example                                                                     |
-| ------------------------- | --------------------------------------------------------------------------- |
-| Label                     | `label:platform` or `tag:"machine learning"`                                |
-| Lifecycle state           | `state:discussion`                                                          |
-| Visibility or sensitivity | `visibility:workspace sensitivity:confidential`                             |
-| People                    | `author:name@example.com`, `reviewer:alex`, `approver:sam`, or `person:lee` |
-| RFC number                | `rfc:42`                                                                    |
-| Document kind             | `is:rfc`, `is:note`, `is:published`, or `is:unpublished`                    |
-| Presence                  | `has:rfc` or `has:publication`                                              |
+| Filter          | Example                                                                     |
+| --------------- | --------------------------------------------------------------------------- |
+| Label           | `label:platform` or `tag:"machine learning"`                                |
+| Lifecycle state | `state:discussion`                                                          |
+| Visibility      | `visibility:public`, `visibility:private`, or `visibility:confidential`     |
+| People          | `author:name@example.com`, `reviewer:alex`, `approver:sam`, or `person:lee` |
+| RFC number      | `rfc:42`                                                                    |
+| Document kind   | `is:rfc`, `is:note`, `is:published`, or `is:unpublished`                    |
+| Presence        | `has:rfc` or `has:publication`                                              |
 
 For example:
 
 ```text
-label:platform state:discussion "durable checkpoint" -sensitivity:confidential
+label:platform state:discussion "durable checkpoint" -visibility:confidential
 ```
 
 Search reads a derived workspace catalog rather than loading every document authority. The catalog can be rebuilt from authoritative checkpoints.
@@ -257,7 +256,7 @@ INKLING_API_KEY=secret \
 pnpm import-rfcs --source /path/to/source
 ```
 
-The importer preserves RFC numbers and metadata, rewrites known RFC links to canonical routes, uploads media, reuses attachments by digest, and publishes public RFCs after their updates complete. Pass `--publish` to also give workspace-only RFCs a published revision:
+The importer preserves RFC numbers and metadata, rewrites known RFC links to canonical routes, uploads media, reuses attachments by digest, and publishes public RFCs after their updates complete. Pass `--publish` to also give private and confidential RFCs a published revision:
 
 ```sh
 node scripts/import-rfcs.ts --source ~/Development/earendil-rfcs --publish

@@ -21,7 +21,7 @@ The architecture must provide:
 - Durable acknowledgement of edits before clients are told that an edit was accepted.
 - A small workspace-level coordinator for catalog operations and RFC number allocation.
 - A first-class RFC metadata and publication model.
-- Public, workspace-only, confidential, and capability-shared documents.
+- Public, private, confidential, and capability-shared documents.
 - Inline threaded comments anchored to collaborative text positions.
 - A stable HTTP API and CLI suitable for coding agents.
 - Simple backup, export, import, and disaster recovery.
@@ -68,7 +68,7 @@ Markdown exports, rendered HTML, search indexes, snippets, state indexes, keywor
 
 Visibility, sharing, publication, and permissions are not inferred from collaborative Markdown alone. They are structured fields changed through validated commands.
 
-Collaborative frontmatter may propose authors by email address, publication state, visibility, sensitivity, and labels. Those values drive the live publication preview, but they do not change authorization while editing. Known author emails resolve through the workspace people directory so rendered metadata uses the account’s display name; unknown emails render as themselves. The document title is the first top-level Markdown heading and is cached in structured state only as a derived projection. An authorized, explicit publish command validates and promotes frontmatter values into the structured metadata stored with the published revision. Sharing, RFC allocation, and publication state are never controlled by frontmatter.
+Collaborative frontmatter may propose authors by email address, publication state, visibility, and labels. Those values drive the live publication preview, but they do not change authorization while editing. Known author emails resolve through the workspace people directory so rendered metadata uses the account’s display name; unknown emails render as themselves. The document title is the first top-level Markdown heading and is cached in structured state only as a derived projection. An authorized, explicit publish command validates and promotes frontmatter values into the structured metadata stored with the published revision. Sharing, RFC allocation, and publication state are never controlled by frontmatter.
 
 ### 4.6 Local and Cloudflare are adapters around the same core
 
@@ -173,8 +173,7 @@ The target document model must represent:
 - Authors.
 - Created and meaningfully updated dates.
 - State.
-- Visibility.
-- Confidentiality marker.
+- Visibility: public, private, or confidential.
 - Keywords or labels.
 - Reviewers.
 - Approvers.
@@ -192,8 +191,8 @@ Expected RFC states include draft, discussion, published, accepted, implemented,
 - State and keyword index pages are available.
 - Search matches number, title, authors, reviewers, approvers, labels, visibility, state, and summary text.
 - Public visitors see only public, published material, including the anonymous landing-page catalog.
-- Authenticated workspace members can see internal material.
-- Confidential material is visibly marked even when its access policy is the same as other workspace material.
+- Authenticated workspace members can see private and confidential material.
+- Confidential material is visibly distinguished from private material even though both initially use the same access policy.
 - Public pages can be cached aggressively without leaking internal metadata.
 
 #### RFC rendering
@@ -327,8 +326,7 @@ A document carries structured fields for:
 - Identifier and optional RFC number.
 - Derived title cached from the first top-level Markdown heading.
 - Lifecycle state.
-- Public or workspace visibility.
-- Normal or confidential sensitivity.
+- Public, private, or confidential visibility.
 - Labels.
 - Authors, reviewers, and approvers.
 - Creation and update timestamps.
@@ -345,7 +343,7 @@ Authoritative metadata is changed by explicit document commands. The cached titl
 
 The body is a Yjs text value containing Markdown and optional publication frontmatter. It is the only directly collaborative field in the initial design. Its first top-level heading is the document title. Renderers present that heading in the document hero rather than duplicating it in prose, and catalog metadata caches its plain-text value as a rebuildable projection.
 
-Publication frontmatter contains collaboratively edited presentation values such as author email addresses, lifecycle state, intended visibility, sensitivity, and labels. Renderers omit it from prose and use it for live preview. Author entries use normalized email addresses as stable identifiers and resolve display names from the workspace people directory when known. Structured metadata remains authoritative for authorization until an explicit publish command validates and promotes the frontmatter values. Metadata outside the title heading and publication frontmatter is changed through serialized server commands rather than opaque collaborative changes.
+Publication frontmatter contains collaboratively edited presentation values such as author email addresses, lifecycle state, intended visibility, and labels. Renderers omit it from prose and use it for live preview. Author entries use normalized email addresses as stable identifiers and resolve display names from the workspace people directory when known. Structured metadata remains authoritative for authorization until an explicit publish command validates and promotes the frontmatter values. Metadata outside the title heading and publication frontmatter is changed through serialized server commands rather than opaque collaborative changes.
 
 ### 7.4 Comments
 
@@ -638,9 +636,7 @@ The same authorization service is used by HTTP commands, WebSocket upgrades, rec
 
 Public visibility permits anonymous access only to a published revision.
 
-Workspace visibility requires a workspace principal unless a document capability grants access.
-
-Confidentiality is an additional sensitivity marker. Initially, confidential documents use workspace authorization but are visually marked and excluded from accidental public transitions without explicit confirmation. The model permits stricter confidential ACLs later.
+Private and confidential visibility require a workspace principal unless a document capability grants access. Both initially use the same authorization policy, while confidential visibility communicates a higher degree of privacy and remains visually distinct. The model permits stricter confidential ACLs later.
 
 ### 13.4 Capabilities
 
@@ -937,7 +933,7 @@ Limits fail with explicit errors and do not partially apply commands.
 
 ### 21.6 Cache isolation
 
-Public published artifacts may be shared-cacheable. Workspace, confidential, capability, session, and working-head responses are private or uncached. Public catalogs contain no internal titles, excerpts, labels, attachment names, or existence hints.
+Public published artifacts may be shared-cacheable. Private, confidential, capability, session, and working-head responses are private or uncached. Public catalogs contain no internal titles, excerpts, labels, attachment names, or existence hints.
 
 ## 22. Observability and operations
 
@@ -1019,12 +1015,12 @@ The importer reads the RFC Markdown collection and people directory. It preserve
 - Title and body.
 - Authors, reviewers, approvers, and aliases.
 - Created and updated dates.
-- State, visibility, confidentiality, and labels.
+- State, visibility, and labels.
 - Target decision date and related references.
 - Legacy source URL.
 - Imported media and image references.
 
-Existing public RFCs receive an initial published revision. Internal RFCs receive a working checkpoint and remain workspace-only.
+Existing public RFCs receive an initial published revision. Internal RFCs receive a working checkpoint and remain private.
 
 ### 24.3 Validation
 

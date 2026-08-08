@@ -62,6 +62,18 @@ See [the prior decision](../rfcs/0012-prior.md#outcome).
   assert.match(imported.body, /\/rfcs\/0012#outcome/u);
 });
 
+test("legacy confidentiality imports as confidential visibility", async () => {
+  const imported = await Effect.runPromise(
+    importEarendilRfc(
+      "---\nrfc: 43\nvisibility: public\nconfidential: true\n---\n# Restricted decision",
+      { sourcePath: "rfcs/0043-restricted.md" },
+    ),
+  );
+
+  assert.equal(imported.metadata.visibility, "confidential");
+  assert.equal("sensitivity" in imported.metadata, false);
+});
+
 test("legacy Jot import keeps share and comment migration data", async () => {
   const imported = await Effect.runPromise(
     importExistingJot(

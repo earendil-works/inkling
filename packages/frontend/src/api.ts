@@ -98,10 +98,7 @@ export interface ApiClientService {
     access: "disabled" | "view" | "comment" | "edit",
     expectedRevision: number,
   ) => Effect.Effect<ShareResponse, ApiError>;
-  readonly publish: (
-    documentId: string,
-    confirmConfidentialPublic?: boolean,
-  ) => Effect.Effect<DocumentMetadataDto, ApiError>;
+  readonly publish: (documentId: string) => Effect.Effect<DocumentMetadataDto, ApiError>;
   readonly unpublish: (documentId: string) => Effect.Effect<DocumentMetadataDto, ApiError>;
   readonly readPublicRfc: (number: number) => Effect.Effect<PublicDocumentResponse, ApiError>;
 }
@@ -260,9 +257,9 @@ export function makeApiClient(capabilityToken?: string): ApiClientService {
     listPublicDocuments: (query = "") =>
       request(`/api/public/documents?q=${encodeURIComponent(query)}`, CatalogResponseSchema),
     logout: mutation("/api/auth/logout", Schema.Unknown, "POST").pipe(Effect.asVoid),
-    publish: (documentId, confirmConfidentialPublic = false) =>
+    publish: (documentId) =>
       mutation(
-        `/api/documents/${encodeURIComponent(documentId)}/publish${confirmConfidentialPublic ? "?confirmConfidentialPublic=true" : ""}`,
+        `/api/documents/${encodeURIComponent(documentId)}/publish`,
         DocumentMetadataSchema,
         "POST",
       ),

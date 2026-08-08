@@ -57,7 +57,6 @@ interface DesiredMetadata {
   readonly lifecycleState: string;
   readonly relatedDocuments: DocumentMetadataDto["relatedDocuments"];
   readonly reviewers: DocumentMetadataDto["reviewers"];
-  readonly sensitivity: DocumentMetadataDto["sensitivity"];
   readonly targetDecisionDate: string | undefined;
   readonly visibility: DocumentMetadataDto["visibility"];
 }
@@ -285,8 +284,6 @@ function syncRfc(
     if (!sameMetadata(current.metadata, desiredMetadata)) {
       const metadata = yield* client.metadata(documentId, {
         ...desiredMetadata,
-        confirmConfidentialPublic:
-          desiredMetadata.visibility === "public" && desiredMetadata.sensitivity === "confidential",
         expectedRevision: current.metadata.headRevision,
         legacySourceUrl: desiredMetadata.legacySourceUrl ?? null,
         targetDecisionDate: desiredMetadata.targetDecisionDate ?? null,
@@ -306,10 +303,7 @@ function syncRfc(
     let publicationChanged = false;
     if (shouldPublish) {
       if (current.metadata.publishedRevision === undefined || metadataChanged || bodyChanged) {
-        const metadata = yield* client.publish(
-          documentId,
-          desiredMetadata.sensitivity === "confidential" && desiredMetadata.visibility === "public",
-        );
+        const metadata = yield* client.publish(documentId);
         current = { ...current, metadata };
         publicationChanged = true;
       }
@@ -374,9 +368,8 @@ function canonicalBody(
   const frontmatter = serializeDocumentFrontmatter({
     authors: (metadata.authors ?? []).map((author) => author.email.toLocaleLowerCase("en")),
     labels: normalizedLabels(metadata.labels ?? []),
-    sensitivity: metadata.sensitivity ?? "normal",
     state: metadata.lifecycleState ?? "draft",
-    visibility: metadata.visibility ?? "workspace",
+    visibility: metadata.visibility ?? "private",
   });
   return `${frontmatter}\n${body}`;
 }
@@ -394,9 +387,8 @@ function metadataFor(
     lifecycleState: metadata.lifecycleState ?? "draft",
     relatedDocuments,
     reviewers: [...(metadata.reviewers ?? [])],
-    sensitivity: metadata.sensitivity ?? "normal",
     targetDecisionDate: metadata.targetDecisionDate,
-    visibility: metadata.visibility ?? "workspace",
+    visibility: metadata.visibility ?? "private",
   };
 }
 
@@ -410,7 +402,6 @@ function sameMetadata(current: DocumentMetadataDto, desired: DesiredMetadata): b
       lifecycleState: current.lifecycleState,
       relatedDocuments: current.relatedDocuments,
       reviewers: current.reviewers,
-      sensitivity: current.sensitivity,
       targetDecisionDate: current.targetDecisionDate,
       visibility: current.visibility,
     }) === JSON.stringify(desired)
@@ -628,5 +619,5 @@ Defaults:
   --url     INKLING_URL or http://localhost:5173
   API key   INKLING_API_KEY
 
-By default, public RFCs receive published revisions. Pass --publish to publish workspace-only RFCs too. The command is incremental: existing RFC numbers are updated, unchanged attachments are reused by digest, and RFCs are republished only after changes.`);
+By default, public RFCs receive published revisions. Pass --publish to publish private and confidential RFCs too. The command is incremental: existing RFC numbers are updated, unchanged attachments are reused by digest, and RFCs are republished only after changes.`);
 }

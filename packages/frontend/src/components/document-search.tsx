@@ -20,7 +20,11 @@ const operatorCompletions: readonly SearchCompletion[] = [
   { complete: false, description: "Find an author or email", token: "author:" },
   { complete: false, description: "Jump to an RFC number", token: "rfc:" },
   { complete: false, description: "RFCs, notes, or publications", token: "is:" },
-  { complete: false, description: "Public or workspace documents", token: "visibility:" },
+  {
+    complete: false,
+    description: "Public, private, or confidential documents",
+    token: "visibility:",
+  },
 ];
 
 export interface DocumentSearchProps {
@@ -313,9 +317,7 @@ function searchCompletions(query: string, catalog: CatalogResponse): readonly Se
       case "status":
         return documents.map((document) => document.metadata.lifecycleState);
       case "visibility":
-        return ["workspace", "public"];
-      case "sensitivity":
-        return ["normal", "confidential"];
+        return ["public", "private", "confidential"];
       case "author":
       case "from":
         return documents.flatMap((document) =>
@@ -344,7 +346,7 @@ function searchCompletions(query: string, catalog: CatalogResponse): readonly Se
             : [String(document.metadata.rfcNumber).padStart(4, "0")],
         );
       case "is":
-        return ["rfc", "note", "published", "unpublished", "confidential"];
+        return ["rfc", "note", "published", "unpublished", "public", "private", "confidential"];
       case "has":
         return ["rfc", "publication"];
       default:

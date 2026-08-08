@@ -1,14 +1,6 @@
 import type { DocumentMetadataDto } from "@earendil-works/inkling-protocol";
 import type { DocumentFrontmatter } from "@earendil-works/inkling-renderer";
 
-export type DocumentClassification = "confidential" | "public" | "workspace";
-
-export function documentClassification(
-  metadata: Pick<DocumentMetadataDto, "sensitivity" | "visibility">,
-): DocumentClassification {
-  return metadata.sensitivity === "confidential" ? "confidential" : metadata.visibility;
-}
-
 export function metadataWithFrontmatter(
   metadata: DocumentMetadataDto,
   frontmatter: DocumentFrontmatter | undefined,
@@ -36,7 +28,6 @@ export function metadataWithFrontmatter(
       }) ?? metadata.authors,
     labels: frontmatter?.labels ?? metadata.labels,
     lifecycleState: frontmatter?.state ?? metadata.lifecycleState,
-    sensitivity: frontmatter?.sensitivity ?? metadata.sensitivity,
     title: title ?? metadata.title,
     visibility: frontmatter?.visibility ?? metadata.visibility,
   };

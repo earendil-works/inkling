@@ -4,7 +4,6 @@ import type { DocumentMetadataDto } from "@earendil-works/inkling-protocol";
 import type { RenderHeading } from "@earendil-works/inkling-renderer";
 
 import { formatDate } from "../ui.ts";
-import { documentClassification } from "./document-metadata.ts";
 import { DocumentTableOfContents } from "./document-table-of-contents.tsx";
 import { LifecycleStateChip } from "./lifecycle-state-chip.tsx";
 
@@ -23,9 +22,7 @@ export function DocumentPage({
     metadata.rfcNumber === undefined
       ? "Note"
       : `RFC ${String(metadata.rfcNumber).padStart(4, "0")}`;
-  const classification = documentClassification(metadata);
-  const classificationQuery =
-    classification === "confidential" ? "sensitivity:confidential" : `visibility:${classification}`;
+  const visibilityQuery = `visibility:${metadata.visibility}`;
 
   return (
     <div className="document-page" data-document-page="">
@@ -35,11 +32,11 @@ export function DocumentPage({
           <div className="reader-heading__badges">
             <LifecycleStateChip className="reader-state-chip" state={metadata.lifecycleState} />
             <a
-              className="reader-classification-chip"
-              data-document-classification={classification}
-              href={`/?q=${encodeURIComponent(classificationQuery)}`}
+              className="reader-visibility-chip"
+              data-document-visibility={metadata.visibility}
+              href={`/?q=${encodeURIComponent(visibilityQuery)}`}
             >
-              {classification}
+              {metadata.visibility}
             </a>
           </div>
           <h1>{metadata.title}</h1>

@@ -18,9 +18,8 @@ export interface RenderHeading {
 export interface DocumentFrontmatter {
   readonly authors?: readonly string[] | undefined;
   readonly labels?: readonly string[] | undefined;
-  readonly sensitivity?: "confidential" | "normal" | undefined;
   readonly state?: string | undefined;
-  readonly visibility?: "public" | "workspace" | undefined;
+  readonly visibility?: "public" | "private" | "confidential" | undefined;
 }
 
 export interface ParsedDocumentSource {
@@ -94,16 +93,14 @@ export function parseDocumentSource(
 export function serializeDocumentFrontmatter(frontmatter: {
   readonly authors: readonly string[];
   readonly labels: readonly string[];
-  readonly sensitivity: "confidential" | "normal";
   readonly state: string;
-  readonly visibility: "public" | "workspace";
+  readonly visibility: "public" | "private" | "confidential";
 }): string {
   const yaml = YAML.stringify(
     {
       authors: [...frontmatter.authors],
       state: frontmatter.state,
       visibility: frontmatter.visibility,
-      sensitivity: frontmatter.sensitivity,
       labels: [...frontmatter.labels],
     },
     { lineWidth: 0 },
@@ -238,16 +235,30 @@ function parseDocumentSourceUnsafe(markdown: string): ParsedDocumentSource {
   const values = parsed as Readonly<Record<string, unknown>>;
   const authors = optionalAuthors(values["authors"]);
   const state = optionalNonEmptyString(values["state"], "state");
-  const visibility = optionalEnum(values["visibility"], "visibility", ["public", "workspace"]);
-  const sensitivity = optionalEnum(values["sensitivity"], "sensitivity", [
+  const legacyVisibility = optionalEnum(values["visibility"], "visibility", [
+    "public",
+    "private",
+    "confidential",
+    "workspace",
+    "internal",
+  ]);
+  const legacySensitivity = optionalEnum(values["sensitivity"], "sensitivity", [
     "confidential",
     "normal",
   ]);
+  const visibility =
+    legacySensitivity === "confidential" || legacyVisibility === "confidential"
+      ? "confidential"
+      : legacyVisibility === "public"
+        ? "public"
+        : legacyVisibility === undefined
+          ? undefined
+          : "private";
   const labels = optionalLabels(values["labels"]);
   return {
     body: markdown.slice(match[0].length),
     bodyOffset: match[0].length,
-    frontmatter: { authors, labels, sensitivity, state, visibility },
+    frontmatter: { authors, labels, state, visibility },
   };
 }
 

@@ -5,6 +5,7 @@ export const protocolVersion = 1;
 const NonEmptyString = Schema.String.pipe(Schema.minLength(1));
 const Revision = Schema.Number.pipe(Schema.int(), Schema.nonNegative());
 const PositiveInteger = Schema.Number.pipe(Schema.int(), Schema.positive());
+const VisibilitySchema = Schema.Literal("public", "private", "confidential");
 
 export const HealthResponseSchema = Schema.Struct({
   protocolVersion: Schema.Number,
@@ -55,12 +56,11 @@ export const DocumentMetadataSchema = Schema.Struct({
   relatedDocuments: Schema.Array(RelatedDocumentSchema),
   reviewers: Schema.Array(PersonSchema),
   rfcNumber: Schema.optional(PositiveInteger),
-  sensitivity: Schema.Literal("normal", "confidential"),
   sharing: SharingPolicySchema,
   targetDecisionDate: Schema.optional(Schema.String),
   title: NonEmptyString,
   updatedAt: Schema.String,
-  visibility: Schema.Literal("public", "workspace"),
+  visibility: VisibilitySchema,
 });
 export type DocumentMetadataDto = typeof DocumentMetadataSchema.Type;
 
@@ -167,11 +167,10 @@ export const ImportDocumentRequestSchema = Schema.Struct({
     relatedDocuments: Schema.optional(Schema.Array(RelatedDocumentSchema)),
     reviewers: Schema.optional(Schema.Array(PersonSchema)),
     rfcNumber: Schema.optional(PositiveInteger),
-    sensitivity: Schema.optional(Schema.Literal("normal", "confidential")),
     targetDecisionDate: Schema.optional(Schema.String),
     title: NonEmptyString,
     updatedAt: Schema.optional(Schema.String),
-    visibility: Schema.optional(Schema.Literal("public", "workspace")),
+    visibility: Schema.optional(VisibilitySchema),
   }),
   people: Schema.optional(
     Schema.Array(
@@ -189,16 +188,14 @@ export type ImportDocumentRequest = typeof ImportDocumentRequestSchema.Type;
 export const MetadataPatchRequestSchema = Schema.Struct({
   approvers: Schema.optional(Schema.Array(PersonSchema)),
   authors: Schema.optional(Schema.Array(PersonSchema)),
-  confirmConfidentialPublic: Schema.optional(Schema.Boolean),
   expectedRevision: Revision,
   labels: Schema.optional(Schema.Array(Schema.String)),
   legacySourceUrl: Schema.optional(Schema.NullOr(Schema.String)),
   lifecycleState: Schema.optional(NonEmptyString),
   relatedDocuments: Schema.optional(Schema.Array(RelatedDocumentSchema)),
   reviewers: Schema.optional(Schema.Array(PersonSchema)),
-  sensitivity: Schema.optional(Schema.Literal("normal", "confidential")),
   targetDecisionDate: Schema.optional(Schema.NullOr(Schema.String)),
-  visibility: Schema.optional(Schema.Literal("public", "workspace")),
+  visibility: Schema.optional(VisibilitySchema),
 });
 export type MetadataPatchRequest = typeof MetadataPatchRequestSchema.Type;
 

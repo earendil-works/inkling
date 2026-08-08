@@ -27,9 +27,9 @@
   --state-abandoned-bg: light-dark(#efdcd5, #341f20);
   --state-abandoned-border: light-dark(#e0c2b8, #673f3f);
   --state-abandoned-text: light-dark(#8a4a42, #efb9b5);
-  --visibility-bg: light-dark(#f7f0dd, #2a2517);
-  --visibility-border: light-dark(#e3d7b5, #5b4f2e);
-  --visibility-text: light-dark(#6e5b34, #e1cc83);
+  --visibility-public-bg: light-dark(#f4f8f5, #363b38);
+  --visibility-public-border: light-dark(#c5d6ca, #59685e);
+  --visibility-public-text: light-dark(#52695a, #c6d6ca);
   font-family: var(--serif);
   line-height: 1.65;
 }
@@ -154,7 +154,7 @@ body {
 }
 
 .public-state,
-.public-classification {
+.public-visibility {
   display: inline-flex;
   width: max-content;
   padding: 0.3rem 0.5rem;
@@ -204,16 +204,10 @@ body {
   color: var(--state-abandoned-text);
 }
 
-.public-classification[data-document-classification="public"] {
-  border-color: var(--visibility-border);
-  background: var(--visibility-bg);
-  color: var(--visibility-text);
-}
-
-.public-classification[data-document-classification="confidential"] {
-  border-color: var(--state-abandoned-border);
-  background: var(--state-abandoned-bg);
-  color: var(--state-abandoned-text);
+.public-visibility[data-document-visibility="public"] {
+  border-color: var(--visibility-public-border);
+  background: var(--visibility-public-bg);
+  color: var(--visibility-public-text);
 }
 
 .public-catalog-state {
@@ -459,13 +453,28 @@ body {
 }
 
 .catalog li {
-  padding: 1rem 0;
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  gap: 1.25rem;
+  padding: 1rem 0.8rem;
   border-bottom: 1px solid var(--public-border);
+  border-left: 2px solid var(--visibility-public-border);
+  background: var(--visibility-public-bg);
+}
+
+.catalog-folio {
+  color: var(--public-muted);
+  font: var(--font-caption)/1.4 var(--mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.catalog-entry {
+  min-width: 0;
 }
 
 .catalog .title {
   font-size: 1.15rem;
-  font-style: italic;
   font-weight: 600;
 }
 
@@ -475,13 +484,18 @@ body {
 }
 
 .catalog small {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
   color: var(--public-muted);
   font: var(--font-caption)/1.4 var(--mono);
   text-transform: uppercase;
 }
 
-.catalog small a {
-  margin-right: 0.35rem;
+.catalog small .public-state,
+.catalog small .public-visibility {
+  padding: 0.2rem 0.38rem;
 }
 
 @media (width <= 68rem) {

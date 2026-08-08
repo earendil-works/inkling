@@ -141,7 +141,7 @@ test(
       );
       assert.match(
         await first.locator(".cm-content").innerText(),
-        /---\s+authors: \[\]\s+state: draft\s+visibility: workspace\s+sensitivity: normal\s+labels: \[\]\s+---/u,
+        /---\s+authors: \[\]\s+state: draft\s+visibility: private\s+labels: \[\]\s+---/u,
       );
       const draftStateChip = first.locator(".editor-preview-page .reader-state-chip");
       await draftStateChip.waitFor();
@@ -227,6 +227,27 @@ test(
       await first.getByRole("link", { name: "Browse labels" }).click();
       await first.getByRole("link", { name: /platform/u }).click();
       const workingLabelRow = first.locator(".catalog-row", { hasText: "Browser collaboration" });
+      assert.equal(await workingLabelRow.locator(".catalog-row__folio").textContent(), "RFC 0001");
+      assert.equal(
+        await workingLabelRow.locator(".catalog-row__visibility").textContent(),
+        "private",
+      );
+      assert.notEqual(
+        await workingLabelRow.evaluate((row) => getComputedStyle(row).backgroundColor),
+        "rgba(0, 0, 0, 0)",
+      );
+      const visibilityBackgrounds = await first.evaluate(() =>
+        ["public", "private", "confidential"].map((visibility) => {
+          const row = document.createElement("a");
+          row.className = "catalog-row";
+          row.dataset.documentVisibility = visibility;
+          document.body.append(row);
+          const background = getComputedStyle(row).backgroundColor;
+          row.remove();
+          return background;
+        }),
+      );
+      assert.equal(new Set(visibilityBackgrounds).size, 3);
       assert.equal(
         await workingLabelRow.locator("[data-pending-edits]").textContent(),
         "Pending edits",
@@ -259,7 +280,7 @@ test(
       const editorKeyword = first.locator(".cm-content .tok-keyword").last();
       assert.equal(await editorKeyword.textContent(), "const");
       const editorKeywordClass = await editorKeyword.getAttribute("class");
-      const visibilityLine = first.locator(".cm-line", { hasText: "visibility: workspace" });
+      const visibilityLine = first.locator(".cm-line", { hasText: "visibility: private" });
       await visibilityLine.click();
       await first.keyboard.press("End");
       await first.keyboard.press("Shift+Home");
@@ -276,8 +297,7 @@ test(
       await first.keyboard.insertText("c");
       await first.waitForFunction(
         () =>
-          document.querySelector('[data-document-classification="public"]')?.textContent ===
-          "public",
+          document.querySelector('[data-document-visibility="public"]')?.textContent === "public",
       );
       assert.equal(await first.locator("[data-publish]").textContent(), "Publish");
       assert.equal(await first.locator("[data-publish]").isEnabled(), true);
@@ -735,7 +755,7 @@ test(
           ?.slice("inkling_csrf=".length);
         const createdResponse = await fetch("/api/documents", {
           body: JSON.stringify({
-            body: "---\nauthors: []\nstate: published\nvisibility: public\nsensitivity: normal\nlabels:\n  - public\n---\n# Public browser note\n\nVisible without signing in.",
+            body: "---\nauthors: []\nstate: published\nvisibility: public\nlabels:\n  - public\n---\n# Public browser note\n\nVisible without signing in.",
             creationKey: "browser-public-note",
             title: "Public browser note",
           }),

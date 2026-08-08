@@ -42,6 +42,7 @@ import {
   WorkspaceStateStore,
   logoutSession,
   normalizeSearchText,
+  normalizeWorkspaceCatalog,
 } from "@earendil-works/inkling-core";
 import type {
   ApiKeyRecord,
@@ -865,7 +866,7 @@ export function makeLocalInklingApplication(
                 attachments as unknown as readonly AttachmentMetadataDto[],
               ]),
             ),
-            catalog: decodedState.catalog as WorkspaceCatalogState,
+            catalog: normalizeWorkspaceCatalog(decodedState.catalog as WorkspaceCatalogState),
           };
           yield* saveState(restored).pipe(Effect.mapError(toApplicationError));
           return { checkedObjects: objects.length, errors: [] };
@@ -1250,7 +1251,6 @@ export function makeLocalInklingApplication(
               relatedDocuments: yield* convertRelated(request.metadata.relatedDocuments),
               reviewers: yield* convertPeople(request.metadata.reviewers),
               rfcNumber: reservation.entry.rfcNumber,
-              sensitivity: request.metadata.sensitivity,
               targetDecisionDate: request.metadata.targetDecisionDate,
               title: documentTitleFromMarkdown(request.body) ?? request.metadata.title,
               visibility: request.metadata.visibility,
@@ -1610,7 +1610,7 @@ export function makeLocalInklingApplication(
                 authentication: logoutSession(state.authentication, credentials.sessionToken),
               }).pipe(Effect.mapError(toApplicationError)),
             ),
-      publish: (credentials, rawDocumentId, confirmConfidentialPublic = false) =>
+      publish: (credentials, rawDocumentId) =>
         Effect.gen(function* () {
           const room = yield* getRoom(rawDocumentId);
           const principal = yield* resolvePrincipal(credentials, rawDocumentId);
@@ -1640,12 +1640,10 @@ export function makeLocalInklingApplication(
                       : yield* authorsFromEmails(frontmatter.authors, current.metadata),
                   labels: frontmatter.labels,
                   lifecycleState: frontmatter.state,
-                  sensitivity: frontmatter.sensitivity,
                   visibility: frontmatter.visibility,
                 },
                 current.metadata.headRevision,
                 now,
-                confirmConfidentialPublic,
               )
               .pipe(Effect.mapError(toApplicationError));
           }
@@ -1791,13 +1789,7 @@ export function makeLocalInklingApplication(
           const principal = yield* resolvePrincipal(credentials, rawDocumentId);
           const patch = yield* metadataPatch(request);
           const metadata = yield* room
-            .updateMetadata(
-              principal,
-              patch,
-              request.expectedRevision,
-              new Date().toISOString(),
-              request.confirmConfidentialPublic ?? false,
-            )
+            .updateMetadata(principal, patch, request.expectedRevision, new Date().toISOString())
             .pipe(Effect.mapError(toApplicationError));
           yield* projectDocument(room);
           yield* scheduleCheckpoint(room);
@@ -2043,7 +2035,7 @@ function loadWorkspaceState(
               attachments as unknown as readonly AttachmentMetadataDto[],
             ]),
           ),
-          catalog: decoded.catalog as WorkspaceCatalogState,
+          catalog: normalizeWorkspaceCatalog(decoded.catalog as WorkspaceCatalogState),
         })),
       );
     }),
@@ -2146,7 +2138,6 @@ function summaryFromDocument(document: DocumentResponse): Effect.Effect<CatalogS
       revision: document.metadata.headRevision as DocumentRevision,
       reviewers: document.metadata.reviewers as readonly PersonReference[],
       rfcNumber: document.metadata.rfcNumber,
-      sensitivity: document.metadata.sensitivity,
       state: document.metadata.lifecycleState,
       title: document.metadata.title,
       updatedAt: document.metadata.updatedAt,
@@ -2319,7 +2310,6 @@ function withMetadataFrontmatter(body: string, metadata: DocumentMetadata): stri
   const frontmatter = serializeDocumentFrontmatter({
     authors: metadata.authors.map((author) => author.email.toLocaleLowerCase("en")),
     labels: metadata.labels,
-    sensitivity: metadata.sensitivity,
     state: metadata.lifecycleState,
     visibility: metadata.visibility,
   });
@@ -2412,7 +2402,6 @@ function metadataPatch(
       lifecycleState: request.lifecycleState,
       relatedDocuments: yield* convertRelated(request.relatedDocuments),
       reviewers: yield* convertPeople(request.reviewers),
-      sensitivity: request.sensitivity,
       targetDecisionDate: request.targetDecisionDate,
       visibility: request.visibility,
     };

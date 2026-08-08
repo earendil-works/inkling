@@ -405,9 +405,7 @@ function printDocument(document: DocumentResponse): void {
   console.log(`ID: ${metadata.id}`);
   console.log(`Revision: ${metadata.headRevision}`);
   console.log(`State: ${metadata.lifecycleState}`);
-  console.log(
-    `Visibility: ${metadata.visibility}${metadata.sensitivity === "confidential" ? " / CONFIDENTIAL" : ""}`,
-  );
+  console.log(`Visibility: ${metadata.visibility}`);
   console.log("\n---\n");
   console.log(document.body);
   if (document.comments.threads.length > 0) {
@@ -462,11 +460,8 @@ function metadataFieldPatch(
   if (field === "targetDecisionDate" || field === "legacySourceUrl") {
     return Effect.succeed({ [field]: value === "none" ? null : value });
   }
-  if (new Set(["lifecycleState", "sensitivity", "visibility"]).has(field)) {
-    return Effect.succeed({
-      [field]: value,
-      ...(field === "visibility" && value === "public" ? { confirmConfidentialPublic: true } : {}),
-    });
+  if (new Set(["lifecycleState", "visibility"]).has(field)) {
+    return Effect.succeed({ [field]: value });
   }
   return usageFailure(`Unsupported metadata field: ${field}`);
 }

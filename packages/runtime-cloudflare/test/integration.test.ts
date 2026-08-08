@@ -101,7 +101,7 @@ test(
               newText: "authors:\n  - armin@earendil.com\n  - alphatest0@earendil.com",
               oldText: "authors: []",
             },
-            { newText: "visibility: public", oldText: "visibility: workspace" },
+            { newText: "visibility: public", oldText: "visibility: private" },
             { newText: "labels:\n  - working", oldText: "labels: []" },
           ],
           expectedRevision: first.metadata.headRevision,
@@ -176,7 +176,7 @@ test(
         `${running.baseUrl}/api/documents/${second.metadata.id}/edits`,
         {
           body: JSON.stringify({
-            edits: [{ newText: "visibility: public", oldText: "visibility: workspace" }],
+            edits: [{ newText: "visibility: public", oldText: "visibility: private" }],
             expectedRevision: lateNumbered.metadata.headRevision,
           }),
           headers: { ...authorization, "Content-Type": "application/json" },

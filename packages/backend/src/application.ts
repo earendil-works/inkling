@@ -265,7 +265,6 @@ export interface InklingApplicationService {
   readonly publish: (
     credentials: RequestCredentials,
     documentId: string,
-    confirmConfidentialPublic?: boolean,
   ) => Effect.Effect<DocumentMetadataDto, ApplicationError>;
   readonly unpublish: (
     credentials: RequestCredentials,
