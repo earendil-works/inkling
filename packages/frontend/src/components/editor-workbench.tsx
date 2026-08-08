@@ -40,8 +40,12 @@ export function EditorWorkbench({
 
   useEffect(() => {
     const preview = previewRef.current;
-    if (preview === null || previewHtml === "") return;
+    if (preview === null) return;
     preview.innerHTML = previewHtml;
+    if (previewHtml === "") {
+      renderedCallbackRef.current();
+      return;
+    }
     const fiber = browserRuntime.runFork(
       renderMermaid(preview).pipe(
         Effect.ensuring(Effect.sync(() => renderedCallbackRef.current())),

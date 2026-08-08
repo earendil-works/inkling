@@ -155,7 +155,6 @@ export function makeCollaborationClient(
               callbacks.onComments(message.comments);
               callbacks.onMetadata(message.metadata);
               callbacks.onPermissions(message.actions);
-              callbacks.onState("ready");
               welcomed = true;
               for (const [clientUpdateId, pending] of unacknowledged) {
                 sendMessage({
@@ -164,6 +163,7 @@ export function makeCollaborationClient(
                   update: encodeBase64(pending),
                 });
               }
+              callbacks.onState(unacknowledged.size === 0 ? "ready" : "saving");
               settleFlushWaiters();
             });
             break;

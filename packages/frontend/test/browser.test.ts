@@ -116,6 +116,19 @@ test(
         () => document.querySelector("[data-save-state]")?.textContent === "Saved",
       );
       assert.equal(await first.locator("[data-api-status]").textContent(), "Saved");
+      await titleLine.click();
+      await first.keyboard.press("End");
+      await first.keyboard.insertText("\n\nb");
+      await first.waitForFunction(
+        () => document.querySelector("[data-preview]")?.textContent?.trim() === "b",
+      );
+      await first.keyboard.press("Backspace");
+      await first.waitForFunction(
+        () => document.querySelector("[data-preview]")?.textContent === "",
+      );
+      await first.waitForFunction(
+        () => document.querySelector("[data-save-state]")?.textContent === "Saved",
+      );
       assert.match(
         await first.locator(".cm-content").innerText(),
         /---\s+authors: \[\]\s+state: draft\s+visibility: workspace\s+sensitivity: normal\s+labels: \[\]\s+---/u,
