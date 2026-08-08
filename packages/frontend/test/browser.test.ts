@@ -201,7 +201,16 @@ test(
       await first.waitForFunction(
         () => document.querySelector("[data-publish]")?.textContent === "Publish Changes",
       );
-      await first.getByRole("link", { name: "Read" }).click();
+      const documentActionLabels = await first
+        .locator(".document-actions > a, .document-actions > button")
+        .allTextContents();
+      const shareActionIndex = documentActionLabels.indexOf("Share");
+      assert.deepEqual(documentActionLabels.slice(shareActionIndex, shareActionIndex + 3), [
+        "Share",
+        "View",
+        "Publish Changes",
+      ]);
+      await first.getByRole("link", { name: "View" }).click();
       await first.waitForSelector("[data-reader]");
       assert.doesNotMatch(await first.locator("[data-reader]").innerText(), /Published follow-up/u);
       await first.locator("[data-open-editor]").click();
@@ -219,7 +228,7 @@ test(
       await first.evaluate(() => {
         document.documentElement.dataset["browserNavigation"] = "same-document";
       });
-      await first.getByRole("link", { name: "Read" }).click();
+      await first.getByRole("link", { name: "View" }).click();
       await first.waitForURL(/\/documents\/[^/]+$/u);
       assert.equal(
         await first.locator("html").getAttribute("data-browser-navigation"),

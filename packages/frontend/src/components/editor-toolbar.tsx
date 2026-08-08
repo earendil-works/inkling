@@ -51,13 +51,6 @@ export function EditorToolbar({
     <section className="document-bar">
       <DocumentIdentity rfcNumber={metadata.rfcNumber} title={title} />
       <div className="document-actions">
-        <ButtonLink
-          className="document-mode-link"
-          href={documentHref(metadata.id, shared, "read")}
-          variant="toolbar"
-        >
-          Read
-        </ButtonLink>
         <Button
           aria-pressed={previewOpen}
           className="preview-toggle"
@@ -86,21 +79,28 @@ export function EditorToolbar({
           onAllocated={onMetadataChanged}
         />
         {shared ? null : (
-          <>
-            <SharingControl
-              access={metadata.sharing.access}
-              api={api}
-              documentId={metadata.id}
-              expectedRevision={metadata.headRevision}
-              onUpdated={onSharingChanged}
-            />
-            <PublishButton
-              api={api}
-              metadata={publicationMetadata}
-              onPublished={onMetadataChanged}
-              published={metadata.publishedRevision !== undefined}
-            />
-          </>
+          <SharingControl
+            access={metadata.sharing.access}
+            api={api}
+            documentId={metadata.id}
+            expectedRevision={metadata.headRevision}
+            onUpdated={onSharingChanged}
+          />
+        )}
+        <ButtonLink
+          className="document-mode-link"
+          href={documentHref(metadata.id, shared, "read")}
+          variant="toolbar"
+        >
+          View
+        </ButtonLink>
+        {shared ? null : (
+          <PublishButton
+            api={api}
+            metadata={publicationMetadata}
+            onPublished={onMetadataChanged}
+            published={metadata.publishedRevision !== undefined}
+          />
         )}
       </div>
     </section>
