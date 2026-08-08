@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import type { CommentThreadDto } from "@earendil-works/jot-protocol";
+import type { CommentThreadDto } from "@earendil-works/inkling-protocol";
 
 import { AnchoredPopover } from "./anchored-popover.tsx";
 import { Button } from "./button.tsx";

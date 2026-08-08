@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Effect } from "effect";
 
-import { hasPendingPublicationChanges } from "@earendil-works/jot-core";
-import type { DocumentMetadataDto } from "@earendil-works/jot-protocol";
+import { hasPendingPublicationChanges } from "@earendil-works/inkling-core";
+import type { DocumentMetadataDto } from "@earendil-works/inkling-protocol";
 
 import type { ApiClientService, ApiError } from "../api.ts";
 import type { CollaborationClientError } from "../collaboration.ts";

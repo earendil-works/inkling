@@ -35,7 +35,7 @@ export function loadConfig(): Effect.Effect<Config, ConfigError> {
     Effect.flatMap((contents) =>
       Schema.decodeUnknown(Schema.parseJson(configSchema))(contents).pipe(
         Effect.mapError(
-          (cause) => new ConfigError({ cause, message: `Invalid Jot config at ${filePath}.` }),
+          (cause) => new ConfigError({ cause, message: `Invalid Inkling config at ${filePath}.` }),
         ),
       ),
     ),
@@ -45,7 +45,7 @@ export function loadConfig(): Effect.Effect<Config, ConfigError> {
         : Effect.fail(
             cause instanceof ConfigError
               ? cause
-              : new ConfigError({ cause, message: `Cannot read Jot config at ${filePath}.` }),
+              : new ConfigError({ cause, message: `Cannot read Inkling config at ${filePath}.` }),
           ),
     ),
   );
@@ -56,7 +56,7 @@ export function saveConfig(config: Config): Effect.Effect<void, ConfigError> {
   const directory = path.dirname(filePath);
   return Effect.tryPromise({
     catch: (cause) =>
-      new ConfigError({ cause, message: `Cannot write Jot config at ${filePath}.` }),
+      new ConfigError({ cause, message: `Cannot write Inkling config at ${filePath}.` }),
     try: async () => {
       await fs.mkdir(directory, { mode: 0o700, recursive: true });
       const temporary = `${filePath}.tmp-${process.pid}`;
@@ -68,7 +68,7 @@ export function saveConfig(config: Config): Effect.Effect<void, ConfigError> {
 }
 
 export function selectedInstance(config: Config): Effect.Effect<Instance, ConfigError> {
-  const name = process.env["JOT_INSTANCE"] ?? config.active;
+  const name = process.env["INKLING_INSTANCE"] ?? config.active;
   const instance =
     name === undefined && config.instances.length === 1
       ? config.instances[0]
@@ -76,7 +76,7 @@ export function selectedInstance(config: Config): Effect.Effect<Instance, Config
   return instance === undefined
     ? Effect.fail(
         new ConfigError({
-          message: "No Jot instance is selected. Run `jot instance add` and `jot use`.",
+          message: "No Inkling instance is selected. Run `inkling instance add` and `inkling use`.",
         }),
       )
     : Effect.succeed(instance);
@@ -95,10 +95,10 @@ export function upsertInstance(config: Config, instance: Instance): Config {
 
 function configPath(): string {
   return (
-    process.env["JOT_CONFIG"] ??
+    process.env["INKLING_CONFIG"] ??
     path.join(
       process.env["XDG_CONFIG_HOME"] ?? path.join(os.homedir(), ".config"),
-      "jot",
+      "inkling",
       "config.json",
     )
   );

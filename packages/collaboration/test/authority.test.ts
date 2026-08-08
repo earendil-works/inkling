@@ -12,7 +12,7 @@ import {
   ObjectStore,
   personId,
   StorageError,
-} from "@earendil-works/jot-core";
+} from "@earendil-works/inkling-core";
 import type {
   DigestService,
   DurableDocumentJournalService,
@@ -20,7 +20,7 @@ import type {
   ObjectStoreService,
   Principal,
   StoredObject,
-} from "@earendil-works/jot-core";
+} from "@earendil-works/inkling-core";
 
 import {
   applyDocumentUpdate,

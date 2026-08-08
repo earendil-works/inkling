@@ -2,8 +2,8 @@ import { useMemo } from "react";
 import type { Mermaid } from "mermaid";
 import { Effect } from "effect";
 
-import { makeMarkdownRenderer } from "@earendil-works/jot-renderer";
-import type { DocumentFrontmatter, RenderHeading } from "@earendil-works/jot-renderer";
+import { makeMarkdownRenderer } from "@earendil-works/inkling-renderer";
+import type { DocumentFrontmatter, RenderHeading } from "@earendil-works/inkling-renderer";
 
 import {
   mountMermaidDiagramControls,
@@ -61,7 +61,7 @@ async function renderMermaidDiagram(mermaid: Mermaid, diagram: HTMLElement): Pro
       if (diagram.isConnected) mountMermaidDiagramError(diagram);
       return;
     }
-    const rendered = await mermaid.render(`jot-mermaid-${++diagramGeneration}`, code);
+    const rendered = await mermaid.render(`inkling-mermaid-${++diagramGeneration}`, code);
     if (diagram.isConnected) mountMermaidDiagramControls(diagram, rendered.svg);
   } catch {
     if (diagram.isConnected) mountMermaidDiagramError(diagram);

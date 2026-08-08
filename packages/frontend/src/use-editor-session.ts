@@ -15,8 +15,11 @@ import type {
   CommentStateDto,
   DocumentMetadataDto,
   PresenceDto,
-} from "@earendil-works/jot-protocol";
-import { findJotCodeLanguage, jotSyntaxHighlighter } from "@earendil-works/jot-renderer";
+} from "@earendil-works/inkling-protocol";
+import {
+  findInklingCodeLanguage,
+  inklingSyntaxHighlighter,
+} from "@earendil-works/inkling-renderer";
 
 import { makeCollaborationClient } from "./collaboration.ts";
 import type { CollaborationClient, ConnectionState } from "./collaboration.ts";
@@ -116,9 +119,9 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
       state: EditorState.create({
         extensions: [
           basicSetup,
-          syntaxHighlighting(jotSyntaxHighlighter),
+          syntaxHighlighting(inklingSyntaxHighlighter),
           yamlFrontmatter({
-            content: markdown({ codeLanguages: findJotCodeLanguage }),
+            content: markdown({ codeLanguages: findInklingCodeLanguage }),
           }),
           yamlLanguage.data.of({ autocomplete: frontmatterCompletion }),
           autocompletion({

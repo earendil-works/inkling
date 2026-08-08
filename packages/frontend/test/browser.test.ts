@@ -17,7 +17,7 @@ test(
   { skip: browserExecutable === undefined, timeout: 60_000 },
   async () => {
     assert.ok(browserExecutable);
-    const directory = await mkdtemp(path.join(tmpdir(), "jot-browser-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "inkling-browser-"));
     const port = await availablePort();
     const baseUrl = `http://127.0.0.1:${port}`;
     const google = await startGoogleOAuthMock();
@@ -27,14 +27,14 @@ test(
         ...process.env,
         GOOGLE_ADMIN_EMAILS: "browser@example.com",
         GOOGLE_ALLOWED_DOMAINS: "example.com",
-        GOOGLE_CLIENT_ID: "jot-browser-client",
-        GOOGLE_CLIENT_SECRET: "jot-browser-secret",
+        GOOGLE_CLIENT_ID: "inkling-browser-client",
+        GOOGLE_CLIENT_SECRET: "inkling-browser-secret",
         GOOGLE_REDIRECT_URI: `${baseUrl}/api/auth/google/callback`,
-        JOT_DATA_DIR: directory,
-        JOT_GOOGLE_AUTHORIZATION_ENDPOINT: `${google.origin}/authorize`,
-        JOT_GOOGLE_CERTIFICATES_ENDPOINT: `${google.origin}/certificates`,
-        JOT_GOOGLE_TOKEN_ENDPOINT: `${google.origin}/token`,
-        JOT_OAUTH_STATE_SECRET: "jot-browser-state-secret",
+        INKLING_DATA_DIR: directory,
+        INKLING_GOOGLE_AUTHORIZATION_ENDPOINT: `${google.origin}/authorize`,
+        INKLING_GOOGLE_CERTIFICATES_ENDPOINT: `${google.origin}/certificates`,
+        INKLING_GOOGLE_TOKEN_ENDPOINT: `${google.origin}/token`,
+        INKLING_OAUTH_STATE_SECRET: "inkling-browser-state-secret",
         PORT: String(port),
       },
       stdio: "ignore",
@@ -56,9 +56,9 @@ test(
       );
       await first.getByRole("link", { name: "Sign in" }).click();
       await first.waitForSelector("[data-new-document]");
-      assert.equal(await first.title(), "Notes and RFCs");
-      assert.equal(await first.locator(".workspace-heading h1").textContent(), "Notes and RFCs");
-      assert.equal(await first.locator(".wordmark").textContent(), "Notes and RFCs");
+      assert.equal(await first.title(), "Inkling");
+      assert.equal(await first.locator(".workspace-heading h1").textContent(), "Inkling");
+      assert.equal(await first.locator(".wordmark").textContent(), "Inkling");
       assert.equal(await first.locator("[data-account-name]").textContent(), "Browser Admin");
       assert.equal(await first.locator("[data-api-status]").count(), 0);
       assert.equal(await first.locator(".catalog-tools [data-logout]").count(), 0);
@@ -200,7 +200,7 @@ test(
       });
       await first.locator(".wordmark").click();
       await first.waitForSelector("[data-document-search]");
-      assert.equal(await first.title(), "Notes and RFCs");
+      assert.equal(await first.title(), "Inkling");
       await first.getByRole("link", { name: "Browse labels" }).click();
       await first.getByRole("link", { name: /platform/u }).click();
       const workingLabelRow = first.locator(".catalog-row", { hasText: "Browser collaboration" });
@@ -229,7 +229,7 @@ test(
         await first.locator("[data-preview] [data-mermaid-error]").innerText(),
         /not a mermaid diagram/u,
       );
-      assert.equal(await first.locator('body > div[id^="djot-mermaid-"]').count(), 0);
+      assert.equal(await first.locator('body > div[id^="dinkling-mermaid-"]').count(), 0);
       await first.waitForFunction(
         () => document.querySelector("[data-save-state]")?.textContent === "Saved",
       );
@@ -333,11 +333,11 @@ test(
       assert.match(await first.locator("[data-preview]").innerText(), /Shared starting body/u);
       await first.waitForSelector("[data-preview] .tok-keyword");
       await first.waitForSelector("[data-preview] [data-mermaid-error]");
-      assert.equal(await first.locator('body > div[id^="djot-mermaid-"]').count(), 0);
+      assert.equal(await first.locator('body > div[id^="dinkling-mermaid-"]').count(), 0);
       const renderedKeyword = first.locator("[data-preview] .tok-keyword");
       assert.equal(await renderedKeyword.textContent(), "const");
       assert.equal(await renderedKeyword.getAttribute("class"), editorKeywordClass);
-      await first.getByRole("link", { name: "All notes and RFCs" }).click();
+      await first.locator(".reader-back-link").click();
       await first.waitForSelector("[data-document-search]");
       await first.getByRole("link", { name: "Browse labels" }).click();
       await first.waitForURL(/\/labels$/u);
@@ -347,7 +347,7 @@ test(
       assert.equal(new URL(first.url()).searchParams.get("label"), "platform");
       assert.match(await first.locator("[data-catalog]").innerText(), /Browser collaboration/u);
       assert.equal(await first.locator("[data-pending-edits]").count(), 0);
-      await first.getByRole("link", { name: "All notes and RFCs" }).click();
+      await first.getByRole("link", { name: "All documents" }).click();
       await first.waitForSelector("[data-document-search]");
       await first.keyboard.press("/");
       const documentSearch = first.locator("[data-search]");
@@ -482,8 +482,8 @@ test(
         const csrf = document.cookie
           .split(";")
           .map((part) => part.trim())
-          .find((part) => part.startsWith("jot_csrf="))
-          ?.slice("jot_csrf=".length);
+          .find((part) => part.startsWith("inkling_csrf="))
+          ?.slice("inkling_csrf=".length);
         const documentResponse = await fetch(`/api/documents/${id}`);
         const source = (await documentResponse.json()) as { body: string };
         const start = source.body.indexOf("Shared starting body");
@@ -631,8 +631,8 @@ test(
         const csrf = document.cookie
           .split(";")
           .map((part) => part.trim())
-          .find((part) => part.startsWith("jot_csrf="))
-          ?.slice("jot_csrf=".length);
+          .find((part) => part.startsWith("inkling_csrf="))
+          ?.slice("inkling_csrf=".length);
         const current = (await (await fetch(`/api/documents/${id}`)).json()) as {
           metadata: { headRevision: number };
         };
@@ -668,8 +668,8 @@ test(
         const csrf = document.cookie
           .split(";")
           .map((part) => part.trim())
-          .find((part) => part.startsWith("jot_csrf="))
-          ?.slice("jot_csrf=".length);
+          .find((part) => part.startsWith("inkling_csrf="))
+          ?.slice("inkling_csrf=".length);
         const current = (await (await fetch(`/api/documents/${id}`)).json()) as {
           metadata: { headRevision: number };
         };
@@ -708,8 +708,8 @@ test(
         const csrf = document.cookie
           .split(";")
           .map((part) => part.trim())
-          .find((part) => part.startsWith("jot_csrf="))
-          ?.slice("jot_csrf=".length);
+          .find((part) => part.startsWith("inkling_csrf="))
+          ?.slice("inkling_csrf=".length);
         const createdResponse = await fetch("/api/documents", {
           body: JSON.stringify({
             body: "---\nauthors: []\nstate: published\nvisibility: public\nsensitivity: normal\nlabels:\n  - public\n---\n# Public browser note\n\nVisible without signing in.",
@@ -778,7 +778,7 @@ async function startGoogleOAuthMock(): Promise<RunningGoogleOAuthMock> {
   const verificationKey = {
     ...publicKey.export({ format: "jwk" }),
     alg: "RS256",
-    kid: "jot-browser-key",
+    kid: "inkling-browser-key",
     use: "sig",
   };
   let nonce: string | undefined;
@@ -799,9 +799,9 @@ async function startGoogleOAuthMock(): Promise<RunningGoogleOAuthMock> {
     }
     if (url.pathname === "/token") {
       assert.ok(nonce);
-      const header = base64UrlJson({ alg: "RS256", kid: "jot-browser-key", typ: "JWT" });
+      const header = base64UrlJson({ alg: "RS256", kid: "inkling-browser-key", typ: "JWT" });
       const claims = base64UrlJson({
-        aud: "jot-browser-client",
+        aud: "inkling-browser-client",
         email: "browser@example.com",
         email_verified: true,
         exp: Math.floor(Date.now() / 1_000) + 300,

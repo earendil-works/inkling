@@ -6,7 +6,7 @@ import type {
   DocumentResponse,
   PersonDto,
   PresenceDto,
-} from "@earendil-works/jot-protocol";
+} from "@earendil-works/inkling-protocol";
 
 import { ApiError, makeApiClient } from "./api.ts";
 import type { ApiClientService } from "./api.ts";
@@ -74,7 +74,7 @@ export function App(): React.JSX.Element {
   const pageTitle =
     route.state.data?.screen === "editor" || route.state.data?.screen === "reader"
       ? route.state.data.document.metadata.title
-      : "Notes and RFCs";
+      : "Inkling";
 
   useEffect(() => {
     document.title = pageTitle;
@@ -246,7 +246,7 @@ function loadDocumentRoute(
       new ApiError({
         cause,
         code: "chunk_load_failed",
-        message: "Jot could not load this view.",
+        message: "Inkling could not load this view.",
         retryable: true,
         status: 0,
       }),

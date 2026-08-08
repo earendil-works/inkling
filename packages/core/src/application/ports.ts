@@ -33,7 +33,7 @@ export interface ObjectStoreService {
 }
 
 export const ObjectStore = Context.GenericTag<ObjectStoreService>(
-  "@earendil-works/jot/ObjectStore",
+  "@earendil-works/inkling/ObjectStore",
 );
 
 export type JournalEntryKind =
@@ -70,7 +70,7 @@ export interface DurableDocumentJournalService {
 }
 
 export const DurableDocumentJournal = Context.GenericTag<DurableDocumentJournalService>(
-  "@earendil-works/jot/DurableDocumentJournal",
+  "@earendil-works/inkling/DurableDocumentJournal",
 );
 
 export interface WorkspaceStateStoreService {
@@ -79,7 +79,7 @@ export interface WorkspaceStateStoreService {
 }
 
 export const WorkspaceStateStore = Context.GenericTag<WorkspaceStateStoreService>(
-  "@earendil-works/jot/WorkspaceStateStore",
+  "@earendil-works/inkling/WorkspaceStateStore",
 );
 
 export interface IdGeneratorService {
@@ -87,14 +87,14 @@ export interface IdGeneratorService {
 }
 
 export const IdGenerator = Context.GenericTag<IdGeneratorService>(
-  "@earendil-works/jot/IdGenerator",
+  "@earendil-works/inkling/IdGenerator",
 );
 
 export interface DigestService {
   readonly sha256: (bytes: Uint8Array) => Effect.Effect<string, StorageError>;
 }
 
-export const Digest = Context.GenericTag<DigestService>("@earendil-works/jot/Digest");
+export const Digest = Context.GenericTag<DigestService>("@earendil-works/inkling/Digest");
 
 export interface SecretHasherService {
   readonly hash: (secret: string) => Effect.Effect<string, StorageError>;
@@ -102,7 +102,7 @@ export interface SecretHasherService {
 }
 
 export const SecretHasher = Context.GenericTag<SecretHasherService>(
-  "@earendil-works/jot/SecretHasher",
+  "@earendil-works/inkling/SecretHasher",
 );
 
 export interface SecureTokenService {
@@ -110,5 +110,5 @@ export interface SecureTokenService {
 }
 
 export const SecureToken = Context.GenericTag<SecureTokenService>(
-  "@earendil-works/jot/SecureToken",
+  "@earendil-works/inkling/SecureToken",
 );

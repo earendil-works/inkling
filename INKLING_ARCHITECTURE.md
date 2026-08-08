@@ -1,12 +1,12 @@
-# Jot Architecture
+# Inkling Architecture
 
 Status: Proposed clean-room architecture
 
 ## 1. Purpose
 
-Jot is an open-source, multiplayer Markdown workspace. It must run as a self-contained local server and as a Cloudflare deployment without changing its document model, collaboration protocol, or user-facing behavior.
+Inkling is an open-source, multiplayer Markdown workspace. It must run as a self-contained local server and as a Cloudflare deployment without changing its document model, collaboration protocol, or user-facing behavior.
 
-The immediate product goal is to replace the existing Earendil RFC authoring and publishing system while retaining Jot's collaborative editor, comments, sharing, and agent-friendly CLI.
+The immediate product goal is to replace the existing Earendil RFC authoring and publishing system while retaining Inkling's collaborative editor, comments, sharing, and agent-friendly CLI.
 
 This document is the implementation specification for a clean-room rewrite. It records the required behavior of the existing systems and defines the new architecture. The implementation should be derived from this document and its tests rather than by incrementally adapting the current server and browser code.
 
@@ -76,13 +76,13 @@ The domain model, commands, authorization decisions, collaboration messages, ren
 
 ### 4.7 Prefer mature collaboration primitives
 
-Jot should use a mature collaborative text implementation rather than maintain separate server and browser text-rebasing algorithms. The target design uses Yjs for the Markdown body and CodeMirror 6 for editing.
+Inkling should use a mature collaborative text implementation rather than maintain separate server and browser text-rebasing algorithms. The target design uses Yjs for the Markdown body and CodeMirror 6 for editing.
 
 ## 5. Existing functionality to retain
 
 This section describes behavioral requirements, not implementation guidance.
 
-### 5.1 Current Jot functionality
+### 5.1 Current Inkling functionality
 
 #### Workspace and note management
 
@@ -145,7 +145,7 @@ This section describes behavioral requirements, not implementation guidance.
 
 #### CLI and agent use
 
-- The CLI can register named Jot installations with an API key.
+- The CLI can register named Inkling installations with an API key.
 - The CLI can register a shared document directly from its capability URL.
 - Authenticated commands include list, search, read, create, update, edit, delete, share, comment, reply, resolve, reopen, and comment management according to the user's role.
 - Shared commands include read and the operations allowed by the capability.
@@ -157,7 +157,7 @@ This section describes behavioral requirements, not implementation guidance.
 
 #### Local operation
 
-- Jot can be installed and run from the CLI without Cloudflare or another service.
+- Inkling can be installed and run from the CLI without Cloudflare or another service.
 - The port and data directory are configurable.
 - Docker deployment with a persistent data volume is supported.
 - Human-readable Markdown files are available for grep, backup, and external tools.
@@ -200,7 +200,7 @@ Expected RFC states include draft, discussion, published, accepted, implemented,
 
 - RFC pages have stable heading anchors and a table of contents.
 - Code blocks have light and dark syntax themes.
-- Internal links to known RFC source documents are rewritten to canonical Jot RFC routes during import or rendering.
+- Internal links to known RFC source documents are rewritten to canonical Inkling RFC routes during import or rendering.
 - Images and imported media are served under the RFC's authorization policy.
 - Image dimensions represented in imported Markdown are preserved when possible.
 - External links can optionally require workspace authentication before redirecting.
@@ -308,7 +308,7 @@ It stores:
 - Workspace and public catalog projections.
 - Backup manifests.
 
-The bucket is private. Public access always passes through the Jot HTTP runtime so visibility and cache policy can be enforced.
+The bucket is private. Public access always passes through the Inkling HTTP runtime so visibility and cache policy can be enforced.
 
 ## 7. Document model
 
@@ -386,7 +386,7 @@ An anchor that cannot be resolved is marked orphaned rather than silently attach
 
 Attachments are immutable R2 or filesystem objects associated with a document. Attachment metadata includes original filename, media type, size, content digest, creation time, uploader, and optional image dimensions.
 
-Markdown refers to stable Jot attachment URLs rather than directly exposing bucket keys.
+Markdown refers to stable Inkling attachment URLs rather than directly exposing bucket keys.
 
 Replacing an attachment creates a new attachment identifier. Garbage collection happens only after confirming that an attachment is unreferenced and outside the configured retention period.
 
@@ -514,19 +514,19 @@ A missing checkpoint is valid only for a newly initialized document. Corrupt or 
 
 The logical layout is identical in R2 and the local filesystem adapter.
 
-| Object category | Purpose |
-|---|---|
-| Workspace configuration | Non-secret workspace settings and schema version |
-| Workspace catalog | Rebuildable internal catalog projection |
-| Public catalog | Projection containing only publicly visible published documents |
-| Document head checkpoint | Latest compact recoverable document state |
-| Published checkpoint | Immutable or content-addressed revision selected for public serving |
-| Markdown export | Human-readable body and compatible metadata frontmatter |
-| Rendered page | Cacheable HTML representation of a published revision |
-| Search projection | Rebuildable normalized search data |
-| Attachments | Immutable binary document assets |
-| Revision objects | Optional retained historical checkpoints |
-| Backup manifest | Inventory and revision information for export and verification |
+| Object category          | Purpose                                                             |
+| ------------------------ | ------------------------------------------------------------------- |
+| Workspace configuration  | Non-secret workspace settings and schema version                    |
+| Workspace catalog        | Rebuildable internal catalog projection                             |
+| Public catalog           | Projection containing only publicly visible published documents     |
+| Document head checkpoint | Latest compact recoverable document state                           |
+| Published checkpoint     | Immutable or content-addressed revision selected for public serving |
+| Markdown export          | Human-readable body and compatible metadata frontmatter             |
+| Rendered page            | Cacheable HTML representation of a published revision               |
+| Search projection        | Rebuildable normalized search data                                  |
+| Attachments              | Immutable binary document assets                                    |
+| Revision objects         | Optional retained historical checkpoints                            |
+| Backup manifest          | Inventory and revision information for export and verification      |
 
 Authoritative checkpoints are single objects so their internal fields cannot be observed at mismatched revisions. R2 provides no application-level transaction across multiple objects; the architecture therefore never requires a checkpoint and its projections to change atomically.
 
@@ -555,7 +555,7 @@ The workspace authority ignores stale summary revisions. If delivery fails, the 
 
 ### 11.4 Search
 
-The workspace catalog provides the current Jot search behavior and RFC-specific search fields. The initial implementation can scan a derived normalized catalog because expected workspaces are modest in size.
+The workspace catalog provides the current Inkling search behavior and RFC-specific search fields. The initial implementation can scan a derived normalized catalog because expected workspaces are modest in size.
 
 The search projection includes body text for full-content search, but public catalog output contains only data from public published revisions. Search is an interface behind the workspace authority so a future larger-scale index can replace the scan without changing document storage or APIs.
 
@@ -714,7 +714,7 @@ Every WebSocket connection negotiates a protocol version. Unknown incompatible v
 
 ### 15.1 Shared renderer
 
-Jot has one deterministic Markdown rendering package usable from browser, Node.js, and Cloudflare where feasible. Editor preview and published output must agree on Markdown semantics.
+Inkling has one deterministic Markdown rendering package usable from browser, Node.js, and Cloudflare where feasible. Editor preview and published output must agree on Markdown semantics.
 
 The renderer supports:
 
@@ -725,7 +725,7 @@ The renderer supports:
 - Code fences and language metadata.
 - Syntax highlighting with light and dark presentation.
 - Mermaid placeholders rendered safely in the browser.
-- Images and Jot attachment URLs.
+- Images and Inkling attachment URLs.
 - Link rewriting for known RFC references.
 - Optional authentication-gated external links.
 
@@ -772,7 +772,7 @@ Primary surfaces are:
 
 CodeMirror owns text editing, selection, composition, the title heading, and local undo. Application state owns structured metadata, comments, permissions, connection status, and preview state.
 
-Accessibility requirements include keyboard navigation, visible focus, semantic controls, dialog focus management, reduced-motion support, and non-color-only presence indicators. The browser page title is the current note or RFC title on document routes and `Notes and RFCs` on workspace-level routes.
+Accessibility requirements include keyboard navigation, visible focus, semantic controls, dialog focus management, reduced-motion support, and non-color-only presence indicators. The browser page title is the current note or RFC title on document routes and `Inkling` on workspace-level routes.
 
 ## 17. CLI architecture
 
@@ -800,7 +800,7 @@ CLI output has a stable human-readable default and may later add structured JSON
 
 ### 18.1 Requirements
 
-Local Jot runs with one command and no external database. Its configured data directory contains all durable state except optional externally configured object storage.
+Local Inkling runs with one command and no external database. Its configured data directory contains all durable state except optional externally configured object storage.
 
 The runtime provides:
 
@@ -815,13 +815,13 @@ The runtime provides:
 
 ### 18.2 Single-writer rule
 
-Only one local Jot process may own a data directory at a time. The server acquires a process lock and refuses to start when another healthy process owns the directory.
+Only one local Inkling process may own a data directory at a time. The server acquires a process lock and refuses to start when another healthy process owns the directory.
 
 This keeps local coordination equivalent to one Durable Object authority per document.
 
 ### 18.3 Crash recovery
 
-On startup, local Jot discovers dirty journals, loads their checkpoints, replays durable updates, and schedules fresh checkpoints. Truncated final journal records are detected and ignored only when their integrity marker proves they were never fully committed.
+On startup, local Inkling discovers dirty journals, loads their checkpoints, replays durable updates, and schedules fresh checkpoints. Truncated final journal records are detected and ignored only when their integrity marker proves they were never fully committed.
 
 ### 18.4 Docker
 
@@ -995,11 +995,11 @@ Automated multi-page browser tests cover normal typing, rapid typing, paste, com
 
 ### 23.6 Migration tests
 
-Golden import tests cover representative existing Jot notes and Earendil RFCs, including metadata variants, media, explicit heading identifiers, internal links, unusual states, and missing optional fields.
+Golden import tests cover representative legacy Jot notes and Earendil RFCs, including metadata variants, media, explicit heading identifiers, internal links, unusual states, and missing optional fields.
 
 ## 24. Migration and cutover
 
-### 24.1 Existing Jot import
+### 24.1 Legacy Jot import
 
 The importer reads existing Markdown and metadata sidecars and creates new document checkpoints. It preserves where practical:
 
@@ -1044,7 +1044,7 @@ Any skipped or lossy field is reported explicitly.
 
 The recommended cutover sequence is:
 
-1. Deploy Jot at a staging hostname.
+1. Deploy Inkling at a staging hostname.
 2. Import a frozen RFC snapshot.
 3. Run automated and human comparison.
 4. Perform a final incremental import or short authoring freeze.
@@ -1084,7 +1084,7 @@ Suggested source boundaries are domain, collaboration, application services, sto
 - Define document, metadata, comments, identity, authorization, and publication behavior.
 - Define object-store and durable-journal contracts.
 - Implement local storage adapters and recovery tests.
-- Implement RFC and existing Jot importers.
+- Implement RFC and legacy Jot importers.
 
 ### Phase 2: Local collaborative vertical slice
 
@@ -1137,7 +1137,7 @@ The clean-room rewrite is ready for production migration when:
 7. Comment anchors remain attached through ordinary concurrent editing.
 8. Share access changes affect existing connections promptly.
 9. Public routes cannot reveal internal catalog or document data.
-10. Existing Jot CLI workflows have equivalent supported operations.
+10. Legacy Jot CLI workflows have equivalent supported operations.
 11. All existing Earendil RFCs import with preserved numbers, metadata, bodies, and media or appear in an explicit loss report.
 12. Public RFC canonical routes, state pages, keyword pages, search, themes, code rendering, and social metadata are operational.
 13. The catalog can be rebuilt from object-store checkpoints.

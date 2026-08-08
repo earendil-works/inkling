@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Effect } from "effect";
 
-import type { AuthenticationStatus, DocumentResponse } from "@earendil-works/jot-protocol";
+import type { AuthenticationStatus, DocumentResponse } from "@earendil-works/inkling-protocol";
 
 import type { ApiClientService } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
@@ -97,7 +97,7 @@ export function EditorScreen({
     sessionRef.current?.client?.flush ??
     Effect.fail(
       new CollaborationClientError({
-        message: "Jot cannot publish until the editor is connected.",
+        message: "Inkling cannot publish until the editor is connected.",
       }),
     );
   const previewMetadata = metadataWithFrontmatter(

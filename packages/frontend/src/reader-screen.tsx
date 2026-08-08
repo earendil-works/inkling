@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import type { DocumentResponse } from "@earendil-works/jot-protocol";
+import type { DocumentResponse } from "@earendil-works/inkling-protocol";
 
 import { useAppContext } from "./app-context.tsx";
 import { ReaderDocument } from "./components/reader-document.tsx";

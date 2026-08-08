@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import type { AuthenticationStatus } from "@earendil-works/jot-protocol";
+import type { AuthenticationStatus } from "@earendil-works/inkling-protocol";
 
 import type { ApiClientService } from "../api.ts";
 import { Button } from "./button.tsx";

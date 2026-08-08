@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Effect } from "effect";
 
-import type { ShareResponse } from "@earendil-works/jot-protocol";
+import type { ShareResponse } from "@earendil-works/inkling-protocol";
 
 import type { ApiClientService, ApiError } from "../api.ts";
 import { useAppContext } from "../app-context.tsx";

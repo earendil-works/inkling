@@ -1,16 +1,16 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "jot",
+  "name": "inkling",
   "main": "src/index.ts",
   "compatibility_date": "2026-03-27",
   "durable_objects": {
     "bindings": [
       {
-        "name": "JOT_WORKSPACE",
+        "name": "INKLING_WORKSPACE",
         "class_name": "WorkspaceDurableObject",
       },
       {
-        "name": "JOT_DOCUMENTS",
+        "name": "INKLING_DOCUMENTS",
         "class_name": "DocumentDurableObject",
       },
     ],
@@ -27,9 +27,9 @@
   ],
   "r2_buckets": [
     {
-      "binding": "JOT_OBJECTS",
-      "bucket_name": "jot-objects",
-      "preview_bucket_name": "jot-objects-preview",
+      "binding": "INKLING_OBJECTS",
+      "bucket_name": "inkling-objects",
+      "preview_bucket_name": "inkling-objects-preview",
     },
   ],
   "assets": {

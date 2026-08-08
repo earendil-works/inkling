@@ -6,4 +6,4 @@ GOOGLE_ADMIN_EMAILS=admin@example.com
 # Optional when the inferred callback URL is not registered with Google.
 GOOGLE_REDIRECT_URI=http://localhost:5173/api/auth/google/callback
 # Optional dedicated HMAC secret; defaults to GOOGLE_CLIENT_SECRET.
-JOT_OAUTH_STATE_SECRET=
+INKLING_OAUTH_STATE_SECRET=

@@ -1,4 +1,4 @@
-import type { DocumentMetadataDto } from "@earendil-works/jot-protocol";
+import type { DocumentMetadataDto } from "@earendil-works/inkling-protocol";
 
 import { documentHref } from "../ui.ts";
 import { ButtonLink } from "./button-link.tsx";
@@ -19,7 +19,7 @@ export function ReaderToolbar({
   return (
     <nav className="document-bar reader-toolbar" aria-label="Document navigation">
       <ButtonLink className="reader-back-link" href="/" variant="text">
-        All notes and RFCs
+        Inkling
       </ButtonLink>
       {canEdit ? (
         <ButtonLink

@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 import { Effect, Fiber } from "effect";
 
-import type { DocumentMetadataDto } from "@earendil-works/jot-protocol";
-import type { RenderHeading } from "@earendil-works/jot-renderer";
+import type { DocumentMetadataDto } from "@earendil-works/inkling-protocol";
+import type { RenderHeading } from "@earendil-works/inkling-renderer";
 
 import type { ConnectionState } from "../collaboration.ts";
 import { selectedPreviewSourceRange } from "../comments.ts";

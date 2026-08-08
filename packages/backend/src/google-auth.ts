@@ -1,7 +1,7 @@
 import { Effect, Predicate } from "effect";
 
-import { personId } from "@earendil-works/jot-core";
-import type { PeopleDirectoryEntry, WorkspaceIdentity } from "@earendil-works/jot-core";
+import { personId } from "@earendil-works/inkling-core";
+import type { PeopleDirectoryEntry, WorkspaceIdentity } from "@earendil-works/inkling-core";
 
 import type { SessionResult } from "./application.ts";
 
@@ -15,11 +15,11 @@ export interface GoogleAuthenticationEnvironment {
   readonly GOOGLE_CLIENT_ID?: string | undefined;
   readonly GOOGLE_CLIENT_SECRET?: string | undefined;
   readonly GOOGLE_REDIRECT_URI?: string | undefined;
-  readonly JOT_GOOGLE_AUTHORIZATION_ENDPOINT?: string | undefined;
-  readonly JOT_GOOGLE_CERTIFICATES_ENDPOINT?: string | undefined;
-  readonly JOT_GOOGLE_DIRECTORY_ENDPOINT?: string | undefined;
-  readonly JOT_GOOGLE_TOKEN_ENDPOINT?: string | undefined;
-  readonly JOT_OAUTH_STATE_SECRET?: string | undefined;
+  readonly INKLING_GOOGLE_AUTHORIZATION_ENDPOINT?: string | undefined;
+  readonly INKLING_GOOGLE_CERTIFICATES_ENDPOINT?: string | undefined;
+  readonly INKLING_GOOGLE_DIRECTORY_ENDPOINT?: string | undefined;
+  readonly INKLING_GOOGLE_TOKEN_ENDPOINT?: string | undefined;
+  readonly INKLING_OAUTH_STATE_SECRET?: string | undefined;
 }
 
 export type GoogleIdentityLogin = (
@@ -108,7 +108,7 @@ export async function startGoogleAuthentication(
   const headers = new Headers({ Location: authorization.href });
   headers.append(
     "Set-Cookie",
-    cookieHeader("jot_oauth", cookie, request, {
+    cookieHeader("inkling_oauth", cookie, request, {
       httpOnly: true,
       maxAge: 600,
       path: "/api/auth/google/callback",
@@ -127,7 +127,7 @@ export async function finishGoogleAuthentication(
   if (configuration === undefined) return oauthUnavailable();
   try {
     const url = new URL(request.url);
-    const stateCookie = parseCookies(request.headers.get("Cookie"))["jot_oauth"];
+    const stateCookie = parseCookies(request.headers.get("Cookie"))["inkling_oauth"];
     const payload =
       stateCookie === undefined
         ? undefined
@@ -210,7 +210,7 @@ export async function finishGoogleAuthentication(
     const headers = new Headers({ Location: "/" });
     headers.append(
       "Set-Cookie",
-      cookieHeader("jot_session", session.sessionToken, request, {
+      cookieHeader("inkling_session", session.sessionToken, request, {
         expires: session.expiresAt,
         httpOnly: true,
         path: "/",
@@ -219,7 +219,7 @@ export async function finishGoogleAuthentication(
     );
     headers.append(
       "Set-Cookie",
-      cookieHeader("jot_csrf", session.csrfToken, request, {
+      cookieHeader("inkling_csrf", session.csrfToken, request, {
         expires: session.expiresAt,
         httpOnly: false,
         path: "/",
@@ -228,7 +228,7 @@ export async function finishGoogleAuthentication(
     );
     headers.append(
       "Set-Cookie",
-      cookieHeader("jot_oauth", "", request, {
+      cookieHeader("inkling_oauth", "", request, {
         httpOnly: true,
         maxAge: 0,
         path: "/api/auth/google/callback",
@@ -253,19 +253,21 @@ function googleConfiguration(request: Request, environment: GoogleAuthentication
   return {
     allowedDomains,
     authorizationEndpoint:
-      environment.JOT_GOOGLE_AUTHORIZATION_ENDPOINT ??
+      environment.INKLING_GOOGLE_AUTHORIZATION_ENDPOINT ??
       "https://accounts.google.com/o/oauth2/v2/auth",
     certificatesEndpoint:
-      environment.JOT_GOOGLE_CERTIFICATES_ENDPOINT ?? "https://www.googleapis.com/oauth2/v3/certs",
+      environment.INKLING_GOOGLE_CERTIFICATES_ENDPOINT ??
+      "https://www.googleapis.com/oauth2/v3/certs",
     clientId,
     clientSecret,
     directoryEndpoint:
-      environment.JOT_GOOGLE_DIRECTORY_ENDPOINT ??
+      environment.INKLING_GOOGLE_DIRECTORY_ENDPOINT ??
       "https://admin.googleapis.com/admin/directory/v1/users",
     redirectUri:
       environment.GOOGLE_REDIRECT_URI ?? `${new URL(request.url).origin}/api/auth/google/callback`,
-    stateSecret: environment.JOT_OAUTH_STATE_SECRET ?? clientSecret,
-    tokenEndpoint: environment.JOT_GOOGLE_TOKEN_ENDPOINT ?? "https://oauth2.googleapis.com/token",
+    stateSecret: environment.INKLING_OAUTH_STATE_SECRET ?? clientSecret,
+    tokenEndpoint:
+      environment.INKLING_GOOGLE_TOKEN_ENDPOINT ?? "https://oauth2.googleapis.com/token",
   };
 }
 

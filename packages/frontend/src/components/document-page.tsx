@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
-import type { DocumentMetadataDto } from "@earendil-works/jot-protocol";
-import type { RenderHeading } from "@earendil-works/jot-renderer";
+import type { DocumentMetadataDto } from "@earendil-works/inkling-protocol";
+import type { RenderHeading } from "@earendil-works/inkling-renderer";
 
 import { formatDate } from "../ui.ts";
 import { documentClassification } from "./document-metadata.ts";

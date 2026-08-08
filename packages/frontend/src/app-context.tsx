@@ -1,7 +1,7 @@
 import { createContext, useContext } from "react";
 import type { Dispatch, SetStateAction } from "react";
 
-import type { PresenceDto } from "@earendil-works/jot-protocol";
+import type { PresenceDto } from "@earendil-works/inkling-protocol";
 
 import type { ConnectionState } from "./collaboration.ts";
 import type { NavigateOptions } from "./navigation.ts";

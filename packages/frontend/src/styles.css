@@ -1962,13 +1962,13 @@ select:disabled {
   white-space: nowrap;
 }
 
-.jot-code,
-.jot-mermaid {
+.inkling-code,
+.inkling-mermaid {
   position: relative;
 }
 
-.jot-code > .segment-comment-slot,
-.jot-mermaid > .segment-comment-slot {
+.inkling-code > .segment-comment-slot,
+.inkling-mermaid > .segment-comment-slot {
   position: absolute;
   z-index: 3;
   top: 0.55rem;
@@ -2212,7 +2212,7 @@ select:disabled {
   text-align: left;
 }
 
-.jot-mermaid {
+.inkling-mermaid {
   position: relative;
   min-height: 12rem;
   overflow: hidden;
@@ -2221,7 +2221,7 @@ select:disabled {
   background: white;
 }
 
-.jot-mermaid[data-mermaid-error] {
+.inkling-mermaid[data-mermaid-error] {
   min-height: 0;
   padding: 0;
   overflow: visible;
@@ -2229,7 +2229,7 @@ select:disabled {
   background: transparent;
 }
 
-.jot-mermaid > .jot-mermaid__error {
+.inkling-mermaid > .inkling-mermaid__error {
   margin: 0 0 0.5rem;
   color: var(--danger);
   font: var(--font-caption)/1.4 var(--mono);
@@ -2237,7 +2237,7 @@ select:disabled {
   text-transform: uppercase;
 }
 
-.jot-mermaid[data-mermaid-error] > pre {
+.inkling-mermaid[data-mermaid-error] > pre {
   margin-top: 0;
 }
 
@@ -2251,7 +2251,7 @@ select:disabled {
   cursor: grabbing;
 }
 
-.jot-mermaid__controls {
+.inkling-mermaid__controls {
   position: absolute;
   right: 0.6rem;
   bottom: 0.6rem;
@@ -2259,7 +2259,7 @@ select:disabled {
   gap: 0.25rem;
 }
 
-.jot-mermaid__controls button {
+.inkling-mermaid__controls button {
   padding: 0.35rem 0.55rem;
   border: 1px solid #777;
   background: #fff;

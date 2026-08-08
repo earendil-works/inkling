@@ -17,17 +17,17 @@ import {
   ReplyRequestSchema,
   ResolutionRequestSchema,
   ShareUpdateRequestSchema,
-} from "@earendil-works/jot-protocol";
-import { taggedId, uuidV7Bytes } from "@earendil-works/jot-core";
+} from "@earendil-works/inkling-protocol";
+import { taggedId, uuidV7Bytes } from "@earendil-works/inkling-core";
 import type {
   CatalogResponse,
   DocumentMetadataDto,
   HealthResponse,
   ProtocolError,
-} from "@earendil-works/jot-protocol";
+} from "@earendil-works/inkling-protocol";
 
-import { ApplicationError, JotApplication } from "./application.ts";
-import type { JotApplicationService, RequestCredentials } from "./application.ts";
+import { ApplicationError, InklingApplication } from "./application.ts";
+import type { InklingApplicationService, RequestCredentials } from "./application.ts";
 import { finishGoogleAuthentication, startGoogleAuthentication } from "./google-auth.ts";
 import type { GoogleAuthenticationEnvironment } from "./google-auth.ts";
 
@@ -37,12 +37,12 @@ export type {
   BackupVerification,
   CollaborationConnection,
   DocumentRuntimeConfiguration,
-  JotApplicationService,
+  InklingApplicationService,
   RequestCredentials,
   SessionResult,
 } from "./application.ts";
-export { ApplicationError, JotApplication } from "./application.ts";
-export { localApplicationLayer, makeLocalJotApplication } from "./local.ts";
+export { ApplicationError, InklingApplication } from "./application.ts";
+export { localApplicationLayer, makeLocalInklingApplication } from "./local.ts";
 export type { LocalApplicationOptions } from "./local.ts";
 export { DigestLive, IdGeneratorLive, SecretHasherLive, SecureTokenLive } from "./crypto.ts";
 export {
@@ -56,7 +56,7 @@ export type { GoogleAuthenticationEnvironment, GoogleIdentityLogin } from "./goo
 export interface BackendOptions {
   readonly googleAuthentication?: GoogleAuthenticationEnvironment | undefined;
   readonly version?: string | undefined;
-  readonly runtime?: ManagedRuntime.ManagedRuntime<JotApplicationService, never> | undefined;
+  readonly runtime?: ManagedRuntime.ManagedRuntime<InklingApplicationService, never> | undefined;
 }
 
 export function createBackendApp(options: BackendOptions = {}): Hono {
@@ -98,7 +98,7 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
   app.get("/api/health", (context) => {
     const response: HealthResponse = {
       protocolVersion,
-      service: "jot",
+      service: "inkling",
       status: "ok",
       version,
     };
@@ -120,7 +120,7 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
       return context.json(
         {
           code: "service_unavailable",
-          message: "The Jot application runtime is not configured.",
+          message: "The Inkling application runtime is not configured.",
           retryable: true,
         } satisfies ProtocolError,
         503,
@@ -131,7 +131,7 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
       options.googleAuthentication ?? {},
       (identity, people) =>
         runtime.runPromise(
-          Effect.flatMap(JotApplication, (service) =>
+          Effect.flatMap(InklingApplication, (service) =>
             service.loginWorkspaceIdentity(identity, people),
           ),
         ),
@@ -147,8 +147,8 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
           Effect.zipRight(service.logout(credentials(context))),
           Effect.tap(() =>
             Effect.sync(() => {
-              deleteCookie(context, "jot_session", { path: "/" });
-              deleteCookie(context, "jot_csrf", { path: "/" });
+              deleteCookie(context, "inkling_session", { path: "/" });
+              deleteCookie(context, "inkling_csrf", { path: "/" });
             }),
           ),
         ),
@@ -472,7 +472,7 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
   );
 
   app.get("/rfcs/:number", (context, next) =>
-    getCookie(context, "jot_session") !== undefined
+    getCookie(context, "inkling_session") !== undefined
       ? next()
       : execute(
           context,
@@ -541,7 +541,7 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
       (service) => service.exportWorkspace(credentials(context)),
       (bytes) => {
         context.header("Cache-Control", "no-store");
-        context.header("Content-Disposition", 'attachment; filename="jot-backup.json"');
+        context.header("Content-Disposition", 'attachment; filename="inkling-backup.json"');
         context.header("Content-Type", "application/json; charset=utf-8");
         return context.body(new Uint8Array(bytes).buffer);
       },
@@ -593,7 +593,7 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
   app.notFound((context) => {
     const response: ProtocolError = {
       code: "not_found",
-      message: "The requested Jot resource does not exist.",
+      message: "The requested Inkling resource does not exist.",
       retryable: false,
     };
     return context.json(response, 404);
@@ -605,20 +605,20 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
 const inlineAttachmentTypes = new Set(["image/gif", "image/jpeg", "image/png", "image/webp"]);
 
 function agentInstructions(baseUrl: string): string {
-  return `# Jot agent instructions
+  return `# Inkling agent instructions
 
-This server is a Jot workspace for collaborative Markdown notes and RFCs.
+This server is an Inkling workspace for collaborative Markdown notes and RFCs.
 Its base URL is ${baseUrl}.
 
-Use the \`jot\` command-line client for workspace operations. Do not scrape the browser UI or call private storage directly.
+Use the \`inkling\` command-line client for workspace operations. Do not scrape the browser UI or call private storage directly.
 
 ## Connect your CLI
 
 First check whether a workspace is already configured:
 
 \`\`\`sh
-jot instance list
-jot --help
+inkling instance list
+inkling --help
 \`\`\`
 
 If this server is not configured, ask the user to connect it:
@@ -628,58 +628,58 @@ If this server is not configured, ask the user to connect it:
 3. Create a personal key and copy the one-time setup command.
 4. Run that command in the agent's terminal. Do not paste the key into source files, chat transcripts, AGENTS.md, or skills.
 
-The setup command registers this URL and stores the key in Jot's user-only CLI configuration. API keys belong to the user who created them and have that user's workspace permissions. If a key is lost, revoke it and create another one.
+The setup command registers this URL and stores the key in Inkling's user-only CLI configuration. API keys belong to the user who created them and have that user's workspace permissions. If a key is lost, revoke it and create another one.
 
 Select the instance when necessary:
 
 \`\`\`sh
-jot use workspace
-# Alternatively, set JOT_INSTANCE for one command.
-JOT_INSTANCE=workspace jot list
+inkling use workspace
+# Alternatively, set INKLING_INSTANCE for one command.
+INKLING_INSTANCE=workspace inkling list
 \`\`\`
 
-If \`jot\` is not on \`PATH\`, ask the user how the Jot CLI is installed in their environment. In a Jot source checkout it can be run as \`node packages/cli/src/main.ts\`.
+If \`inkling\` is not on \`PATH\`, ask the user how the Inkling CLI is installed in their environment. In an Inkling source checkout it can be run as \`node packages/cli/src/main.ts\`.
 
 ## Safe command-line workflow
 
-Run \`jot --help\` for the complete, current command list. Common operations include:
+Run \`inkling --help\` for the complete, current command list. Common operations include:
 
 \`\`\`sh
-jot list
-jot search 'state:discussion label:platform'
-jot read DOCUMENT_ID
-jot read DOCUMENT_ID --lines 1:120
-jot create 'Proposal title' --rfc
-jot edit DOCUMENT_ID 'unique old text' 'replacement text'
-jot comment DOCUMENT_ID START_OFFSET END_OFFSET 'Review comment'
-jot publish DOCUMENT_ID
+inkling list
+inkling search 'state:discussion label:platform'
+inkling read DOCUMENT_ID
+inkling read DOCUMENT_ID --lines 1:120
+inkling create 'Proposal title' --rfc
+inkling edit DOCUMENT_ID 'unique old text' 'replacement text'
+inkling comment DOCUMENT_ID START_OFFSET END_OFFSET 'Review comment'
+inkling publish DOCUMENT_ID
 \`\`\`
 
 Follow these rules:
 
 - Read a document before changing it. Use line ranges for large documents.
-- Prefer \`jot edit\`, which replaces unique existing text and rejects missing or ambiguous matches. Re-read and retry after a concurrent revision conflict.
-- Use \`jot replace\` only when the user explicitly wants a full-body replacement.
+- Prefer \`inkling edit\`, which replaces unique existing text and rejects missing or ambiguous matches. Re-read and retry after a concurrent revision conflict.
+- Use \`inkling replace\` only when the user explicitly wants a full-body replacement.
 - Preserve the frontmatter and top-level title conventions shown in the document.
-- Use thread and message IDs printed by \`jot read\` for replies and comment management.
+- Use thread and message IDs printed by \`inkling read\` for replies and comment management.
 - Never print, commit, log, or embed API keys or capability URLs.
 
 ## Create a reusable agent skill
 
-If the user asks for reusable Jot support, create an [Agent Skills](https://agentskills.io/) skill rather than editing a project's AGENTS.md. Prefer \`~/.agents/skills/jot/SKILL.md\` for a user-wide skill or \`.agents/skills/jot/SKILL.md\` when the user requests a project-local skill. Use this minimal shape:
+If the user asks for reusable Inkling support, create an [Agent Skills](https://agentskills.io/) skill rather than editing a project's AGENTS.md. Prefer \`~/.agents/skills/inkling/SKILL.md\` for a user-wide skill or \`.agents/skills/inkling/SKILL.md\` when the user requests a project-local skill. Use this minimal shape:
 
 \`\`\`markdown
 ---
-name: jot
-description: Work with Jot Markdown workspaces through the jot CLI. Use when reading, searching, editing, commenting on, or publishing Jot notes and RFCs.
+name: inkling
+description: Work with Inkling Markdown workspaces through the inkling CLI. Use when reading, searching, editing, commenting on, or publishing Inkling notes and RFCs.
 ---
 
-# Jot
+# Inkling
 
-- Run \`jot --help\` for the current CLI contract.
-- Run \`jot instance list\` before work and select the intended instance.
+- Run \`inkling --help\` for the current CLI contract.
+- Run \`inkling instance list\` before work and select the intended instance.
 - Read before editing; use unique-text edits and re-read after conflicts.
-- Keep credentials only in Jot's CLI config, never in this skill.
+- Keep credentials only in Inkling's CLI config, never in this skill.
 - Workspace agent instructions: ${baseUrl}/AGENTS.md
 \`\`\`
 
@@ -708,7 +708,7 @@ function operationCategory(pathname: string): string {
 function execute<A>(
   context: HonoContext,
   options: BackendOptions,
-  operation: (service: JotApplicationService) => Effect.Effect<A, ApplicationError>,
+  operation: (service: InklingApplicationService) => Effect.Effect<A, ApplicationError>,
   respond: (value: A) => Response | Promise<Response> = (value) => context.json(value),
 ): Promise<Response> {
   if (options.runtime === undefined) {
@@ -716,7 +716,7 @@ function execute<A>(
       context.json(
         {
           code: "service_unavailable",
-          message: "The Jot application runtime is not configured.",
+          message: "The Inkling application runtime is not configured.",
           retryable: true,
         } satisfies ProtocolError,
         503,
@@ -724,7 +724,7 @@ function execute<A>(
     );
   }
   return options.runtime
-    .runPromise(Effect.flatMap(JotApplication, operation).pipe(Effect.either))
+    .runPromise(Effect.flatMap(InklingApplication, operation).pipe(Effect.either))
     .then((result) =>
       Either.isRight(result) ? respond(result.right) : errorResponse(context, result.left),
     );
@@ -807,13 +807,13 @@ function readAttachmentUpload(
   { readonly bytes: Uint8Array; readonly filename: string; readonly mediaType: string },
   ApplicationError
 > {
-  const filename = context.req.header("X-Jot-Filename");
+  const filename = context.req.header("X-Inkling-Filename");
   const mediaType = context.req.header("Content-Type");
   if (filename === undefined || mediaType === undefined) {
     return Effect.fail(
       new ApplicationError({
         code: "invalid_attachment",
-        message: "Attachment uploads require Content-Type and X-Jot-Filename headers.",
+        message: "Attachment uploads require Content-Type and X-Inkling-Filename headers.",
         retryable: false,
         status: 400,
       }),
@@ -851,8 +851,8 @@ function credentials(context: HonoContext): RequestCredentials {
   return {
     bearerToken,
     capabilityToken: context.req.query("cap"),
-    guestName: context.req.header("X-Jot-Guest-Name"),
-    sessionToken: getCookie(context, "jot_session"),
+    guestName: context.req.header("X-Inkling-Guest-Name"),
+    sessionToken: getCookie(context, "inkling_session"),
   };
 }
 
@@ -873,7 +873,7 @@ function requireMutationProtection(context: HonoContext): Effect.Effect<void, Ap
   }
   const origin = context.req.header("Origin");
   const csrfHeader = context.req.header("X-CSRF-Token");
-  const csrfCookie = getCookie(context, "jot_csrf");
+  const csrfCookie = getCookie(context, "inkling_csrf");
   const expectedOrigin = new URL(context.req.url).origin;
   return origin === expectedOrigin && csrfHeader !== undefined && csrfHeader === csrfCookie
     ? Effect.void
@@ -966,7 +966,7 @@ function publicCatalogHtml(titleValue: string, catalog: CatalogResponse): string
       return `<li><a class="title" href="${href}">${metadata.rfcNumber === undefined ? "Note" : `RFC ${String(metadata.rfcNumber).padStart(4, "0")}`} — ${escapeHtml(metadata.title)}</a><p>${escapeHtml(excerpt)}</p><small>${state} · ${escapeHtml(metadata.updatedAt.slice(0, 10))} ${labels}</small></li>`;
     })
     .join("");
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Published notes and RFCs"><title>Notes and RFCs</title><link rel="stylesheet" href="/fonts.css"><link rel="stylesheet" href="/public.css"></head><body><header class="public-masthead"><a href="/">JOT</a><span>NOTES AND RFCS</span></header><main class="public-catalog-shell"><article class="public-paper public-catalog-paper"><h1>${title}</h1><ol class="catalog">${rows || "<li>No published notes or RFCs.</li>"}</ol></article></main></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Published notes and RFCs"><title>Inkling</title><link rel="stylesheet" href="/fonts.css"><link rel="stylesheet" href="/public.css"></head><body><header class="public-masthead"><a href="/">INKLING</a><span>PUBLISHED</span></header><main class="public-catalog-shell"><article class="public-paper public-catalog-paper"><h1>${title}</h1><ol class="catalog">${rows || "<li>No published notes or RFCs.</li>"}</ol></article></main></body></html>`;
 }
 
 function publicDocumentHtml(document: {
@@ -1002,7 +1002,7 @@ function publicDocumentHtml(document: {
       : `<aside class="public-toc" aria-label="On this page"><p>On this page</p><ol>${toc}</ol></aside>`;
   const state = publicStateLink(metadata.lifecycleState);
   const classification = publicClassificationChip(metadata);
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${description}"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><link rel="canonical" href="${escapeHtml(document.canonicalPath)}"><title>${title}</title><link rel="stylesheet" href="/fonts.css"><link rel="stylesheet" href="/public.css"></head><body><header class="public-masthead"><a href="/">JOT</a><span>${folio}</span></header><main class="public-page-shell"><article class="public-paper public-document"><div class="public-topline"><a href="/">All notes and RFCs</a></div><header class="public-hero"><p class="public-folio">${folio}</p><div class="public-hero-main"><div class="public-hero-badges">${state}${classification}</div><h1>${title}</h1>${labels === "" ? "" : `<div class="public-labels" aria-label="Labels">${labels}</div>`}</div></header>${publicMetadataHtml(metadata)}<div class="public-content-grid"><div class="public-prose">${document.html}</div>${tocHtml}</div></article></main></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${description}"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><link rel="canonical" href="${escapeHtml(document.canonicalPath)}"><title>${title}</title><link rel="stylesheet" href="/fonts.css"><link rel="stylesheet" href="/public.css"></head><body><header class="public-masthead"><a href="/">INKLING</a><span>${folio}</span></header><main class="public-page-shell"><article class="public-paper public-document"><div class="public-topline"><a href="/">Inkling</a></div><header class="public-hero"><p class="public-folio">${folio}</p><div class="public-hero-main"><div class="public-hero-badges">${state}${classification}</div><h1>${title}</h1>${labels === "" ? "" : `<div class="public-labels" aria-label="Labels">${labels}</div>`}</div></header>${publicMetadataHtml(metadata)}<div class="public-content-grid"><div class="public-prose">${document.html}</div>${tocHtml}</div></article></main></body></html>`;
 }
 
 function publicClassificationChip(metadata: DocumentMetadataDto): string {

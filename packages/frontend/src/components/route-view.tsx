@@ -4,7 +4,7 @@ import type {
   AuthenticationStatus,
   CatalogResponse,
   DocumentResponse,
-} from "@earendil-works/jot-protocol";
+} from "@earendil-works/inkling-protocol";
 
 import type { ApiClientService, ApiError } from "../api.ts";
 import type { FrontmatterVocabulary } from "../frontmatter-completion.ts";
@@ -59,7 +59,7 @@ export function RouteView({ refresh, state }: RouteViewProps): React.JSX.Element
         <main className="fatal-layout" id="app" tabIndex={-1}>
           <section>
             <p className="eyebrow">Runtime failure</p>
-            <h1>Jot could not open.</h1>
+            <h1>Inkling could not open.</h1>
             <p>{state.error.message}</p>
             <Button variant="primary" data-retry="" onClick={refresh}>
               Try again

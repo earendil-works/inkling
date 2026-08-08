@@ -22,7 +22,7 @@ test(
   "Cloudflare development runtime persists isolated document authorities in R2 and DO storage",
   { timeout: 60_000 },
   async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "jot-cloudflare-test-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "inkling-cloudflare-test-"));
     let google: RunningGoogleOAuthMock | undefined;
     let running: RunningWrangler | undefined;
     try {
@@ -34,7 +34,7 @@ test(
       assert.ok((await agentInstructions.text()).includes(`base URL is ${running.baseUrl}`));
 
       const cookie = await loginWithGoogle(running.baseUrl);
-      const csrf = cookieValue(cookie, "jot_csrf");
+      const csrf = cookieValue(cookie, "inkling_csrf");
       assert.ok(csrf);
       const keyResponse = await fetch(`${running.baseUrl}/api/api-keys`, {
         body: JSON.stringify({ label: "cloudflare integration" }),
@@ -353,8 +353,8 @@ async function loginWithGoogle(baseUrl: string): Promise<string> {
     .getSetCookie()
     .map((value) => value.split(";")[0])
     .join("; ");
-  assert.ok(cookieValue(cookie, "jot_session"));
-  assert.ok(cookieValue(cookie, "jot_csrf"));
+  assert.ok(cookieValue(cookie, "inkling_session"));
+  assert.ok(cookieValue(cookie, "inkling_csrf"));
 
   const authenticated = await fetch(`${baseUrl}/api/auth/status`, { headers: { Cookie: cookie } });
   const authenticatedBody = (await authenticated.json()) as {
@@ -372,7 +372,7 @@ async function startGoogleOAuthMock(): Promise<RunningGoogleOAuthMock> {
   const verificationKey = {
     ...publicKey.export({ format: "jwk" }),
     alg: "RS256",
-    kid: "jot-test-key",
+    kid: "inkling-test-key",
     use: "sig",
   };
   let nonce: string | undefined;
@@ -394,9 +394,9 @@ async function startGoogleOAuthMock(): Promise<RunningGoogleOAuthMock> {
     }
     if (url.pathname === "/token") {
       assert.ok(nonce);
-      const header = base64UrlJson({ alg: "RS256", kid: "jot-test-key", typ: "JWT" });
+      const header = base64UrlJson({ alg: "RS256", kid: "inkling-test-key", typ: "JWT" });
       const claims = base64UrlJson({
-        aud: "jot-test-client",
+        aud: "inkling-test-client",
         email: "armin@earendil.com",
         email_verified: true,
         exp: Math.floor(Date.now() / 1_000) + 300,
@@ -475,14 +475,14 @@ async function startWrangler(directory: string, googleOrigin: string): Promise<R
     [
       "GOOGLE_ADMIN_EMAILS=armin@earendil.com",
       "GOOGLE_ALLOWED_DOMAINS=earendil.com",
-      "GOOGLE_CLIENT_ID=jot-test-client",
-      "GOOGLE_CLIENT_SECRET=jot-test-secret",
+      "GOOGLE_CLIENT_ID=inkling-test-client",
+      "GOOGLE_CLIENT_SECRET=inkling-test-secret",
       `GOOGLE_REDIRECT_URI=${baseUrl}/api/auth/google/callback`,
-      `JOT_GOOGLE_AUTHORIZATION_ENDPOINT=${googleOrigin}/authorize`,
-      `JOT_GOOGLE_CERTIFICATES_ENDPOINT=${googleOrigin}/certificates`,
-      `JOT_GOOGLE_DIRECTORY_ENDPOINT=${googleOrigin}/directory/users`,
-      `JOT_GOOGLE_TOKEN_ENDPOINT=${googleOrigin}/token`,
-      "JOT_OAUTH_STATE_SECRET=jot-test-state-secret",
+      `INKLING_GOOGLE_AUTHORIZATION_ENDPOINT=${googleOrigin}/authorize`,
+      `INKLING_GOOGLE_CERTIFICATES_ENDPOINT=${googleOrigin}/certificates`,
+      `INKLING_GOOGLE_DIRECTORY_ENDPOINT=${googleOrigin}/directory/users`,
+      `INKLING_GOOGLE_TOKEN_ENDPOINT=${googleOrigin}/token`,
+      "INKLING_OAUTH_STATE_SECRET=inkling-test-state-secret",
       "",
     ].join("\n"),
   );

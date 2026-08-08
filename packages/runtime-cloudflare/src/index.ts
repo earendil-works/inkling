@@ -2,47 +2,51 @@ import { DurableObject } from "cloudflare:workers";
 import { Effect, Layer, ManagedRuntime } from "effect";
 import type { ManagedRuntime as ManagedRuntimeType } from "effect";
 
-import { DurableDocumentJournal, ObjectStore, WorkspaceStateStore } from "@earendil-works/jot-core";
+import {
+  DurableDocumentJournal,
+  ObjectStore,
+  WorkspaceStateStore,
+} from "@earendil-works/inkling-core";
 import type {
   PeopleDirectoryEntry,
   PersonReference,
   Principal,
   WorkspaceIdentity,
-} from "@earendil-works/jot-core";
+} from "@earendil-works/inkling-core";
 import {
   ApplicationError,
   createBackendApp,
   DigestLive,
   finishGoogleAuthentication,
   IdGeneratorLive,
-  JotApplication,
+  InklingApplication,
   localApplicationLayer,
   SecretHasherLive,
   SecureTokenLive,
   startGoogleAuthentication,
-} from "@earendil-works/jot-backend";
+} from "@earendil-works/inkling-backend";
 import type {
   DocumentRuntimeConfiguration,
-  JotApplicationService,
+  InklingApplicationService,
   LocalApplicationOptions,
   RequestCredentials,
   SessionResult,
-} from "@earendil-works/jot-backend";
-import { decodeBase64 } from "@earendil-works/jot-collaboration";
+} from "@earendil-works/inkling-backend";
+import { decodeBase64 } from "@earendil-works/inkling-collaboration";
 import {
   ClientCollaborationMessageSchema,
   decodeJson,
   encodeJson,
   ServerCollaborationMessageSchema,
-} from "@earendil-works/jot-protocol";
+} from "@earendil-works/inkling-protocol";
 import type {
   ClientCollaborationMessage,
   DocumentMetadataDto,
   DocumentResponse,
   PresenceDto,
   ServerCollaborationMessage,
-} from "@earendil-works/jot-protocol";
-import { MarkdownRendererLive } from "@earendil-works/jot-renderer";
+} from "@earendil-works/inkling-protocol";
+import { MarkdownRendererLive } from "@earendil-works/inkling-renderer";
 
 import {
   makeDurableObjectJournal,
@@ -58,14 +62,14 @@ export interface CloudflareEnvironment {
   readonly GOOGLE_CLIENT_ID?: string | undefined;
   readonly GOOGLE_CLIENT_SECRET?: string | undefined;
   readonly GOOGLE_REDIRECT_URI?: string | undefined;
-  readonly JOT_GOOGLE_AUTHORIZATION_ENDPOINT?: string | undefined;
-  readonly JOT_GOOGLE_CERTIFICATES_ENDPOINT?: string | undefined;
-  readonly JOT_GOOGLE_DIRECTORY_ENDPOINT?: string | undefined;
-  readonly JOT_GOOGLE_TOKEN_ENDPOINT?: string | undefined;
-  readonly JOT_OAUTH_STATE_SECRET?: string | undefined;
-  readonly JOT_DOCUMENTS: DurableObjectNamespace<DocumentDurableObject>;
-  readonly JOT_OBJECTS: R2Bucket;
-  readonly JOT_WORKSPACE: DurableObjectNamespace<WorkspaceDurableObject>;
+  readonly INKLING_GOOGLE_AUTHORIZATION_ENDPOINT?: string | undefined;
+  readonly INKLING_GOOGLE_CERTIFICATES_ENDPOINT?: string | undefined;
+  readonly INKLING_GOOGLE_DIRECTORY_ENDPOINT?: string | undefined;
+  readonly INKLING_GOOGLE_TOKEN_ENDPOINT?: string | undefined;
+  readonly INKLING_OAUTH_STATE_SECRET?: string | undefined;
+  readonly INKLING_DOCUMENTS: DurableObjectNamespace<DocumentDurableObject>;
+  readonly INKLING_OBJECTS: R2Bucket;
+  readonly INKLING_WORKSPACE: DurableObjectNamespace<WorkspaceDurableObject>;
 }
 
 interface SocketAttachment {
@@ -91,7 +95,7 @@ type RpcResult<A> =
 /** Low-traffic authority for authentication, allocation, and catalog projections. */
 export class WorkspaceDurableObject extends DurableObject<CloudflareEnvironment> {
   readonly #state: DurableObjectState;
-  readonly #runtime: ManagedRuntimeType.ManagedRuntime<JotApplicationService, never>;
+  readonly #runtime: ManagedRuntimeType.ManagedRuntime<InklingApplicationService, never>;
   readonly #app: ReturnType<typeof createBackendApp>;
 
   constructor(state: DurableObjectState, environment: CloudflareEnvironment) {
@@ -115,7 +119,7 @@ export class WorkspaceDurableObject extends DurableObject<CloudflareEnvironment>
 
   override async alarm(): Promise<void> {
     await this.#runtime.runPromise(
-      Effect.flatMap(JotApplication, (application) => application.checkpointAll()),
+      Effect.flatMap(InklingApplication, (application) => application.checkpointAll()),
     );
   }
 
@@ -125,7 +129,7 @@ export class WorkspaceDurableObject extends DurableObject<CloudflareEnvironment>
   ): Promise<RpcResult<SessionResult>> {
     return runRpc(
       this.#runtime,
-      Effect.flatMap(JotApplication, (application) =>
+      Effect.flatMap(InklingApplication, (application) =>
         application.loginWorkspaceIdentity(identity, people),
       ),
     );
@@ -137,7 +141,7 @@ export class WorkspaceDurableObject extends DurableObject<CloudflareEnvironment>
   ): Promise<RpcResult<Principal>> {
     return runRpc(
       this.#runtime,
-      Effect.flatMap(JotApplication, (application) =>
+      Effect.flatMap(InklingApplication, (application) =>
         application.authorizeRequest(requestCredentials, documentId),
       ),
     );
@@ -146,14 +150,14 @@ export class WorkspaceDurableObject extends DurableObject<CloudflareEnvironment>
   async resolvePeople(emails: readonly string[]): Promise<RpcResult<readonly PersonReference[]>> {
     return runRpc(
       this.#runtime,
-      Effect.flatMap(JotApplication, (application) => application.resolvePeople(emails)),
+      Effect.flatMap(InklingApplication, (application) => application.resolvePeople(emails)),
     );
   }
 
   async configurations(): Promise<RpcResult<readonly DocumentRuntimeConfiguration[]>> {
     return runRpc(
       this.#runtime,
-      Effect.flatMap(JotApplication, (application) =>
+      Effect.flatMap(InklingApplication, (application) =>
         Effect.gen(function* () {
           yield* application.checkpointAll();
           const configurations = yield* application.allDocumentRuntimeConfigurations();
@@ -169,7 +173,7 @@ export class WorkspaceDurableObject extends DurableObject<CloudflareEnvironment>
   async configuration(documentId: string): Promise<RpcResult<DocumentRuntimeConfiguration>> {
     return runRpc(
       this.#runtime,
-      Effect.flatMap(JotApplication, (application) =>
+      Effect.flatMap(InklingApplication, (application) =>
         Effect.gen(function* () {
           yield* application.checkpointAll();
           const configuration = yield* application.documentRuntimeConfiguration(documentId);
@@ -186,7 +190,7 @@ export class WorkspaceDurableObject extends DurableObject<CloudflareEnvironment>
   ): Promise<RpcResult<number>> {
     return runRpc(
       this.#runtime,
-      Effect.flatMap(JotApplication, (application) =>
+      Effect.flatMap(InklingApplication, (application) =>
         application.reserveRfcNumber(requestCredentials, documentId),
       ),
     );
@@ -195,7 +199,7 @@ export class WorkspaceDurableObject extends DurableObject<CloudflareEnvironment>
   async applyProjection(document: DocumentResponse): Promise<RpcResult<boolean>> {
     return runRpc(
       this.#runtime,
-      Effect.flatMap(JotApplication, (application) =>
+      Effect.flatMap(InklingApplication, (application) =>
         application.applyDocumentProjection(document).pipe(Effect.as(true)),
       ),
     );
@@ -204,7 +208,7 @@ export class WorkspaceDurableObject extends DurableObject<CloudflareEnvironment>
   async markDeleted(documentId: string): Promise<RpcResult<boolean>> {
     return runRpc(
       this.#runtime,
-      Effect.flatMap(JotApplication, (application) =>
+      Effect.flatMap(InklingApplication, (application) =>
         application.markCatalogDeleted(documentId).pipe(Effect.as(true)),
       ),
     );
@@ -213,7 +217,7 @@ export class WorkspaceDurableObject extends DurableObject<CloudflareEnvironment>
   async resolvePublicRfc(rfcNumber: number): Promise<RpcResult<DocumentRuntimeConfiguration>> {
     return runRpc(
       this.#runtime,
-      Effect.flatMap(JotApplication, (application) =>
+      Effect.flatMap(InklingApplication, (application) =>
         application.listPublicDocuments("").pipe(
           Effect.flatMap((catalog) => {
             const document = catalog.documents.find(
@@ -240,7 +244,7 @@ export class WorkspaceDurableObject extends DurableObject<CloudflareEnvironment>
 export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> {
   readonly #state: DurableObjectState;
   readonly #environment: CloudflareEnvironment;
-  #runtime: ManagedRuntimeType.ManagedRuntime<JotApplicationService, never> | undefined;
+  #runtime: ManagedRuntimeType.ManagedRuntime<InklingApplicationService, never> | undefined;
   #app: ReturnType<typeof createBackendApp> | undefined;
   #configuration: DocumentRuntimeConfiguration | undefined;
 
@@ -320,13 +324,13 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
     }
     const result = await runRpc(
       runtime,
-      Effect.flatMap(JotApplication, (application) =>
+      Effect.flatMap(InklingApplication, (application) =>
         application.assignRfcNumber(requestCredentials, documentId, rfcNumber),
       ),
     );
     if (result.ok) {
       const projection = await runtime.runPromise(
-        Effect.flatMap(JotApplication, (application) =>
+        Effect.flatMap(InklingApplication, (application) =>
           application.currentDocumentProjection(documentId),
         ),
       );
@@ -374,7 +378,7 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
         await this.#requestResynchronization();
       } else {
         const projection = runtime.runPromise(
-          Effect.flatMap(JotApplication, (application) =>
+          Effect.flatMap(InklingApplication, (application) =>
             application.currentDocumentProjection(configuration.documentId),
           ),
         );
@@ -401,7 +405,7 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
     const runtime = this.#runtime;
     if (runtime !== undefined) {
       await runtime.runPromise(
-        Effect.flatMap(JotApplication, (application) => application.checkpointAll()),
+        Effect.flatMap(InklingApplication, (application) => application.checkpointAll()),
       );
       await this.#flushCatalogOutbox();
     }
@@ -495,9 +499,9 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
     socket: WebSocket,
     attachment: SocketAttachment,
     message: ClientCollaborationMessage,
-  ): Effect.Effect<void, unknown, JotApplicationService> {
+  ): Effect.Effect<void, unknown, InklingApplicationService> {
     return Effect.gen(this, function* () {
-      const application = yield* JotApplication;
+      const application = yield* InklingApplication;
       if (!attachment.initialized) {
         if (message.type !== "hello") {
           return yield* protocolFailure(
@@ -749,8 +753,8 @@ async function flushDocumentsForBackup(
   if (!configurations.ok) return configurations;
   const results = await Promise.all(
     configurations.value.map(async (configuration): Promise<RpcResult<boolean>> => {
-      const document = environment.JOT_DOCUMENTS.get(
-        environment.JOT_DOCUMENTS.idFromName(configuration.documentId),
+      const document = environment.INKLING_DOCUMENTS.get(
+        environment.INKLING_DOCUMENTS.idFromName(configuration.documentId),
       );
       const initialized = await document.initialize(configuration);
       return initialized.ok ? document.flush() : initialized;
@@ -770,7 +774,9 @@ async function dispatchDocument(
       ? await workspaceStub(environment).configuration(documentId)
       : ({ ok: true, value: knownConfiguration } as const);
   if (!configurationResult.ok) return protocolErrorResponse(configurationResult.error);
-  const document = environment.JOT_DOCUMENTS.get(environment.JOT_DOCUMENTS.idFromName(documentId));
+  const document = environment.INKLING_DOCUMENTS.get(
+    environment.INKLING_DOCUMENTS.idFromName(documentId),
+  );
   const initialized = await document.initialize(configurationResult.value);
   return initialized.ok ? document.fetch(request) : protocolErrorResponse(initialized.error);
 }
@@ -790,7 +796,9 @@ async function allocateRfcNumber(
   const configuration = await workspace.configuration(documentId);
   if (!configuration.ok) return protocolErrorResponse(configuration.error);
 
-  const document = environment.JOT_DOCUMENTS.get(environment.JOT_DOCUMENTS.idFromName(documentId));
+  const document = environment.INKLING_DOCUMENTS.get(
+    environment.INKLING_DOCUMENTS.idFromName(documentId),
+  );
   const initialized = await document.initialize(configuration.value);
   if (!initialized.ok) return protocolErrorResponse(initialized.error);
   const assigned = await document.assignRfcNumber(requestCredentials, documentId, allocation.value);
@@ -802,10 +810,10 @@ function createApplicationRuntime(
   state: DurableObjectState,
   environment: CloudflareEnvironment,
   options: LocalApplicationOptions,
-): ManagedRuntimeType.ManagedRuntime<JotApplicationService, never> {
+): ManagedRuntimeType.ManagedRuntime<InklingApplicationService, never> {
   const storage = Layer.mergeAll(
     Layer.succeed(WorkspaceStateStore, makeDurableWorkspaceStateStore(state.storage)),
-    Layer.succeed(ObjectStore, makeR2ObjectStore(environment.JOT_OBJECTS)),
+    Layer.succeed(ObjectStore, makeR2ObjectStore(environment.INKLING_OBJECTS)),
     Layer.succeed(DurableDocumentJournal, makeDurableObjectJournal(state.storage)),
   );
   const dependencies = Layer.mergeAll(
@@ -844,12 +852,12 @@ function isolatedWorkspaceState(configuration: DocumentRuntimeConfiguration): un
 }
 
 function workspaceStub(environment: CloudflareEnvironment) {
-  return environment.JOT_WORKSPACE.get(environment.JOT_WORKSPACE.idFromName("primary"));
+  return environment.INKLING_WORKSPACE.get(environment.INKLING_WORKSPACE.idFromName("primary"));
 }
 
 function runRpc<A>(
-  runtime: ManagedRuntimeType.ManagedRuntime<JotApplicationService, never>,
-  effect: Effect.Effect<A, ApplicationError, JotApplicationService>,
+  runtime: ManagedRuntimeType.ManagedRuntime<InklingApplicationService, never>,
+  effect: Effect.Effect<A, ApplicationError, InklingApplicationService>,
 ): Promise<RpcResult<A>> {
   return runtime.runPromise(
     effect.pipe(
@@ -946,8 +954,8 @@ function credentials(request: Request): RequestCredentials {
       : undefined,
     capabilityToken: url.searchParams.get("cap") ?? undefined,
     guestName:
-      request.headers.get("X-Jot-Guest-Name") ?? url.searchParams.get("guest") ?? undefined,
-    sessionToken: parseCookies(request.headers.get("Cookie"))["jot_session"],
+      request.headers.get("X-Inkling-Guest-Name") ?? url.searchParams.get("guest") ?? undefined,
+    sessionToken: parseCookies(request.headers.get("Cookie"))["inkling_session"],
   };
 }
 
@@ -1024,7 +1032,7 @@ function mutationProtectionError(request: Request): RpcError | undefined {
   ) {
     return undefined;
   }
-  const csrfCookie = parseCookies(request.headers.get("Cookie"))["jot_csrf"];
+  const csrfCookie = parseCookies(request.headers.get("Cookie"))["inkling_csrf"];
   const csrfHeader = request.headers.get("X-CSRF-Token");
   return isSameOrigin(request.headers.get("Origin"), request.url) &&
     csrfHeader !== null &&

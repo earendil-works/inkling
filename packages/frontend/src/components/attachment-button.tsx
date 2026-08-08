@@ -1,4 +1,4 @@
-import type { AttachmentMetadataDto } from "@earendil-works/jot-protocol";
+import type { AttachmentMetadataDto } from "@earendil-works/inkling-protocol";
 
 import type { ApiClientService, ApiError } from "../api.ts";
 import { useAppContext } from "../app-context.tsx";

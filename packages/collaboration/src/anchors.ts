@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import * as Y from "yjs";
 
-import type { CommentAnchor } from "@earendil-works/jot-core";
+import type { CommentAnchor } from "@earendil-works/inkling-core";
 
 import { decodeBase64, encodeBase64 } from "./binary.ts";
 import { CollaborationError } from "./document.ts";

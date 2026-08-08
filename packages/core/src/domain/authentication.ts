@@ -193,7 +193,7 @@ export function createApiKey(
     return {
       record,
       state: { ...state, apiKeys: [...state.apiKeys, record] },
-      token: `jot_${id}.${secret}`,
+      token: `inkling_${id}.${secret}`,
     };
   });
 }
@@ -208,7 +208,7 @@ export function authenticateApiKey(
   typeof SecretHasher.Service
 > {
   return Effect.gen(function* () {
-    const match = /^jot_([^.]+)\.(.+)$/u.exec(token);
+    const match = /^inkling_([^.]+)\.(.+)$/u.exec(token);
     if (match === null) {
       return yield* authenticationFailure("invalid_token", "The API key is invalid.");
     }

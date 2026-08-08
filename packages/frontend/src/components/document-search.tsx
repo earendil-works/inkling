@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react";
 
-import type { CatalogResponse } from "@earendil-works/jot-protocol";
+import type { CatalogResponse } from "@earendil-works/inkling-protocol";
 
 import type { ApiClientService } from "../api.ts";
 import { useAppContext } from "../app-context.tsx";
@@ -121,7 +121,7 @@ export function DocumentSearch({
       }}
     >
       <label className="document-search__label" htmlFor={inputId}>
-        Search notes and RFCs
+        Search Inkling
       </label>
       <div className="document-search__control">
         <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -170,7 +170,7 @@ export function DocumentSearch({
           }}
           placeholder={
             publicCatalog
-              ? "Search published notes and RFCs"
+              ? "Search published documents"
               : "Search text, or try label:platform -state:abandoned"
           }
           ref={inputRef}
@@ -222,7 +222,7 @@ export function DocumentSearch({
               <p aria-live="polite" className="document-search__message">
                 {pending
                   ? publicCatalog
-                    ? "Searching published notes and RFCs…"
+                    ? "Searching published documents…"
                     : "Searching titles, metadata, and complete working heads…"
                   : "No document matches this query."}
               </p>

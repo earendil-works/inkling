@@ -3,4 +3,4 @@ export {
   IdGeneratorLive,
   SecretHasherLive,
   SecureTokenLive,
-} from "@earendil-works/jot-backend";
+} from "@earendil-works/inkling-backend";

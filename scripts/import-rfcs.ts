@@ -113,7 +113,7 @@ function run(arguments_: readonly string[]): Effect.Effect<void, ImportCommandEr
       return;
     }
     if (options.apiKey === undefined || options.apiKey.trim() === "") {
-      return yield* fail("JOT_API_KEY or --api-key is required unless --dry-run is used.");
+      return yield* fail("INKLING_API_KEY or --api-key is required unless --dry-run is used.");
     }
 
     const client = makeCliClient({
@@ -128,7 +128,7 @@ function run(arguments_: readonly string[]): Effect.Effect<void, ImportCommandEr
       if (number === undefined) continue;
       if (existingByNumber.has(number)) {
         return yield* fail(
-          `The Jot catalog contains RFC ${formatRfcNumber(number)} more than once.`,
+          `The Inkling catalog contains RFC ${formatRfcNumber(number)} more than once.`,
         );
       }
       existingByNumber.set(number, document.metadata.id);
@@ -516,8 +516,8 @@ function formatRfcNumber(number: number): string {
 function parseOptions(
   arguments_: readonly string[],
 ): Effect.Effect<CommandOptions, ImportCommandError> {
-  let apiKey = process.env["JOT_API_KEY"];
-  let baseUrl = process.env["JOT_URL"] ?? "http://localhost:5173";
+  let apiKey = process.env["INKLING_API_KEY"];
+  let baseUrl = process.env["INKLING_URL"] ?? "http://localhost:5173";
   let dryRun = false;
   let help = false;
   let sourceDirectory = defaultSourceDirectory;
@@ -609,15 +609,15 @@ function reportFailure(error: ImportCommandError): Effect.Effect<void> {
 }
 
 function printHelp(): void {
-  console.log(`Import Earendil RFCs into Jot
+  console.log(`Import Earendil RFCs into Inkling
 
 Usage:
   pnpm import-rfcs [--source PATH] [--url URL] [--api-key KEY] [--dry-run]
 
 Defaults:
   --source  ~/Development/earendil-rfcs
-  --url     JOT_URL or http://localhost:5173
-  API key   JOT_API_KEY
+  --url     INKLING_URL or http://localhost:5173
+  API key   INKLING_API_KEY
 
 The command is incremental: existing RFC numbers are updated, unchanged attachments are reused by digest, and public RFCs are republished only after changes.`);
 }

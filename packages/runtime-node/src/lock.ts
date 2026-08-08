@@ -19,11 +19,11 @@ export function acquireDataDirectoryLock(
           (cause) =>
             new DataDirectoryLockError({
               cause,
-              message: "Jot cannot create its data directory.",
+              message: "Inkling cannot create its data directory.",
             }),
         ),
       );
-      const lockPath = path.join(dataDirectory, ".jot.lock");
+      const lockPath = path.join(dataDirectory, ".inkling.lock");
       yield* removeStaleLock(fileSystem, lockPath);
       yield* Effect.scoped(
         fileSystem.open(lockPath, { flag: "wx", mode: 0o600 }).pipe(
@@ -31,7 +31,7 @@ export function acquireDataDirectoryLock(
             (cause) =>
               new DataDirectoryLockError({
                 cause,
-                message: "Another Jot process owns this data directory.",
+                message: "Another Inkling process owns this data directory.",
               }),
           ),
           Effect.flatMap((file) =>
@@ -46,7 +46,7 @@ export function acquireDataDirectoryLock(
                   (cause) =>
                     new DataDirectoryLockError({
                       cause,
-                      message: "Jot cannot write its data-directory lock.",
+                      message: "Inkling cannot write its data-directory lock.",
                     }),
                 ),
               ),
@@ -70,7 +70,7 @@ function removeStaleLock(
   return fileSystem.exists(lockPath).pipe(
     Effect.mapError(
       (cause) =>
-        new DataDirectoryLockError({ cause, message: "Jot cannot inspect its data lock." }),
+        new DataDirectoryLockError({ cause, message: "Inkling cannot inspect its data lock." }),
     ),
     Effect.flatMap((exists) => {
       if (!exists) {
@@ -84,7 +84,7 @@ function removeStaleLock(
           if (typeof pid === "number" && Number.isSafeInteger(pid) && isProcessAlive(pid)) {
             return Effect.fail(
               new DataDirectoryLockError({
-                message: `Another Jot process (PID ${pid}) owns this data directory.`,
+                message: `Another Inkling process (PID ${pid}) owns this data directory.`,
               }),
             );
           }
@@ -93,7 +93,7 @@ function removeStaleLock(
               (cause) =>
                 new DataDirectoryLockError({
                   cause,
-                  message: "Jot cannot remove a stale data lock.",
+                  message: "Inkling cannot remove a stale data lock.",
                 }),
             ),
           );

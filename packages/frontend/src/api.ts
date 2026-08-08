@@ -12,7 +12,7 @@ import {
   ProtocolErrorSchema,
   PublicDocumentResponseSchema,
   ShareResponseSchema,
-} from "@earendil-works/jot-protocol";
+} from "@earendil-works/inkling-protocol";
 import type {
   ApiKeyCreated,
   ApiKeyDto,
@@ -26,7 +26,7 @@ import type {
   DocumentResponse,
   PublicDocumentResponse,
   ShareResponse,
-} from "@earendil-works/jot-protocol";
+} from "@earendil-works/inkling-protocol";
 
 export class ApiError extends Data.TaggedError("ApiError")<{
   readonly code: string;
@@ -106,7 +106,7 @@ export interface ApiClientService {
   readonly readPublicRfc: (number: number) => Effect.Effect<PublicDocumentResponse, ApiError>;
 }
 
-export const ApiClient = Context.GenericTag<ApiClientService>("@earendil-works/jot/ApiClient");
+export const ApiClient = Context.GenericTag<ApiClientService>("@earendil-works/inkling/ApiClient");
 
 export function apiClientLayer(capabilityToken?: string): Layer.Layer<ApiClientService> {
   return Layer.succeed(ApiClient, makeApiClient(capabilityToken));
@@ -133,7 +133,7 @@ export function makeApiClient(capabilityToken?: string): ApiClientService {
         new ApiError({
           cause,
           code: "network_error",
-          message: "Jot is unreachable.",
+          message: "Inkling is unreachable.",
           retryable: true,
           status: 0,
         }),
@@ -154,7 +154,7 @@ export function makeApiClient(capabilityToken?: string): ApiClientService {
             new ApiError({
               cause,
               code: "invalid_response",
-              message: "Jot returned an unreadable response.",
+              message: "Inkling returned an unreadable response.",
               retryable: false,
               status: response.status,
             }),
@@ -168,7 +168,7 @@ export function makeApiClient(capabilityToken?: string): ApiClientService {
                       new ApiError({
                         cause,
                         code: "invalid_response",
-                        message: "Jot returned an unexpected response.",
+                        message: "Inkling returned an unexpected response.",
                         retryable: false,
                         status: response.status,
                       }),
@@ -191,7 +191,7 @@ export function makeApiClient(capabilityToken?: string): ApiClientService {
                       : new ApiError({
                           cause: error,
                           code: "request_failed",
-                          message: `Jot rejected the request (${response.status}).`,
+                          message: `Inkling rejected the request (${response.status}).`,
                           retryable: response.status >= 500,
                           status: response.status,
                         }),
@@ -302,7 +302,7 @@ export function makeApiClient(capabilityToken?: string): ApiClientService {
         AttachmentMetadataSchema,
         {
           body: file,
-          headers: { "Content-Type": file.type, "X-Jot-Filename": file.name },
+          headers: { "Content-Type": file.type, "X-Inkling-Filename": file.name },
           method: "POST",
         },
       ),
@@ -330,6 +330,6 @@ function csrfToken(): string | undefined {
   const entry = document.cookie
     .split(";")
     .map((item) => item.trim())
-    .find((item) => item.startsWith("jot_csrf="));
-  return entry === undefined ? undefined : decodeURIComponent(entry.slice("jot_csrf=".length));
+    .find((item) => item.startsWith("inkling_csrf="));
+  return entry === undefined ? undefined : decodeURIComponent(entry.slice("inkling_csrf=".length));
 }

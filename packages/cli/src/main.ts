@@ -5,11 +5,11 @@ import path from "node:path";
 
 import { Effect } from "effect";
 
-import { importEarendilRfc, importExistingJot } from "@earendil-works/jot-importers";
-import type { ImportedDocument, PeopleDirectoryRecord } from "@earendil-works/jot-importers";
-import type { ImportDocumentRequest } from "@earendil-works/jot-protocol";
-import { startServer } from "@earendil-works/jot-runtime-node";
-import type { DocumentResponse } from "@earendil-works/jot-protocol";
+import { importEarendilRfc, importExistingJot } from "@earendil-works/inkling-importers";
+import type { ImportedDocument, PeopleDirectoryRecord } from "@earendil-works/inkling-importers";
+import type { ImportDocumentRequest } from "@earendil-works/inkling-protocol";
+import { startServer } from "@earendil-works/inkling-runtime-node";
+import type { DocumentResponse } from "@earendil-works/inkling-protocol";
 
 import { makeCliClient } from "./client.ts";
 import type { CliClient } from "./client.ts";
@@ -30,13 +30,14 @@ function main(arguments_: readonly string[]): Effect.Effect<void, unknown> {
   }
   if (command === "serve") {
     const port = Number(option(arguments_, "--port") ?? process.env["PORT"] ?? "8787");
-    const dataDirectory = option(arguments_, "--data-dir") ?? process.env["JOT_DATA_DIR"] ?? ".jot";
+    const dataDirectory =
+      option(arguments_, "--data-dir") ?? process.env["INKLING_DATA_DIR"] ?? ".inkling";
     return Number.isSafeInteger(port) && port > 0 && port <= 65_535
       ? Effect.scoped(
           startServer({
             dataDirectory,
             onListen: (listeningPort) =>
-              console.log(`Jot is running at http://localhost:${listeningPort}`),
+              console.log(`Inkling is running at http://localhost:${listeningPort}`),
             port,
           }).pipe(Effect.zipRight(Effect.never)),
         )
@@ -73,7 +74,9 @@ function main(arguments_: readonly string[]): Effect.Effect<void, unknown> {
       case "import-jot": {
         const source = yield* argument(arguments_, 1, "Markdown path");
         const sidecarPath = yield* argument(arguments_, 2, "metadata sidecar path");
-        const markdown = yield* fileOperation("read Jot Markdown", () => readFile(source, "utf8"));
+        const markdown = yield* fileOperation("read legacy Jot Markdown", () =>
+          readFile(source, "utf8"),
+        );
         const sidecar = yield* readJsonFile<unknown>(sidecarPath);
         const imported = yield* importExistingJot(markdown, sidecar, {
           now: new Date().toISOString(),
@@ -355,7 +358,7 @@ function instanceCommand(arguments_: readonly string[]): Effect.Effect<void, unk
       console.log(`Removed ${name}.`);
       return;
     }
-    return yield* usageFailure("Usage: jot instance add|remove|list");
+    return yield* usageFailure("Usage: inkling instance add|remove|list");
   });
 }
 
@@ -368,7 +371,7 @@ function shareInstanceCommand(arguments_: readonly string[]): Effect.Effect<void
     const match = /^\/share\/([^/]+)$/u.exec(capabilityUrl.pathname);
     const capabilityToken = capabilityUrl.searchParams.get("cap");
     if (match?.[1] === undefined || capabilityToken === null) {
-      return yield* usageFailure("The shared URL is not a Jot capability URL.");
+      return yield* usageFailure("The shared URL is not an Inkling capability URL.");
     }
     const config = yield* loadConfig();
     yield* saveConfig(
@@ -543,7 +546,7 @@ function normalizedBaseUrl(value: string): Effect.Effect<string, Error> {
     Effect.flatMap((url) =>
       url.protocol === "http:" || url.protocol === "https:"
         ? Effect.succeed(url.href)
-        : usageFailure("Jot instance URLs must use HTTP or HTTPS."),
+        : usageFailure("Inkling instance URLs must use HTTP or HTTPS."),
     ),
   );
 }
@@ -728,33 +731,33 @@ function reportError(error: unknown): Effect.Effect<void> {
 }
 
 function printHelp(): void {
-  console.log(`Jot — multiplayer Markdown for people and agents
+  console.log(`Inkling — multiplayer Markdown for people and agents
 
 Usage:
-  jot serve [--port PORT] [--data-dir PATH]
-  jot instance add NAME URL API_KEY
-  jot instance remove NAME | jot instance list | jot use NAME
-  jot share-instance NAME CAPABILITY_URL
-  jot list | jot search QUERY
-  jot import-rfc MARKDOWN [--people PEOPLE_JSON] [--publish]
-  jot import-jot MARKDOWN SIDECAR_JSON [--publish]
-  jot backup DESTINATION | jot restore BACKUP | jot verify | jot repair
-  jot read [DOCUMENT] [--lines START:END]
-  jot create TITLE [--rfc] [--body MARKDOWN]
-  jot edit [DOCUMENT] OLD_TEXT NEW_TEXT
-  jot replace [DOCUMENT] MARKDOWN_PATH|-
-  jot metadata [DOCUMENT] FIELD VALUE
-  jot delete|publish|unpublish [DOCUMENT]
-  jot share [DOCUMENT] disabled|view|comment|edit
-  jot attachment list [DOCUMENT]
-  jot attachment upload FILE [DOCUMENT] [--type MEDIA_TYPE]
-  jot attachment download ATTACHMENT_ID DESTINATION [DOCUMENT]
-  jot comment [DOCUMENT] START_OFFSET END_OFFSET BODY
-  jot reply [DOCUMENT] THREAD_ID PARENT_MESSAGE_ID BODY
-  jot comment-edit [DOCUMENT] THREAD_ID MESSAGE_ID BODY
-  jot comment-delete [DOCUMENT] THREAD_ID MESSAGE_ID
-  jot thread-delete [DOCUMENT] THREAD_ID
-  jot resolve|reopen [DOCUMENT] THREAD_ID
+  inkling serve [--port PORT] [--data-dir PATH]
+  inkling instance add NAME URL API_KEY
+  inkling instance remove NAME | inkling instance list | inkling use NAME
+  inkling share-instance NAME CAPABILITY_URL
+  inkling list | inkling search QUERY
+  inkling import-rfc MARKDOWN [--people PEOPLE_JSON] [--publish]
+  inkling import-jot MARKDOWN SIDECAR_JSON [--publish]
+  inkling backup DESTINATION | inkling restore BACKUP | inkling verify | inkling repair
+  inkling read [DOCUMENT] [--lines START:END]
+  inkling create TITLE [--rfc] [--body MARKDOWN]
+  inkling edit [DOCUMENT] OLD_TEXT NEW_TEXT
+  inkling replace [DOCUMENT] MARKDOWN_PATH|-
+  inkling metadata [DOCUMENT] FIELD VALUE
+  inkling delete|publish|unpublish [DOCUMENT]
+  inkling share [DOCUMENT] disabled|view|comment|edit
+  inkling attachment list [DOCUMENT]
+  inkling attachment upload FILE [DOCUMENT] [--type MEDIA_TYPE]
+  inkling attachment download ATTACHMENT_ID DESTINATION [DOCUMENT]
+  inkling comment [DOCUMENT] START_OFFSET END_OFFSET BODY
+  inkling reply [DOCUMENT] THREAD_ID PARENT_MESSAGE_ID BODY
+  inkling comment-edit [DOCUMENT] THREAD_ID MESSAGE_ID BODY
+  inkling comment-delete [DOCUMENT] THREAD_ID MESSAGE_ID
+  inkling thread-delete [DOCUMENT] THREAD_ID
+  inkling resolve|reopen [DOCUMENT] THREAD_ID
 
-Set JOT_INSTANCE to override the active instance and JOT_AUTHOR for guest comments.`);
+Set INKLING_INSTANCE to override the active instance and INKLING_AUTHOR for guest comments.`);
 }

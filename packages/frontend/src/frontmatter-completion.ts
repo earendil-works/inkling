@@ -6,8 +6,8 @@ import type {
 } from "@codemirror/autocomplete";
 import { snippetCompletion } from "@codemirror/autocomplete";
 
-import { knownLifecycleStates } from "@earendil-works/jot-core";
-import type { PersonDto } from "@earendil-works/jot-protocol";
+import { knownLifecycleStates } from "@earendil-works/inkling-core";
+import type { PersonDto } from "@earendil-works/inkling-protocol";
 
 export interface FrontmatterVocabulary {
   readonly labels: readonly string[];

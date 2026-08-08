@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 
-import type { PresenceDto } from "@earendil-works/jot-protocol";
+import type { PresenceDto } from "@earendil-works/inkling-protocol";
 
 import type { ApiClientService } from "../api.ts";
 import type { AppStatus } from "../app-context.tsx";
@@ -37,15 +37,15 @@ export function AppHeader({
   const toggleTheme = (): void => {
     setTheme((current) => {
       const next = current === "dark" ? "light" : "dark";
-      localStorage.setItem("jot-theme", next);
+      localStorage.setItem("inkling-theme", next);
       return next;
     });
   };
 
   return (
     <header className="masthead">
-      <a className="wordmark" href="/" aria-label="Notes and RFCs home">
-        Notes and RFCs
+      <a className="wordmark" href="/" aria-label="Inkling home">
+        Inkling
       </a>
       <div className="masthead__right">
         <div className="participants" data-participants="" aria-label="Connected participants">

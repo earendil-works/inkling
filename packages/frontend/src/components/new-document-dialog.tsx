@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import type { CreateDocumentRequest, DocumentResponse } from "@earendil-works/jot-protocol";
+import type { CreateDocumentRequest, DocumentResponse } from "@earendil-works/inkling-protocol";
 
 import type { ApiClientService, ApiError } from "../api.ts";
 import { useAppContext } from "../app-context.tsx";

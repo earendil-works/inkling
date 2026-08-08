@@ -3,8 +3,8 @@ import test from "node:test";
 
 import { Effect } from "effect";
 
-import { IdGenerator } from "@earendil-works/jot-core";
-import type { HealthResponse } from "@earendil-works/jot-protocol";
+import { IdGenerator } from "@earendil-works/inkling-core";
+import type { HealthResponse } from "@earendil-works/inkling-protocol";
 
 import { createBackendApp, IdGeneratorLive } from "../src/index.ts";
 
@@ -19,7 +19,7 @@ test("served agent instructions explain personal API keys and safe CLI use", asy
   assert.match(body, /base URL is https:\/\/rfcs\.example\.com/u);
   assert.match(body, /account menu.*API keys/su);
   assert.match(body, /API keys belong to the user who created them/u);
-  assert.match(body, /\.agents\/skills\/jot\/SKILL\.md/u);
+  assert.match(body, /\.agents\/skills\/inkling\/SKILL\.md/u);
   assert.match(body, /never contain an API key/u);
 });
 
@@ -32,7 +32,7 @@ test("health identifies the service and protocol", async () => {
   assert.match(response.headers.get("x-request-id") ?? "", /^request_[0-9A-Za-z]+$/u);
   assert.deepEqual(body, {
     protocolVersion: 1,
-    service: "jot",
+    service: "inkling",
     status: "ok",
     version: "test",
   });

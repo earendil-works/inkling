@@ -1,4 +1,4 @@
-import { taggedId, uuidV7Bytes } from "@earendil-works/jot-core";
+import { taggedId, uuidV7Bytes } from "@earendil-works/inkling-core";
 
 export function randomId(tag: string): string {
   return taggedId(tag, uuidV7Bytes(Date.now(), crypto.getRandomValues(new Uint8Array(10))));
@@ -42,10 +42,10 @@ export function colorFor(value: string): string {
 }
 
 export function storedGuestName(): string | undefined {
-  const existing = localStorage.getItem("jot-guest-name")?.trim();
+  const existing = localStorage.getItem("inkling-guest-name")?.trim();
   return existing === "" ? undefined : existing;
 }
 
 export function storeGuestName(displayName: string): void {
-  localStorage.setItem("jot-guest-name", displayName);
+  localStorage.setItem("inkling-guest-name", displayName);
 }

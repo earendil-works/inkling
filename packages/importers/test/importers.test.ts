@@ -62,7 +62,7 @@ See [the prior decision](../rfcs/0012-prior.md#outcome).
   assert.match(imported.body, /\/rfcs\/0012#outcome/u);
 });
 
-test("existing Jot import keeps share and comment migration data", async () => {
+test("legacy Jot import keeps share and comment migration data", async () => {
   const imported = await Effect.runPromise(
     importExistingJot(
       "---\nignored: frontmatter\n---\nBody text",

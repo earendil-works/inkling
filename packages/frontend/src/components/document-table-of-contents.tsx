@@ -1,4 +1,4 @@
-import type { RenderHeading } from "@earendil-works/jot-renderer";
+import type { RenderHeading } from "@earendil-works/inkling-renderer";
 
 export interface DocumentTableOfContentsProps {
   readonly headings: readonly RenderHeading[];

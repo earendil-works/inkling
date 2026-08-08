@@ -1,5 +1,5 @@
 {
-  "name": "@earendil-works/jot-runtime-node",
+  "name": "@earendil-works/inkling-runtime-node",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,11 +13,11 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@earendil-works/jot-backend": "workspace:*",
-    "@earendil-works/jot-collaboration": "workspace:*",
-    "@earendil-works/jot-core": "workspace:*",
-    "@earendil-works/jot-protocol": "workspace:*",
-    "@earendil-works/jot-renderer": "workspace:*",
+    "@earendil-works/inkling-backend": "workspace:*",
+    "@earendil-works/inkling-collaboration": "workspace:*",
+    "@earendil-works/inkling-core": "workspace:*",
+    "@earendil-works/inkling-protocol": "workspace:*",
+    "@earendil-works/inkling-renderer": "workspace:*",
     "@effect/platform": "0.97.1",
     "@effect/platform-node": "0.108.1",
     "@hono/node-server": "2.1.0",

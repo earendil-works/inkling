@@ -8,14 +8,14 @@ import {
   StorageError,
   taggedId,
   uuidV7Bytes,
-} from "@earendil-works/jot-core";
+} from "@earendil-works/inkling-core";
 import type {
   DigestService,
   IdGeneratorService,
   SecretHasherService,
   SecureTokenService,
-} from "@earendil-works/jot-core";
-import { decodeBase64, encodeBase64 } from "@earendil-works/jot-collaboration";
+} from "@earendil-works/inkling-core";
+import { decodeBase64, encodeBase64 } from "@earendil-works/inkling-collaboration";
 
 const textEncoder = new TextEncoder();
 const pbkdf2Iterations = 310_000;

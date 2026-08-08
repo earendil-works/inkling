@@ -1,4 +1,4 @@
-import type { CatalogResponse } from "@earendil-works/jot-protocol";
+import type { CatalogResponse } from "@earendil-works/inkling-protocol";
 
 import { DocumentCatalogRow } from "./document-catalog-row.tsx";
 

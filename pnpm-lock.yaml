@@ -29,16 +29,16 @@ importers:
 
   packages/backend:
     dependencies:
-      '@earendil-works/jot-collaboration':
+      '@earendil-works/inkling-collaboration':
         specifier: workspace:*
         version: link:../collaboration
-      '@earendil-works/jot-core':
+      '@earendil-works/inkling-core':
         specifier: workspace:*
         version: link:../core
-      '@earendil-works/jot-protocol':
+      '@earendil-works/inkling-protocol':
         specifier: workspace:*
         version: link:../protocol
-      '@earendil-works/jot-renderer':
+      '@earendil-works/inkling-renderer':
         specifier: workspace:*
         version: link:../renderer
       effect:
@@ -50,16 +50,16 @@ importers:
 
   packages/cli:
     dependencies:
-      '@earendil-works/jot-core':
+      '@earendil-works/inkling-core':
         specifier: workspace:*
         version: link:../core
-      '@earendil-works/jot-importers':
+      '@earendil-works/inkling-importers':
         specifier: workspace:*
         version: link:../importers
-      '@earendil-works/jot-protocol':
+      '@earendil-works/inkling-protocol':
         specifier: workspace:*
         version: link:../protocol
-      '@earendil-works/jot-runtime-node':
+      '@earendil-works/inkling-runtime-node':
         specifier: workspace:*
         version: link:../runtime-node
       effect:
@@ -68,7 +68,7 @@ importers:
 
   packages/collaboration:
     dependencies:
-      '@earendil-works/jot-core':
+      '@earendil-works/inkling-core':
         specifier: workspace:*
         version: link:../core
       effect:
@@ -110,16 +110,16 @@ importers:
       '@codemirror/view':
         specifier: 6.43.7
         version: 6.43.7
-      '@earendil-works/jot-collaboration':
+      '@earendil-works/inkling-collaboration':
         specifier: workspace:*
         version: link:../collaboration
-      '@earendil-works/jot-core':
+      '@earendil-works/inkling-core':
         specifier: workspace:*
         version: link:../core
-      '@earendil-works/jot-protocol':
+      '@earendil-works/inkling-protocol':
         specifier: workspace:*
         version: link:../protocol
-      '@earendil-works/jot-renderer':
+      '@earendil-works/inkling-renderer':
         specifier: workspace:*
         version: link:../renderer
       codemirror:
@@ -165,7 +165,7 @@ importers:
 
   packages/importers:
     dependencies:
-      '@earendil-works/jot-core':
+      '@earendil-works/inkling-core':
         specifier: workspace:*
         version: link:../core
       effect:
@@ -204,19 +204,19 @@ importers:
 
   packages/runtime-cloudflare:
     dependencies:
-      '@earendil-works/jot-backend':
+      '@earendil-works/inkling-backend':
         specifier: workspace:*
         version: link:../backend
-      '@earendil-works/jot-collaboration':
+      '@earendil-works/inkling-collaboration':
         specifier: workspace:*
         version: link:../collaboration
-      '@earendil-works/jot-core':
+      '@earendil-works/inkling-core':
         specifier: workspace:*
         version: link:../core
-      '@earendil-works/jot-protocol':
+      '@earendil-works/inkling-protocol':
         specifier: workspace:*
         version: link:../protocol
-      '@earendil-works/jot-renderer':
+      '@earendil-works/inkling-renderer':
         specifier: workspace:*
         version: link:../renderer
       effect:
@@ -235,19 +235,19 @@ importers:
 
   packages/runtime-node:
     dependencies:
-      '@earendil-works/jot-backend':
+      '@earendil-works/inkling-backend':
         specifier: workspace:*
         version: link:../backend
-      '@earendil-works/jot-collaboration':
+      '@earendil-works/inkling-collaboration':
         specifier: workspace:*
         version: link:../collaboration
-      '@earendil-works/jot-core':
+      '@earendil-works/inkling-core':
         specifier: workspace:*
         version: link:../core
-      '@earendil-works/jot-protocol':
+      '@earendil-works/inkling-protocol':
         specifier: workspace:*
         version: link:../protocol
-      '@earendil-works/jot-renderer':
+      '@earendil-works/inkling-renderer':
         specifier: workspace:*
         version: link:../renderer
       '@effect/platform':

@@ -1,8 +1,8 @@
-# Jot agent guide
+# Inkling agent guide
 
 ## Source of truth
 
-Read `JOT_ARCHITECTURE.md` before changing behavior or package boundaries. This is a clean-room implementation: use the old systems only to inventory behavior and build migration fixtures, not as source code to adapt.
+Read `INKLING_ARCHITECTURE.md` before changing behavior or package boundaries. This is a clean-room implementation: use the old systems only to inventory behavior and build migration fixtures, not as source code to adapt.
 
 Do not create a root `README.md` until the project maintainer requests one.
 

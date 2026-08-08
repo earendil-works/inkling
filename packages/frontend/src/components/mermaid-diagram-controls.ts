@@ -6,9 +6,9 @@ interface MermaidControlButton {
 export function mountMermaidDiagramError(diagram: HTMLElement): void {
   if (diagram.dataset["mermaidError"] !== undefined) return;
   diagram.dataset["mermaidError"] = "";
-  diagram.querySelector(":scope > .jot-mermaid__controls")?.remove();
+  diagram.querySelector(":scope > .inkling-mermaid__controls")?.remove();
   const message = document.createElement("p");
-  message.className = "jot-mermaid__error";
+  message.className = "inkling-mermaid__error";
   message.textContent = "Diagram preview unavailable — showing Mermaid source.";
   diagram.prepend(message);
 }
@@ -19,7 +19,7 @@ export function mountMermaidDiagramControls(diagram: HTMLElement, svg: string): 
   viewport.innerHTML = svg;
 
   const controls = document.createElement("div");
-  controls.className = "jot-mermaid__controls";
+  controls.className = "inkling-mermaid__controls";
   const buttons = [
     makeControlButton("zoom-in", "Zoom in", "+"),
     makeControlButton("zoom-out", "Zoom out", "−"),

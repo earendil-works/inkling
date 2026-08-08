@@ -1,4 +1,4 @@
-import type { DocumentResponse } from "@earendil-works/jot-protocol";
+import type { DocumentResponse } from "@earendil-works/inkling-protocol";
 
 import { useRenderedMarkdown } from "../markdown.tsx";
 import { metadataWithFrontmatter } from "./document-metadata.ts";

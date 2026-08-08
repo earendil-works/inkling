@@ -212,7 +212,7 @@ test("legacy credentials without a domain identity are rejected", async () => {
     ),
   );
   const apiKey = await Effect.runPromise(
-    authenticateApiKey(state, "jot_legacy-key.key-secret", now).pipe(
+    authenticateApiKey(state, "inkling_legacy-key.key-secret", now).pipe(
       Effect.provideService(SecretHasher, hasher),
       Effect.either,
     ),

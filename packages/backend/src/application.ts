@@ -6,7 +6,7 @@ import type {
   PersonReference,
   Principal,
   WorkspaceIdentity,
-} from "@earendil-works/jot-core";
+} from "@earendil-works/inkling-core";
 import type {
   ApiKeyCreated,
   ApiKeyDto,
@@ -29,7 +29,7 @@ import type {
   ShareResponse,
   ShareUpdateRequest,
   ServerCollaborationMessage,
-} from "@earendil-works/jot-protocol";
+} from "@earendil-works/inkling-protocol";
 
 export interface RequestCredentials {
   /** Trusted principal supplied only by an internal runtime adapter. */
@@ -97,7 +97,7 @@ export interface DocumentRuntimeConfiguration {
   readonly summary?: CatalogSummary | undefined;
 }
 
-export interface JotApplicationService {
+export interface InklingApplicationService {
   /** Internal coordinator operations are exposed only through runtime bindings. */
   readonly authorizeRequest: (
     credentials: RequestCredentials,
@@ -290,6 +290,6 @@ export interface JotApplicationService {
   ) => Effect.Effect<void, ApplicationError>;
 }
 
-export const JotApplication = Context.GenericTag<JotApplicationService>(
-  "@earendil-works/jot/JotApplication",
+export const InklingApplication = Context.GenericTag<InklingApplicationService>(
+  "@earendil-works/inkling/InklingApplication",
 );

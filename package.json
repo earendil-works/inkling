@@ -1,11 +1,11 @@
 {
-  "name": "@earendil-works/jot",
+  "name": "@earendil-works/inkling",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm --parallel --filter @earendil-works/jot-runtime-cloudflare --filter @earendil-works/jot-frontend run dev",
-    "build": "pnpm --filter @earendil-works/jot-frontend run build && pnpm --filter @earendil-works/jot-runtime-cloudflare run build",
+    "dev": "pnpm --parallel --filter @earendil-works/inkling-runtime-cloudflare --filter @earendil-works/inkling-frontend run dev",
+    "build": "pnpm --filter @earendil-works/inkling-frontend run build && pnpm --filter @earendil-works/inkling-runtime-cloudflare run build",
     "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",

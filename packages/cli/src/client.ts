@@ -1,6 +1,6 @@
 import { Data, Effect, Schema } from "effect";
 
-import { taggedId, uuidV7Bytes } from "@earendil-works/jot-core";
+import { taggedId, uuidV7Bytes } from "@earendil-works/inkling-core";
 import {
   AttachmentListResponseSchema,
   AttachmentMetadataSchema,
@@ -11,7 +11,7 @@ import {
   DocumentResponseSchema,
   ProtocolErrorSchema,
   ShareResponseSchema,
-} from "@earendil-works/jot-protocol";
+} from "@earendil-works/inkling-protocol";
 import type {
   AttachmentMetadataDto,
   BackupVerificationDto,
@@ -21,7 +21,7 @@ import type {
   DocumentResponse,
   ImportDocumentRequest,
   ShareResponse,
-} from "@earendil-works/jot-protocol";
+} from "@earendil-works/inkling-protocol";
 
 import type { Instance } from "./config.ts";
 
@@ -165,7 +165,7 @@ export function makeCliClient(instance: Instance): CliClient {
             new ClientError({
               cause,
               code: "invalid_response",
-              message: "Jot returned unreadable JSON.",
+              message: "Inkling returned unreadable JSON.",
               status: response.status,
             }),
           try: () => response.json() as Promise<unknown>,
@@ -178,7 +178,7 @@ export function makeCliClient(instance: Instance): CliClient {
                       new ClientError({
                         cause,
                         code: "invalid_response",
-                        message: "Jot returned an unexpected response.",
+                        message: "Inkling returned an unexpected response.",
                         status: response.status,
                       }),
                   ),
@@ -199,7 +199,7 @@ export function makeCliClient(instance: Instance): CliClient {
                       : new ClientError({
                           cause: error,
                           code: "request_failed",
-                          message: `Jot rejected the request (${response.status}).`,
+                          message: `Inkling rejected the request (${response.status}).`,
                           status: response.status,
                         }),
                   ),
@@ -241,7 +241,7 @@ export function makeCliClient(instance: Instance): CliClient {
             : { headers: { Authorization: `Bearer ${instance.apiKey}` } },
         );
         if (!response.ok) {
-          throw new Error(`Jot rejected the download (${response.status}).`);
+          throw new Error(`Inkling rejected the download (${response.status}).`);
         }
         return new Uint8Array(await response.arrayBuffer());
       },
@@ -295,7 +295,7 @@ export function makeCliClient(instance: Instance): CliClient {
             AttachmentMetadataSchema,
             {
               body: new Uint8Array(bytes).buffer,
-              headers: { "Content-Type": mediaType, "X-Jot-Filename": filename },
+              headers: { "Content-Type": mediaType, "X-Inkling-Filename": filename },
               method: "POST",
             },
           ),
@@ -340,7 +340,7 @@ export function makeCliClient(instance: Instance): CliClient {
             CommentStateSchema,
             "POST",
             {
-              authorDisplayName: process.env["JOT_AUTHOR"] ?? "CLI agent",
+              authorDisplayName: process.env["INKLING_AUTHOR"] ?? "CLI agent",
               body,
               selection: { end, start },
             },
@@ -420,7 +420,7 @@ export function makeCliClient(instance: Instance): CliClient {
         CommentStateSchema,
         "POST",
         {
-          authorDisplayName: process.env["JOT_AUTHOR"] ?? "CLI agent",
+          authorDisplayName: process.env["INKLING_AUTHOR"] ?? "CLI agent",
           body,
           parentId,
         },

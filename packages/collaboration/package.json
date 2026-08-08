@@ -1,5 +1,5 @@
 {
-  "name": "@earendil-works/jot-collaboration",
+  "name": "@earendil-works/inkling-collaboration",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@earendil-works/jot-core": "workspace:*",
+    "@earendil-works/inkling-core": "workspace:*",
     "effect": "3.22.1",
     "yjs": "13.6.32"
   }

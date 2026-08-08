@@ -1,5 +1,5 @@
-import { hasPendingPublicationChanges } from "@earendil-works/jot-core";
-import type { CatalogResponse } from "@earendil-works/jot-protocol";
+import { hasPendingPublicationChanges } from "@earendil-works/inkling-core";
+import type { CatalogResponse } from "@earendil-works/inkling-protocol";
 
 import { documentHref, formatDate, publicDocumentHref } from "../ui.ts";
 import { LifecycleStateChip } from "./lifecycle-state-chip.tsx";

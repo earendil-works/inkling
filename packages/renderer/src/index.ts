@@ -6,8 +6,8 @@ import MarkdownIt from "markdown-it";
 import type { MarkdownIt as MarkdownItType, Token } from "markdown-it";
 import YAML from "yaml";
 
-const jotCodeLanguages = languages;
-export const jotSyntaxHighlighter = classHighlighter;
+const inklingCodeLanguages = languages;
+export const inklingSyntaxHighlighter = classHighlighter;
 
 export interface RenderHeading {
   readonly depth: number;
@@ -56,7 +56,7 @@ export interface MarkdownRendererService {
 }
 
 export const MarkdownRenderer = Context.GenericTag<MarkdownRendererService>(
-  "@earendil-works/jot/MarkdownRenderer",
+  "@earendil-works/inkling/MarkdownRenderer",
 );
 
 export const MarkdownRendererLive = Layer.succeed(MarkdownRenderer, makeMarkdownRenderer());
@@ -126,7 +126,7 @@ async function renderMarkdown(
     typographer: false,
   });
 
-  parser.core.ruler.after("inline", "jot-links-tasks-and-source-positions", (state) => {
+  parser.core.ruler.after("inline", "inkling-links-tasks-and-source-positions", (state) => {
     for (const token of state.tokens) {
       rewriteTokenUrls(token, parser, options);
       if (options.sourcePositions === true) {
@@ -167,23 +167,23 @@ async function renderMarkdown(
     const sourceAttributes = parser.renderer.renderAttrs(token);
     if (language === "mermaid") {
       if (code.length > 100_000) {
-        return `<pre class="jot-code jot-code--rejected"${sourceAttributes}><code>Mermaid diagram exceeds the 100 KB render limit.</code></pre>\n`;
+        return `<pre class="inkling-code inkling-code--rejected"${sourceAttributes}><code>Mermaid diagram exceeds the 100 KB render limit.</code></pre>\n`;
       }
-      return `<div class="jot-mermaid" data-mermaid${sourceAttributes}><pre><code>${parser.utils.escapeHtml(code)}</code></pre><div class="jot-mermaid__controls"><button type="button" data-mermaid-zoom-in aria-label="Zoom in">+</button><button type="button" data-mermaid-zoom-out aria-label="Zoom out">−</button><button type="button" data-mermaid-reset>Reset</button></div></div>\n`;
+      return `<div class="inkling-mermaid" data-mermaid${sourceAttributes}><pre><code>${parser.utils.escapeHtml(code)}</code></pre><div class="inkling-mermaid__controls"><button type="button" data-mermaid-zoom-in aria-label="Zoom in">+</button><button type="button" data-mermaid-zoom-out aria-label="Zoom out">−</button><button type="button" data-mermaid-reset>Reset</button></div></div>\n`;
     }
-    const description = findJotCodeLanguage(token.info);
+    const description = findInklingCodeLanguage(token.info);
     const highlighted =
       description?.support === undefined
         ? parser.utils.escapeHtml(code)
         : highlightCodeAsHtml(code, description.support.language.parser, parser.utils.escapeHtml);
     const classes = [
-      description?.support === undefined ? undefined : "jot-syntax",
+      description?.support === undefined ? undefined : "inkling-syntax",
       language ? `language-${language}` : undefined,
     ]
       .filter((value): value is string => value !== undefined)
       .map((value) => parser.utils.escapeHtml(value));
     const className = classes.length === 0 ? "" : ` class="${classes.join(" ")}"`;
-    return `<pre class="jot-code"${sourceAttributes}><code${className}>${highlighted}</code></pre>\n`;
+    return `<pre class="inkling-code"${sourceAttributes}><code${className}>${highlighted}</code></pre>\n`;
   };
 
   const environment = {};
@@ -197,7 +197,7 @@ async function renderMarkdown(
   const languagesToLoad = new Set<LanguageDescription>();
   for (const token of contentTokens) {
     if (token.type !== "fence") continue;
-    const description = findJotCodeLanguage(token.info);
+    const description = findInklingCodeLanguage(token.info);
     if (description !== null) languagesToLoad.add(description);
   }
   await Promise.all(
@@ -298,11 +298,11 @@ function optionalLabels(value: unknown): readonly string[] | undefined {
   return value.map((label) => String(label).trim()).filter(Boolean);
 }
 
-export function findJotCodeLanguage(info: string): LanguageDescription | null {
+export function findInklingCodeLanguage(info: string): LanguageDescription | null {
   const language = info.trim().split(/\s+/u)[0]?.toLocaleLowerCase("en") ?? "";
   return language === "" || language === "mermaid"
     ? null
-    : LanguageDescription.matchLanguageName(jotCodeLanguages, language, true);
+    : LanguageDescription.matchLanguageName(inklingCodeLanguages, language, true);
 }
 
 function highlightCodeAsHtml(
@@ -314,7 +314,7 @@ function highlightCodeAsHtml(
   highlightCode(
     source,
     parser.parse(source),
-    jotSyntaxHighlighter,
+    inklingSyntaxHighlighter,
     (text, classes) => {
       const escapedText = escapeHtml(text);
       html +=
@@ -357,9 +357,9 @@ function annotateSourcePosition(
   if (!sourcePositionTokenTypes.has(token.type) || token.map === null) return;
   const start = (lineOffsets[token.map[0]] ?? markdownLength) + bodyOffset;
   const end = (lineOffsets[token.map[1]] ?? markdownLength) + bodyOffset;
-  token.attrSet("data-jot-source-start", String(start));
-  token.attrSet("data-jot-source-end", String(end));
-  token.attrSet("data-jot-source-kind", token.type.replace(/_(?:open|block)$/u, ""));
+  token.attrSet("data-inkling-source-start", String(start));
+  token.attrSet("data-inkling-source-end", String(end));
+  token.attrSet("data-inkling-source-kind", token.type.replace(/_(?:open|block)$/u, ""));
 }
 
 function rewriteTokenUrls(token: Token, parser: MarkdownItType, options: RenderOptions): void {

@@ -2,6 +2,7 @@ node_modules/
 dist/
 coverage/
 .wrangler/
+.inkling/
 .jot/
 .DS_Store
 *.log

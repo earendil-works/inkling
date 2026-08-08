@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Effect } from "effect";
 
-import type { ApiKeyCreated, ApiKeyDto } from "@earendil-works/jot-protocol";
+import type { ApiKeyCreated, ApiKeyDto } from "@earendil-works/inkling-protocol";
 
 import type { ApiClientService, ApiError } from "../api.ts";
 import { useEffectAction, useEffectQuery } from "../effect-hooks.ts";
@@ -53,7 +53,7 @@ export function SettingsDialog({
       onSuccess: (created) => {
         setKeys((current) => [created.metadata, ...current]);
         setAgentCommand(
-          `jot instance add workspace ${location.origin} ${created.key} && jot use workspace`,
+          `inkling instance add workspace ${location.origin} ${created.key} && inkling use workspace`,
         );
         setCommandCopied(false);
         setLabel("My agent");
@@ -88,7 +88,7 @@ export function SettingsDialog({
           />
           <p className="dialog-note">
             Keys belong to your account and have the same workspace permissions you do. Use one to
-            connect the Jot CLI or a coding agent.
+            connect the Inkling CLI or a coding agent.
           </p>
 
           {agentCommand === undefined ? null : (
@@ -115,7 +115,7 @@ export function SettingsDialog({
               </div>
               <small>
                 The secret is shown only now. The CLI stores it in your user-only config; never put
-                it in AGENTS.md or an agent skill. Run <code>jot --help</code> next.
+                it in AGENTS.md or an agent skill. Run <code>inkling --help</code> next.
               </small>
             </section>
           )}

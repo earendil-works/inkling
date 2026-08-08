@@ -41,7 +41,7 @@ import {
   WorkspaceStateStore,
   logoutSession,
   normalizeSearchText,
-} from "@earendil-works/jot-core";
+} from "@earendil-works/inkling-core";
 import type {
   ApiKeyRecord,
   AuthenticationState,
@@ -56,7 +56,7 @@ import type {
   RelatedDocumentReference,
   SessionRecord,
   WorkspaceCatalogState,
-} from "@earendil-works/jot-core";
+} from "@earendil-works/inkling-core";
 import {
   CollaborationError,
   decodeBase64,
@@ -64,13 +64,16 @@ import {
   loadDocumentRevision,
   makeDocumentAuthority,
   RecoveryError,
-} from "@earendil-works/jot-collaboration";
-import type { DocumentAuthorityService, DocumentSnapshot } from "@earendil-works/jot-collaboration";
-import { ApplicationError, JotApplication } from "./application.ts";
+} from "@earendil-works/inkling-collaboration";
+import type {
+  DocumentAuthorityService,
+  DocumentSnapshot,
+} from "@earendil-works/inkling-collaboration";
+import { ApplicationError, InklingApplication } from "./application.ts";
 import type {
   CollaborationConnection,
   DocumentRuntimeConfiguration,
-  JotApplicationService,
+  InklingApplicationService,
   RequestCredentials,
 } from "./application.ts";
 import type {
@@ -86,13 +89,13 @@ import type {
   PublicDocumentResponse,
   ServerCollaborationMessage,
   ShareResponse,
-} from "@earendil-works/jot-protocol";
+} from "@earendil-works/inkling-protocol";
 import {
   MarkdownRenderer,
   parseDocumentSource,
   RenderError,
   serializeDocumentFrontmatter,
-} from "@earendil-works/jot-renderer";
+} from "@earendil-works/inkling-renderer";
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -178,10 +181,10 @@ export interface LocalApplicationOptions {
     | undefined;
 }
 
-export function makeLocalJotApplication(
+export function makeLocalInklingApplication(
   options: LocalApplicationOptions = {},
 ): Effect.Effect<
-  JotApplicationService,
+  InklingApplicationService,
   StorageError,
   | typeof WorkspaceStateStore.Service
   | typeof ObjectStore.Service
@@ -574,7 +577,7 @@ export function makeLocalJotApplication(
         };
       });
 
-    const service: JotApplicationService = {
+    const service: InklingApplicationService = {
       authorizeRequest: resolvePrincipal,
       documentRuntimeConfiguration: runtimeConfiguration,
       allDocumentRuntimeConfigurations: () =>
@@ -1871,7 +1874,7 @@ export function makeLocalJotApplication(
 }
 
 export function localApplicationLayer(options: LocalApplicationOptions = {}) {
-  return Layer.effect(JotApplication, makeLocalJotApplication(options));
+  return Layer.effect(InklingApplication, makeLocalInklingApplication(options));
 }
 
 function persistCatalogProjections(

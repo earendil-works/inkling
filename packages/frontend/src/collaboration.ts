@@ -1,7 +1,7 @@
 import { Data, Effect } from "effect";
 import * as Y from "yjs";
 
-import { taggedId, uuidV7Bytes } from "@earendil-works/jot-core";
+import { taggedId, uuidV7Bytes } from "@earendil-works/inkling-core";
 
 import { browserRuntime } from "./effect-runtime.ts";
 
@@ -10,16 +10,20 @@ import {
   decodeJson,
   encodeJson,
   ServerCollaborationMessageSchema,
-} from "@earendil-works/jot-protocol";
+} from "@earendil-works/inkling-protocol";
 import type {
   CommentStateDto,
   DocumentMetadataDto,
   PresenceDto,
   ServerCollaborationMessage,
-} from "@earendil-works/jot-protocol";
-import { decodeBase64, encodeBase64, encodeStateVector } from "@earendil-works/jot-collaboration";
+} from "@earendil-works/inkling-protocol";
+import {
+  decodeBase64,
+  encodeBase64,
+  encodeStateVector,
+} from "@earendil-works/inkling-collaboration";
 
-const remoteOrigin = Symbol("jot-remote-update");
+const remoteOrigin = Symbol("inkling-remote-update");
 
 export type ConnectionState = "connecting" | "disconnected" | "ready" | "saving";
 
@@ -105,7 +109,7 @@ export function makeCollaborationClient(
         () =>
           waiter.fail(
             new CollaborationClientError({
-              message: "Jot could not save the document before publishing.",
+              message: "Inkling could not save the document before publishing.",
             }),
           ),
         30_000,
@@ -242,7 +246,7 @@ export function makeCollaborationClient(
       });
       socket.addEventListener("message", (event) => {
         if (typeof event.data !== "string") {
-          callbacks.onError("Jot received an unsupported binary message.");
+          callbacks.onError("Inkling received an unsupported binary message.");
           return;
         }
         browserRuntime.runFork(

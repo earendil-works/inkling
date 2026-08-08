@@ -3,7 +3,7 @@ import type { EditorState, Extension, Text } from "@codemirror/state";
 import { Decoration, EditorView, WidgetType } from "@codemirror/view";
 import type { DecorationSet } from "@codemirror/view";
 
-import type { CommentThreadDto } from "@earendil-works/jot-protocol";
+import type { CommentThreadDto } from "@earendil-works/inkling-protocol";
 
 export interface ProjectedCommentThread {
   readonly end: number;
@@ -372,7 +372,7 @@ function segmentPriority(element: HTMLElement): number {
     ordered_list: 5,
     table: 5,
   };
-  return priorities[element.dataset["jotSourceKind"] ?? ""] ?? 10;
+  return priorities[element.dataset["inklingSourceKind"] ?? ""] ?? 10;
 }
 
 function attachmentTarget(segment: HTMLElement): HTMLElement {
@@ -384,7 +384,11 @@ function attachmentTarget(segment: HTMLElement): HTMLElement {
 }
 
 function sourceElements(preview: HTMLElement): readonly HTMLElement[] {
-  return [...preview.querySelectorAll<HTMLElement>("[data-jot-source-start][data-jot-source-end]")];
+  return [
+    ...preview.querySelectorAll<HTMLElement>(
+      "[data-inkling-source-start][data-inkling-source-end]",
+    ),
+  ];
 }
 
 function sourceAncestors(node: Node, preview: HTMLElement): readonly HTMLElement[] {
@@ -399,8 +403,8 @@ function sourceAncestors(node: Node, preview: HTMLElement): readonly HTMLElement
 }
 
 function sourceRange(element: HTMLElement): PreviewSourceRange | undefined {
-  const start = Number(element.dataset["jotSourceStart"]);
-  const end = Number(element.dataset["jotSourceEnd"]);
+  const start = Number(element.dataset["inklingSourceStart"]);
+  const end = Number(element.dataset["inklingSourceEnd"]);
   return Number.isSafeInteger(start) && Number.isSafeInteger(end) && start >= 0 && end >= start
     ? { end, start }
     : undefined;

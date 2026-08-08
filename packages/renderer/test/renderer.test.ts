@@ -31,7 +31,7 @@ test("frontmatter is parsed without entering rendered content", async () => {
     visibility: "public",
   });
   assert.doesNotMatch(rendered.html, /visibility/u);
-  assert.match(rendered.html, /<h2 id="decision" data-jot-source-start="103"/u);
+  assert.match(rendered.html, /<h2 id="decision" data-inkling-source-start="103"/u);
 });
 
 test("author frontmatter uses normalized email identifiers", async () => {
@@ -78,11 +78,11 @@ test("interactive rendering annotates block elements with Markdown source ranges
   const rendered = await Effect.runPromise(renderer.render(markdown, { sourcePositions: true }));
   assert.equal(rendered.title, "Heading");
   assert.doesNotMatch(rendered.html, /<h1/u);
-  assert.match(rendered.html, /<p data-jot-source-start="11" data-jot-source-end="43"/u);
-  assert.match(rendered.html, /data-jot-source-kind="list_item"/u);
+  assert.match(rendered.html, /<p data-inkling-source-start="11" data-inkling-source-end="43"/u);
+  assert.match(rendered.html, /data-inkling-source-kind="list_item"/u);
 
   const published = await Effect.runPromise(renderer.render(markdown));
-  assert.doesNotMatch(published.html, /data-jot-source/u);
+  assert.doesNotMatch(published.html, /data-inkling-source/u);
 });
 
 test("fenced code is syntax highlighted with language metadata", async () => {
@@ -91,9 +91,9 @@ test("fenced code is syntax highlighted with language metadata", async () => {
   );
   assert.match(
     rendered.html,
-    /<pre class="jot-code" data-jot-source-start="0" data-jot-source-end="34"/u,
+    /<pre class="inkling-code" data-inkling-source-start="0" data-inkling-source-end="34"/u,
   );
-  assert.match(rendered.html, /<code class="jot-syntax language-ts">/u);
+  assert.match(rendered.html, /<code class="inkling-syntax language-ts">/u);
   assert.match(rendered.html, /<span class="tok-keyword">const<\/span>/u);
   assert.match(rendered.html, /<span class="tok-typeName">number<\/span>/u);
 });

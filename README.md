@@ -1,8 +1,8 @@
-# RFC Editor
+# Inkling
 
-RFC Editor is a collaborative Markdown workspace for drafting, reviewing, and publishing RFCs. It supports numbered RFCs as well as unnumbered notes, with multiplayer editing, threaded comments, capability sharing, full-text search, and an agent-friendly CLI.
+Inkling is a collaborative Markdown workspace for drafting, reviewing, and publishing RFCs. It supports numbered RFCs as well as unnumbered notes, with multiplayer editing, threaded comments, capability sharing, full-text search, and an agent-friendly CLI.
 
-RFC Editor is based on the earlier **Jot** tool. Existing package names, the `jot` CLI command, `JOT_*` environment variables, API headers, and on-disk paths retain that name for compatibility.
+Inkling was previously developed under the working name **Jot**. The Inkling name now applies to its packages, command-line executable, environment variables, API headers, and default on-disk paths.
 
 ## Features
 
@@ -43,7 +43,7 @@ GOOGLE_CLIENT_SECRET=your-web-client-secret
 GOOGLE_ALLOWED_DOMAINS=example.com,example.org
 GOOGLE_ADMIN_EMAILS=admin@example.com
 GOOGLE_REDIRECT_URI=http://localhost:5173/api/auth/google/callback
-JOT_OAUTH_STATE_SECRET=a-long-random-value
+INKLING_OAUTH_STATE_SECRET=a-long-random-value
 ```
 
 Then start both processes:
@@ -59,10 +59,10 @@ Open <http://localhost:5173>. Vite proxies API and WebSocket traffic to the Work
 ### Authentication settings
 
 - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` identify the Google OAuth web client.
-- `GOOGLE_ALLOWED_DOMAINS` is a comma-separated allowlist. RFC Editor checks the exact domain of Google's verified email claim; Google's hosted-domain hint is not treated as authorization.
+- `GOOGLE_ALLOWED_DOMAINS` is a comma-separated allowlist. Inkling checks the exact domain of Google's verified email claim; Google's hosted-domain hint is not treated as authorization.
 - `GOOGLE_ADMIN_EMAILS` is a comma-separated list of allowed users who may administer the workspace. Other allowed users become workspace members. Every user manages their own API keys, which inherit that user's role.
 - `GOOGLE_REDIRECT_URI` must exactly match an authorized redirect URI on the OAuth client.
-- `JOT_OAUTH_STATE_SECRET` signs short-lived OAuth state. It is optional and falls back to `GOOGLE_CLIENT_SECRET`, but a separate value generated with `openssl rand -base64 48` is recommended.
+- `INKLING_OAUTH_STATE_SECRET` signs short-lived OAuth state. It is optional and falls back to `GOOGLE_CLIENT_SECRET`, but a separate value generated with `openssl rand -base64 48` is recommended.
 
 ### Create Google OAuth credentials
 
@@ -79,7 +79,7 @@ Google's current setup is under **Google Auth Platform** in the [Google Cloud Co
    http://localhost:5173/api/auth/google/callback
    ```
 
-7. Add the production callback, replacing the hostname with the deployed RFC Editor hostname:
+7. Add the production callback, replacing the hostname with the deployed Inkling hostname:
 
    ```text
    https://rfcs.example.com/api/auth/google/callback
@@ -88,7 +88,7 @@ Google's current setup is under **Google Auth Platform** in the [Google Cloud Co
 8. Create the client and save its client ID and client secret.
 9. Put those values in `.dev.vars` for local development or in Cloudflare Worker secrets for production.
 
-RFC Editor uses a server-side authorization-code flow with PKCE, so no Authorized JavaScript Origin is required for authentication. Redirect URI matching is exact, including scheme, host, port, path, and trailing slash.
+Inkling uses a server-side authorization-code flow with PKCE, so no Authorized JavaScript Origin is required for authentication. Redirect URI matching is exact, including scheme, host, port, path, and trailing slash.
 
 Official references:
 
@@ -103,21 +103,21 @@ The Node.js runtime uses a filesystem data directory and the same allowed-domain
 Build the frontend and start the server:
 
 ```sh
-pnpm --filter @earendil-works/jot-frontend build
-pnpm --filter @earendil-works/jot-runtime-node start
+pnpm --filter @earendil-works/inkling-frontend build
+pnpm --filter @earendil-works/inkling-runtime-node start
 ```
 
-Configure the Google OAuth environment variables described above, including `GOOGLE_REDIRECT_URI=http://localhost:8787/api/auth/google/callback`, then open <http://localhost:8787> and sign in. The server stores its data in `.jot` by default and permits only one process to use a data directory at a time.
+Configure the Google OAuth environment variables described above, including `GOOGLE_REDIRECT_URI=http://localhost:8787/api/auth/google/callback`, then open <http://localhost:8787> and sign in. The server stores its data in `.inkling` by default and permits only one process to use a data directory at a time.
 
 Configure it with:
 
 - `PORT` — listening port, default `8787`.
-- `JOT_DATA_DIR` — data directory, default `.jot` in the current directory.
+- `INKLING_DATA_DIR` — data directory, default `.inkling` in the current directory.
 
 The CLI can also launch the local runtime:
 
 ```sh
-node packages/cli/src/main.ts serve --port 8787 --data-dir .jot
+node packages/cli/src/main.ts serve --port 8787 --data-dir .inkling
 ```
 
 ### Docker
@@ -125,8 +125,8 @@ node packages/cli/src/main.ts serve --port 8787 --data-dir .jot
 The Docker image runs the same local runtime. Mount the complete `/data` directory for persistence:
 
 ```sh
-docker build -t rfc-editor .
-docker run --rm -p 8787:8787 -v rfc-editor-data:/data rfc-editor
+docker build -t inkling .
+docker run --rm -p 8787:8787 -v inkling-data:/data inkling
 ```
 
 ## Cloudflare deployment
@@ -141,16 +141,16 @@ pnpm exec wrangler secret put GOOGLE_CLIENT_ID
 pnpm exec wrangler secret put GOOGLE_CLIENT_SECRET
 pnpm exec wrangler secret put GOOGLE_ALLOWED_DOMAINS
 pnpm exec wrangler secret put GOOGLE_ADMIN_EMAILS
-pnpm exec wrangler secret put JOT_OAUTH_STATE_SECRET
+pnpm exec wrangler secret put INKLING_OAUTH_STATE_SECRET
 ```
 
-`GOOGLE_REDIRECT_URI` is optional in production. When omitted, RFC Editor derives it as `https://<request-host>/api/auth/google/callback`; that URI must be registered on the OAuth client. Set it explicitly with `wrangler secret put GOOGLE_REDIRECT_URI` when requests reach the Worker through a different public origin.
+`GOOGLE_REDIRECT_URI` is optional in production. When omitted, Inkling derives it as `https://<request-host>/api/auth/google/callback`; that URI must be registered on the OAuth client. Set it explicitly with `wrangler secret put GOOGLE_REDIRECT_URI` when requests reach the Worker through a different public origin.
 
 Build and deploy from the repository root:
 
 ```sh
 pnpm build
-pnpm --filter @earendil-works/jot-runtime-cloudflare deploy
+pnpm --filter @earendil-works/inkling-runtime-cloudflare deploy
 ```
 
 The R2 bucket names and Durable Object bindings are declared in [`packages/runtime-cloudflare/wrangler.jsonc`](packages/runtime-cloudflare/wrangler.jsonc).
@@ -205,7 +205,7 @@ Search reads a derived workspace catalog rather than loading every document auth
 
 ## CLI and agent access
 
-The command is still named `jot` for compatibility. Run it directly from a checkout with:
+The command-line executable is named `inkling`. Run it directly from a checkout with:
 
 ```sh
 node packages/cli/src/main.ts --help
@@ -214,19 +214,19 @@ node packages/cli/src/main.ts --help
 Open the account menu and choose **API keys**. Create a personal key, then copy the one-time setup command. It registers the workspace without putting the key in project files:
 
 ```sh
-jot instance add workspace https://rfcs.example.com API_KEY
-jot use workspace
-jot list
-jot search 'state:discussion label:platform'
-jot read DOCUMENT_ID
-jot create 'New proposal' --rfc
+inkling instance add workspace https://rfcs.example.com API_KEY
+inkling use workspace
+inkling list
+inkling search 'state:discussion label:platform'
+inkling read DOCUMENT_ID
+inkling create 'New proposal' --rfc
 ```
 
-The CLI supports safe unique-text edits, line-range reads, metadata and publication commands, sharing, threaded comments, attachments, imports, backups, restore, verification, and catalog repair. Capability URLs can be registered with `jot share-instance` for document-scoped access.
+The CLI supports safe unique-text edits, line-range reads, metadata and publication commands, sharing, threaded comments, attachments, imports, backups, restore, verification, and catalog repair. Capability URLs can be registered with `inkling share-instance` for document-scoped access.
 
 Each deployment also serves an origin-aware [`/AGENTS.md`](http://localhost:8787/AGENTS.md). Point a coding agent at that URL for current CLI setup, safe editing guidance, and a reusable Agent Skills template. The served instructions never contain credentials.
 
-Set `JOT_CONFIG` to override the CLI configuration path, `JOT_INSTANCE` to override the active instance, and `JOT_AUTHOR` to set the guest comment name.
+Set `INKLING_CONFIG` to override the CLI configuration path, `INKLING_INSTANCE` to override the active instance, and `INKLING_AUTHOR` to set the guest comment name.
 
 ## Importing an existing RFC collection
 
@@ -252,20 +252,20 @@ pnpm import-rfcs --source /path/to/source --dry-run
 Sign in with an administrator account, create its personal API key, and run the import:
 
 ```sh
-JOT_URL=https://rfcs.example.com \
-JOT_API_KEY=secret \
+INKLING_URL=https://rfcs.example.com \
+INKLING_API_KEY=secret \
 pnpm import-rfcs --source /path/to/source
 ```
 
 The importer preserves RFC numbers and metadata, rewrites known RFC links to canonical routes, uploads media, reuses attachments by digest, and publishes public RFCs after their updates complete. It is incremental: rerunning it updates matching RFC numbers and leaves unchanged documents alone.
 
-The CLI also provides `jot import-rfc` for a single legacy RFC and `jot import-jot` for a Markdown file plus an earlier Jot metadata sidecar.
+The CLI also provides `inkling import-rfc` for a single legacy RFC and `inkling import-jot` for a Markdown file plus a legacy Jot metadata sidecar.
 
 ## Architecture
 
 The implementation is split into runtime-independent domain, collaboration, protocol, rendering, backend, and import packages, with separate browser, Node.js, and Cloudflare adapters. Authoritative edits are journaled before acknowledgement, while rendered HTML, Markdown exports, search indexes, and catalogs remain rebuildable projections.
 
-See [`JOT_ARCHITECTURE.md`](JOT_ARCHITECTURE.md) for the complete design and invariants. That document and internal APIs still use the historical Jot name.
+See [`INKLING_ARCHITECTURE.md`](INKLING_ARCHITECTURE.md) for the complete design and invariants.
 
 ## Checks
 

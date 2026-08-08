@@ -1,14 +1,14 @@
 import { Data, Effect, Predicate, Schema } from "effect";
 import YAML from "yaml";
 
-import { personId, validatePerson } from "@earendil-works/jot-core";
+import { personId, validatePerson } from "@earendil-works/inkling-core";
 import type {
   CapabilityAccess,
   CreateMetadataInput,
   PersonReference,
   Sensitivity,
   Visibility,
-} from "@earendil-works/jot-core";
+} from "@earendil-works/inkling-core";
 
 export interface ImportedAttachment {
   readonly sourcePath: string;
@@ -192,7 +192,7 @@ export function importExistingJot(
           new ImportError({
             cause,
             code: "invalid_sidecar",
-            message: "The existing Jot metadata sidecar is invalid.",
+            message: "The legacy Jot metadata sidecar is invalid.",
             sourcePath: context.sourcePath,
           }),
       ),
@@ -227,7 +227,7 @@ export function rewriteLegacyRfcLinks(markdown: string): string {
   );
 }
 
-/** Rewrites links to known legacy source documents to canonical Jot RFC routes. */
+/** Rewrites links to known legacy source documents to canonical Inkling RFC routes. */
 export function rewriteKnownRfcSourceLinks(
   markdown: string,
   rfcs: readonly {

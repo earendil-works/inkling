@@ -1,21 +1,21 @@
 FROM node:24-bookworm-slim
 
 ENV NODE_ENV=production \
-    JOT_DATA_DIR=/data \
+    INKLING_DATA_DIR=/data \
     PORT=8787
 
-RUN corepack enable && useradd --create-home --uid 10001 jot
+RUN corepack enable && useradd --create-home --uid 10001 inkling
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json .npmrc ./
 COPY packages ./packages
 RUN pnpm install --frozen-lockfile \
-      --filter @earendil-works/jot-cli... \
-      --filter @earendil-works/jot-frontend \
-    && pnpm --filter @earendil-works/jot-frontend run build
+      --filter @earendil-works/inkling-cli... \
+      --filter @earendil-works/inkling-frontend \
+    && pnpm --filter @earendil-works/inkling-frontend run build
 
-RUN mkdir -p /data && chown -R jot:jot /app /data
-USER jot
+RUN mkdir -p /data && chown -R inkling:inkling /app /data
+USER inkling
 VOLUME ["/data"]
 EXPOSE 8787
 

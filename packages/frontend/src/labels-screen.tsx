@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import type { CatalogResponse } from "@earendil-works/jot-protocol";
+import type { CatalogResponse } from "@earendil-works/inkling-protocol";
 
 import { ButtonLink } from "./components/button-link.tsx";
 import { DocumentCatalog } from "./components/document-catalog.tsx";
@@ -30,12 +30,12 @@ export function LabelsScreen({
       <section className="workspace-heading labels-heading">
         <div>
           <p className="eyebrow">
-            <a href="/">{publicCatalog ? "Published notes and RFCs" : "Notes and RFCs"}</a> / Labels
+            <a href="/">Inkling</a> / Labels
           </p>
           <h1>{selectedLabel ?? "Labels"}</h1>
         </div>
         <ButtonLink href="/" variant="text">
-          All notes and RFCs
+          All documents
         </ButtonLink>
       </section>
       {selectedLabel === undefined ? (

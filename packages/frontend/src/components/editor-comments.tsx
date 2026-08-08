@@ -1,8 +1,8 @@
 import { useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { Effect, Fiber } from "effect";
 
-import { createCommentAnchor, resolveCommentAnchor } from "@earendil-works/jot-collaboration";
-import type { CommentStateDto } from "@earendil-works/jot-protocol";
+import { createCommentAnchor, resolveCommentAnchor } from "@earendil-works/inkling-collaboration";
+import type { CommentStateDto } from "@earendil-works/inkling-protocol";
 
 import { ApiError } from "../api.ts";
 import type { ApiClientService } from "../api.ts";

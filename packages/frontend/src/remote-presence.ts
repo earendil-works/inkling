@@ -3,7 +3,7 @@ import type { Range, Transaction } from "@codemirror/state";
 import { Decoration, EditorView, WidgetType } from "@codemirror/view";
 import type { DecorationSet } from "@codemirror/view";
 
-import type { PresenceDto } from "@earendil-works/jot-protocol";
+import type { PresenceDto } from "@earendil-works/inkling-protocol";
 
 interface PositionedPresence {
   readonly anchor: number;

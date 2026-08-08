@@ -8,8 +8,8 @@ import { Effect } from "effect";
 import { WebSocket } from "ws";
 import * as Y from "yjs";
 
-import { JotApplication } from "@earendil-works/jot-backend";
-import { personId } from "@earendil-works/jot-core";
+import { InklingApplication } from "@earendil-works/inkling-backend";
+import { personId } from "@earendil-works/inkling-core";
 
 import { startServer } from "../src/server.ts";
 
@@ -17,7 +17,7 @@ test(
   "local HTTP, WebSocket, publication, attachment, and restart behavior",
   { timeout: 30_000 },
   async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "jot-integration-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "inkling-integration-"));
     try {
       const first = await withServer(directory, async (baseUrl, session) => {
         const agentInstructions = await fetch(`${baseUrl}/AGENTS.md`);
@@ -270,7 +270,7 @@ test(
         assert.doesNotMatch(publishedHtml, /<style>/u);
         const statePage = await fetch(`${baseUrl}/state/draft`);
         assert.equal(statePage.status, 200);
-        assert.match(await statePage.text(), /<title>Notes and RFCs<\/title>/u);
+        assert.match(await statePage.text(), /<title>Inkling<\/title>/u);
         const fontStylesheet = await fetch(`${baseUrl}/fonts.css`);
         assert.equal(fontStylesheet.status, 200);
         const fontStyles = await fontStylesheet.text();
@@ -330,7 +330,7 @@ test(
             headers: {
               ...authorization,
               "Content-Type": "text/plain",
-              "X-Jot-Filename": "decision.txt",
+              "X-Inkling-Filename": "decision.txt",
             },
             method: "POST",
           },
@@ -401,8 +401,8 @@ test(
 );
 
 test("backup corruption is rejected and a fresh installation restores portably", async () => {
-  const sourceDirectory = await mkdtemp(path.join(tmpdir(), "jot-backup-source-"));
-  const targetDirectory = await mkdtemp(path.join(tmpdir(), "jot-backup-target-"));
+  const sourceDirectory = await mkdtemp(path.join(tmpdir(), "inkling-backup-source-"));
+  const targetDirectory = await mkdtemp(path.join(tmpdir(), "inkling-backup-target-"));
   try {
     const source = await withServer(sourceDirectory, async (baseUrl, session) => {
       const authorization = await setupApiKey(baseUrl, "source backup", session);
@@ -500,7 +500,7 @@ async function withServer<A>(
         const accountId = yield* personId("admin@example.com");
         const session = yield* Effect.promise(() =>
           running.runtime.runPromise(
-            Effect.flatMap(JotApplication, (application) =>
+            Effect.flatMap(InklingApplication, (application) =>
               application.loginWorkspaceIdentity({
                 displayName: "Integration Admin",
                 email: "admin@example.com",
@@ -514,7 +514,7 @@ async function withServer<A>(
           catch: (cause) => cause,
           try: () =>
             callback(`http://127.0.0.1:${address.port}`, {
-              cookieHeader: `jot_session=${session.sessionToken}; jot_csrf=${session.csrfToken}`,
+              cookieHeader: `inkling_session=${session.sessionToken}; inkling_csrf=${session.csrfToken}`,
               csrf: session.csrfToken,
             }),
         });

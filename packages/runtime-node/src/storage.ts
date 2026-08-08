@@ -11,7 +11,7 @@ import {
   taggedId,
   uuidV7Bytes,
   WorkspaceStateStore,
-} from "@earendil-works/jot-core";
+} from "@earendil-works/inkling-core";
 import type {
   DigestService,
   DurableDocumentJournalService,
@@ -19,8 +19,8 @@ import type {
   ObjectStoreService,
   StoredObject,
   WorkspaceStateStoreService,
-} from "@earendil-works/jot-core";
-import { decodeBase64, encodeBase64 } from "@earendil-works/jot-collaboration";
+} from "@earendil-works/inkling-core";
+import { decodeBase64, encodeBase64 } from "@earendil-works/inkling-collaboration";
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();

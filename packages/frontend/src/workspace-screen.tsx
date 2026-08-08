@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import type { CatalogResponse } from "@earendil-works/jot-protocol";
+import type { CatalogResponse } from "@earendil-works/inkling-protocol";
 
 import type { ApiClientService } from "./api.ts";
 import { CatalogControls } from "./components/catalog-controls.tsx";
@@ -32,7 +32,7 @@ export function WorkspaceScreen({
           <p className="eyebrow">
             {publicCatalog ? "Public archive / published revisions" : "Workspace / recent activity"}
           </p>
-          <h1>Notes and RFCs</h1>
+          <h1>Inkling</h1>
         </div>
         {publicCatalog ? null : <NewDocumentControl api={api} />}
       </section>

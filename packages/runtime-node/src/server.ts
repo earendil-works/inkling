@@ -7,12 +7,12 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { NodeFileSystem } from "@effect/platform-node";
 import { Effect, Layer, ManagedRuntime, type Scope } from "effect";
 
-import { createBackendApp } from "@earendil-works/jot-backend";
+import { createBackendApp } from "@earendil-works/inkling-backend";
 import type {
   GoogleAuthenticationEnvironment,
-  JotApplicationService,
-} from "@earendil-works/jot-backend";
-import { MarkdownRendererLive } from "@earendil-works/jot-renderer";
+  InklingApplicationService,
+} from "@earendil-works/inkling-backend";
+import { MarkdownRendererLive } from "@earendil-works/inkling-renderer";
 
 import { localApplicationLayer } from "./application.ts";
 import { DigestLive, IdGeneratorLive, SecretHasherLive, SecureTokenLive } from "./crypto.ts";
@@ -30,7 +30,7 @@ export interface StartServerOptions {
 
 export interface RunningServer {
   readonly server: ServerType;
-  readonly runtime: ManagedRuntime.ManagedRuntime<JotApplicationService, never>;
+  readonly runtime: ManagedRuntime.ManagedRuntime<InklingApplicationService, never>;
 }
 
 export function parsePort(rawValue: string | undefined): number {
@@ -45,7 +45,7 @@ export function parsePort(rawValue: string | undefined): number {
 }
 
 export function resolveDataDirectory(rawValue: string | undefined): string {
-  return path.resolve(rawValue ?? path.join(process.cwd(), ".jot"));
+  return path.resolve(rawValue ?? path.join(process.cwd(), ".inkling"));
 }
 
 export function startServer(
@@ -58,7 +58,7 @@ export function startServer(
       catch: (cause) =>
         new DataDirectoryLockError({
           cause,
-          message: "The Jot application runtime could not initialize.",
+          message: "The Inkling application runtime could not initialize.",
         }),
       try: () => runtime.runtime(),
     });
@@ -108,17 +108,17 @@ export function googleAuthenticationFromEnvironment(
     GOOGLE_CLIENT_ID: environment["GOOGLE_CLIENT_ID"],
     GOOGLE_CLIENT_SECRET: environment["GOOGLE_CLIENT_SECRET"],
     GOOGLE_REDIRECT_URI: environment["GOOGLE_REDIRECT_URI"],
-    JOT_GOOGLE_AUTHORIZATION_ENDPOINT: environment["JOT_GOOGLE_AUTHORIZATION_ENDPOINT"],
-    JOT_GOOGLE_CERTIFICATES_ENDPOINT: environment["JOT_GOOGLE_CERTIFICATES_ENDPOINT"],
-    JOT_GOOGLE_DIRECTORY_ENDPOINT: environment["JOT_GOOGLE_DIRECTORY_ENDPOINT"],
-    JOT_GOOGLE_TOKEN_ENDPOINT: environment["JOT_GOOGLE_TOKEN_ENDPOINT"],
-    JOT_OAUTH_STATE_SECRET: environment["JOT_OAUTH_STATE_SECRET"],
+    INKLING_GOOGLE_AUTHORIZATION_ENDPOINT: environment["INKLING_GOOGLE_AUTHORIZATION_ENDPOINT"],
+    INKLING_GOOGLE_CERTIFICATES_ENDPOINT: environment["INKLING_GOOGLE_CERTIFICATES_ENDPOINT"],
+    INKLING_GOOGLE_DIRECTORY_ENDPOINT: environment["INKLING_GOOGLE_DIRECTORY_ENDPOINT"],
+    INKLING_GOOGLE_TOKEN_ENDPOINT: environment["INKLING_GOOGLE_TOKEN_ENDPOINT"],
+    INKLING_OAUTH_STATE_SECRET: environment["INKLING_OAUTH_STATE_SECRET"],
   };
 }
 
 function createRuntime(
   dataDirectory: string,
-): ManagedRuntime.ManagedRuntime<JotApplicationService, never> {
+): ManagedRuntime.ManagedRuntime<InklingApplicationService, never> {
   const base = Layer.mergeAll(
     NodeFileSystem.layer,
     DigestLive,

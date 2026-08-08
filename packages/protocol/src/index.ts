@@ -8,7 +8,7 @@ const PositiveInteger = Schema.Number.pipe(Schema.int(), Schema.positive());
 
 export const HealthResponseSchema = Schema.Struct({
   protocolVersion: Schema.Number,
-  service: Schema.Literal("jot"),
+  service: Schema.Literal("inkling"),
   status: Schema.Literal("ok"),
   version: Schema.String,
 });

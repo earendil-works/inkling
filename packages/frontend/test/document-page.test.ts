@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { DocumentMetadataDto } from "@earendil-works/jot-protocol";
+import type { DocumentMetadataDto } from "@earendil-works/inkling-protocol";
 
 import {
   documentClassification,

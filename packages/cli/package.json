@@ -1,19 +1,19 @@
 {
-  "name": "@earendil-works/jot-cli",
+  "name": "@earendil-works/inkling-cli",
   "version": "0.0.0",
   "private": true,
   "bin": {
-    "jot": "./src/main.ts"
+    "inkling": "./src/main.ts"
   },
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@earendil-works/jot-core": "workspace:*",
-    "@earendil-works/jot-importers": "workspace:*",
-    "@earendil-works/jot-protocol": "workspace:*",
-    "@earendil-works/jot-runtime-node": "workspace:*",
+    "@earendil-works/inkling-core": "workspace:*",
+    "@earendil-works/inkling-importers": "workspace:*",
+    "@earendil-works/inkling-protocol": "workspace:*",
+    "@earendil-works/inkling-runtime-node": "workspace:*",
     "effect": "3.22.1"
   }
 }

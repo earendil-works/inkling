@@ -23,7 +23,7 @@ import {
   setCommentThreadResolution,
   updateDocumentMetadata,
   updateSharingPolicy,
-} from "@earendil-works/jot-core";
+} from "@earendil-works/inkling-core";
 import type {
   AuthorizationError,
   BodyEditError,
@@ -40,7 +40,7 @@ import type {
   Principal,
   StorageError,
   TextReplacement,
-} from "@earendil-works/jot-core";
+} from "@earendil-works/inkling-core";
 
 import {
   createCommentAnchor as createRelativeAnchor,
@@ -249,7 +249,7 @@ export interface DocumentAuthorityService {
 }
 
 export const DocumentAuthority = Context.GenericTag<DocumentAuthorityService>(
-  "@earendil-works/jot/DocumentAuthority",
+  "@earendil-works/inkling/DocumentAuthority",
 );
 
 export interface MakeDocumentAuthorityOptions {
@@ -858,7 +858,7 @@ function writePortableProjections(
     const body = capture.body ?? "";
     const metadata = JSON.stringify(capture.metadata, undefined, 2);
     const markdownBytes = textEncoder.encode(
-      `---\njot: ${JSON.stringify(capture.metadata)}\n---\n\n${body}`,
+      `---\ninkling: ${JSON.stringify(capture.metadata)}\n---\n\n${body}`,
     );
     const metadataBytes = textEncoder.encode(metadata);
     const markdownDigest = yield* digest.sha256(markdownBytes);

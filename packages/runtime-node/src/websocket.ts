@@ -5,24 +5,24 @@ import { Effect, Fiber, Stream, type ManagedRuntime } from "effect";
 import { WebSocket, WebSocketServer } from "ws";
 import type { RawData } from "ws";
 
-import { ApplicationError, JotApplication } from "@earendil-works/jot-backend";
+import { ApplicationError, InklingApplication } from "@earendil-works/inkling-backend";
 import type {
   CollaborationConnection,
-  JotApplicationService,
+  InklingApplicationService,
   RequestCredentials,
-} from "@earendil-works/jot-backend";
+} from "@earendil-works/inkling-backend";
 import {
   ClientCollaborationMessageSchema,
   decodeJson,
   encodeJson,
   ServerCollaborationMessageSchema,
-} from "@earendil-works/jot-protocol";
+} from "@earendil-works/inkling-protocol";
 import type {
   ClientCollaborationMessage,
   PresenceDto,
   ServerCollaborationMessage,
-} from "@earendil-works/jot-protocol";
-import { decodeBase64 } from "@earendil-works/jot-collaboration";
+} from "@earendil-works/inkling-protocol";
+import { decodeBase64 } from "@earendil-works/inkling-collaboration";
 import type { ServerType } from "@hono/node-server";
 
 interface ConnectedClient {
@@ -34,7 +34,7 @@ interface ConnectedClient {
 
 export function installWebSocketServer(
   server: ServerType,
-  runtime: ManagedRuntime.ManagedRuntime<JotApplicationService, never>,
+  runtime: ManagedRuntime.ManagedRuntime<InklingApplicationService, never>,
 ): () => void {
   const webSocketServer = new WebSocketServer({ maxPayload: 1_200_000, noServer: true });
   const clients = new Set<ConnectedClient>();
@@ -59,7 +59,7 @@ export function installWebSocketServer(
     const requestCredentials: RequestCredentials = {
       capabilityToken: url.searchParams.get("cap") ?? undefined,
       guestName: url.searchParams.get("guest") ?? undefined,
-      sessionToken: parseCookies(request.headers.cookie)["jot_session"],
+      sessionToken: parseCookies(request.headers.cookie)["inkling_session"],
     };
 
     webSocketServer.handleUpgrade(request, socket, head, (webSocket) => {
@@ -110,7 +110,9 @@ export function installWebSocketServer(
         );
       };
 
-      const processMessage = (data: RawData): Effect.Effect<void, unknown, JotApplicationService> =>
+      const processMessage = (
+        data: RawData,
+      ): Effect.Effect<void, unknown, InklingApplicationService> =>
         decodeMessage(data).pipe(
           Effect.flatMap((message) =>
             Effect.gen(function* () {
@@ -129,7 +131,7 @@ export function installWebSocketServer(
                   message.stateVector === undefined
                     ? undefined
                     : yield* decodeBase64(message.stateVector);
-                const service = yield* JotApplication;
+                const service = yield* InklingApplication;
                 const established = yield* service.connectCollaboration(
                   credentials,
                   documentId,

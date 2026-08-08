@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 
-import { StorageError } from "@earendil-works/jot-core";
+import { StorageError } from "@earendil-works/inkling-core";
 import type {
   DigestService,
   DurableDocumentJournalService,
@@ -8,7 +8,7 @@ import type {
   ObjectStoreService,
   StoredObject,
   WorkspaceStateStoreService,
-} from "@earendil-works/jot-core";
+} from "@earendil-works/inkling-core";
 
 export function makeDurableWorkspaceStateStore(
   storage: DurableObjectStorage,

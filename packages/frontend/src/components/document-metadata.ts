@@ -1,5 +1,5 @@
-import type { DocumentMetadataDto } from "@earendil-works/jot-protocol";
-import type { DocumentFrontmatter } from "@earendil-works/jot-renderer";
+import type { DocumentMetadataDto } from "@earendil-works/inkling-protocol";
+import type { DocumentFrontmatter } from "@earendil-works/inkling-renderer";
 
 export type DocumentClassification = "confidential" | "public" | "workspace";
 

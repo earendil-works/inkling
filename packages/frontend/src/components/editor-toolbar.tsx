@@ -2,7 +2,7 @@ import type {
   AttachmentMetadataDto,
   DocumentMetadataDto,
   ShareResponse,
-} from "@earendil-works/jot-protocol";
+} from "@earendil-works/inkling-protocol";
 
 import type { ApiClientService } from "../api.ts";
 import { documentHref } from "../ui.ts";

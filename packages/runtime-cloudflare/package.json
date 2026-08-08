@@ -1,5 +1,5 @@
 {
-  "name": "@earendil-works/jot-runtime-cloudflare",
+  "name": "@earendil-works/inkling-runtime-cloudflare",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -14,11 +14,11 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@earendil-works/jot-backend": "workspace:*",
-    "@earendil-works/jot-collaboration": "workspace:*",
-    "@earendil-works/jot-core": "workspace:*",
-    "@earendil-works/jot-protocol": "workspace:*",
-    "@earendil-works/jot-renderer": "workspace:*",
+    "@earendil-works/inkling-backend": "workspace:*",
+    "@earendil-works/inkling-collaboration": "workspace:*",
+    "@earendil-works/inkling-core": "workspace:*",
+    "@earendil-works/inkling-protocol": "workspace:*",
+    "@earendil-works/inkling-renderer": "workspace:*",
     "effect": "3.22.1",
     "hono": "4.13.0"
   },

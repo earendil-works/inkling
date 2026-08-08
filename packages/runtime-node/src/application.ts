@@ -1,2 +1,5 @@
-export { localApplicationLayer, makeLocalJotApplication } from "@earendil-works/jot-backend";
-export type { LocalApplicationOptions } from "@earendil-works/jot-backend";
+export {
+  localApplicationLayer,
+  makeLocalInklingApplication,
+} from "@earendil-works/inkling-backend";
+export type { LocalApplicationOptions } from "@earendil-works/inkling-backend";
