@@ -729,7 +729,7 @@ Raw HTML is disabled by default. If later enabled for trusted workspaces, it mus
 
 ### 15.2 Editor preview
 
-Preview rendering is debounced and must not block typing or collaboration. It parses publication frontmatter, omits it from rendered prose, and reflects valid draft metadata immediately without changing authorization. Author email identifiers display the corresponding workspace account name when the people directory knows it and otherwise display the email address. Mermaid diagram rendering is separately debounced and preserves pan and zoom state for unchanged diagrams where practical.
+Preview rendering is debounced and must not block typing or collaboration. It parses publication frontmatter, omits it from rendered prose, and reflects valid draft metadata immediately without changing authorization. Author email identifiers display the corresponding workspace account name when the people directory knows it and otherwise display the email address. The source and preview panes synchronize scrolling proportionally on a best-effort basis in either direction. Mermaid diagram rendering is separately debounced and preserves pan and zoom state for unchanged diagrams where practical.
 
 Comments are overlaid using resolved anchor positions after rendering. Rendered HTML never becomes authoritative document state.
 

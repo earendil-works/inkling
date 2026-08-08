@@ -36,7 +36,9 @@ export function EditorWorkbench({
   metadata,
 }: EditorWorkbenchProps): React.JSX.Element {
   const renderedCallbackRef = useRef(onPreviewRendered);
+  const previewScrollerRef = useRef<HTMLDivElement>(null);
   renderedCallbackRef.current = onPreviewRendered;
+  useSynchronizedScrolling(editorHostRef, previewScrollerRef);
 
   useEffect(() => {
     const preview = previewRef.current;
@@ -84,7 +86,7 @@ export function EditorWorkbench({
             ×
           </Button>
         </div>
-        <div className="editor-preview-page">
+        <div className="editor-preview-page" ref={previewScrollerRef}>
           <div className="editor-preview-page__paper">
             <DocumentPage headings={previewHeadings} metadata={metadata}>
               <article
@@ -100,6 +102,58 @@ export function EditorWorkbench({
       </div>
     </section>
   );
+}
+
+function useSynchronizedScrolling(
+  editorHostRef: React.RefObject<HTMLDivElement | null>,
+  previewScrollerRef: React.RefObject<HTMLDivElement | null>,
+): void {
+  useEffect(() => {
+    const editorHost = editorHostRef.current;
+    const previewScroller = previewScrollerRef.current;
+    if (editorHost === null || previewScroller === null) return;
+
+    let syncFrame: number | undefined;
+    let releaseFrame: number | undefined;
+    let programmaticTarget: HTMLElement | undefined;
+
+    const queueSync = (source: HTMLElement, target: HTMLElement): void => {
+      if (programmaticTarget === source) return;
+      if (syncFrame !== undefined) cancelAnimationFrame(syncFrame);
+      syncFrame = requestAnimationFrame(() => {
+        syncFrame = undefined;
+        const sourceMaximum = source.scrollHeight - source.clientHeight;
+        const targetMaximum = target.scrollHeight - target.clientHeight;
+        if (sourceMaximum <= 0 || targetMaximum <= 0) return;
+        programmaticTarget = target;
+        target.scrollTop = (source.scrollTop / sourceMaximum) * targetMaximum;
+        if (releaseFrame !== undefined) cancelAnimationFrame(releaseFrame);
+        releaseFrame = requestAnimationFrame(() => {
+          releaseFrame = undefined;
+          if (programmaticTarget === target) programmaticTarget = undefined;
+        });
+      });
+    };
+
+    const synchronizeFromSource = (event: Event): void => {
+      const source = event.target;
+      if (!(source instanceof HTMLElement) || !source.matches(".cm-scroller")) return;
+      queueSync(source, previewScroller);
+    };
+    const synchronizeFromPreview = (): void => {
+      const source = editorHost.querySelector<HTMLElement>(".cm-scroller");
+      if (source !== null) queueSync(previewScroller, source);
+    };
+
+    editorHost.addEventListener("scroll", synchronizeFromSource, true);
+    previewScroller.addEventListener("scroll", synchronizeFromPreview);
+    return () => {
+      editorHost.removeEventListener("scroll", synchronizeFromSource, true);
+      previewScroller.removeEventListener("scroll", synchronizeFromPreview);
+      if (syncFrame !== undefined) cancelAnimationFrame(syncFrame);
+      if (releaseFrame !== undefined) cancelAnimationFrame(releaseFrame);
+    };
+  }, [editorHostRef, previewScrollerRef]);
 }
 
 export function connectionLabel(state: ConnectionState): string {

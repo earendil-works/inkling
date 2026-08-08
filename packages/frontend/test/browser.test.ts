@@ -475,6 +475,38 @@ test(
         overflowX: "auto",
         whiteSpace: "nowrap",
       });
+      const synchronizedScroll = await first.evaluate(async () => {
+        const source = document.querySelector<HTMLElement>(".cm-scroller");
+        const preview = document.querySelector<HTMLElement>(".editor-preview-page");
+        if (source === null || preview === null) throw new Error("Editor panes are missing.");
+        source.scrollTop = 0;
+        await new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        );
+        source.scrollTop = source.scrollHeight;
+        await new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        );
+        const downward = {
+          preview: preview.scrollTop / (preview.scrollHeight - preview.clientHeight),
+          source: source.scrollTop / (source.scrollHeight - source.clientHeight),
+        };
+        preview.scrollTop = 0;
+        await new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        );
+        return {
+          downward,
+          upward: {
+            preview: preview.scrollTop / (preview.scrollHeight - preview.clientHeight),
+            source: source.scrollTop / (source.scrollHeight - source.clientHeight),
+          },
+        };
+      });
+      assert.ok(synchronizedScroll.downward.source > 0.95);
+      assert.ok(synchronizedScroll.downward.preview > 0.9);
+      assert.ok(synchronizedScroll.upward.source < 0.1);
+      assert.ok(synchronizedScroll.upward.preview < 0.1);
 
       await first.locator(".cm-content").click();
       await first.keyboard.press("ControlOrMeta+Home");
