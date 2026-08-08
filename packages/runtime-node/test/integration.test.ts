@@ -219,14 +219,17 @@ test(
           "architecture",
           "platform",
         ]);
-        assert.equal((await fetch(`${baseUrl}/rfc/0001`)).status, 404);
+        assert.equal((await fetch(`${baseUrl}/rfcs/0001`)).status, 404);
         const publish = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/publish`, {
           headers: authorization,
           method: "POST",
         });
         assert.equal(publish.status, 200);
-        const published = await fetch(`${baseUrl}/rfc/0001`);
+        const published = await fetch(`${baseUrl}/rfcs/0001`);
         assert.equal(published.status, 200);
+        const legacyRfc = await fetch(`${baseUrl}/rfc/0001`, { redirect: "manual" });
+        assert.equal(legacyRfc.status, 308);
+        assert.equal(legacyRfc.headers.get("location"), "/rfcs/0001");
         const publishedCsp = published.headers.get("content-security-policy") ?? "";
         assert.match(publishedCsp, /style-src 'self' https:\/\/fonts\.googleapis\.com/u);
         assert.match(publishedCsp, /font-src 'self' https:\/\/fonts\.gstatic\.com/u);
@@ -289,7 +292,7 @@ test(
         assert.equal(publishedDocumentBody.metadata.title, "Integrated RFC");
         assert.match(publishedDocumentBody.body, /# Integrated RFC/u);
         assert.doesNotMatch(publishedDocumentBody.body, /Unpublished working title/u);
-        const isolatedPublication = await (await fetch(`${baseUrl}/rfc/0001`)).text();
+        const isolatedPublication = await (await fetch(`${baseUrl}/rfcs/0001`)).text();
         assert.match(isolatedPublication, /Integrated RFC/u);
         assert.doesNotMatch(isolatedPublication, /Unpublished working title/u);
 
@@ -362,7 +365,7 @@ test(
           /---\n\n# Unpublished working title\n\nDurable body from collaboration\n\n```ts\nconst value: number = 1;\n```$/u,
         );
         assert.equal(recovered.comments.threads.length, 1);
-        assert.equal((await fetch(`${baseUrl}/rfc/0001`)).status, 200);
+        assert.equal((await fetch(`${baseUrl}/rfcs/0001`)).status, 200);
       });
     } finally {
       await rm(directory, { force: true, recursive: true });

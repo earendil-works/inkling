@@ -1,7 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { colorFor } from "../src/ui.ts";
+import { colorFor, documentHref } from "../src/ui.ts";
+
+test("RFC document links use canonical number routes", () => {
+  assert.equal(documentHref("doc_example123", 42, false, "read", ""), "/rfcs/0042");
+  assert.equal(documentHref("doc_example123", 42, false, "edit", ""), "/rfcs/0042/edit");
+  assert.equal(
+    documentHref("doc_example123", undefined, false, "read", ""),
+    "/documents/doc_example123",
+  );
+  assert.equal(
+    documentHref("doc_example123", 42, true, "edit", "?cap=secret"),
+    "/share/doc_example123/edit?cap=secret",
+  );
+});
 
 test("participant colors are stable and use perceptual OKLCH values", () => {
   const first = colorFor("person_armin");

@@ -442,20 +442,22 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
     ),
   );
 
-  app.get("/rfc/:number", (context) =>
-    execute(
-      context,
-      options,
-      (service) =>
-        positiveInteger(context.req.param("number"), "RFC number").pipe(
-          Effect.flatMap((number) => service.readPublicRfc(number)),
+  app.get("/rfcs/:number", (context, next) =>
+    getCookie(context, "jot_session") !== undefined
+      ? next()
+      : execute(
+          context,
+          options,
+          (service) =>
+            positiveInteger(context.req.param("number"), "RFC number").pipe(
+              Effect.flatMap((number) => service.readPublicRfc(number)),
+            ),
+          (document) => {
+            context.header("Cache-Control", "public, max-age=300, stale-while-revalidate=3600");
+            context.header("Content-Security-Policy", contentSecurityPolicy);
+            return context.html(publicDocumentHtml(document));
+          },
         ),
-      (document) => {
-        context.header("Cache-Control", "public, max-age=300, stale-while-revalidate=3600");
-        context.header("Content-Security-Policy", contentSecurityPolicy);
-        return context.html(publicDocumentHtml(document));
-      },
-    ),
   );
 
   app.get("/state/:state", (context) =>
@@ -484,12 +486,16 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
     ),
   );
 
-  app.get("/rfc/:number/:slug", (context) => {
+  app.get("/rfcs/:number/:slug", (context, next) => {
+    if (context.req.param("slug") === "edit") return next();
     const number = Number(context.req.param("number"));
     return Number.isSafeInteger(number)
-      ? context.redirect(`/rfc/${String(number).padStart(4, "0")}`, 308)
+      ? context.redirect(`/rfcs/${String(number).padStart(4, "0")}`, 308)
       : context.notFound();
   });
+
+  app.get("/rfc/:number", redirectLegacyRfc);
+  app.get("/rfc/:number/:slug", redirectLegacyRfc);
 
   app.post("/api/admin/import", (context) =>
     execute(context, options, (service) =>
@@ -569,6 +575,13 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
 
 const inlineAttachmentTypes = new Set(["image/gif", "image/jpeg", "image/png", "image/webp"]);
 
+function redirectLegacyRfc(context: HonoContext): Response | Promise<Response> {
+  const number = Number(context.req.param("number"));
+  return Number.isSafeInteger(number)
+    ? context.redirect(`/rfcs/${String(number).padStart(4, "0")}`, 308)
+    : context.notFound();
+}
+
 function operationCategory(pathname: string): string {
   if (pathname.includes("/attachments")) return "attachment";
   if (pathname.includes("/comments")) return "comment";
@@ -576,7 +589,7 @@ function operationCategory(pathname: string): string {
   if (pathname.includes("/auth/")) return "authentication";
   if (pathname.includes("/admin/")) return "administration";
   if (pathname.includes("/documents")) return "document";
-  if (pathname.includes("/rfc/")) return "public-rfc";
+  if (pathname.includes("/rfc/") || pathname.includes("/rfcs/")) return "public-rfc";
   return "http";
 }
 
@@ -853,7 +866,7 @@ function publicCatalogHtml(titleValue: string, catalog: CatalogResponse): string
       const href =
         metadata.rfcNumber === undefined
           ? `/public/documents/${encodeURIComponent(metadata.id)}`
-          : `/rfc/${String(metadata.rfcNumber).padStart(4, "0")}`;
+          : `/rfcs/${String(metadata.rfcNumber).padStart(4, "0")}`;
       const labels = metadata.labels
         .map((label) => `<a href="/keyword/${encodeURIComponent(label)}">${escapeHtml(label)}</a>`)
         .join(" ");

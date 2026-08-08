@@ -5,7 +5,7 @@ import type { CreateDocumentRequest, DocumentResponse } from "@earendil-works/jo
 import type { ApiClientService, ApiError } from "../api.ts";
 import { useAppContext } from "../app-context.tsx";
 import { useEffectAction } from "../effect-hooks.ts";
-import { randomId } from "../ui.ts";
+import { documentHref, randomId } from "../ui.ts";
 import { Button } from "./button.tsx";
 import { CheckboxField } from "./checkbox-field.tsx";
 import { DialogHeader } from "./dialog-header.tsx";
@@ -43,7 +43,9 @@ export function NewDocumentDialog({
       {
         onSuccess: (document) => {
           onDismiss();
-          navigate(`/documents/${encodeURIComponent(document.metadata.id)}/edit`);
+          navigate(
+            documentHref(document.metadata.id, document.metadata.rfcNumber, false, "edit", ""),
+          );
         },
       },
     );

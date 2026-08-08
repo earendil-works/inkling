@@ -166,7 +166,7 @@ export function EditorScreen({
       )}
       {shared && displayName === undefined ? (
         <GuestIdentityDialog
-          onCancel={() => navigate(documentHref(metadata.id, true, "read"))}
+          onCancel={() => navigate(documentHref(metadata.id, metadata.rfcNumber, true, "read"))}
           onIdentify={(name) => {
             storeGuestName(name);
             setDisplayName(name);

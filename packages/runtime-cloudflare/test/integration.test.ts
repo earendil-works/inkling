@@ -167,7 +167,7 @@ test(
           id: "alphatest0@earendil.com",
         },
       ]);
-      const publicRfc = await fetch(`${running.baseUrl}/rfc/0001`);
+      const publicRfc = await fetch(`${running.baseUrl}/rfcs/0001`);
       assert.equal(publicRfc.status, 200);
       const publicHtml = await publicRfc.text();
       assert.match(publicHtml, />Armin Ronacher<\/a>/u);

@@ -65,6 +65,7 @@ export function startServer(
       "../../frontend/dist",
     );
     app.get("/documents/*", serveStatic({ path: "index.html", root: frontendRoot }));
+    app.get("/rfcs/*", serveStatic({ path: "index.html", root: frontendRoot }));
     app.get("/share/*", serveStatic({ path: "index.html", root: frontendRoot }));
     app.use("/*", serveStatic({ root: frontendRoot }));
 

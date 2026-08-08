@@ -1,7 +1,7 @@
 import { hasPendingPublicationChanges } from "@earendil-works/jot-core";
 import type { CatalogResponse } from "@earendil-works/jot-protocol";
 
-import { formatDate } from "../ui.ts";
+import { documentHref, formatDate } from "../ui.ts";
 import { LifecycleStateChip } from "./lifecycle-state-chip.tsx";
 
 export interface DocumentCatalogRowProps {
@@ -20,7 +20,10 @@ export function DocumentCatalogRow({
       : `RFC ${String(metadata.rfcNumber).padStart(4, "0")}`;
 
   return (
-    <a className="catalog-row" href={`/documents/${encodeURIComponent(metadata.id)}`}>
+    <a
+      className="catalog-row"
+      href={documentHref(metadata.id, metadata.rfcNumber, false, "read", "")}
+    >
       <span className="catalog-row__index">{String(index + 1).padStart(2, "0")}</span>
       <span className="catalog-row__main">
         <span className="catalog-row__title">

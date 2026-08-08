@@ -729,6 +729,9 @@ const worker: ExportedHandler<CloudflareEnvironment> = {
     if (documentId !== undefined) {
       return dispatchDocument(request, environment, documentId);
     }
+    if (/^\/rfcs\/\d+\/?$/u.test(url.pathname) && credentials(request).sessionToken !== undefined) {
+      return environment.ASSETS.fetch(request);
+    }
     const rfcNumber = rfcNumberFromPath(url.pathname);
     if (rfcNumber !== undefined) {
       const resolution = await workspaceStub(environment).resolvePublicRfc(rfcNumber);
@@ -1498,8 +1501,10 @@ function documentIdFromRfcAllocation(pathname: string): string | undefined {
 }
 
 function rfcNumberFromPath(pathname: string): number | undefined {
-  const match = /^\/(?:api\/public\/)?rfc\/(\d+)(?:\/|$)/u.exec(pathname);
-  const value = Number(match?.[1]);
+  const api = /^\/api\/public\/rfc\/(\d+)\/?$/u.exec(pathname);
+  const canonical = /^\/rfcs\/(\d+)(?:\/(?!edit\/?$)[^/]+)?\/?$/u.exec(pathname);
+  const legacy = /^\/rfc\/(\d+)(?:\/[^/]+)?\/?$/u.exec(pathname);
+  const value = Number(api?.[1] ?? canonical?.[1] ?? legacy?.[1]);
   return Number.isSafeInteger(value) && value > 0 ? value : undefined;
 }
 

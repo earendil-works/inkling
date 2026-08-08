@@ -20,7 +20,7 @@ export function ReaderToolbar({ metadata, shared }: ReaderToolbarProps): React.J
         <ButtonLink
           className="document-mode-link"
           data-open-editor=""
-          href={documentHref(metadata.id, shared, "edit")}
+          href={documentHref(metadata.id, metadata.rfcNumber, shared, "edit")}
           size="small"
           variant="primary"
         >

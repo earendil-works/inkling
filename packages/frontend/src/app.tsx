@@ -123,6 +123,7 @@ function loadRoute(url: URL): Effect.Effect<RouteModel, ApiError> {
   const api = makeApiClient(capabilityToken);
   const shared = /^\/share\/([^/]+)(?:\/(edit))?\/?$/u.exec(url.pathname);
   const documentRoute = /^\/documents\/([^/]+)(?:\/(edit))?\/?$/u.exec(url.pathname);
+  const rfcRoute = /^\/rfcs\/(\d+)(?:\/(edit))?\/?$/u.exec(url.pathname);
   if (shared?.[1] !== undefined) {
     return loadDocumentRoute(
       api,
@@ -140,6 +141,19 @@ function loadRoute(url: URL): Effect.Effect<RouteModel, ApiError> {
       documentRoute[2] === "edit" ? "editor" : "reader",
       false,
     );
+  }
+  if (rfcRoute?.[1] !== undefined) {
+    const number = Number(rfcRoute[1]);
+    return Number.isSafeInteger(number) && number > 0
+      ? loadRfcRoute(api, capabilityToken, number, rfcRoute[2] === "edit" ? "editor" : "reader")
+      : Effect.fail(
+          new ApiError({
+            code: "invalid_rfc_number",
+            message: "The RFC number is invalid.",
+            retryable: false,
+            status: 400,
+          }),
+        );
   }
   return api.authenticationStatus.pipe(
     Effect.flatMap((authentication) => {
@@ -183,6 +197,45 @@ function loadRoute(url: URL): Effect.Effect<RouteModel, ApiError> {
           catalog,
           screen: "workspace",
         })),
+      );
+    }),
+  );
+}
+
+function loadRfcRoute(
+  api: ApiClientService,
+  capabilityToken: string | undefined,
+  number: number,
+  screen: "editor" | "reader",
+): Effect.Effect<RouteModel, ApiError> {
+  return api.authenticationStatus.pipe(
+    Effect.flatMap((authentication): Effect.Effect<RouteModel, ApiError> => {
+      if (authentication.needsSetup || !authentication.authenticated) {
+        const model: RouteModel = {
+          api,
+          capabilityToken,
+          methods: authentication.authenticationMethods,
+          mode: authentication.needsSetup ? "setup" : "login",
+          screen: "authentication",
+        };
+        return Effect.succeed(model);
+      }
+      return api.listDocuments(`rfc:${number}`).pipe(
+        Effect.flatMap((catalog) => {
+          const document = catalog.documents.find(
+            (candidate) => candidate.metadata.rfcNumber === number,
+          );
+          return document === undefined
+            ? Effect.fail(
+                new ApiError({
+                  code: "not_found",
+                  message: `RFC ${String(number).padStart(4, "0")} does not exist.`,
+                  retryable: false,
+                  status: 404,
+                }),
+              )
+            : loadDocumentRoute(api, capabilityToken, document.metadata.id, screen, false);
+        }),
       );
     }),
   );
@@ -284,6 +337,7 @@ function isApplicationUrl(url: URL): boolean {
     (url.pathname === "/" ||
       url.pathname === "/labels" ||
       url.pathname.startsWith("/documents/") ||
+      url.pathname.startsWith("/rfcs/") ||
       url.pathname.startsWith("/share/"))
   );
 }

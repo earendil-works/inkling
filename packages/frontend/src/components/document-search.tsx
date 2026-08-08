@@ -5,6 +5,7 @@ import type { CatalogResponse } from "@earendil-works/jot-protocol";
 import type { ApiClientService } from "../api.ts";
 import { useAppContext } from "../app-context.tsx";
 import { useEffectQuery } from "../effect-hooks.ts";
+import { documentHref } from "../ui.ts";
 import { LifecycleStateChip } from "./lifecycle-state-chip.tsx";
 
 interface SearchCompletion {
@@ -99,7 +100,7 @@ export function DocumentSearch({
   const openResult = (index: number): void => {
     const result = topResults[index];
     if (result === undefined) return;
-    navigate(`/documents/${encodeURIComponent(result.metadata.id)}`);
+    navigate(documentHref(result.metadata.id, result.metadata.rfcNumber, false, "read", ""));
   };
 
   return (
@@ -227,7 +228,7 @@ export function DocumentSearch({
                       aria-selected={activeResult === index}
                       className="document-search__result"
                       data-search-result=""
-                      href={`/documents/${encodeURIComponent(metadata.id)}`}
+                      href={documentHref(metadata.id, metadata.rfcNumber, false, "read", "")}
                       id={`${listboxId}-result-${index}`}
                       key={metadata.id}
                       onPointerMove={() => setActiveResult(index)}

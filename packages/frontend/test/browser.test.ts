@@ -121,6 +121,7 @@ test(
       await first.keyboard.insertText("state: draft");
       assert.equal(await first.locator("[data-document-details]").count(), 0);
       await first.locator("[data-allocate-rfc]").click();
+      await first.waitForURL(/\/rfcs\/0001\/edit$/u);
       await first.waitForFunction(
         () =>
           document.querySelector(".document-bar .document-identity > span")?.textContent ===
@@ -250,7 +251,7 @@ test(
         document.documentElement.dataset["browserNavigation"] = "same-document";
       });
       await first.getByRole("link", { name: "View" }).click();
-      await first.waitForURL(/\/documents\/[^/]+$/u);
+      await first.waitForURL(/\/rfcs\/0001$/u);
       assert.equal(
         await first.locator("html").getAttribute("data-browser-navigation"),
         "same-document",
@@ -332,9 +333,9 @@ test(
       );
       assert.equal(await first.locator("[data-search-result]").count(), 1);
       await documentSearch.press("Enter");
-      await first.waitForURL(/\/documents\/[^/]+$/u);
+      await first.waitForURL(/\/rfcs\/0001$/u);
       await first.locator("[data-open-editor]").click();
-      await first.waitForURL(/\/documents\/[^/]+\/edit$/u);
+      await first.waitForURL(/\/rfcs\/0001\/edit$/u);
       await first.waitForFunction(
         () => document.querySelector("[data-save-state]")?.textContent === "Saved",
       );
@@ -379,7 +380,7 @@ test(
       await first.keyboard.press("ArrowRight");
 
       const second = await context.newPage();
-      await second.goto(`${baseUrl}/documents/${documentId}/edit`);
+      await second.goto(`${baseUrl}/rfcs/0001/edit`);
       await second.waitForSelector(".cm-content");
       await first.locator(".cm-content").click();
       await first.keyboard.press("ControlOrMeta+End");

@@ -6,11 +6,16 @@ export function randomId(tag: string): string {
 
 export function documentHref(
   documentId: string,
+  rfcNumber: number | undefined,
   shared: boolean,
   mode: "edit" | "read",
   search = location.search,
 ): string {
-  const base = `${shared ? "/share" : "/documents"}/${encodeURIComponent(documentId)}`;
+  const base = shared
+    ? `/share/${encodeURIComponent(documentId)}`
+    : rfcNumber === undefined
+      ? `/documents/${encodeURIComponent(documentId)}`
+      : `/rfcs/${String(rfcNumber).padStart(4, "0")}`;
   return `${base}${mode === "edit" ? "/edit" : ""}${search}`;
 }
 

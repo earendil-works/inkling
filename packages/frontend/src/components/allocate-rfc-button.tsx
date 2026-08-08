@@ -3,6 +3,7 @@ import type { DocumentMetadataDto } from "@earendil-works/jot-protocol";
 import type { ApiClientService, ApiError } from "../api.ts";
 import { useAppContext } from "../app-context.tsx";
 import { useEffectAction } from "../effect-hooks.ts";
+import { documentHref } from "../ui.ts";
 import { Button } from "./button.tsx";
 
 export interface AllocateRfcButtonProps {
@@ -18,7 +19,7 @@ export function AllocateRfcButton({
   metadata,
   onAllocated,
 }: AllocateRfcButtonProps): React.JSX.Element | null {
-  const { showToast } = useAppContext();
+  const { navigate, showToast } = useAppContext();
   const allocation = useEffectAction<undefined, DocumentMetadataDto, ApiError>(() =>
     api.allocateRfc(metadata.id),
   );
@@ -32,7 +33,12 @@ export function AllocateRfcButton({
       onClick={() =>
         allocation.execute(undefined, {
           onFailure: (error) => showToast(error.message, "error"),
-          onSuccess: onAllocated,
+          onSuccess: (allocated) => {
+            onAllocated(allocated);
+            navigate(documentHref(allocated.id, allocated.rfcNumber, false, "edit", ""), {
+              replace: true,
+            });
+          },
         })
       }
       variant="toolbar"

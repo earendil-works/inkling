@@ -89,7 +89,7 @@ export function EditorToolbar({
         )}
         <ButtonLink
           className="document-mode-link"
-          href={documentHref(metadata.id, shared, "read")}
+          href={documentHref(metadata.id, metadata.rfcNumber, shared, "read")}
           variant="toolbar"
         >
           View
