@@ -263,7 +263,7 @@ test(
       await first.locator(".cm-content").click();
       await first.keyboard.press("ControlOrMeta+End");
       await first.keyboard.insertText(
-        "\nShared starting body\n\n## Architecture\n\nSecond line\n\n```ts\nconst answer: number = 42;\n```\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n```mermaid\nnot a mermaid diagram\n```\n\nThird line",
+        "\nShared starting body\n\n## Architecture\n\nSecond line\n\n```ts\nconst answer: number = 42;\n```\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n```mermaid\nnot a mermaid diagram\n```\n\nThird line\n\n## Delivery\n\nFourth line",
       );
       await first.waitForSelector(".cm-content .tok-keyword");
       await first.waitForSelector("[data-preview] .tok-keyword");
@@ -364,13 +364,26 @@ test(
         await first.getByRole("navigation", { name: "On this page" }).locator("p").textContent(),
         "On this page",
       );
+      const readerToc = first.getByRole("navigation", { name: "On this page" });
+      const architectureTocLink = readerToc.getByRole("link", { name: "Architecture" });
+      const deliveryTocLink = readerToc.getByRole("link", { name: "Delivery" });
+      assert.equal(await architectureTocLink.getAttribute("href"), "#architecture");
+      assert.equal(await architectureTocLink.getAttribute("aria-current"), "location");
       assert.equal(
-        await first
-          .getByRole("navigation", { name: "On this page" })
-          .getByRole("link", { name: "Architecture" })
-          .getAttribute("href"),
-        "#architecture",
+        await architectureTocLink
+          .locator("..")
+          .evaluate((item) => getComputedStyle(item, "::before").width),
+        "2px",
       );
+      await first.locator("#delivery").evaluate((heading) => heading.scrollIntoView());
+      await first.waitForFunction(
+        () =>
+          document.querySelector('a[href="#delivery"]')?.getAttribute("aria-current") ===
+          "location",
+      );
+      assert.equal(await architectureTocLink.getAttribute("aria-current"), null);
+      assert.equal(await deliveryTocLink.getAttribute("aria-current"), "location");
+      await first.evaluate(() => window.scrollTo(0, 0));
       assert.equal(await first.locator("[data-api-status]").count(), 0);
       assert.equal(await first.locator(".cm-editor").count(), 0);
       assert.match(await first.locator("[data-preview]").innerText(), /Shared starting body/u);
@@ -402,6 +415,26 @@ test(
       assert.equal(
         await documentSearch.evaluate((input) => input === document.activeElement),
         true,
+      );
+      await documentSearch.fill("author:me");
+      await first.waitForSelector("[data-search-completions]");
+      const currentAuthorCompletion = first.locator("[data-search-completions] button").first();
+      assert.equal(
+        await currentAuthorCompletion.locator("code").textContent(),
+        "author:browser@example.com",
+      );
+      await currentAuthorCompletion.click();
+      assert.equal(await documentSearch.inputValue(), "author:browser@example.com ");
+      assert.deepEqual(
+        await documentSearch.evaluate((input) => [input.selectionStart, input.selectionEnd]),
+        [27, 27],
+      );
+      await documentSearch.fill("author:browser@");
+      await documentSearch.press("Tab");
+      assert.equal(await documentSearch.inputValue(), "author:browser@example.com ");
+      assert.deepEqual(
+        await documentSearch.evaluate((input) => [input.selectionStart, input.selectionEnd]),
+        [27, 27],
       );
       await documentSearch.fill("lab");
       await first.waitForSelector("[data-search-completions]");

@@ -29,6 +29,7 @@ const operatorCompletions: readonly SearchCompletion[] = [
 
 export interface DocumentSearchProps {
   readonly api: ApiClientService;
+  readonly currentUserEmail?: string | undefined;
   readonly initialCatalog: CatalogResponse;
   readonly onResultsChange: (catalog: CatalogResponse) => void;
   readonly publicCatalog?: boolean | undefined;
@@ -36,6 +37,7 @@ export interface DocumentSearchProps {
 
 export function DocumentSearch({
   api,
+  currentUserEmail,
   initialCatalog,
   onResultsChange,
   publicCatalog = false,
@@ -59,8 +61,8 @@ export function DocumentSearch({
     [displayedCatalog.documents],
   );
   const completions = useMemo(
-    () => (publicCatalog ? [] : searchCompletions(query, initialCatalog)),
-    [initialCatalog, publicCatalog, query],
+    () => (publicCatalog ? [] : searchCompletions(query, initialCatalog, currentUserEmail)),
+    [currentUserEmail, initialCatalog, publicCatalog, query],
   );
   const panelOpen = focused && (query.trim() !== "" || completions.length > 0);
 
@@ -100,7 +102,12 @@ export function DocumentSearch({
     const fragment = trailingSearchFragment(query);
     const prefix = query.slice(0, query.length - fragment.length);
     updateQuery(`${prefix}${completion.token}${completion.complete ? " " : ""}`);
-    requestAnimationFrame(() => inputRef.current?.focus());
+    requestAnimationFrame(() => {
+      const input = inputRef.current;
+      if (input === null) return;
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    });
   };
 
   const resultHref = (document: CatalogResponse["documents"][number]): string =>
@@ -150,6 +157,11 @@ export function DocumentSearch({
           onKeyDown={(event) => {
             if (event.key === "Escape") {
               setFocused(false);
+              return;
+            }
+            if (event.key === "Tab" && completions[0] !== undefined) {
+              event.preventDefault();
+              completeSearch(completions[0]);
               return;
             }
             if (event.key === "Enter") {
@@ -285,7 +297,11 @@ export function DocumentSearch({
   );
 }
 
-function searchCompletions(query: string, catalog: CatalogResponse): readonly SearchCompletion[] {
+function searchCompletions(
+  query: string,
+  catalog: CatalogResponse,
+  currentUserEmail?: string,
+): readonly SearchCompletion[] {
   const fragment = trailingSearchFragment(query);
   const negated = fragment.startsWith("-");
   const candidate = negated ? fragment.slice(1) : fragment;
@@ -353,7 +369,7 @@ function searchCompletions(query: string, catalog: CatalogResponse): readonly Se
         return [];
     }
   })();
-  return [...new Set(values)]
+  const completions = [...new Set(values)]
     .filter((value) => value.toLowerCase().includes(valuePrefix))
     .toSorted((left, right) => left.localeCompare(right))
     .slice(0, 6)
@@ -362,6 +378,25 @@ function searchCompletions(query: string, catalog: CatalogResponse): readonly Se
       description: `Use ${field} filter`,
       token: `${negated ? "-" : ""}${field}:${quoteSearchValue(value)}`,
     }));
+  const email = currentUserEmail?.trim();
+  if (
+    email === undefined ||
+    email === "" ||
+    (field !== "author" && field !== "from") ||
+    valuePrefix === "" ||
+    !"me".startsWith(valuePrefix)
+  ) {
+    return completions;
+  }
+  const currentUserCompletion: SearchCompletion = {
+    complete: true,
+    description: "Use your account email",
+    token: `${negated ? "-" : ""}${field}:${quoteSearchValue(email)}`,
+  };
+  return [
+    currentUserCompletion,
+    ...completions.filter((completion) => completion.token !== currentUserCompletion.token),
+  ].slice(0, 6);
 }
 
 function trailingSearchFragment(query: string): string {

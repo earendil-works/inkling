@@ -1431,8 +1431,23 @@ select:disabled {
   list-style: none;
 }
 
+.reader-toc li {
+  position: relative;
+}
+
 .reader-toc li + li {
   margin-top: 0.5rem;
+}
+
+.reader-toc li[data-current-heading]::before {
+  position: absolute;
+  top: 0.18em;
+  bottom: 0.18em;
+  left: -1.0625rem;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--text);
+  content: "";
 }
 
 .reader-toc__level-2 {
@@ -1448,11 +1463,25 @@ select:disabled {
   text-decoration: none;
 }
 
+.reader-toc a[aria-current="location"] {
+  color: var(--text);
+  font-weight: 600;
+}
+
 .reader-toc a:hover {
   color: var(--text);
   text-decoration: underline;
   text-decoration-style: dotted;
   text-underline-offset: 0.14em;
+}
+
+@media (width > 68rem) {
+  .reader-document .reader-toc a[aria-current="location"] {
+    margin: -0.18rem -0.4rem;
+    padding: 0.18rem 0.4rem;
+    border-radius: 2px;
+    background: color-mix(in oklab, var(--surface-muted) 94%, var(--text));
+  }
 }
 
 /* Editor */
@@ -1651,6 +1680,16 @@ select:disabled {
   background: var(--surface-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.editor-preview-page .reader-toc li[data-current-heading]::before {
+  display: none;
+}
+
+.editor-preview-page .reader-toc a[aria-current="location"] {
+  border-color: var(--border-strong);
+  background: color-mix(in oklab, var(--surface-muted) 94%, var(--text));
+  box-shadow: inset 0 -2px var(--text);
 }
 
 .editor-preview-page .reader-body.markdown-body {
@@ -2456,6 +2495,10 @@ select:disabled {
     scroll-snap-align: start;
   }
 
+  .reader-toc li[data-current-heading]::before {
+    display: none;
+  }
+
   .reader-toc a {
     display: block;
     max-width: 18rem;
@@ -2466,6 +2509,12 @@ select:disabled {
     background: var(--surface-muted);
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .reader-toc a[aria-current="location"] {
+    border-color: var(--border-strong);
+    background: color-mix(in oklab, var(--surface-muted) 94%, var(--text));
+    box-shadow: inset 0 -2px var(--text);
   }
 }
 
