@@ -15,19 +15,27 @@ import { makeCliClient } from "./client.ts";
 import type { CliClient } from "./client.ts";
 import { loadConfig, saveConfig, selectedInstance, upsertInstance } from "./config.ts";
 import type { Instance } from "./config.ts";
+import { renderHelp, requestedHelp } from "./help.ts";
 
-const args = process.argv.slice(2);
+if (import.meta.main) {
+  Effect.runPromise(main(process.argv.slice(2)).pipe(Effect.catchAll(reportError))).catch(
+    (error: unknown) => {
+      console.error(error);
+      process.exitCode = 1;
+    },
+  );
+}
 
-Effect.runPromise(main(args).pipe(Effect.catchAll(reportError))).catch((error: unknown) => {
-  console.error(error);
-  process.exitCode = 1;
-});
-
-function main(arguments_: readonly string[]): Effect.Effect<void, unknown> {
-  const command = arguments_[0];
-  if (command === undefined || command === "help" || command === "--help" || command === "-h") {
-    return Effect.sync(printHelp);
+export function main(arguments_: readonly string[]): Effect.Effect<void, unknown> {
+  const help = requestedHelp(arguments_);
+  if (help !== undefined) {
+    const output = renderHelp(help.topic);
+    return output === undefined
+      ? usageFailure(`Unknown help topic: ${help.topic}`)
+      : Effect.sync(() => console.log(output.trimEnd()));
   }
+  const command = arguments_[0];
+  if (command === undefined) return usageFailure("Missing command.");
   if (command === "serve") {
     const port = Number(option(arguments_, "--port") ?? process.env["PORT"] ?? "8787");
     const dataDirectory =
@@ -723,36 +731,4 @@ function reportError(error: unknown): Effect.Effect<void> {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
   });
-}
-
-function printHelp(): void {
-  console.log(`Inkling — multiplayer Markdown for people and agents
-
-Usage:
-  inkling serve [--port PORT] [--data-dir PATH]
-  inkling instance add NAME URL API_KEY
-  inkling instance remove NAME | inkling instance list | inkling use NAME
-  inkling share-instance NAME CAPABILITY_URL
-  inkling list | inkling search QUERY
-  inkling import-rfc MARKDOWN [--people PEOPLE_JSON] [--publish]
-  inkling import-jot MARKDOWN SIDECAR_JSON [--publish]
-  inkling backup DESTINATION | inkling restore BACKUP | inkling verify | inkling repair
-  inkling read [DOCUMENT] [--lines START:END]
-  inkling create TITLE [--rfc] [--body MARKDOWN]
-  inkling edit [DOCUMENT] OLD_TEXT NEW_TEXT
-  inkling replace [DOCUMENT] MARKDOWN_PATH|-
-  inkling metadata [DOCUMENT] FIELD VALUE
-  inkling delete|publish|unpublish [DOCUMENT]
-  inkling share [DOCUMENT] disabled|view|comment|edit
-  inkling attachment list [DOCUMENT]
-  inkling attachment upload FILE [DOCUMENT] [--type MEDIA_TYPE]
-  inkling attachment download ATTACHMENT_ID DESTINATION [DOCUMENT]
-  inkling comment [DOCUMENT] START_OFFSET END_OFFSET BODY
-  inkling reply [DOCUMENT] THREAD_ID PARENT_MESSAGE_ID BODY
-  inkling comment-edit [DOCUMENT] THREAD_ID MESSAGE_ID BODY
-  inkling comment-delete [DOCUMENT] THREAD_ID MESSAGE_ID
-  inkling thread-delete [DOCUMENT] THREAD_ID
-  inkling resolve|reopen [DOCUMENT] THREAD_ID
-
-Set INKLING_INSTANCE to override the active instance and INKLING_AUTHOR for guest comments.`);
 }

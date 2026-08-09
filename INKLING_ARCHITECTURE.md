@@ -790,7 +790,7 @@ The CLI supports:
 - Workspace import and export.
 - Catalog verification and repair for administrators.
 
-CLI output has a stable human-readable default and may later add structured JSON output without changing server semantics.
+CLI output has a stable human-readable default and may later add structured JSON output without changing server semantics. Every command and nested subcommand provides command-specific `--help` and `-h` output before configuration loading or positional-argument validation; equivalent topics are available through `inkling help COMMAND [SUBCOMMAND]`.
 
 ## 18. Local runtime
 
