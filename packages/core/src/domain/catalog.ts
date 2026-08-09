@@ -6,6 +6,7 @@ import type {
   DocumentMetadata,
   DocumentRevision,
   LifecycleState,
+  PersonId,
   PersonReference,
   Visibility,
 } from "./document.ts";
@@ -63,6 +64,7 @@ export interface RfcAllocation {
 }
 
 export interface CatalogSearchOptions {
+  readonly currentPersonId?: PersonId | undefined;
   readonly includeDeleted?: boolean | undefined;
   readonly publicOnly?: boolean | undefined;
   readonly limit?: number | undefined;
@@ -245,7 +247,7 @@ export function searchCatalog(
         (summary.visibility === "public" && summary.publishedRevision !== undefined),
     )
     .flatMap((summary) => {
-      const score = scoreSummary(summary, parsed, state.people);
+      const score = scoreSummary(summary, parsed, state.people, options.currentPersonId);
       return score === undefined ? [] : [{ score, summary }];
     });
   const summaries =
@@ -378,6 +380,7 @@ function scoreSummary(
   summary: CatalogSummary,
   query: CatalogSearchQuery,
   directory: readonly PeopleDirectoryEntry[],
+  currentPersonId?: PersonId,
 ): number | undefined {
   if (query.terms.length === 0) return 1;
   const indexed = indexSummary(summary, directory);
@@ -386,7 +389,7 @@ function scoreSummary(
     const matched =
       term.field === undefined
         ? indexed.all.includes(term.value)
-        : matchesSearchFilter(summary, indexed, term.field, term.value);
+        : matchesSearchFilter(summary, indexed, term.field, term.value, currentPersonId);
     if (term.negated ? matched : !matched) return undefined;
     if (!term.negated) {
       score +=
@@ -457,6 +460,7 @@ function matchesSearchFilter(
   indexed: IndexedCatalogSummary,
   field: CatalogSearchField,
   value: string,
+  currentPersonId?: PersonId,
 ): boolean {
   switch (field) {
     case "label":
@@ -466,13 +470,18 @@ function matchesSearchFilter(
     case "visibility":
       return indexed.visibility === value;
     case "author":
-      return indexed.authors.includes(value);
+      return matchesPersonFilter(summary.authors, indexed.authors, value, currentPersonId);
     case "reviewer":
-      return indexed.reviewers.includes(value);
+      return matchesPersonFilter(summary.reviewers, indexed.reviewers, value, currentPersonId);
     case "approver":
-      return indexed.approvers.includes(value);
+      return matchesPersonFilter(summary.approvers, indexed.approvers, value, currentPersonId);
     case "person":
-      return indexed.people.includes(value);
+      return matchesPersonFilter(
+        [...summary.authors, ...summary.reviewers, ...summary.approvers],
+        indexed.people,
+        value,
+        currentPersonId,
+      );
     case "rfc": {
       const requested = Number(value.replace(/^rfc /u, ""));
       return Number.isSafeInteger(requested) && summary.rfcNumber === requested;
@@ -503,6 +512,18 @@ function matchesSearchFilter(
           return false;
       }
   }
+}
+
+function matchesPersonFilter(
+  people: readonly PersonReference[],
+  indexed: string,
+  value: string,
+  currentPersonId?: PersonId,
+): boolean {
+  if (value === "me") {
+    return currentPersonId !== undefined && people.some((person) => person.id === currentPersonId);
+  }
+  return indexed.includes(value);
 }
 
 function scoreFreeText(

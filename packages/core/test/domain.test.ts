@@ -402,7 +402,9 @@ test("RFC reservations are idempotent and numbers are never reused", async () =>
 });
 
 test("catalog search covers full bodies and Gmail-style metadata filters", async () => {
-  const authorId = await Effect.runPromise(personId("armin@example.com"));
+  const [authorId, otherPersonId] = await Effect.runPromise(
+    Effect.all([personId("armin@example.com"), personId("else@example.com")]),
+  );
   const author = {
     displayName: "A. Ronacher",
     email: "armin@example.com",
@@ -469,6 +471,11 @@ test("catalog search covers full bodies and Gmail-style metadata filters", async
     rfcMetadata.id,
   );
   assert.equal(searchCatalog(state, "author:mitsuhiko")[0]?.documentId, rfcMetadata.id);
+  assert.equal(
+    searchCatalog(state, "author:me", { currentPersonId: authorId })[0]?.documentId,
+    rfcMetadata.id,
+  );
+  assert.deepEqual(searchCatalog(state, "author:me", { currentPersonId: otherPersonId }), []);
   assert.equal(searchCatalog(state, "rfc:0042")[0]?.documentId, rfcMetadata.id);
   assert.equal(searchCatalog(state, "label:planning")[0]?.documentId, noteMetadata.id);
   assert.equal(searchCatalog(state, "is:note")[0]?.documentId, noteMetadata.id);

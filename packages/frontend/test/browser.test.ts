@@ -447,16 +447,18 @@ test(
       await documentSearch.fill("author:me");
       await first.waitForSelector("[data-search-completions]");
       const currentAuthorCompletion = first.locator("[data-search-completions] button").first();
-      assert.equal(
-        await currentAuthorCompletion.locator("code").textContent(),
-        "author:browser@example.com",
+      assert.equal(await currentAuthorCompletion.locator("code").textContent(), "author:me");
+      await first.waitForFunction(
+        () =>
+          document.querySelector("[data-document-search]")?.getAttribute("aria-busy") === "false",
       );
+      assert.equal(await first.locator(".catalog-row").count(), 2);
       await documentSearch.press("Enter");
       assert.equal(await first.locator("[data-search-panel]").count(), 0);
-      assert.equal(await documentSearch.inputValue(), "author:browser@example.com ");
+      assert.equal(await documentSearch.inputValue(), "author:me");
       assert.deepEqual(
         await documentSearch.evaluate((input) => [input.selectionStart, input.selectionEnd]),
-        [27, 27],
+        [9, 9],
       );
       await documentSearch.fill("author:browser@");
       await documentSearch.press("Tab");

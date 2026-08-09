@@ -26,7 +26,6 @@ const operatorCompletions: readonly SearchCompletion[] = [
 
 export interface DocumentSearchProps {
   readonly api: ApiClientService;
-  readonly currentUserEmail?: string | undefined;
   readonly initialCatalog: CatalogResponse;
   readonly onResultsChange: (catalog: CatalogResponse) => void;
   readonly publicCatalog?: boolean | undefined;
@@ -34,7 +33,6 @@ export interface DocumentSearchProps {
 
 export function DocumentSearch({
   api,
-  currentUserEmail,
   initialCatalog,
   onResultsChange,
   publicCatalog = false,
@@ -51,8 +49,8 @@ export function DocumentSearch({
   const panelId = `${inputId}-suggestions`;
   const pending = deferredQuery !== query || search.state.status === "loading";
   const completions = useMemo(
-    () => (publicCatalog ? [] : searchCompletions(query, initialCatalog, currentUserEmail)),
-    [currentUserEmail, initialCatalog, publicCatalog, query],
+    () => (publicCatalog ? [] : searchCompletions(query, initialCatalog)),
+    [initialCatalog, publicCatalog, query],
   );
   const failed = search.state.status === "failure" && !pending;
   const panelOpen = focused && (completions.length > 0 || failed);
@@ -138,9 +136,6 @@ export function DocumentSearch({
             }
             if (event.key === "Enter") {
               event.preventDefault();
-              if (isCurrentUserAlias(query) && completions[0] !== undefined) {
-                completeSearch(completions[0]);
-              }
               setFocused(false);
             }
           }}
@@ -206,11 +201,7 @@ export function DocumentSearch({
   );
 }
 
-function searchCompletions(
-  query: string,
-  catalog: CatalogResponse,
-  currentUserEmail?: string,
-): readonly SearchCompletion[] {
+function searchCompletions(query: string, catalog: CatalogResponse): readonly SearchCompletion[] {
   const fragment = trailingSearchFragment(query);
   const negated = fragment.startsWith("-");
   const candidate = negated ? fragment.slice(1) : fragment;
@@ -287,20 +278,16 @@ function searchCompletions(
       description: `Use ${field} filter`,
       token: `${negated ? "-" : ""}${field}:${quoteSearchValue(value)}`,
     }));
-  const email = currentUserEmail?.trim();
   if (
-    email === undefined ||
-    email === "" ||
-    (field !== "author" && field !== "from") ||
-    valuePrefix === "" ||
+    !["approver", "author", "from", "person", "reviewer"].includes(field) ||
     !"me".startsWith(valuePrefix)
   ) {
     return completions;
   }
   const currentUserCompletion: SearchCompletion = {
     complete: true,
-    description: "Use your account email",
-    token: `${negated ? "-" : ""}${field}:${quoteSearchValue(email)}`,
+    description: "Use your account identity",
+    token: `${negated ? "-" : ""}${field}:me`,
   };
   return [
     currentUserCompletion,
@@ -310,10 +297,6 @@ function searchCompletions(
 
 function trailingSearchFragment(query: string): string {
   return /(?:^|\s)(\S*)$/u.exec(query)?.[1] ?? "";
-}
-
-function isCurrentUserAlias(query: string): boolean {
-  return /^-?(?:author|from):me$/iu.test(trailingSearchFragment(query));
 }
 
 function quoteSearchValue(value: string): string {

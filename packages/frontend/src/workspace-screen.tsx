@@ -9,14 +9,12 @@ import { NewDocumentControl } from "./components/new-document-control.tsx";
 
 export interface WorkspaceScreenProps {
   readonly api: ApiClientService;
-  readonly currentUserEmail?: string | undefined;
   readonly initialCatalog: CatalogResponse;
   readonly publicCatalog?: boolean | undefined;
 }
 
 export function WorkspaceScreen({
   api,
-  currentUserEmail,
   initialCatalog,
   publicCatalog = false,
 }: WorkspaceScreenProps): React.JSX.Element {
@@ -40,7 +38,6 @@ export function WorkspaceScreen({
       </section>
       <CatalogControls
         api={api}
-        currentUserEmail={currentUserEmail}
         initialCatalog={initialCatalog}
         onResultsChange={setCatalog}
         publicCatalog={publicCatalog}

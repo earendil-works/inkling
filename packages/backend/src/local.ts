@@ -1544,7 +1544,12 @@ export function makeLocalInklingApplication(
           yield* authorizeWorkspace(principal, "read-catalog").pipe(
             Effect.mapError(toApplicationError),
           );
-          const summaries = searchCatalog(state.catalog, query);
+          const summaries = searchCatalog(state.catalog, query, {
+            currentPersonId:
+              principal.kind === "workspace" || principal.kind === "api-key"
+                ? principal.personId
+                : undefined,
+          });
           const documents = yield* Effect.forEach(summaries, (summary) =>
             summary.metadata === undefined
               ? getRoom(summary.documentId).pipe(

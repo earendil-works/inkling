@@ -6,7 +6,6 @@ import { DocumentSearch } from "./document-search.tsx";
 
 export interface CatalogControlsProps {
   readonly api: ApiClientService;
-  readonly currentUserEmail?: string | undefined;
   readonly initialCatalog: CatalogResponse;
   readonly onResultsChange: (catalog: CatalogResponse) => void;
   readonly publicCatalog?: boolean | undefined;
@@ -14,7 +13,6 @@ export interface CatalogControlsProps {
 
 export function CatalogControls({
   api,
-  currentUserEmail,
   initialCatalog,
   onResultsChange,
   publicCatalog = false,
@@ -23,7 +21,6 @@ export function CatalogControls({
     <section className="catalog-tools" aria-label="Document tools">
       <DocumentSearch
         api={api}
-        currentUserEmail={currentUserEmail}
         initialCatalog={initialCatalog}
         onResultsChange={onResultsChange}
         publicCatalog={publicCatalog}

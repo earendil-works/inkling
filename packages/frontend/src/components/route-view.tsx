@@ -76,7 +76,6 @@ export function RouteView({ refresh, state }: RouteViewProps): React.JSX.Element
       return (
         <WorkspaceScreen
           api={model.api}
-          currentUserEmail={model.account?.email}
           initialCatalog={model.catalog}
           publicCatalog={model.publicCatalog}
         />
