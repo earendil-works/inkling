@@ -115,6 +115,13 @@ interface PreviewSourceSegment {
   readonly top: number;
 }
 
+interface ScrollMapPoint {
+  readonly preview: number;
+  readonly source: number;
+}
+
+const synchronizationLineOffset = 3;
+
 function useSynchronizedScrolling(
   editor: EditorView | undefined,
   editorHostRef: React.RefObject<HTMLDivElement | null>,
@@ -134,9 +141,17 @@ function useSynchronizedScrolling(
       return;
     }
 
+    let scrollMap: readonly ScrollMapPoint[] | undefined;
     let syncFrame: number | undefined;
     let releaseFrame: number | undefined;
     let programmaticTarget: HTMLElement | undefined;
+    const invalidateScrollMap = (): void => {
+      scrollMap = undefined;
+    };
+    const currentScrollMap = (): readonly ScrollMapPoint[] => {
+      scrollMap ??= collectScrollMap(editor, preview, previewScroller);
+      return scrollMap;
+    };
 
     const queueSync = (source: HTMLElement, target: HTMLElement, synchronize: () => void): void => {
       if (programmaticTarget === source) return;
@@ -157,48 +172,93 @@ function useSynchronizedScrolling(
       const source = event.target;
       if (!(source instanceof HTMLElement) || source !== editor.scrollDOM) return;
       queueSync(source, previewScroller, () => {
-        const sourceRectangle = source.getBoundingClientRect();
-        const sourceAnchor = sourceRectangle.top + source.clientHeight / 2;
-        const sourcePosition = editor.posAtCoords(
-          { x: editor.contentDOM.getBoundingClientRect().left + 1, y: sourceAnchor },
-          false,
+        previewScroller.scrollTop = mappedScrollOffset(
+          currentScrollMap(),
+          source.scrollTop,
+          "source",
+          "preview",
         );
-        const previewPosition = previewPositionForSource(
-          sourcePosition,
-          collectPreviewSourceSegments(preview, previewScroller),
-          editor.state.doc.length,
-          previewScroller.scrollHeight,
-        );
-        previewScroller.scrollTop = previewPosition - previewScroller.clientHeight / 2;
       });
     };
     const synchronizeFromPreview = (): void => {
       const source = editor.scrollDOM;
       queueSync(previewScroller, source, () => {
-        const previewPosition = previewScroller.scrollTop + previewScroller.clientHeight / 2;
-        const sourcePosition = sourcePositionForPreview(
-          previewPosition,
-          collectPreviewSourceSegments(preview, previewScroller),
-          editor.state.doc.length,
-          previewScroller.scrollHeight,
+        source.scrollTop = mappedScrollOffset(
+          currentScrollMap(),
+          previewScroller.scrollTop,
+          "preview",
+          "source",
         );
-        const sourceRectangle = source.getBoundingClientRect();
-        const sourceAnchor = sourceRectangle.top + source.clientHeight / 2;
-        const currentDocumentPosition = sourceAnchor - editor.documentTop;
-        const targetDocumentPosition = editorDocumentPosition(editor, sourcePosition);
-        source.scrollTop += targetDocumentPosition - currentDocumentPosition;
       });
     };
 
+    const mutationObserver = new MutationObserver(invalidateScrollMap);
+    mutationObserver.observe(preview, { childList: true, subtree: true });
+    const resizeObserver = new ResizeObserver(invalidateScrollMap);
+    resizeObserver.observe(editor.scrollDOM);
+    resizeObserver.observe(preview);
+    resizeObserver.observe(previewScroller);
     editorHost.addEventListener("scroll", synchronizeFromSource, true);
     previewScroller.addEventListener("scroll", synchronizeFromPreview);
     return () => {
+      mutationObserver.disconnect();
+      resizeObserver.disconnect();
       editorHost.removeEventListener("scroll", synchronizeFromSource, true);
       previewScroller.removeEventListener("scroll", synchronizeFromPreview);
       if (syncFrame !== undefined) cancelAnimationFrame(syncFrame);
       if (releaseFrame !== undefined) cancelAnimationFrame(releaseFrame);
     };
   }, [editor, editorHostRef, previewRef, previewScrollerRef]);
+}
+
+function collectScrollMap(
+  editor: EditorView,
+  preview: HTMLElement,
+  previewScroller: HTMLElement,
+): readonly ScrollMapPoint[] {
+  const sourceMaximum = Math.max(0, editor.scrollDOM.scrollHeight - editor.scrollDOM.clientHeight);
+  const previewMaximum = Math.max(0, previewScroller.scrollHeight - previewScroller.clientHeight);
+  if (sourceMaximum === 0 || previewMaximum === 0) return [{ preview: 0, source: 0 }];
+
+  const sourceAnchor = editor.defaultLineHeight * synchronizationLineOffset;
+  const previewAnchor =
+    measuredLineHeight(preview, editor.defaultLineHeight) * synchronizationLineOffset;
+  const segments = collectPreviewSourceSegments(preview, previewScroller);
+  const candidates: ScrollMapPoint[] = [];
+
+  // Each point describes the moment a sampled source line reaches the three-line
+  // anchor. Sampling every three lines lets the scroll position between that line
+  // and the line six rows from the viewport top be interpolated continuously.
+  for (let lineNumber = 1; lineNumber <= editor.state.doc.lines; lineNumber += 3) {
+    const line = editor.state.doc.line(lineNumber);
+    candidates.push({
+      preview:
+        previewPositionForSource(
+          line.from,
+          segments,
+          editor.state.doc.length,
+          previewScroller.scrollHeight,
+        ) - previewAnchor,
+      source: editorDocumentPosition(editor, line.from) - sourceAnchor,
+    });
+  }
+
+  const points: ScrollMapPoint[] = [{ preview: 0, source: 0 }];
+  for (const candidate of candidates.toSorted((left, right) => left.source - right.source)) {
+    const previous = points.at(-1);
+    if (
+      previous === undefined ||
+      candidate.source <= previous.source ||
+      candidate.preview <= previous.preview ||
+      candidate.source >= sourceMaximum ||
+      candidate.preview >= previewMaximum
+    ) {
+      continue;
+    }
+    points.push(candidate);
+  }
+  points.push({ preview: previewMaximum, source: sourceMaximum });
+  return points;
 }
 
 function collectPreviewSourceSegments(
@@ -254,43 +314,32 @@ function previewPositionForSource(
   );
 }
 
-function sourcePositionForPreview(
-  position: number,
-  segments: readonly PreviewSourceSegment[],
-  sourceLength: number,
-  previewHeight: number,
-): number {
-  const containing = segments
-    .filter((segment) => segment.top <= position && segment.bottom >= position)
-    .toSorted(compareSourceSpecificity)[0];
-  if (containing !== undefined) {
-    return interpolate(
-      containing.start,
-      containing.end,
-      (position - containing.top) / (containing.bottom - containing.top),
-    );
-  }
-  const before = segments
-    .filter((segment) => segment.bottom < position)
-    .toSorted((left, right) => right.bottom - left.bottom || right.end - left.end)[0];
-  const after = segments
-    .filter((segment) => segment.top > position)
-    .toSorted((left, right) => left.top - right.top || left.start - right.start)[0];
-  return interpolateBetweenSourcePoints(
-    position,
-    before?.bottom ?? 0,
-    before?.end ?? 0,
-    after?.top ?? previewHeight,
-    after?.start ?? sourceLength,
-  );
-}
-
 function compareSourceSpecificity(left: PreviewSourceSegment, right: PreviewSourceSegment): number {
   const sourceLength = left.end - left.start - (right.end - right.start);
   if (sourceLength !== 0) return sourceLength;
   const verticalLength = left.bottom - left.top - (right.bottom - right.top);
   if (verticalLength !== 0) return verticalLength;
   return left.element.querySelectorAll("*").length - right.element.querySelectorAll("*").length;
+}
+
+function mappedScrollOffset(
+  points: readonly ScrollMapPoint[],
+  position: number,
+  from: keyof ScrollMapPoint,
+  to: keyof ScrollMapPoint,
+): number {
+  if (points.length < 2 || position <= 0) return 0;
+  let low = 1;
+  let high = points.length - 1;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if ((points[middle]?.[from] ?? 0) < position) low = middle + 1;
+    else high = middle;
+  }
+  const before = points[low - 1];
+  const after = points[low];
+  if (before === undefined || after === undefined) return 0;
+  return interpolateBetweenSourcePoints(position, before[from], before[to], after[from], after[to]);
 }
 
 function interpolateBetweenSourcePoints(
@@ -318,6 +367,11 @@ function editorDocumentPosition(editor: EditorView, position: number): number {
   const block = editor.lineBlockAt(clamped);
   const progress = line.length === 0 ? 0 : (clamped - line.from) / line.length;
   return interpolate(block.top, block.top + block.height, progress);
+}
+
+function measuredLineHeight(element: HTMLElement, fallback: number): number {
+  const lineHeight = Number.parseFloat(getComputedStyle(element).lineHeight);
+  return Number.isFinite(lineHeight) && lineHeight > 0 ? lineHeight : fallback;
 }
 
 export function connectionLabel(state: ConnectionState): string {

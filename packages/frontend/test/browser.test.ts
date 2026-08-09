@@ -475,9 +475,10 @@ test(
         overflowX: "auto",
         whiteSpace: "nowrap",
       });
-      const sourceToPreviewAlignment = await first.evaluate(async () => {
+      const synchronizedScroll = await first.evaluate(async () => {
         const source = document.querySelector<HTMLElement>(".cm-scroller");
         const preview = document.querySelector<HTMLElement>(".editor-preview-page");
+        const previewBody = document.querySelector<HTMLElement>("[data-preview]");
         const sourceHeading = [...document.querySelectorAll<HTMLElement>(".cm-line")].find(
           (line) => line.textContent === "## Architecture",
         );
@@ -487,43 +488,118 @@ test(
         if (
           source === null ||
           preview === null ||
+          previewBody === null ||
           sourceHeading === undefined ||
           previewHeading === undefined
         ) {
           throw new Error("Mapped editor headings are missing.");
         }
-        sourceHeading.scrollIntoView({ block: "center" });
+        const sourceAnchor = Number.parseFloat(getComputedStyle(sourceHeading).lineHeight) * 3;
+        const previewAnchor = Number.parseFloat(getComputedStyle(previewBody).lineHeight) * 3;
+
+        sourceHeading.scrollIntoView({ block: "start" });
+        source.scrollTop +=
+          sourceHeading.getBoundingClientRect().top -
+          source.getBoundingClientRect().top -
+          sourceAnchor;
         await new Promise((resolve) => setTimeout(resolve, 80));
-        return {
+        const sourceToPreview = {
           preview: previewHeading.getBoundingClientRect().top - preview.getBoundingClientRect().top,
           source: sourceHeading.getBoundingClientRect().top - source.getBoundingClientRect().top,
         };
-      });
-      assert.ok(Math.abs(sourceToPreviewAlignment.source - sourceToPreviewAlignment.preview) < 35);
 
-      const previewToSourceAlignment = await first.evaluate(async () => {
-        const source = document.querySelector<HTMLElement>(".cm-scroller");
-        const preview = document.querySelector<HTMLElement>(".editor-preview-page");
-        const previewHeading = [
-          ...document.querySelectorAll<HTMLElement>("[data-preview] h2"),
-        ].find((heading) => heading.textContent === "Architecture");
-        if (source === null || preview === null || previewHeading === undefined) {
-          throw new Error("Mapped editor headings are missing.");
+        const sourceMaximum = source.scrollHeight - source.clientHeight;
+        const sourceBase = Math.min(source.scrollTop, sourceMaximum - 24);
+        const previewSteps: number[] = [];
+        let sourceChain = Promise.resolve();
+        for (const offset of [0, 4, 8, 12, 16, 20, 24]) {
+          sourceChain = sourceChain.then(
+            () =>
+              new Promise<void>((resolve) => {
+                source.scrollTop = sourceBase + offset;
+                setTimeout(() => {
+                  previewSteps.push(preview.scrollTop);
+                  resolve();
+                }, 40);
+              }),
+          );
         }
-        preview.scrollTop = preview.scrollHeight;
+        await sourceChain;
+
+        previewHeading.scrollIntoView({ block: "start" });
+        preview.scrollTop +=
+          previewHeading.getBoundingClientRect().top -
+          preview.getBoundingClientRect().top -
+          previewAnchor;
         await new Promise((resolve) => setTimeout(resolve, 80));
-        previewHeading.scrollIntoView({ block: "center" });
-        await new Promise((resolve) => setTimeout(resolve, 80));
-        const sourceHeading = [...document.querySelectorAll<HTMLElement>(".cm-line")].find(
+        const currentSourceHeading = [...document.querySelectorAll<HTMLElement>(".cm-line")].find(
           (line) => line.textContent === "## Architecture",
         );
-        if (sourceHeading === undefined) throw new Error("Mapped source heading is missing.");
-        return {
+        if (currentSourceHeading === undefined)
+          throw new Error("Mapped source heading is missing.");
+        const previewToSource = {
           preview: previewHeading.getBoundingClientRect().top - preview.getBoundingClientRect().top,
-          source: sourceHeading.getBoundingClientRect().top - source.getBoundingClientRect().top,
+          source:
+            currentSourceHeading.getBoundingClientRect().top - source.getBoundingClientRect().top,
+        };
+
+        const previewMaximum = preview.scrollHeight - preview.clientHeight;
+        const previewBase = Math.min(preview.scrollTop, previewMaximum - 60);
+        const sourceSteps: number[] = [];
+        let previewChain = Promise.resolve();
+        for (const offset of [0, 10, 20, 30, 40, 50, 60]) {
+          previewChain = previewChain.then(
+            () =>
+              new Promise<void>((resolve) => {
+                preview.scrollTop = previewBase + offset;
+                setTimeout(() => {
+                  sourceSteps.push(source.scrollTop);
+                  resolve();
+                }, 40);
+              }),
+          );
+        }
+        await previewChain;
+
+        source.scrollTop = Math.min(80, sourceMaximum);
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        source.scrollTop = 0;
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        const sourceTop = { preview: preview.scrollTop, source: source.scrollTop };
+        preview.scrollTop = Math.min(80, previewMaximum);
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        preview.scrollTop = 0;
+        await new Promise((resolve) => setTimeout(resolve, 80));
+
+        return {
+          anchors: { preview: previewAnchor, source: sourceAnchor },
+          previewSteps,
+          previewToSource,
+          previewTop: { preview: preview.scrollTop, source: source.scrollTop },
+          sourceSteps,
+          sourceToPreview,
+          sourceTop,
         };
       });
-      assert.ok(Math.abs(previewToSourceAlignment.source - previewToSourceAlignment.preview) < 35);
+      assert.ok(
+        Math.abs(synchronizedScroll.sourceToPreview.source - synchronizedScroll.anchors.source) < 4,
+      );
+      assert.ok(
+        Math.abs(synchronizedScroll.sourceToPreview.preview - synchronizedScroll.anchors.preview) <
+          40,
+      );
+      assert.ok(
+        Math.abs(synchronizedScroll.previewToSource.preview - synchronizedScroll.anchors.preview) <
+          4,
+      );
+      assert.ok(
+        Math.abs(synchronizedScroll.previewToSource.source - synchronizedScroll.anchors.source) <
+          40,
+      );
+      assert.ok(strictlyIncreasing(synchronizedScroll.previewSteps));
+      assert.ok(strictlyIncreasing(synchronizedScroll.sourceSteps));
+      assert.deepEqual(synchronizedScroll.sourceTop, { preview: 0, source: 0 });
+      assert.deepEqual(synchronizedScroll.previewTop, { preview: 0, source: 0 });
 
       await first.locator(".cm-content").click();
       await first.keyboard.press("ControlOrMeta+Home");
@@ -881,6 +957,10 @@ test(
     }
   },
 );
+
+function strictlyIncreasing(values: readonly number[]): boolean {
+  return values.length > 1 && values.slice(1).every((value, index) => value > (values[index] ?? 0));
+}
 
 interface RunningGoogleOAuthMock {
   readonly origin: string;
