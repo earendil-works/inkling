@@ -188,9 +188,9 @@ const helpTopics: Readonly<Record<string, HelpTopic>> = {
   share: {
     arguments: [
       ["DOCUMENT", "Document ID. Omit it when using a shared-document instance."],
-      ["ACCESS", "One of disabled, view, comment, or edit. Omit to inspect current access."],
+      ["ACCESS", "One of view, comment, or edit. Omit to list links; disabled deletes all."],
     ],
-    description: "Inspect or change a document's capability-sharing policy.",
+    description: "List, create, or delete a document's capability links.",
     usage: ["inkling share [DOCUMENT] [disabled|view|comment|edit]"],
   },
   attachment: {

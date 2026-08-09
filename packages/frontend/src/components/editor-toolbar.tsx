@@ -1,7 +1,7 @@
 import type {
   AttachmentMetadataDto,
   DocumentMetadataDto,
-  ShareResponse,
+  ShareLinksResponse,
 } from "@earendil-works/inkling-protocol";
 
 import type { ApiClientService } from "../api.ts";
@@ -24,7 +24,7 @@ export interface EditorToolbarProps {
   readonly onAttachment: (attachment: AttachmentMetadataDto) => void;
   readonly onMetadataChanged: (metadata: DocumentMetadataDto) => void;
   readonly onOpenComments: () => void;
-  readonly onSharingChanged: (response: ShareResponse) => void;
+  readonly onSharingChanged: (response: ShareLinksResponse) => void;
   readonly onTogglePreview: () => void;
   readonly openCommentCount: number;
   readonly previewOpen: boolean;
@@ -90,7 +90,6 @@ export function EditorToolbar({
             access={metadata.sharing.access}
             api={api}
             documentId={metadata.id}
-            expectedRevision={metadata.headRevision}
             onUpdated={onSharingChanged}
           />
         )}

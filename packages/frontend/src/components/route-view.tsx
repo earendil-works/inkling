@@ -12,6 +12,7 @@ import type { EffectQueryState } from "../effect-hooks.ts";
 import { LabelsScreen } from "../labels-screen.tsx";
 import { WorkspaceScreen } from "../workspace-screen.tsx";
 import { Button } from "./button.tsx";
+import { SharePasswordScreen } from "./share-password-screen.tsx";
 
 const loadEditorScreen = () =>
   import("../editor-screen.tsx").then(({ EditorScreen }) => ({ default: EditorScreen }));
@@ -44,6 +45,10 @@ export type RouteModel =
       readonly catalog: CatalogResponse;
       readonly publicCatalog: boolean;
       readonly screen: "workspace";
+    })
+  | (RouteBase & {
+      readonly documentId: string;
+      readonly screen: "share-password";
     });
 
 export interface RouteViewProps {
@@ -73,6 +78,10 @@ export function RouteView({ navigationKey, refresh, state }: RouteViewProps): Re
   }
 
   switch (model.screen) {
+    case "share-password":
+      return (
+        <SharePasswordScreen api={model.api} documentId={model.documentId} onUnlocked={refresh} />
+      );
     case "workspace":
       return (
         <WorkspaceScreen

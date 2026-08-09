@@ -23,6 +23,7 @@ export type Principal =
       readonly kind: "capability";
       readonly documentId: string;
       readonly access: Exclude<CapabilityAccess, "disabled">;
+      readonly expiresAt?: string | undefined;
       readonly generation: number;
       readonly guestId?: PersonId | undefined;
     };
@@ -118,9 +119,7 @@ export function isDocumentActionAllowed(
     principal.documentId !== metadata.id ||
     principal.generation !== metadata.sharing.generation ||
     metadata.sharing.access === "disabled" ||
-    metadata.sharing.access !== principal.access ||
-    (metadata.sharing.expiresAt !== undefined &&
-      Date.parse(metadata.sharing.expiresAt) <= Date.parse(now))
+    (principal.expiresAt !== undefined && Date.parse(principal.expiresAt) <= Date.parse(now))
   ) {
     return false;
   }

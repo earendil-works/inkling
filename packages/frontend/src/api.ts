@@ -11,7 +11,8 @@ import {
   DocumentResponseSchema,
   ProtocolErrorSchema,
   PublicDocumentResponseSchema,
-  ShareResponseSchema,
+  ShareLinksResponseSchema,
+  ShareUnlockResponseSchema,
 } from "@earendil-works/inkling-protocol";
 import type {
   ApiKeyCreated,
@@ -25,7 +26,8 @@ import type {
   DocumentMetadataDto,
   DocumentResponse,
   PublicDocumentResponse,
-  ShareResponse,
+  ShareLinksResponse,
+  ShareUnlockResponse,
 } from "@earendil-works/inkling-protocol";
 
 export class ApiError extends Data.TaggedError("ApiError")<{
@@ -93,11 +95,24 @@ export interface ApiClientService {
     threadId: string,
     resolved: boolean,
   ) => Effect.Effect<CommentStateDto, ApiError>;
-  readonly updateShare: (
+  readonly listShareLinks: (documentId: string) => Effect.Effect<ShareLinksResponse, ApiError>;
+  readonly createShareLink: (
     documentId: string,
-    access: "disabled" | "view" | "comment" | "edit",
+    input: {
+      readonly access: "view" | "comment" | "edit";
+      readonly expectedRevision: number;
+      readonly password?: string | undefined;
+    },
+  ) => Effect.Effect<ShareLinksResponse, ApiError>;
+  readonly deleteShareLink: (
+    documentId: string,
+    shareId: string,
     expectedRevision: number,
-  ) => Effect.Effect<ShareResponse, ApiError>;
+  ) => Effect.Effect<ShareLinksResponse, ApiError>;
+  readonly unlockShareLink: (
+    documentId: string,
+    password: string,
+  ) => Effect.Effect<ShareUnlockResponse, ApiError>;
   readonly publish: (documentId: string) => Effect.Effect<DocumentMetadataDto, ApiError>;
   readonly unpublish: (documentId: string) => Effect.Effect<DocumentMetadataDto, ApiError>;
   readonly readPublicRfc: (number: number) => Effect.Effect<PublicDocumentResponse, ApiError>;
@@ -310,15 +325,27 @@ export function makeApiClient(capabilityToken?: string): ApiClientService {
         "PATCH",
         body,
       ),
-    updateShare: (documentId, access, expectedRevision) =>
+    createShareLink: (documentId, body) =>
       mutation(
-        `/api/documents/${encodeURIComponent(documentId)}/share`,
-        ShareResponseSchema,
-        "PATCH",
-        {
-          access,
-          expectedRevision,
-        },
+        `/api/documents/${encodeURIComponent(documentId)}/shares`,
+        ShareLinksResponseSchema,
+        "POST",
+        body,
+      ),
+    deleteShareLink: (documentId, shareId, expectedRevision) =>
+      mutation(
+        `/api/documents/${encodeURIComponent(documentId)}/shares/${encodeURIComponent(shareId)}?expectedRevision=${expectedRevision}`,
+        ShareLinksResponseSchema,
+        "DELETE",
+      ),
+    listShareLinks: (documentId) =>
+      request(`/api/documents/${encodeURIComponent(documentId)}/shares`, ShareLinksResponseSchema),
+    unlockShareLink: (documentId, password) =>
+      mutation(
+        `/api/documents/${encodeURIComponent(documentId)}/shares/unlock`,
+        ShareUnlockResponseSchema,
+        "POST",
+        { password },
       ),
   };
 }

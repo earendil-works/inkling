@@ -13,7 +13,7 @@ import { chromium } from "playwright-core";
 const browserExecutable = await findBrowser();
 
 test(
-  "browser pages read, collaborate, comment, preview, and honor a live share downgrade",
+  "browser pages read, collaborate, comment, preview, and honor share revocation",
   { skip: browserExecutable === undefined, timeout: 60_000 },
   async () => {
     assert.ok(browserExecutable);
@@ -970,22 +970,19 @@ test(
         () => document.querySelectorAll("[data-participants] .participant").length === 0,
       );
 
+      await first.locator("[data-share]").click();
+      await first.getByLabel("Anyone with this link can").selectOption("edit");
+      await first.getByRole("button", { name: "Create and copy link" }).click();
+      await first.locator('[data-share-link] >> text="Can edit"').waitFor();
       const capabilityUrl = await first.evaluate(async (id) => {
-        const csrf = document.cookie
-          .split(";")
-          .map((part) => part.trim())
-          .find((part) => part.startsWith("inkling_csrf="))
-          ?.slice("inkling_csrf=".length);
-        const current = (await (await fetch(`/api/documents/${id}`)).json()) as {
-          metadata: { headRevision: number };
+        const response = await fetch(`/api/documents/${id}/shares`);
+        const links = (await response.json()) as {
+          links: { access: string; passwordProtected: boolean; url: string }[];
         };
-        const response = await fetch(`/api/documents/${id}/share`, {
-          body: JSON.stringify({ access: "edit", expectedRevision: current.metadata.headRevision }),
-          headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf ?? "" },
-          method: "PATCH",
-        });
-        return ((await response.json()) as { capabilityUrl: string }).capabilityUrl;
+        return links.links.find((link) => link.access === "edit" && !link.passwordProtected)?.url;
       }, documentId);
+      assert.ok(capabilityUrl);
+      await first.getByRole("button", { name: "Close sharing settings" }).click();
       const sharedContext = await browser.newContext();
       const shared = await sharedContext.newPage();
       await shared.goto(capabilityUrl);
@@ -1007,21 +1004,10 @@ test(
       );
       assert.match(guestPresenceColor, /^oklch\(/u);
       assert.notEqual(guestPresenceColor, adminPresenceColor);
-      await first.evaluate(async (id) => {
-        const csrf = document.cookie
-          .split(";")
-          .map((part) => part.trim())
-          .find((part) => part.startsWith("inkling_csrf="))
-          ?.slice("inkling_csrf=".length);
-        const current = (await (await fetch(`/api/documents/${id}`)).json()) as {
-          metadata: { headRevision: number };
-        };
-        await fetch(`/api/documents/${id}/share`, {
-          body: JSON.stringify({ access: "view", expectedRevision: current.metadata.headRevision }),
-          headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf ?? "" },
-          method: "PATCH",
-        });
-      }, documentId);
+      await first.locator("[data-share]").click();
+      const editableLink = first.locator("[data-share-link]", { hasText: "Can edit" });
+      await editableLink.getByRole("button", { name: "Delete" }).click();
+      await editableLink.waitFor({ state: "detached" });
       await shared.waitForFunction(
         () => document.querySelector(".cm-content")?.getAttribute("contenteditable") === "false",
       );
@@ -1037,6 +1023,34 @@ test(
           .evaluate((pane) => getComputedStyle(pane).display),
         "block",
       );
+
+      await first.getByLabel("Anyone with this link can").selectOption("view");
+      await first.getByLabel("Require a password").check();
+      await first.getByLabel("Password", { exact: true }).fill("browser share password");
+      await first.getByRole("button", { name: "Create and copy link" }).click();
+      const protectedRow = first.locator("[data-share-link]", { hasText: "Password protected" });
+      await protectedRow.waitFor();
+      const protectedCapabilityUrl = await first.evaluate(async (id) => {
+        const response = await fetch(`/api/documents/${id}/shares`);
+        const links = (await response.json()) as {
+          links: { passwordProtected: boolean; url: string }[];
+        };
+        return links.links.find((link) => link.passwordProtected)?.url;
+      }, documentId);
+      assert.ok(protectedCapabilityUrl);
+      await first.getByRole("button", { name: "Close sharing settings" }).click();
+
+      const protectedContext = await browser.newContext();
+      const protectedPage = await protectedContext.newPage();
+      await protectedPage.goto(protectedCapabilityUrl);
+      await protectedPage.waitForSelector(".share-password-layout");
+      await protectedPage.getByLabel("Password", { exact: true }).fill("wrong password");
+      await protectedPage.getByRole("button", { name: "Open document" }).click();
+      await protectedPage.getByText("The share password is incorrect.").waitFor();
+      await protectedPage.getByLabel("Password", { exact: true }).fill("browser share password");
+      await protectedPage.getByRole("button", { name: "Open document" }).click();
+      await protectedPage.waitForSelector("[data-reader]");
+      await protectedContext.close();
 
       await first.setViewportSize({ height: 844, width: 390 });
       await first.locator("[data-preview-toggle]").click();

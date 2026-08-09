@@ -142,16 +142,22 @@ test(
         assert.equal(comment.status, 200);
 
         document = await readDocument(baseUrl, document.metadata.id, authorization);
-        const share = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/share`, {
+        const share = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/shares`, {
           body: JSON.stringify({
             access: "view",
             expectedRevision: document.metadata.headRevision,
           }),
           headers: { ...authorization, "Content-Type": "application/json" },
-          method: "PATCH",
+          method: "POST",
         });
         assert.equal(share.status, 200);
-        const capabilityUrl = ((await share.json()) as { capabilityUrl: string }).capabilityUrl;
+        const shared = (await share.json()) as {
+          links: { id: string; passwordProtected: boolean; url: string }[];
+        };
+        assert.equal(shared.links.length, 1);
+        assert.equal(shared.links[0]?.passwordProtected, false);
+        const capabilityUrl = shared.links[0]?.url;
+        assert.ok(capabilityUrl);
         const capability = new URL(capabilityUrl).searchParams.get("cap");
         assert.ok(capability);
         assert.equal(
@@ -177,6 +183,94 @@ test(
             )
           ).status,
           403,
+        );
+
+        const retained = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/shares`, {
+          headers: authorization,
+        });
+        assert.equal(retained.status, 200);
+        assert.equal(
+          ((await retained.json()) as { links: { url: string }[] }).links[0]?.url,
+          capabilityUrl,
+        );
+
+        document = await readDocument(baseUrl, document.metadata.id, authorization);
+        const duplicate = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/shares`, {
+          body: JSON.stringify({
+            access: "view",
+            expectedRevision: document.metadata.headRevision,
+          }),
+          headers: { ...authorization, "Content-Type": "application/json" },
+          method: "POST",
+        });
+        assert.equal(duplicate.status, 409);
+
+        const protectedShare = await fetch(
+          `${baseUrl}/api/documents/${document.metadata.id}/shares`,
+          {
+            body: JSON.stringify({
+              access: "view",
+              expectedRevision: document.metadata.headRevision,
+              password: "correct horse battery staple",
+            }),
+            headers: { ...authorization, "Content-Type": "application/json" },
+            method: "POST",
+          },
+        );
+        assert.equal(protectedShare.status, 200);
+        const protectedLinks = (await protectedShare.json()) as {
+          links: { id: string; passwordProtected: boolean; url: string }[];
+        };
+        const protectedLink = protectedLinks.links.find((link) => link.passwordProtected);
+        assert.ok(protectedLink);
+        const protectedCapability = new URL(protectedLink.url).searchParams.get("cap");
+        assert.ok(protectedCapability);
+        const protectedDocumentUrl = `${baseUrl}/api/documents/${document.metadata.id}?cap=${encodeURIComponent(protectedCapability)}`;
+        const passwordRequired = await fetch(protectedDocumentUrl);
+        assert.equal(passwordRequired.status, 401);
+        assert.equal(
+          ((await passwordRequired.json()) as { code: string }).code,
+          "capability_password_required",
+        );
+        const wrongPassword = await fetch(
+          `${baseUrl}/api/documents/${document.metadata.id}/shares/unlock?cap=${encodeURIComponent(protectedCapability)}`,
+          {
+            body: JSON.stringify({ password: "incorrect password" }),
+            headers: { "Content-Type": "application/json" },
+            method: "POST",
+          },
+        );
+        assert.equal(wrongPassword.status, 401);
+        const unlocked = await fetch(
+          `${baseUrl}/api/documents/${document.metadata.id}/shares/unlock?cap=${encodeURIComponent(protectedCapability)}`,
+          {
+            body: JSON.stringify({ password: "correct horse battery staple" }),
+            headers: { "Content-Type": "application/json" },
+            method: "POST",
+          },
+        );
+        assert.equal(unlocked.status, 200);
+        const shareCookie = unlocked.headers.get("set-cookie");
+        assert.ok(shareCookie);
+        assert.equal(
+          (await fetch(protectedDocumentUrl, { headers: { Cookie: shareCookie } })).status,
+          200,
+        );
+
+        document = await readDocument(baseUrl, document.metadata.id, authorization);
+        const deletedShare = await fetch(
+          `${baseUrl}/api/documents/${document.metadata.id}/shares/${shared.links[0]?.id}?expectedRevision=${document.metadata.headRevision}`,
+          { headers: authorization, method: "DELETE" },
+        );
+        assert.equal(deletedShare.status, 200);
+        assert.equal(((await deletedShare.json()) as { links: unknown[] }).links.length, 1);
+        assert.equal(
+          (
+            await fetch(
+              `${baseUrl}/api/documents/${document.metadata.id}?cap=${encodeURIComponent(capability)}`,
+            )
+          ).status,
+          401,
         );
 
         document = await readDocument(baseUrl, document.metadata.id, authorization);

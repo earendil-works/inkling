@@ -26,8 +26,9 @@ import type {
   ReplaceBodyRequest,
   ReplyRequest,
   ResolutionRequest,
-  ShareResponse,
-  ShareUpdateRequest,
+  ShareLinkCreateRequest,
+  ShareLinksResponse,
+  ShareUnlockResponse,
   ServerCollaborationMessage,
 } from "@earendil-works/inkling-protocol";
 
@@ -37,7 +38,20 @@ export interface RequestCredentials {
   readonly bearerToken?: string | undefined;
   readonly sessionToken?: string | undefined;
   readonly capabilityToken?: string | undefined;
+  readonly capabilityProof?: string | undefined;
   readonly guestName?: string | undefined;
+}
+
+export function shareProofCookieName(capabilityId: string): string | undefined {
+  return /^[A-Za-z0-9_-]{3,128}$/u.test(capabilityId) ? `inkling_share_${capabilityId}` : undefined;
+}
+
+export function shareProofCookieNameFromToken(token: string | undefined): string | undefined {
+  if (token === undefined) return undefined;
+  const [prefix, , capabilityId, secret, extra] = token.split(".");
+  return prefix === "cap" && secret !== undefined && extra === undefined
+    ? shareProofCookieName(capabilityId ?? "")
+    : undefined;
 }
 
 export interface CollaborationConnection {
@@ -87,8 +101,12 @@ export interface DocumentRuntimeConfiguration {
     readonly access: "view" | "comment" | "edit";
     readonly documentId: string;
     readonly expiresAt?: string | undefined;
+    readonly createdAt?: string | undefined;
     readonly generation: number;
     readonly id: string;
+    readonly passwordHash?: string | undefined;
+    readonly passwordProof?: string | undefined;
+    readonly retainedSecret?: string | undefined;
     readonly tokenHash: string;
   }[];
   readonly workspaceId: string;
@@ -221,12 +239,32 @@ export interface InklingApplicationService {
     documentId: string,
     expectedRevision: number,
   ) => Effect.Effect<void, ApplicationError>;
-  readonly updateShare: (
+  readonly listShareLinks: (
     credentials: RequestCredentials,
     documentId: string,
-    request: ShareUpdateRequest,
     baseUrl: string,
-  ) => Effect.Effect<ShareResponse, ApplicationError>;
+  ) => Effect.Effect<ShareLinksResponse, ApplicationError>;
+  readonly createShareLink: (
+    credentials: RequestCredentials,
+    documentId: string,
+    request: ShareLinkCreateRequest,
+    baseUrl: string,
+  ) => Effect.Effect<ShareLinksResponse, ApplicationError>;
+  readonly deleteShareLink: (
+    credentials: RequestCredentials,
+    documentId: string,
+    shareId: string,
+    expectedRevision: number,
+    baseUrl: string,
+  ) => Effect.Effect<ShareLinksResponse, ApplicationError>;
+  readonly unlockShareLink: (
+    credentials: RequestCredentials,
+    documentId: string,
+    password: string,
+  ) => Effect.Effect<
+    ShareUnlockResponse & { readonly capabilityId: string; readonly proof: string },
+    ApplicationError
+  >;
   readonly createThread: (
     credentials: RequestCredentials,
     documentId: string,

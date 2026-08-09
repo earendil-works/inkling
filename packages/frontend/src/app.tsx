@@ -137,12 +137,24 @@ function loadRoute(url: URL): Effect.Effect<RouteModel, ApiError> {
   const documentRoute = /^\/documents\/([^/]+)(?:\/(edit))?\/?$/u.exec(url.pathname);
   const rfcRoute = /^\/rfcs\/(\d+)(?:\/(edit))?\/?$/u.exec(url.pathname);
   if (shared?.[1] !== undefined) {
+    const documentId = decodeURIComponent(shared[1]);
     return loadDocumentRoute(
       api,
       capabilityToken,
-      decodeURIComponent(shared[1]),
+      documentId,
       shared[2] === "edit" ? "editor" : "reader",
       true,
+    ).pipe(
+      Effect.catchIf(
+        (error) => error.code === "capability_password_required",
+        (): Effect.Effect<RouteModel> =>
+          Effect.succeed({
+            api,
+            capabilityToken,
+            documentId,
+            screen: "share-password",
+          }),
+      ),
     );
   }
   if (documentRoute?.[1] !== undefined) {

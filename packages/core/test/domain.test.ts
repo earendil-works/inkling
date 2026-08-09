@@ -333,6 +333,31 @@ test("capability generations revoke existing principals", async () => {
   assert.equal(Either.isLeft(denied), true);
 });
 
+test("capability access is link-specific within a shared document", async () => {
+  const metadata = await Effect.runPromise(
+    createDocumentMetadata({ id: "document_multilink1", title: "Decision" }, now),
+  );
+  const shared = await Effect.runPromise(updateSharingPolicy(metadata, "edit", 0, now));
+  const viewer: Principal = {
+    access: "view",
+    documentId: metadata.id,
+    generation: shared.sharing.generation,
+    kind: "capability",
+  };
+
+  await Effect.runPromise(authorizeDocument(viewer, "read-working", shared, now));
+  const deniedEdit = await Effect.runPromise(
+    authorizeDocument(viewer, "edit-body", shared, now).pipe(Effect.either),
+  );
+  assert.equal(Either.isLeft(deniedEdit), true);
+
+  const expiredViewer: Principal = { ...viewer, expiresAt: "2025-01-01T00:00:00.000Z" };
+  const deniedExpired = await Effect.runPromise(
+    authorizeDocument(expiredViewer, "read-working", shared, now).pipe(Effect.either),
+  );
+  assert.equal(Either.isLeft(deniedExpired), true);
+});
+
 test("agent replacements are atomic and reject ambiguity", async () => {
   const changed = await Effect.runPromise(
     applyUniqueTextReplacements("alpha beta gamma", [

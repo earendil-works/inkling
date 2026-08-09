@@ -220,19 +220,34 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
         const target = yield* documentTarget(instance, arguments_, 1);
         const id = target.documentId;
         const access = arguments_[target.nextIndex];
+        const active = yield* client.listShareLinks(id);
         if (access === undefined) {
-          const current = yield* client.read(id);
-          console.log(
-            `${current.metadata.sharing.access}\tgeneration=${current.metadata.sharing.generation}${current.metadata.sharing.expiresAt === undefined ? "" : `\texpires=${current.metadata.sharing.expiresAt}`}`,
-          );
+          if (active.links.length === 0) console.log("No active share links.");
+          for (const link of active.links) {
+            console.log(
+              `${link.id}\t${link.access}\t${link.passwordProtected ? "password" : "unprotected"}\t${link.url ?? "URL unavailable"}`,
+            );
+          }
           return;
         }
-        if (!new Set(["disabled", "view", "comment", "edit"]).has(access)) {
+        if (access === "disabled") {
+          let revision = (yield* client.read(id)).metadata.headRevision;
+          for (const link of active.links) {
+            yield* client.deleteShareLink(id, link.id, revision);
+            revision += 1;
+          }
+          console.log("Deleted all share links.");
+          return;
+        }
+        if (!isShareAccess(access)) {
           return yield* usageFailure("Share access must be disabled, view, comment, or edit.");
         }
         const current = yield* client.read(id);
-        const shared = yield* client.share(id, access, current.metadata.headRevision);
-        console.log(shared.capabilityUrl ?? `Share access is now ${shared.policy.access}.`);
+        const shared = yield* client.createShareLink(id, access, current.metadata.headRevision);
+        const created = shared.links.find(
+          (link) => link.access === access && !link.passwordProtected,
+        );
+        console.log(created?.url ?? "Share link created.");
         return;
       }
       case "attachment": {
@@ -720,6 +735,10 @@ function readStandardInput(): Effect.Effect<string, unknown> {
           return Buffer.concat(chunks).toString("utf8");
         },
       });
+}
+
+function isShareAccess(value: string): value is "view" | "comment" | "edit" {
+  return value === "view" || value === "comment" || value === "edit";
 }
 
 function usageFailure(message: string): Effect.Effect<never, Error> {

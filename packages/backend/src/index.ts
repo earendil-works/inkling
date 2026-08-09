@@ -1,7 +1,7 @@
 import { Effect, Either, type ManagedRuntime, type Schema } from "effect";
 import { Hono } from "hono";
 import type { Context as HonoContext } from "hono";
-import { deleteCookie, getCookie } from "hono/cookie";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 
 import {
   ApiKeyCreateRequestSchema,
@@ -16,7 +16,8 @@ import {
   ReplaceBodyRequestSchema,
   ReplyRequestSchema,
   ResolutionRequestSchema,
-  ShareUpdateRequestSchema,
+  ShareLinkCreateRequestSchema,
+  ShareUnlockRequestSchema,
 } from "@earendil-works/inkling-protocol";
 import { identifierTag, taggedId, uuidV7Bytes } from "@earendil-works/inkling-core";
 import type {
@@ -26,7 +27,12 @@ import type {
   ProtocolError,
 } from "@earendil-works/inkling-protocol";
 
-import { ApplicationError, InklingApplication } from "./application.ts";
+import {
+  ApplicationError,
+  InklingApplication,
+  shareProofCookieName,
+  shareProofCookieNameFromToken,
+} from "./application.ts";
 import type { InklingApplicationService, RequestCredentials } from "./application.ts";
 import { finishGoogleAuthentication, startGoogleAuthentication } from "./google-auth.ts";
 import type { GoogleAuthenticationEnvironment } from "./google-auth.ts";
@@ -41,7 +47,12 @@ export type {
   RequestCredentials,
   SessionResult,
 } from "./application.ts";
-export { ApplicationError, InklingApplication } from "./application.ts";
+export {
+  ApplicationError,
+  InklingApplication,
+  shareProofCookieName,
+  shareProofCookieNameFromToken,
+} from "./application.ts";
 export { localApplicationLayer, makeLocalInklingApplication } from "./local.ts";
 export type { LocalApplicationOptions } from "./local.ts";
 export { DigestLive, IdGeneratorLive, SecretHasherLive, SecureTokenLive } from "./crypto.ts";
@@ -302,17 +313,70 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
     ),
   );
 
-  app.patch("/api/documents/:documentId/share", (context) =>
+  app.get("/api/documents/:documentId/shares", (context) =>
     execute(context, options, (service) =>
-      mutation(context, readJson(context, ShareUpdateRequestSchema)).pipe(
+      service.listShareLinks(
+        credentials(context),
+        context.req.param("documentId"),
+        new URL(context.req.url).origin,
+      ),
+    ),
+  );
+
+  app.post("/api/documents/:documentId/shares", (context) =>
+    execute(context, options, (service) =>
+      mutation(context, readJson(context, ShareLinkCreateRequestSchema)).pipe(
         Effect.flatMap((request) =>
-          service.updateShare(
+          service.createShareLink(
             credentials(context),
             context.req.param("documentId"),
             request,
             new URL(context.req.url).origin,
           ),
         ),
+      ),
+    ),
+  );
+
+  app.delete("/api/documents/:documentId/shares/:shareId", (context) =>
+    execute(context, options, (service) =>
+      mutation(context, requiredRevision(context)).pipe(
+        Effect.flatMap((expectedRevision) =>
+          service.deleteShareLink(
+            credentials(context),
+            context.req.param("documentId"),
+            context.req.param("shareId"),
+            expectedRevision,
+            new URL(context.req.url).origin,
+          ),
+        ),
+      ),
+    ),
+  );
+
+  app.post("/api/documents/:documentId/shares/unlock", (context) =>
+    execute(context, options, (service) =>
+      mutation(context, readJson(context, ShareUnlockRequestSchema)).pipe(
+        Effect.flatMap((request) =>
+          service.unlockShareLink(
+            credentials(context),
+            context.req.param("documentId"),
+            request.password,
+          ),
+        ),
+        Effect.tap((unlocked) =>
+          Effect.sync(() => {
+            const cookieName = shareProofCookieName(unlocked.capabilityId);
+            if (cookieName === undefined) return;
+            setCookie(context, cookieName, unlocked.proof, {
+              httpOnly: true,
+              path: "/",
+              sameSite: "Lax",
+              secure: new URL(context.req.url).protocol === "https:",
+            });
+          }),
+        ),
+        Effect.map(() => ({ unlocked: true as const })),
       ),
     ),
   );
@@ -847,9 +911,13 @@ function credentials(context: HonoContext): RequestCredentials {
   const bearerToken = authorization?.startsWith("Bearer ")
     ? authorization.slice("Bearer ".length)
     : undefined;
+  const capabilityToken = context.req.query("cap");
+  const proofCookieName = shareProofCookieNameFromToken(capabilityToken);
   return {
     bearerToken,
-    capabilityToken: context.req.query("cap"),
+    capabilityProof:
+      proofCookieName === undefined ? undefined : getCookie(context, proofCookieName),
+    capabilityToken,
     guestName: context.req.header("X-Inkling-Guest-Name"),
     sessionToken: getCookie(context, "inkling_session"),
   };

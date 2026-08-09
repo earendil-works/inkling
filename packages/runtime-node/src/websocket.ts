@@ -5,7 +5,11 @@ import { Effect, Fiber, Stream, type ManagedRuntime } from "effect";
 import { WebSocket, WebSocketServer } from "ws";
 import type { RawData } from "ws";
 
-import { ApplicationError, InklingApplication } from "@earendil-works/inkling-backend";
+import {
+  ApplicationError,
+  InklingApplication,
+  shareProofCookieNameFromToken,
+} from "@earendil-works/inkling-backend";
 import type {
   CollaborationConnection,
   InklingApplicationService,
@@ -56,10 +60,14 @@ export function installWebSocketServer(
       socket.destroy();
       return;
     }
+    const capabilityToken = url.searchParams.get("cap") ?? undefined;
+    const cookies = parseCookies(request.headers.cookie);
+    const proofCookieName = shareProofCookieNameFromToken(capabilityToken);
     const requestCredentials: RequestCredentials = {
-      capabilityToken: url.searchParams.get("cap") ?? undefined,
+      capabilityProof: proofCookieName === undefined ? undefined : cookies[proofCookieName],
+      capabilityToken,
       guestName: url.searchParams.get("guest") ?? undefined,
-      sessionToken: parseCookies(request.headers.cookie)["inkling_session"],
+      sessionToken: cookies["inkling_session"],
     };
 
     webSocketServer.handleUpgrade(request, socket, head, (webSocket) => {

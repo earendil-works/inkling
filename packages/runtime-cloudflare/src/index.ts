@@ -23,6 +23,7 @@ import {
   localApplicationLayer,
   SecretHasherLive,
   SecureTokenLive,
+  shareProofCookieNameFromToken,
   startGoogleAuthentication,
 } from "@earendil-works/inkling-backend";
 import type {
@@ -948,14 +949,18 @@ function protocolErrorResponse(error: RpcError): Response {
 function credentials(request: Request): RequestCredentials {
   const url = new URL(request.url);
   const authorization = request.headers.get("Authorization");
+  const capabilityToken = url.searchParams.get("cap") ?? undefined;
+  const cookies = parseCookies(request.headers.get("Cookie"));
+  const proofCookieName = shareProofCookieNameFromToken(capabilityToken);
   return {
     bearerToken: authorization?.startsWith("Bearer ")
       ? authorization.slice("Bearer ".length)
       : undefined,
-    capabilityToken: url.searchParams.get("cap") ?? undefined,
+    capabilityProof: proofCookieName === undefined ? undefined : cookies[proofCookieName],
+    capabilityToken,
     guestName:
       request.headers.get("X-Inkling-Guest-Name") ?? url.searchParams.get("guest") ?? undefined,
-    sessionToken: parseCookies(request.headers.get("Cookie"))["inkling_session"],
+    sessionToken: cookies["inkling_session"],
   };
 }
 

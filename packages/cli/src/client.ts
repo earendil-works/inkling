@@ -10,7 +10,7 @@ import {
   DocumentMetadataSchema,
   DocumentResponseSchema,
   ProtocolErrorSchema,
-  ShareResponseSchema,
+  ShareLinksResponseSchema,
 } from "@earendil-works/inkling-protocol";
 import type {
   AttachmentMetadataDto,
@@ -20,7 +20,7 @@ import type {
   DocumentMetadataDto,
   DocumentResponse,
   ImportDocumentRequest,
-  ShareResponse,
+  ShareLinksResponse,
 } from "@earendil-works/inkling-protocol";
 
 import type { Instance } from "./config.ts";
@@ -86,11 +86,17 @@ export interface CliClient {
   ) => Effect.Effect<void, ClientError>;
   readonly publish: (documentId: string) => Effect.Effect<DocumentMetadataDto, ClientError>;
   readonly unpublish: (documentId: string) => Effect.Effect<DocumentMetadataDto, ClientError>;
-  readonly share: (
+  readonly listShareLinks: (documentId: string) => Effect.Effect<ShareLinksResponse, ClientError>;
+  readonly createShareLink: (
     documentId: string,
-    access: string,
+    access: "view" | "comment" | "edit",
     expectedRevision: number,
-  ) => Effect.Effect<ShareResponse, ClientError>;
+  ) => Effect.Effect<ShareLinksResponse, ClientError>;
+  readonly deleteShareLink: (
+    documentId: string,
+    shareId: string,
+    expectedRevision: number,
+  ) => Effect.Effect<ShareLinksResponse, ClientError>;
   readonly editComment: (
     documentId: string,
     threadId: string,
@@ -429,13 +435,21 @@ export function makeCliClient(instance: Instance): CliClient {
         "PATCH",
         { resolved },
       ),
-    share: (documentId, access, expectedRevision) =>
+    createShareLink: (documentId, access, expectedRevision) =>
       mutate(
-        `/api/documents/${encodeURIComponent(documentId)}/share`,
-        ShareResponseSchema,
-        "PATCH",
+        `/api/documents/${encodeURIComponent(documentId)}/shares`,
+        ShareLinksResponseSchema,
+        "POST",
         { access, expectedRevision },
       ),
+    deleteShareLink: (documentId, shareId, expectedRevision) =>
+      mutate(
+        `/api/documents/${encodeURIComponent(documentId)}/shares/${encodeURIComponent(shareId)}?expectedRevision=${expectedRevision}`,
+        ShareLinksResponseSchema,
+        "DELETE",
+      ),
+    listShareLinks: (documentId) =>
+      request(`/api/documents/${encodeURIComponent(documentId)}/shares`, ShareLinksResponseSchema),
     unpublish: (documentId) =>
       mutate(
         `/api/documents/${encodeURIComponent(documentId)}/unpublish`,

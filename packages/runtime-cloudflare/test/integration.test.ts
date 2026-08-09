@@ -208,6 +208,37 @@ test(
       );
       assert.equal(anonymousSecond.status, 200);
 
+      const shareSource = await readDocument(running.baseUrl, first.metadata.id, authorization);
+      const protectedShare = await fetch(
+        `${running.baseUrl}/api/documents/${first.metadata.id}/shares`,
+        {
+          body: JSON.stringify({
+            access: "view",
+            expectedRevision: shareSource.metadata.headRevision,
+            password: "cloudflare share password",
+          }),
+          headers: { ...authorization, "Content-Type": "application/json" },
+          method: "POST",
+        },
+      );
+      assert.equal(protectedShare.status, 200);
+      const protectedCapability = new URL(
+        (
+          (await protectedShare.json()) as {
+            links: { passwordProtected: boolean; url: string }[];
+          }
+        ).links.find((link) => link.passwordProtected)?.url ?? "",
+      ).searchParams.get("cap");
+      assert.ok(protectedCapability);
+      assert.equal(
+        (
+          await fetch(
+            `${running.baseUrl}/api/documents/${first.metadata.id}?cap=${encodeURIComponent(protectedCapability)}`,
+          )
+        ).status,
+        401,
+      );
+
       const backup = await fetch(`${running.baseUrl}/api/admin/backup`, {
         headers: authorization,
       });
@@ -221,6 +252,26 @@ test(
         assert.match(
           (await readDocument(running.baseUrl, first.metadata.id, authorization)).body,
           /---\n\n# Newest projected title\n\ndurable first$/u,
+        );
+        const unlocked = await fetch(
+          `${running.baseUrl}/api/documents/${first.metadata.id}/shares/unlock?cap=${encodeURIComponent(protectedCapability)}`,
+          {
+            body: JSON.stringify({ password: "cloudflare share password" }),
+            headers: { "Content-Type": "application/json" },
+            method: "POST",
+          },
+        );
+        assert.equal(unlocked.status, 200);
+        const shareCookie = unlocked.headers.get("set-cookie");
+        assert.ok(shareCookie);
+        assert.equal(
+          (
+            await fetch(
+              `${running.baseUrl}/api/documents/${first.metadata.id}?cap=${encodeURIComponent(protectedCapability)}`,
+              { headers: { Cookie: shareCookie } },
+            )
+          ).status,
+          200,
         );
         const persistedSecond = await readDocument(
           running.baseUrl,

@@ -216,18 +216,38 @@ export const ReplaceBodyRequestSchema = Schema.Struct({
 });
 export type ReplaceBodyRequest = typeof ReplaceBodyRequestSchema.Type;
 
-export const ShareUpdateRequestSchema = Schema.Struct({
-  access: Schema.Literal("disabled", "view", "comment", "edit"),
+export const ShareLinkSchema = Schema.Struct({
+  access: Schema.Literal("view", "comment", "edit"),
+  createdAt: Schema.String,
+  expiresAt: Schema.optional(Schema.String),
+  id: NonEmptyString,
+  passwordProtected: Schema.Boolean,
+  url: Schema.optional(Schema.String),
+});
+export type ShareLinkDto = typeof ShareLinkSchema.Type;
+
+export const ShareLinksResponseSchema = Schema.Struct({
+  links: Schema.Array(ShareLinkSchema),
+  policy: SharingPolicySchema,
+  revision: Revision,
+});
+export type ShareLinksResponse = typeof ShareLinksResponseSchema.Type;
+
+export const ShareLinkCreateRequestSchema = Schema.Struct({
+  access: Schema.Literal("view", "comment", "edit"),
   expectedRevision: Revision,
   expiresAt: Schema.optional(Schema.String),
+  password: Schema.optional(Schema.String.pipe(Schema.minLength(8), Schema.maxLength(1024))),
 });
-export type ShareUpdateRequest = typeof ShareUpdateRequestSchema.Type;
+export type ShareLinkCreateRequest = typeof ShareLinkCreateRequestSchema.Type;
 
-export const ShareResponseSchema = Schema.Struct({
-  capabilityUrl: Schema.optional(Schema.String),
-  policy: SharingPolicySchema,
+export const ShareUnlockRequestSchema = Schema.Struct({
+  password: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(1024)),
 });
-export type ShareResponse = typeof ShareResponseSchema.Type;
+export type ShareUnlockRequest = typeof ShareUnlockRequestSchema.Type;
+
+export const ShareUnlockResponseSchema = Schema.Struct({ unlocked: Schema.Literal(true) });
+export type ShareUnlockResponse = typeof ShareUnlockResponseSchema.Type;
 
 export const PublicationResponseSchema = Schema.Struct({
   metadata: DocumentMetadataSchema,

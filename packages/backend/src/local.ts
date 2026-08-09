@@ -90,7 +90,9 @@ import type {
   MetadataPatchRequest,
   PublicDocumentResponse,
   ServerCollaborationMessage,
-  ShareResponse,
+  ShareLinkCreateRequest,
+  ShareLinkDto,
+  ShareLinksResponse,
 } from "@earendil-works/inkling-protocol";
 import {
   MarkdownRenderer,
@@ -108,7 +110,11 @@ interface CapabilityRecord {
   readonly tokenHash: string;
   readonly generation: number;
   readonly access: Exclude<CapabilityAccess, "disabled">;
+  readonly createdAt?: string | undefined;
   readonly expiresAt?: string | undefined;
+  readonly passwordHash?: string | undefined;
+  readonly passwordProof?: string | undefined;
+  readonly retainedSecret?: string | undefined;
 }
 
 interface LocalWorkspaceState {
@@ -125,10 +131,14 @@ const privateDocumentStateSchema = Schema.Struct({
   capabilities: Schema.Array(
     Schema.Struct({
       access: Schema.Literal("view", "comment", "edit"),
+      createdAt: Schema.optional(Schema.String),
       documentId: Schema.String,
       expiresAt: Schema.optional(Schema.String),
       generation: Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
       id: Schema.String,
+      passwordHash: Schema.optional(Schema.String),
+      passwordProof: Schema.optional(Schema.String),
+      retainedSecret: Schema.optional(Schema.String),
       tokenHash: Schema.String,
     }),
   ),
@@ -157,10 +167,14 @@ const persistedStateSchema = Schema.Struct({
   capabilities: Schema.Array(
     Schema.Struct({
       access: Schema.Literal("view", "comment", "edit"),
+      createdAt: Schema.optional(Schema.String),
       documentId: Schema.String,
       expiresAt: Schema.optional(Schema.String),
       generation: Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
       id: Schema.String,
+      passwordHash: Schema.optional(Schema.String),
+      passwordProof: Schema.optional(Schema.String),
+      retainedSecret: Schema.optional(Schema.String),
       tokenHash: Schema.String,
     }),
   ),
@@ -337,6 +351,7 @@ export function makeLocalInklingApplication(
               credentials.capabilityToken,
               targetDocumentId,
               credentials.guestName,
+              credentials.capabilityProof,
               hasher,
             );
           }
@@ -1807,53 +1822,88 @@ export function makeLocalInklingApplication(
           yield* scheduleCheckpoint(room);
           return metadata as DocumentMetadataDto;
         }),
-      updateShare: (credentials, rawDocumentId, request, baseUrl) =>
+      listShareLinks: (credentials, rawDocumentId, baseUrl) =>
         Effect.gen(function* () {
           const room = yield* getRoom(rawDocumentId);
           const principal = yield* resolvePrincipal(credentials, rawDocumentId);
-          const metadata = yield* room
-            .updateSharing(
-              principal,
-              request.access,
-              request.expectedRevision,
-              new Date().toISOString(),
-              request.expiresAt,
-            )
+          const now = new Date().toISOString();
+          const snapshot = yield* room
+            .snapshot(principal, now)
             .pipe(Effect.mapError(toApplicationError));
+          yield* authorizeDocument(principal, "manage-sharing", snapshot.metadata, now).pipe(
+            Effect.mapError(toApplicationError),
+          );
+          return yield* withState(
+            Effect.succeed(
+              shareLinksResponse(
+                snapshot.metadata,
+                state.capabilities.filter(
+                  (capability) => capability.documentId === room.documentId,
+                ),
+                baseUrl,
+              ),
+            ),
+          );
+        }),
+      createShareLink: (credentials, rawDocumentId, request, baseUrl) =>
+        Effect.gen(function* () {
+          const room = yield* getRoom(rawDocumentId);
+          const principal = yield* resolvePrincipal(credentials, rawDocumentId);
+          const now = new Date().toISOString();
+          const snapshot = yield* room
+            .snapshot(principal, now)
+            .pipe(Effect.mapError(toApplicationError));
+          yield* authorizeDocument(principal, "manage-sharing", snapshot.metadata, now).pipe(
+            Effect.mapError(toApplicationError),
+          );
+          const existing = yield* withState(
+            Effect.succeed(
+              state.capabilities.filter((capability) => capability.documentId === room.documentId),
+            ),
+          );
+          if (existing.some((capability) => sameShareConfiguration(capability, request))) {
+            return yield* applicationFailure(
+              "share_configuration_exists",
+              "A share link with this access and protection already exists.",
+              409,
+            );
+          }
+
+          const id = yield* ids.generate(identifierTag.capability);
+          const secret = yield* tokens.generate(32).pipe(Effect.mapError(toApplicationError));
+          const tokenHash = yield* hasher.hash(secret).pipe(Effect.mapError(toApplicationError));
+          const passwordHash =
+            request.password === undefined
+              ? undefined
+              : yield* hasher.hash(request.password).pipe(Effect.mapError(toApplicationError));
+          const passwordProof =
+            request.password === undefined
+              ? undefined
+              : yield* tokens.generate(32).pipe(Effect.mapError(toApplicationError));
+          const access = strongestCapabilityAccess([...existing, { access: request.access }]);
+          const metadata = yield* room
+            .updateSharing(principal, access, request.expectedRevision, now)
+            .pipe(Effect.mapError(toApplicationError));
+          const capability: CapabilityRecord = {
+            access: request.access,
+            createdAt: now,
+            documentId: room.documentId,
+            expiresAt: request.expiresAt,
+            generation: metadata.sharing.generation,
+            id,
+            passwordHash,
+            passwordProof,
+            retainedSecret: secret,
+            tokenHash,
+          };
           const result = yield* withState(
             Effect.gen(function* () {
-              const existing = state.capabilities.find(
-                (capability) => capability.documentId === room.documentId,
+              const documentCapabilities = [...existing, capability].map((item) =>
+                capabilityWithGeneration(item, metadata.sharing.generation),
               );
-              let capabilityUrl: string | undefined;
-              let capability: CapabilityRecord;
-              if (existing === undefined) {
-                const id = yield* ids.generate(identifierTag.capability);
-                const secret = yield* tokens.generate(32).pipe(Effect.mapError(toApplicationError));
-                const tokenHash = yield* hasher
-                  .hash(secret)
-                  .pipe(Effect.mapError(toApplicationError));
-                capability = {
-                  access: request.access === "disabled" ? "view" : request.access,
-                  documentId: room.documentId,
-                  expiresAt: request.expiresAt,
-                  generation: metadata.sharing.generation,
-                  id,
-                  tokenHash,
-                };
-                const capabilityToken = `cap.${room.documentId}.${id}.${secret}`;
-                capabilityUrl = `${baseUrl}/share/${room.documentId}?cap=${encodeURIComponent(capabilityToken)}`;
-              } else {
-                capability = {
-                  ...existing,
-                  access: request.access === "disabled" ? existing.access : request.access,
-                  expiresAt: request.expiresAt,
-                  generation: metadata.sharing.generation,
-                };
-              }
               const capabilities = [
                 ...state.capabilities.filter((item) => item.documentId !== room.documentId),
-                capability,
+                ...documentCapabilities,
               ];
               yield* saveState({ ...state, capabilities }).pipe(
                 Effect.mapError(toApplicationError),
@@ -1861,17 +1911,98 @@ export function makeLocalInklingApplication(
               yield* persistPrivateDocumentState(state, room.documentId, objectStore, digest).pipe(
                 Effect.mapError(toApplicationError),
               );
-              const response: ShareResponse = {
-                capabilityUrl,
-                policy: metadata.sharing,
-              };
-              return response;
+              return shareLinksResponse(metadata, documentCapabilities, baseUrl);
             }),
           );
           yield* projectDocument(room);
           yield* scheduleCheckpoint(room);
           return result;
         }),
+      deleteShareLink: (credentials, rawDocumentId, shareId, expectedRevision, baseUrl) =>
+        Effect.gen(function* () {
+          const room = yield* getRoom(rawDocumentId);
+          const principal = yield* resolvePrincipal(credentials, rawDocumentId);
+          const now = new Date().toISOString();
+          const snapshot = yield* room
+            .snapshot(principal, now)
+            .pipe(Effect.mapError(toApplicationError));
+          yield* authorizeDocument(principal, "manage-sharing", snapshot.metadata, now).pipe(
+            Effect.mapError(toApplicationError),
+          );
+          const existing = yield* withState(
+            Effect.succeed(
+              state.capabilities.filter((capability) => capability.documentId === room.documentId),
+            ),
+          );
+          if (!existing.some((capability) => capability.id === shareId)) {
+            return yield* applicationFailure(
+              "share_link_not_found",
+              "The share link does not exist.",
+              404,
+            );
+          }
+          const remaining = existing.filter((capability) => capability.id !== shareId);
+          const metadata = yield* room
+            .updateSharing(principal, strongestCapabilityAccess(remaining), expectedRevision, now)
+            .pipe(Effect.mapError(toApplicationError));
+          const result = yield* withState(
+            Effect.gen(function* () {
+              const documentCapabilities = remaining.map((capability) =>
+                capabilityWithGeneration(capability, metadata.sharing.generation),
+              );
+              const capabilities = [
+                ...state.capabilities.filter((item) => item.documentId !== room.documentId),
+                ...documentCapabilities,
+              ];
+              yield* saveState({ ...state, capabilities }).pipe(
+                Effect.mapError(toApplicationError),
+              );
+              yield* persistPrivateDocumentState(state, room.documentId, objectStore, digest).pipe(
+                Effect.mapError(toApplicationError),
+              );
+              return shareLinksResponse(metadata, documentCapabilities, baseUrl);
+            }),
+          );
+          yield* projectDocument(room);
+          yield* scheduleCheckpoint(room);
+          return result;
+        }),
+      unlockShareLink: (credentials, rawDocumentId, password) =>
+        withState(
+          Effect.gen(function* () {
+            const token = credentials.capabilityToken;
+            if (token === undefined) {
+              return yield* applicationFailure(
+                "invalid_capability",
+                "The capability is invalid.",
+                401,
+              );
+            }
+            const capability = yield* findCapabilityRecord(state, token, rawDocumentId, hasher);
+            if (capability.passwordHash === undefined || capability.passwordProof === undefined) {
+              return yield* applicationFailure(
+                "share_password_not_required",
+                "This share link does not require a password.",
+                400,
+              );
+            }
+            const valid = yield* hasher
+              .verify(password, capability.passwordHash)
+              .pipe(Effect.mapError(toApplicationError));
+            if (!valid) {
+              return yield* applicationFailure(
+                "invalid_share_password",
+                "The share password is incorrect.",
+                401,
+              );
+            }
+            return {
+              capabilityId: capability.id,
+              proof: capability.passwordProof,
+              unlocked: true as const,
+            };
+          }),
+        ),
     };
 
     return service;
@@ -2080,8 +2211,44 @@ function resolveCapability(
   token: string,
   targetDocumentId: string,
   guestName: string | undefined,
+  capabilityProof: string | undefined,
   hasher: typeof SecretHasher.Service,
 ): Effect.Effect<Principal, ApplicationError> {
+  return Effect.gen(function* () {
+    const record = yield* findCapabilityRecord(state, token, targetDocumentId, hasher);
+    if (
+      record.passwordHash !== undefined &&
+      (record.passwordProof === undefined || record.passwordProof !== capabilityProof)
+    ) {
+      return yield* applicationFailure(
+        "capability_password_required",
+        "This share link requires a password.",
+        401,
+      );
+    }
+    const guestId =
+      guestName === undefined
+        ? undefined
+        : yield* personId(`${identifierTag.guest}_${record.id}`).pipe(
+            Effect.mapError(toApplicationError),
+          );
+    return {
+      access: record.access,
+      documentId: targetDocumentId,
+      expiresAt: record.expiresAt,
+      generation: record.generation,
+      guestId,
+      kind: "capability",
+    };
+  });
+}
+
+function findCapabilityRecord(
+  state: LocalWorkspaceState,
+  token: string,
+  targetDocumentId: string,
+  hasher: typeof SecretHasher.Service,
+): Effect.Effect<CapabilityRecord, ApplicationError> {
   return Effect.gen(function* () {
     const [prefix, documentValue, id, secret, extra] = token.split(".");
     if (
@@ -2105,18 +2272,61 @@ function resolveCapability(
     if (record.expiresAt !== undefined && Date.parse(record.expiresAt) <= Date.now()) {
       return yield* applicationFailure("invalid_capability", "The capability has expired.", 401);
     }
-    const guestId =
-      guestName === undefined
-        ? undefined
-        : yield* personId(`${identifierTag.guest}_${id}`).pipe(Effect.mapError(toApplicationError));
-    return {
-      access: record.access,
-      documentId: targetDocumentId,
-      generation: record.generation,
-      guestId,
-      kind: "capability",
-    };
+    return record;
   });
+}
+
+function capabilityWithGeneration(
+  capability: CapabilityRecord,
+  generation: number,
+): CapabilityRecord {
+  return { ...capability, generation };
+}
+
+function sameShareConfiguration(
+  capability: CapabilityRecord,
+  request: ShareLinkCreateRequest,
+): boolean {
+  return (
+    capability.access === request.access &&
+    capability.expiresAt === request.expiresAt &&
+    (capability.passwordHash !== undefined) === (request.password !== undefined)
+  );
+}
+
+function strongestCapabilityAccess(
+  capabilities: readonly { readonly access: Exclude<CapabilityAccess, "disabled"> }[],
+): CapabilityAccess {
+  if (capabilities.some((capability) => capability.access === "edit")) return "edit";
+  if (capabilities.some((capability) => capability.access === "comment")) return "comment";
+  return capabilities.length === 0 ? "disabled" : "view";
+}
+
+function shareLinksResponse(
+  metadata: DocumentMetadata,
+  capabilities: readonly CapabilityRecord[],
+  baseUrl: string,
+): ShareLinksResponse {
+  const links = capabilities
+    .map((capability): ShareLinkDto => {
+      const capabilityToken =
+        capability.retainedSecret === undefined
+          ? undefined
+          : `cap.${capability.documentId}.${capability.id}.${capability.retainedSecret}`;
+      return {
+        access: capability.access,
+        createdAt: capability.createdAt ?? metadata.createdAt,
+        expiresAt: capability.expiresAt,
+        id: capability.id,
+        passwordProtected: capability.passwordHash !== undefined,
+        url:
+          capabilityToken === undefined
+            ? undefined
+            : `${baseUrl}/share/${encodeURIComponent(capability.documentId)}?cap=${encodeURIComponent(capabilityToken)}`,
+      };
+    })
+    .toSorted((left, right) => right.createdAt.localeCompare(left.createdAt));
+  return { links, policy: metadata.sharing, revision: metadata.headRevision };
 }
 
 function allowedActions(

@@ -145,7 +145,7 @@ export function EditorScreen({
         onSharingChanged={(response) =>
           setMetadata((current) => ({
             ...current,
-            headRevision: current.headRevision + 1,
+            headRevision: response.revision,
             sharing: response.policy,
           }))
         }
