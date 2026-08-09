@@ -60,7 +60,10 @@ test(
       assert.equal(await first.title(), "Inkling");
       assert.equal(await first.locator("[data-workspace-heading] > div > p").count(), 0);
       assert.equal(await first.locator("[data-workspace-heading] h1").textContent(), "Inkling");
-      assert.equal(await first.locator(".wordmark").textContent(), "Inkling");
+      assert.equal(
+        await first.getByRole("link", { name: "Inkling home" }).textContent(),
+        "Inkling",
+      );
       assert.equal(await first.locator("[data-account-name]").textContent(), "Browser Admin");
       assert.equal(await first.locator("[data-api-status]").count(), 0);
       assert.equal(await first.locator("[data-catalog-tools] [data-logout]").count(), 0);
@@ -69,19 +72,16 @@ test(
         "Trash",
       ]);
       assert.equal(await first.locator("[data-account-menu]").isVisible(), false);
-      await first.locator(".account-control__trigger").click();
+      await first.locator("[data-account-trigger]").click();
       assert.deepEqual(await first.locator("[data-account-menu] button").allTextContents(), [
         "API keys",
         "Sign out",
       ]);
       await first.locator("[data-open-api-keys]").click();
-      assert.equal(
-        await first.locator("[data-settings-dialog] .dialog-heading .eyebrow").count(),
-        0,
-      );
+      assert.equal(await first.locator("[data-settings-dialog] [data-dialog-eyebrow]").count(), 0);
       assert.equal(await first.locator("[data-settings-dialog] h2").textContent(), "API keys");
       assert.match(
-        (await first.locator("[data-settings-dialog] .dialog-note").textContent()) ?? "",
+        (await first.locator("[data-settings-note]").textContent()) ?? "",
         /belong to your account/u,
       );
       await first.getByLabel("Key name").fill("Browser agent");
@@ -221,7 +221,7 @@ test(
       await first.keyboard.press("Shift+Home");
       await first.keyboard.insertText("labels: [] invalid");
       await first.waitForTimeout(100);
-      assert.equal(await first.locator("[data-toasts] .toast").count(), 0);
+      assert.equal(await first.locator("[data-toasts] [data-toast]").count(), 0);
       assert.equal(
         await first.locator("[data-preview-scroller] [data-document-page] h1").textContent(),
         "Browser collaboration",
@@ -254,7 +254,7 @@ test(
           (document) => document.metadata.title === "Browser collaboration",
         );
       });
-      await first.locator(".wordmark").click();
+      await first.getByRole("link", { name: "Inkling home" }).click();
       await first.waitForSelector("[data-document-search]");
       assert.equal(await first.title(), "Inkling");
       await first.getByRole("link", { name: "Browse labels" }).click();
@@ -435,7 +435,7 @@ test(
       const renderedKeyword = first.locator("[data-preview] .tok-keyword");
       assert.equal(await renderedKeyword.textContent(), "const");
       assert.equal(await renderedKeyword.getAttribute("class"), editorKeywordClass);
-      assert.equal(await first.locator(".reader-back-link").count(), 0);
+      assert.equal(await first.getByRole("link", { name: "Back" }).count(), 0);
       const readerState = first.locator("[data-reader] [data-lifecycle-state]");
       assert.equal(await readerState.getAttribute("href"), "/?q=state%3Adraft");
       await readerState.click();
@@ -476,7 +476,7 @@ test(
       await first.waitForFunction(
         () => document.querySelector("[data-save-state]")?.textContent === "Saved",
       );
-      await first.locator(".wordmark").click();
+      await first.getByRole("link", { name: "Inkling home" }).click();
       await first.waitForSelector("[data-document-search]");
       assert.equal(await first.locator("[data-catalog-document-id]").count(), 2);
       await first.keyboard.press("j");
@@ -515,7 +515,7 @@ test(
         await documentSearch.evaluate((input) => [input.selectionStart, input.selectionEnd]),
         [9, 9],
       );
-      await first.locator(".wordmark").click();
+      await first.getByRole("link", { name: "Inkling home" }).click();
       await first.waitForFunction(
         () =>
           new URL(location.href).searchParams.get("q") === null &&
@@ -1100,7 +1100,7 @@ test(
       const protectedContext = await browser.newContext();
       const protectedPage = await protectedContext.newPage();
       await protectedPage.goto(protectedCapabilityUrl);
-      await protectedPage.waitForSelector(".share-password-layout");
+      await protectedPage.waitForSelector("[data-share-password-screen]");
       await protectedPage.getByLabel("Password", { exact: true }).fill("wrong password");
       await protectedPage.getByRole("button", { name: "Open document" }).click();
       await protectedPage.getByText("The share password is incorrect.").waitFor();
@@ -1313,7 +1313,7 @@ test(
       await first.waitForSelector(`[data-hard-delete-document="${trashDocumentId}"]`);
       await first.locator(`[data-hard-delete-document="${trashDocumentId}"]`).click();
       await first
-        .locator(".confirmation-dialog")
+        .locator("[data-confirmation-dialog]")
         .getByRole("button", { name: "Delete forever" })
         .click();
       await first.waitForSelector(`[data-trash-document="${trashDocumentId}"]`, {
@@ -1353,7 +1353,7 @@ test(
       const logoutResponse = first.waitForResponse((response) =>
         response.url().endsWith("/api/auth/logout"),
       );
-      await first.locator(".account-control__trigger").click();
+      await first.locator("[data-account-trigger]").click();
       await first.locator("[data-logout]").click();
       assert.equal((await logoutResponse).status(), 200);
       await first.waitForSelector("[data-public-catalog]");

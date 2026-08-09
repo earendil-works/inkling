@@ -1,5 +1,7 @@
 import type { ButtonHTMLAttributes } from "react";
 
+import styles from "./button.module.css";
+
 export type ButtonVariant = "icon" | "plain" | "primary" | "text" | "toolbar";
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -15,12 +17,13 @@ export function Button({
   ...props
 }: ButtonProps): React.JSX.Element {
   const classes = [
-    variant === "plain" ? undefined : `${variant}-button`,
-    variant === "primary" && size === "small" ? "primary-button--small" : undefined,
+    styles["base"],
+    variant === "plain" ? undefined : styles[variant],
+    variant === "primary" && size === "small" ? styles["small"] : undefined,
     className,
   ]
     .filter(Boolean)
     .join(" ");
 
-  return <button {...props} className={classes || undefined} type={type} />;
+  return <button {...props} className={classes} type={type} />;
 }

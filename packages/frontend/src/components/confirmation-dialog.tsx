@@ -2,6 +2,7 @@ import { useId } from "react";
 import type { ReactNode } from "react";
 
 import { Button } from "./button.tsx";
+import styles from "./confirmation-dialog.module.css";
 import { ModalDialog } from "./modal-dialog.tsx";
 
 export interface ConfirmationDialogProps {
@@ -32,7 +33,8 @@ export function ConfirmationDialog({
     <ModalDialog
       aria-describedby={descriptionId}
       aria-labelledby={titleId}
-      className="confirmation-dialog"
+      className={styles["dialog"]}
+      data-confirmation-dialog=""
       onDismiss={onCancel}
       open={open}
       preventDismiss={pending}
@@ -44,18 +46,18 @@ export function ConfirmationDialog({
         }}
       >
         <div>
-          <p className="eyebrow">Please confirm</p>
+          <p className={styles["eyebrow"]}>Please confirm</p>
           <h2 id={titleId}>{title}</h2>
         </div>
-        <p className="dialog-note" id={descriptionId}>
+        <p className={styles["note"]} id={descriptionId}>
           {description}
         </p>
-        <div className="confirmation-dialog__actions">
+        <div className={styles["actions"]}>
           <Button disabled={pending} onClick={onCancel} variant="toolbar">
             Cancel
           </Button>
           <Button
-            className={tone === "danger" ? "confirmation-dialog__danger" : undefined}
+            className={tone === "danger" ? styles["danger"] : undefined}
             disabled={pending}
             type="submit"
             variant="primary"

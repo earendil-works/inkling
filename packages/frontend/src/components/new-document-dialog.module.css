@@ -1,0 +1,9 @@
+.dialog {
+  width: min(40rem, calc(100vw - 2rem));
+  padding: 1.5rem;
+}
+
+.dialog form {
+  display: grid;
+  gap: 1rem;
+}

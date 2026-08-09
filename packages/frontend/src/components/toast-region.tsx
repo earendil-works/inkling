@@ -2,6 +2,7 @@ import { useCallback, useEffect, useImperativeHandle, useRef, useState } from "r
 import type { Ref } from "react";
 
 import type { ToastKind } from "../app-context.tsx";
+import styles from "./toast-region.module.css";
 
 interface ToastMessage {
   readonly id: number;
@@ -42,9 +43,13 @@ export function ToastRegion({ ref }: ToastRegionProps): React.JSX.Element {
   );
 
   return (
-    <div className="toast-region" data-toasts="" role="status" aria-live="polite">
+    <div className={styles["region"]} data-toasts="" role="status" aria-live="polite">
       {toasts.map((toast) => (
-        <div className={`toast toast--${toast.kind}`} key={toast.id}>
+        <div
+          className={`${styles["toast"]}${toast.kind === "error" ? ` ${styles["error"]}` : ""}`}
+          data-toast={toast.kind}
+          key={toast.id}
+        >
           {toast.message}
         </div>
       ))}

@@ -1,6 +1,8 @@
 import { useId } from "react";
 import type { InputHTMLAttributes, ReactNode, Ref } from "react";
 
+import styles from "./form-controls.module.css";
+
 export interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "className"> {
   readonly className?: string | undefined;
   readonly error?: string | undefined;
@@ -27,18 +29,18 @@ export function TextField({
     .join(" ");
 
   return (
-    <label className={["field", className].filter(Boolean).join(" ")} htmlFor={id}>
-      <span className="field__label">{label}</span>
+    <label className={[styles["field"], className].filter(Boolean).join(" ")} htmlFor={id}>
+      <span className={styles["label"]}>{label}</span>
       <input
         {...inputProps}
         aria-describedby={describedBy || undefined}
         aria-invalid={error === undefined ? inputProps["aria-invalid"] : true}
-        className={["field__control", inputClassName].filter(Boolean).join(" ")}
+        className={[styles["control"], inputClassName].filter(Boolean).join(" ")}
         id={id}
         ref={ref}
       />
       {error === undefined ? null : (
-        <span className="field__error" id={errorId} role="alert">
+        <span className={styles["error"]} id={errorId} role="alert">
           {error}
         </span>
       )}

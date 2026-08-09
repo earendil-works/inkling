@@ -1,6 +1,8 @@
 import { useId } from "react";
 import type { InputHTMLAttributes, ReactNode, Ref } from "react";
 
+import styles from "./form-controls.module.css";
+
 export interface CheckboxFieldProps extends Omit<
   InputHTMLAttributes<HTMLInputElement>,
   "className" | "type"
@@ -21,7 +23,7 @@ export function CheckboxField({
   const id = providedId ?? generatedId;
 
   return (
-    <label className={["checkbox-field", className].filter(Boolean).join(" ")} htmlFor={id}>
+    <label className={[styles["checkbox"], className].filter(Boolean).join(" ")} htmlFor={id}>
       <input {...inputProps} id={id} ref={ref} type="checkbox" />
       <span>{label}</span>
     </label>

@@ -1,0 +1,82 @@
+.root {
+  position: relative;
+  min-width: 0;
+  padding-left: 0.9rem;
+  border-left: 1px solid var(--border);
+  font-family: var(--mono);
+}
+
+.trigger {
+  display: flex;
+  max-width: min(18rem, 30vw);
+  min-height: 2rem;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0;
+  list-style: none;
+  font-size: var(--font-caption);
+}
+
+.trigger::-webkit-details-marker {
+  display: none;
+}
+
+.trigger strong {
+  overflow: hidden;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  transform: translateY(0.0625rem);
+  white-space: nowrap;
+}
+
+.trigger svg {
+  width: 0.75rem;
+  flex: none;
+  transition: transform 120ms ease;
+}
+
+.root[open] .trigger svg {
+  transform: rotate(180deg);
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 0.65rem);
+  right: 0;
+  display: grid;
+  width: 11.5rem;
+  padding: 0.35rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.menu button {
+  width: 100%;
+  padding: 0.65rem 0.7rem;
+  border-radius: 2px;
+  color: var(--text);
+  text-align: left;
+  text-transform: none;
+}
+
+.menu button:hover {
+  background: var(--surface-muted);
+}
+
+.menu [data-logout] {
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  color: var(--muted);
+}
+
+@media (width <= 34rem) {
+  .root {
+    padding-left: 0.55rem;
+  }
+
+  .trigger {
+    max-width: 8.5rem;
+  }
+}

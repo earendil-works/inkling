@@ -10,6 +10,7 @@ import { ConfirmationDialog } from "./confirmation-dialog.tsx";
 import { DialogHeader } from "./dialog-header.tsx";
 import { FormError } from "./form-error.tsx";
 import { ModalDialog } from "./modal-dialog.tsx";
+import styles from "./settings-dialog.module.css";
 import { TextField } from "./text-field.tsx";
 
 export interface SettingsDialogProps {
@@ -66,7 +67,7 @@ export function SettingsDialog({ api, onClose }: SettingsDialogProps): React.JSX
     <>
       <ModalDialog
         aria-labelledby="settings-dialog-title"
-        className="settings-dialog"
+        className={styles["dialog"]}
         data-settings-dialog=""
         onDismiss={onClose}
         open
@@ -78,20 +79,20 @@ export function SettingsDialog({ api, onClose }: SettingsDialogProps): React.JSX
             title="API keys"
             titleId="settings-dialog-title"
           />
-          <p className="dialog-note">
+          <p className={styles["note"]} data-settings-note="">
             Keys belong to your account and have the same workspace permissions you do. Use one to
             connect the Inkling CLI or a coding agent.
           </p>
 
           {revealedKey === undefined ? null : (
-            <section className="api-key-reveal" data-api-key-reveal="">
-              <p className="eyebrow">API key created</p>
+            <section className={styles["reveal"]} data-api-key-reveal="">
+              <p className={styles["revealEyebrow"]}>API key created</p>
               <h3>Copy this key now</h3>
               <p>The secret is shown only once.</p>
               <pre data-api-key-secret="">
                 <code>{revealedKey}</code>
               </pre>
-              <div className="api-key-reveal__action">
+              <div className={styles["revealAction"]}>
                 <Button
                   data-copy-api-key=""
                   onClick={() =>
@@ -112,12 +113,12 @@ export function SettingsDialog({ api, onClose }: SettingsDialogProps): React.JSX
             </section>
           )}
 
-          <section className="api-key-create" aria-labelledby="api-key-create-title">
+          <section className={styles["create"]} aria-labelledby="api-key-create-title">
             <div>
               <h3 id="api-key-create-title">Create a personal key</h3>
               <p>Name the device or agent so it is easy to revoke later.</p>
             </div>
-            <div className="api-key-create__controls">
+            <div className={styles["createControls"]}>
               <TextField
                 label="Key name"
                 maxLength={200}
@@ -132,17 +133,17 @@ export function SettingsDialog({ api, onClose }: SettingsDialogProps): React.JSX
             </div>
           </section>
 
-          <section className="api-key-list" aria-labelledby="api-key-list-title" data-api-keys="">
-            <div className="api-key-list__heading">
+          <section className={styles["list"]} aria-labelledby="api-key-list-title" data-api-keys="">
+            <div className={styles["listHeading"]}>
               <h3 id="api-key-list-title">Active keys</h3>
               <span>{activeKeys.length}</span>
             </div>
             {keyQuery.state.status === "loading" && keys.length === 0 ? <p>Loading keys…</p> : null}
             {activeKeys.length === 0 && keyQuery.state.status !== "loading" ? (
-              <p className="api-key-list__empty">No active API keys.</p>
+              <p className={styles["listEmpty"]}>No active API keys.</p>
             ) : null}
             {activeKeys.map((key) => (
-              <div className="api-key-row" key={key.id}>
+              <div className={styles["keyRow"]} key={key.id}>
                 <span>
                   <b>{key.label}</b>
                   <small>{keyActivity(key)}</small>

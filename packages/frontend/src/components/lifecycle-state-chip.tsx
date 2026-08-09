@@ -1,3 +1,5 @@
+import styles from "./lifecycle-state-chip.module.css";
+
 export interface LifecycleStateChipProps {
   readonly className?: string | undefined;
   readonly href?: string | undefined;
@@ -10,7 +12,7 @@ export function LifecycleStateChip({
   state,
 }: LifecycleStateChipProps): React.JSX.Element {
   const properties = {
-    className: ["lifecycle-state-chip", className].filter(Boolean).join(" "),
+    className: [styles["root"], className].filter(Boolean).join(" "),
     "data-lifecycle-state": state.trim().toLocaleLowerCase("en"),
   };
   return href === undefined ? (

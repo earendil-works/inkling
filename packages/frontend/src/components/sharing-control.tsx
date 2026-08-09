@@ -18,6 +18,7 @@ import { DialogHeader } from "./dialog-header.tsx";
 import { FormError } from "./form-error.tsx";
 import { ModalDialog } from "./modal-dialog.tsx";
 import { SelectField } from "./select-field.tsx";
+import styles from "./sharing-control.module.css";
 import { TextField } from "./text-field.tsx";
 
 type ShareAccess = "view" | "comment" | "edit";
@@ -91,7 +92,7 @@ export function SharingControl({
       </Button>
       <ModalDialog
         aria-labelledby="sharing-dialog-title"
-        className="sharing-dialog"
+        className={styles["dialog"]}
         onDismiss={dismiss}
         open={open}
         preventDismiss={pending}
@@ -128,15 +129,15 @@ export function SharingControl({
             titleId="sharing-dialog-title"
           />
 
-          <section className="share-link-list" aria-labelledby="share-link-list-title">
-            <div className="share-link-list__heading">
+          <section className={styles["linkList"]} aria-labelledby="share-link-list-title">
+            <div className={styles["listHeading"]}>
               <h3 id="share-link-list-title">Active links</h3>
               <span>{links.length}</span>
             </div>
             {linksQuery.state.status === "loading" && links.length === 0 ? (
-              <p className="share-link-list__empty">Loading share links…</p>
+              <p className={styles["listEmpty"]}>Loading share links…</p>
             ) : links.length === 0 ? (
-              <p className="share-link-list__empty">This document has no share links.</p>
+              <p className={styles["listEmpty"]}>This document has no share links.</p>
             ) : (
               links.map((link) => (
                 <ShareLinkRow
@@ -166,7 +167,7 @@ export function SharingControl({
             ) : null}
           </section>
 
-          <section className="share-link-create" aria-labelledby="share-link-create-title">
+          <section className={styles["linkCreate"]} aria-labelledby="share-link-create-title">
             <h3 id="share-link-create-title">Create a link</h3>
             <SelectField
               label="Anyone with this link can"
@@ -197,7 +198,7 @@ export function SharingControl({
               />
             ) : null}
             {duplicateConfiguration ? (
-              <p className="dialog-note" data-share-duplicate="">
+              <p className={styles["note"]} data-share-duplicate="">
                 A link with this access and protection already exists.
               </p>
             ) : null}
@@ -233,7 +234,7 @@ function ShareLinkRow({
   readonly onDelete: (id: string) => void;
 }): React.JSX.Element {
   return (
-    <div className="share-link-row" data-share-link={link.id}>
+    <div className={styles["linkRow"]} data-share-link={link.id}>
       <span>
         <b>{accessLabel(link.access)}</b>
         <small>
@@ -244,7 +245,7 @@ function ShareLinkRow({
           <small>Created before retained links; its URL cannot be shown again.</small>
         ) : null}
       </span>
-      <div className="share-link-row__actions">
+      <div className={styles["rowActions"]}>
         {link.url === undefined ? null : (
           <Button
             aria-label={`Copy ${accessLabel(link.access).toLocaleLowerCase("en")} share link`}
@@ -257,7 +258,7 @@ function ShareLinkRow({
         )}
         <Button
           aria-label={`Delete ${accessLabel(link.access).toLocaleLowerCase("en")} share link`}
-          className="share-link-row__delete"
+          className={styles["delete"]}
           disabled={disabled}
           onClick={() => onDelete(link.id)}
           variant="text"

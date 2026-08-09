@@ -1,0 +1,176 @@
+.masthead {
+  position: relative;
+  z-index: 30;
+  display: flex;
+  height: var(--masthead-height);
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--page-padding);
+  border-bottom: 1px solid var(--border);
+  background: var(--page);
+}
+
+.masthead::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: var(--accent);
+  content: "";
+  opacity: 0;
+  transform: scaleX(0.08);
+  transform-origin: left;
+}
+
+:global(:root[data-navigating]) .masthead::after {
+  opacity: 1;
+  transform: scaleX(0.86);
+  transition:
+    opacity 60ms ease,
+    transform 180ms ease-out;
+}
+
+:global(:root[data-navigation-complete]) .masthead::after {
+  opacity: 0;
+  transform: scaleX(1);
+  transition:
+    opacity 80ms ease 90ms,
+    transform 70ms ease-out;
+}
+
+.right,
+.apiState,
+.participants {
+  display: flex;
+  align-items: center;
+}
+
+.right {
+  flex: none;
+  gap: 0.9rem;
+}
+
+.breadcrumbs {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.breadcrumbs ol,
+.breadcrumbs li {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.breadcrumbs ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.breadcrumbs li {
+  flex: none;
+}
+
+.breadcrumbs .truncate {
+  flex: 0 1 auto;
+}
+
+.separator {
+  margin: 0 0.55rem;
+  color: var(--muted);
+  font: 500 var(--font-caption) / 1 var(--mono);
+}
+
+.wordmark,
+.breadcrumbLabel {
+  display: block;
+  overflow: hidden;
+  color: var(--text);
+  font: 650 var(--font-small) / 1 var(--mono);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wordmark {
+  font-weight: 800;
+  letter-spacing: 0.09em;
+}
+
+.breadcrumbLabel {
+  letter-spacing: -0.01em;
+}
+
+a.breadcrumbLabel:hover {
+  color: var(--accent);
+}
+
+.apiState {
+  gap: 0.45rem;
+  color: var(--muted);
+  font: var(--font-caption) / 1 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.apiLight {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--danger);
+}
+
+:global(:root[data-api="ready"]) .apiLight {
+  background: var(--accent);
+}
+
+:global(:root[data-api="saving"]) .apiLight,
+:global(:root[data-api="connecting"]) .apiLight {
+  animation: pulse 0.9s infinite alternate;
+}
+
+.themeToggle svg {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+}
+
+.signIn {
+  flex: none;
+  text-decoration: none;
+}
+
+.participants {
+  gap: 0.25rem;
+}
+
+.participant {
+  display: grid;
+  width: 1.55rem;
+  height: 1.55rem;
+  place-items: center;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--participant);
+  color: oklch(18% 0.02 260);
+  font: var(--font-caption) var(--mono);
+}
+
+@keyframes pulse {
+  to {
+    opacity: 0.25;
+  }
+}
+
+@media (width <= 34rem) {
+  .apiState span:last-child {
+    display: none;
+  }
+
+  .right {
+    gap: 0.55rem;
+  }
+}

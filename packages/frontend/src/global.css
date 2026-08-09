@@ -1,0 +1,177 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+:root {
+  color-scheme: light;
+  --page: #faf9f6;
+  --surface: #fffefa;
+  --surface-muted: #f1f0ec;
+  --editor-background: color-mix(in oklab, var(--page) 96%, var(--text));
+  --editor-active-line-background: color-mix(in oklab, var(--editor-background) 96%, var(--text));
+  --text: #353431;
+  --muted: #74716c;
+  --border: #d8d5cf;
+  --border-strong: #bcb8b1;
+  --accent: #353431;
+  --accent-contrast: #faf9f6;
+  --accent-soft: #e8e6e0;
+  --focus-ring: #9b6b4a;
+  --danger: #a44335;
+  --state-draft-bg: light-dark(#ece7de, #28251f);
+  --state-draft-border: light-dark(#d9cfc0, #454036);
+  --state-draft-text: light-dark(#6f665b, #c8bdad);
+  --state-discussion-bg: light-dark(#e1e9d6, #1f3021);
+  --state-discussion-border: light-dark(#c8d5b6, #3e5a3c);
+  --state-discussion-text: light-dark(#4f6540, #b9d6a8);
+  --state-published-bg: light-dark(#dce7f1, #1c2a36);
+  --state-published-border: light-dark(#c2d3e4, #38506a);
+  --state-published-text: light-dark(#3f5e7a, #b9d4ee);
+  --state-accepted-bg: light-dark(#d9e9df, #1d3024);
+  --state-accepted-border: light-dark(#bad2c2, #3c6047);
+  --state-accepted-text: light-dark(#3f654c, #b8ddc1);
+  --state-implemented-bg: light-dark(#5c765f, #2f5b39);
+  --state-implemented-border: light-dark(#4b6550, #4a8256);
+  --state-implemented-text: light-dark(#eef4ea, #eff8ed);
+  --state-abandoned-bg: light-dark(#efdcd5, #341f20);
+  --state-abandoned-border: light-dark(#e0c2b8, #673f3f);
+  --state-abandoned-text: light-dark(#8a4a42, #efb9b5);
+  --visibility-public-bg: light-dark(#f4f8f5, #363b38);
+  --visibility-public-hover: light-dark(#edf4ef, #3a423d);
+  --visibility-public-border: light-dark(#c5d6ca, #59685e);
+  --visibility-public-text: light-dark(#52695a, #c6d6ca);
+  --visibility-private-bg: light-dark(#faf7ed, #3a3832);
+  --visibility-private-hover: light-dark(#f6f1e2, #403d35);
+  --visibility-private-border: light-dark(#ddd2ad, #6e674f);
+  --visibility-private-text: light-dark(#746a4d, #ded4b5);
+  --visibility-confidential-bg: light-dark(#faf2f1, #3a3433);
+  --visibility-confidential-hover: light-dark(#f7eae8, #423938);
+  --visibility-confidential-border: light-dark(#dfc3be, #725d59);
+  --visibility-confidential-text: light-dark(#775952, #dec7c3);
+  --shadow: 0 18px 48px rgb(53 52 49 / 14%);
+  --page-padding: 4.6875rem;
+  --masthead-height: 4rem;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #2e2d2b;
+  --surface: #343330;
+  --surface-muted: #3a3936;
+  --editor-background: color-mix(in oklab, var(--page) 96%, var(--text));
+  --editor-active-line-background: color-mix(in oklab, var(--editor-background) 96%, var(--text));
+  --text: #f8f7f4;
+  --muted: #aaa7a1;
+  --border: #4a4844;
+  --border-strong: #66635d;
+  --accent: #f8f7f4;
+  --accent-contrast: #2e2d2b;
+  --accent-soft: #44423e;
+  --focus-ring: #d5a27c;
+  --danger: #ef806c;
+  --shadow: 0 18px 48px rgb(0 0 0 / 32%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --page: #2e2d2b;
+    --surface: #343330;
+    --surface-muted: #3a3936;
+    --editor-background: color-mix(in oklab, var(--page) 96%, var(--text));
+    --editor-active-line-background: color-mix(in oklab, var(--editor-background) 96%, var(--text));
+    --text: #f8f7f4;
+    --muted: #aaa7a1;
+    --border: #4a4844;
+    --border-strong: #66635d;
+    --accent: #f8f7f4;
+    --accent-contrast: #2e2d2b;
+    --accent-soft: #44423e;
+    --focus-ring: #d5a27c;
+    --danger: #ef806c;
+    --shadow: 0 18px 48px rgb(0 0 0 / 32%);
+  }
+}
+
+html {
+  min-width: 20rem;
+  min-height: 100%;
+  background: var(--page);
+}
+
+body,
+h1,
+h2,
+h3,
+p,
+blockquote {
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--page);
+  color: var(--text);
+  font-family: var(--serif);
+}
+
+#app {
+  min-height: calc(100vh - var(--masthead-height));
+}
+
+button,
+input,
+textarea,
+select {
+  color: inherit;
+  font: inherit;
+}
+
+button,
+a,
+summary {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+summary {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+@media (width <= 52rem) {
+  :root {
+    --page-padding: 2.5rem;
+  }
+}
+
+@media (width <= 34rem) {
+  :root {
+    --page-padding: 1.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

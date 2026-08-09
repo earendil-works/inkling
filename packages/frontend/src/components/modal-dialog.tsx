@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import type { DialogHTMLAttributes } from "react";
 
+import styles from "./modal-dialog.module.css";
+
 export interface ModalDialogProps extends Omit<
   DialogHTMLAttributes<HTMLDialogElement>,
   "onCancel" | "open"
@@ -29,7 +31,7 @@ export function ModalDialog({
   return (
     <dialog
       {...dialogProps}
-      className={["modal-dialog", className].filter(Boolean).join(" ")}
+      className={[styles["dialog"], className].filter(Boolean).join(" ")}
       onCancel={(event) => {
         event.preventDefault();
         if (!preventDismiss) onDismiss();

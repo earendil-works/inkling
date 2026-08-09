@@ -1,0 +1,143 @@
+.dialog {
+  width: min(36rem, calc(100vw - 2rem));
+  max-height: min(48rem, calc(100dvh - 2rem));
+  padding: 1.5rem;
+  overflow: auto;
+}
+
+.dialog form {
+  display: grid;
+  gap: 1rem;
+}
+
+.note {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--font-ui);
+  line-height: 1.5;
+}
+
+.create,
+.list {
+  display: grid;
+  gap: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.create h3,
+.list h3,
+.reveal h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.create p,
+.listEmpty,
+.reveal p,
+.reveal small {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--font-small);
+  line-height: 1.45;
+}
+
+.createControls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.65rem;
+}
+
+.createControls button {
+  min-height: 2.55rem;
+}
+
+.listHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.listHeading span {
+  display: inline-grid;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--muted);
+  font: var(--font-caption) / 1 var(--mono);
+  place-items: center;
+}
+
+.keyRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.keyRow span {
+  display: grid;
+  min-width: 0;
+  gap: 0.25rem;
+}
+
+.keyRow b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.keyRow small {
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+.reveal {
+  display: grid;
+  gap: 0.65rem;
+  padding: 1rem;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+}
+
+.revealEyebrow {
+  margin: 0;
+  color: var(--text);
+  font: var(--font-caption) / 1.3 var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.reveal pre {
+  margin: 0;
+  overflow: auto;
+  padding: 0.75rem;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  font: var(--font-caption) / 1.5 var(--mono);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.revealAction {
+  display: flex;
+  min-height: 1.75rem;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.revealAction span {
+  color: var(--muted);
+  font: var(--font-caption) / 1 var(--mono);
+}
+
+@media (width <= 34rem) {
+  .createControls {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,23 @@
+.region {
+  position: fixed;
+  z-index: 100;
+  right: 1rem;
+  bottom: 1rem;
+  display: grid;
+  width: min(24rem, calc(100vw - 2rem));
+  gap: 0.5rem;
+}
+
+.toast {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--text);
+  box-shadow: var(--shadow);
+  color: var(--page);
+  font: var(--font-small) / 1.4 var(--mono);
+}
+
+.error {
+  border-left: 4px solid var(--danger);
+}

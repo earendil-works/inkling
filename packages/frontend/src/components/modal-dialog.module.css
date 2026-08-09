@@ -1,0 +1,12 @@
+.dialog {
+  margin: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--text);
+}
+
+.dialog::backdrop {
+  background: rgb(8 12 10 / 42%);
+}

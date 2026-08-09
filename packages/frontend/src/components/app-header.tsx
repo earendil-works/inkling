@@ -6,6 +6,7 @@ import type { PresenceDto } from "@earendil-works/inkling-protocol";
 import type { ApiClientService } from "../api.ts";
 import type { AppStatus } from "../app-context.tsx";
 import { AccountControl } from "./account-control.tsx";
+import styles from "./app-header.module.css";
 import type { AccountControlProps } from "./account-control.tsx";
 import { Button } from "./button.tsx";
 import { ButtonLink } from "./button-link.tsx";
@@ -51,19 +52,19 @@ export function AppHeader({
   };
 
   return (
-    <header className="masthead">
-      <nav className="breadcrumbs" aria-label="Breadcrumb" data-breadcrumbs="">
+    <header className={styles["masthead"]}>
+      <nav className={styles["breadcrumbs"]} aria-label="Breadcrumb" data-breadcrumbs="">
         <ol>
           {breadcrumbs.map((breadcrumb, index) => {
             const current = index === breadcrumbs.length - 1;
-            const className = index === 0 ? "wordmark" : "breadcrumb-label";
+            const className = index === 0 ? styles["wordmark"] : styles["breadcrumbLabel"];
             return (
               <li
-                className={breadcrumb.truncate === true ? "breadcrumb-item--truncate" : undefined}
+                className={breadcrumb.truncate === true ? styles["truncate"] : undefined}
                 key={`${index}:${breadcrumb.label}`}
               >
                 {index === 0 ? null : (
-                  <span className="breadcrumb-separator" aria-hidden="true">
+                  <span className={styles["separator"]} aria-hidden="true">
                     /
                   </span>
                 )}
@@ -93,11 +94,15 @@ export function AppHeader({
           })}
         </ol>
       </nav>
-      <div className="masthead__right">
-        <div className="participants" data-participants="" aria-label="Connected participants">
+      <div className={styles["right"]}>
+        <div
+          className={styles["participants"]}
+          data-participants=""
+          aria-label="Connected participants"
+        >
           {participants.map((participant) => (
             <span
-              className="participant"
+              className={styles["participant"]}
               key={participant.participantId}
               style={{ "--participant": participant.color } as CSSProperties}
               title={participant.displayName}
@@ -107,13 +112,14 @@ export function AppHeader({
           ))}
         </div>
         {status === undefined ? null : (
-          <div className="api-state" role="status" aria-live="polite">
-            <span className="api-state__light" aria-hidden="true" />
+          <div className={styles["apiState"]} role="status" aria-live="polite">
+            <span className={styles["apiLight"]} aria-hidden="true" />
             <span data-api-status="">{status.label}</span>
           </div>
         )}
         <Button
           aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+          className={styles["themeToggle"]}
           data-theme-toggle=""
           onClick={(event) => {
             if (event.detail <= 1) toggleTheme();
@@ -128,7 +134,7 @@ export function AppHeader({
         {account === undefined ? (
           api === undefined ? null : (
             <ButtonLink
-              className="masthead-sign-in"
+              className={styles["signIn"]}
               data-sign-in=""
               href="/api/auth/google/start"
               size="small"

@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { Button } from "./button.tsx";
 import { DialogHeader } from "./dialog-header.tsx";
+import styles from "./guest-identity-dialog.module.css";
 import { ModalDialog } from "./modal-dialog.tsx";
 import { TextField } from "./text-field.tsx";
 
@@ -21,7 +22,7 @@ export function GuestIdentityDialog({
   return (
     <ModalDialog
       aria-labelledby="guest-identity-dialog-title"
-      className="guest-identity-dialog"
+      className={styles["dialog"]}
       onDismiss={onCancel}
       open={open}
     >
@@ -48,7 +49,7 @@ export function GuestIdentityDialog({
           required
           value={displayName}
         />
-        <p className="dialog-note">This name is shown to other document participants.</p>
+        <p className={styles["note"]}>This name is shown to other document participants.</p>
         <Button type="submit" variant="primary">
           Join document
         </Button>

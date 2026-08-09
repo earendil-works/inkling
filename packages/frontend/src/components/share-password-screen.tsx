@@ -4,6 +4,7 @@ import type { ApiClientService, ApiError } from "../api.ts";
 import { useEffectAction } from "../effect-hooks.ts";
 import { Button } from "./button.tsx";
 import { FormError } from "./form-error.tsx";
+import styles from "./share-password-screen.module.css";
 import { TextField } from "./text-field.tsx";
 
 export function SharePasswordScreen({
@@ -21,7 +22,7 @@ export function SharePasswordScreen({
   );
 
   return (
-    <main className="share-password-layout" id="app" tabIndex={-1}>
+    <main className={styles["layout"]} data-share-password-screen="" id="app" tabIndex={-1}>
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -29,7 +30,7 @@ export function SharePasswordScreen({
           unlock.execute(password, { onSuccess: onUnlocked });
         }}
       >
-        <p className="eyebrow">Protected share</p>
+        <p className={styles["eyebrow"]}>Protected share</p>
         <h1>Password required</h1>
         <p>Enter the password supplied by the person who shared this document.</p>
         <TextField

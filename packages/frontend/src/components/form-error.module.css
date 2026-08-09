@@ -1,0 +1,6 @@
+.error {
+  min-height: 1.2em;
+  margin: 0;
+  color: var(--danger);
+  font: var(--font-small) / 1.4 var(--mono);
+}

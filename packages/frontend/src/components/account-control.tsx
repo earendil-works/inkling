@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { AuthenticationStatus } from "@earendil-works/inkling-protocol";
 
 import type { ApiClientService } from "../api.ts";
+import styles from "./account-control.module.css";
 import { Button } from "./button.tsx";
 import { LogoutButton } from "./logout-button.tsx";
 import { SettingsDialog } from "./settings-dialog.tsx";
@@ -44,14 +45,15 @@ export function AccountControl({ account, api }: AccountControlProps): React.JSX
   return (
     <>
       <details
-        className="account-control"
+        className={styles["root"]}
         data-account=""
         onToggle={(event) => setMenuOpen(event.currentTarget.open)}
         ref={detailsRef}
       >
         <summary
           aria-haspopup="menu"
-          className="account-control__trigger"
+          className={styles["trigger"]}
+          data-account-trigger=""
           title={account.email ?? accountName}
         >
           <strong data-account-name="">{accountName}</strong>
@@ -59,7 +61,7 @@ export function AccountControl({ account, api }: AccountControlProps): React.JSX
             <path d="m3 4.5 3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.4" />
           </svg>
         </summary>
-        <div className="account-menu" data-account-menu="" role="menu">
+        <div className={styles["menu"]} data-account-menu="" role="menu">
           <Button
             data-open-api-keys=""
             onClick={() => {

@@ -12,6 +12,7 @@ import { CheckboxField } from "./checkbox-field.tsx";
 import { DialogHeader } from "./dialog-header.tsx";
 import { FormError } from "./form-error.tsx";
 import { ModalDialog } from "./modal-dialog.tsx";
+import styles from "./new-document-dialog.module.css";
 import { TextField } from "./text-field.tsx";
 
 export interface NewDocumentDialogProps {
@@ -55,7 +56,7 @@ export function NewDocumentDialog({
   return (
     <ModalDialog
       aria-labelledby="new-document-dialog-title"
-      className="new-document"
+      className={styles["dialog"]}
       data-new-dialog=""
       onDismiss={onDismiss}
       open={open}

@@ -1,6 +1,7 @@
 import type { ComponentPropsWithoutRef } from "react";
 
 import { Button } from "./button.tsx";
+import styles from "./dialog-header.module.css";
 
 export interface DialogHeaderProps {
   readonly className?: string | undefined;
@@ -15,7 +16,7 @@ export interface DialogHeaderProps {
 }
 
 export function DialogHeader({
-  className = "dialog-heading",
+  className = styles["heading"],
   closeLabel,
   disabled = false,
   eyebrow,
@@ -26,9 +27,13 @@ export function DialogHeader({
   titleProps,
 }: DialogHeaderProps): React.JSX.Element {
   return (
-    <div className={className}>
+    <div className={className} data-dialog-header="">
       <div>
-        {eyebrow === undefined ? null : <p className="eyebrow">{eyebrow}</p>}
+        {eyebrow === undefined ? null : (
+          <p className={styles["eyebrow"]} data-dialog-eyebrow="">
+            {eyebrow}
+          </p>
+        )}
         <h2 {...titleDataAttributes} {...titleProps} id={titleId}>
           {title}
         </h2>

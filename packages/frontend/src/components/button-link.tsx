@@ -1,5 +1,6 @@
 import type { AnchorHTMLAttributes } from "react";
 
+import styles from "./button.module.css";
 import type { ButtonVariant } from "./button.tsx";
 
 export interface ButtonLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
@@ -14,8 +15,9 @@ export function ButtonLink({
   ...props
 }: ButtonLinkProps): React.JSX.Element {
   const classes = [
-    `${variant}-button`,
-    variant === "primary" && size === "small" ? "primary-button--small" : undefined,
+    styles["base"],
+    styles[variant],
+    variant === "primary" && size === "small" ? styles["small"] : undefined,
     className,
   ]
     .filter(Boolean)

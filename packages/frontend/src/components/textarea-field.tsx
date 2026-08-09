@@ -1,6 +1,8 @@
 import { useId } from "react";
 import type { ReactNode, Ref, TextareaHTMLAttributes } from "react";
 
+import styles from "./form-controls.module.css";
+
 export interface TextareaFieldProps extends Omit<
   TextareaHTMLAttributes<HTMLTextAreaElement>,
   "className"
@@ -30,18 +32,18 @@ export function TextareaField({
     .join(" ");
 
   return (
-    <label className={["field", className].filter(Boolean).join(" ")} htmlFor={id}>
-      <span className="field__label">{label}</span>
+    <label className={[styles["field"], className].filter(Boolean).join(" ")} htmlFor={id}>
+      <span className={styles["label"]}>{label}</span>
       <textarea
         {...textareaProps}
         aria-describedby={describedBy || undefined}
         aria-invalid={error === undefined ? textareaProps["aria-invalid"] : true}
-        className={["field__control", textareaClassName].filter(Boolean).join(" ")}
+        className={[styles["control"], textareaClassName].filter(Boolean).join(" ")}
         id={id}
         ref={ref}
       />
       {error === undefined ? null : (
-        <span className="field__error" id={errorId} role="alert">
+        <span className={styles["error"]} id={errorId} role="alert">
           {error}
         </span>
       )}

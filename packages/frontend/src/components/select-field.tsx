@@ -1,6 +1,8 @@
 import { useId } from "react";
 import type { ReactNode, Ref, SelectHTMLAttributes } from "react";
 
+import styles from "./form-controls.module.css";
+
 export interface SelectFieldProps extends Omit<
   SelectHTMLAttributes<HTMLSelectElement>,
   "className"
@@ -31,20 +33,20 @@ export function SelectField({
     .join(" ");
 
   return (
-    <label className={["field", className].filter(Boolean).join(" ")} htmlFor={id}>
-      <span className="field__label">{label}</span>
+    <label className={[styles["field"], className].filter(Boolean).join(" ")} htmlFor={id}>
+      <span className={styles["label"]}>{label}</span>
       <select
         {...selectProps}
         aria-describedby={describedBy || undefined}
         aria-invalid={error === undefined ? selectProps["aria-invalid"] : true}
-        className={["field__control", selectClassName].filter(Boolean).join(" ")}
+        className={[styles["control"], selectClassName].filter(Boolean).join(" ")}
         id={id}
         ref={ref}
       >
         {children}
       </select>
       {error === undefined ? null : (
-        <span className="field__error" id={errorId} role="alert">
+        <span className={styles["error"]} id={errorId} role="alert">
           {error}
         </span>
       )}

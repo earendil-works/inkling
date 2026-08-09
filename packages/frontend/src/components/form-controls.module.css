@@ -1,0 +1,67 @@
+.field {
+  display: grid;
+  gap: 0.4rem;
+  color: var(--muted);
+  font: var(--font-small) / 1.3 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.label {
+  min-width: 0;
+}
+
+.control {
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+}
+
+input.control,
+textarea.control {
+  padding: 0.7rem 0.75rem;
+}
+
+select.control {
+  min-height: 2.4rem;
+  padding: 0.45rem 2rem 0.45rem 0.65rem;
+}
+
+textarea.control {
+  resize: vertical;
+}
+
+.control:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.error {
+  color: var(--danger);
+  line-height: 1.4;
+  text-transform: none;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--muted);
+  font: var(--font-small) / 1.3 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.checkbox input {
+  width: auto;
+  color: inherit;
+  font: inherit;
+}
+
+.checkbox input:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}

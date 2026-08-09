@@ -1,0 +1,52 @@
+.root {
+  display: inline-flex;
+  width: max-content;
+  max-width: 100%;
+  align-items: center;
+  padding: 0.28rem 0.42rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  background: var(--surface-muted);
+  color: var(--muted);
+  font: var(--font-caption) / 1 var(--mono);
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.root[data-lifecycle-state="draft"] {
+  border-color: var(--state-draft-border);
+  background: var(--state-draft-bg);
+  color: var(--state-draft-text);
+}
+
+.root[data-lifecycle-state="discussion"] {
+  border-color: var(--state-discussion-border);
+  background: var(--state-discussion-bg);
+  color: var(--state-discussion-text);
+}
+
+.root[data-lifecycle-state="published"] {
+  border-color: var(--state-published-border);
+  background: var(--state-published-bg);
+  color: var(--state-published-text);
+}
+
+.root[data-lifecycle-state="accepted"] {
+  border-color: var(--state-accepted-border);
+  background: var(--state-accepted-bg);
+  color: var(--state-accepted-text);
+}
+
+.root[data-lifecycle-state="implemented"] {
+  border-color: var(--state-implemented-border);
+  background: var(--state-implemented-bg);
+  color: var(--state-implemented-text);
+}
+
+.root[data-lifecycle-state="abandoned"] {
+  border-color: var(--state-abandoned-border);
+  background: var(--state-abandoned-bg);
+  color: var(--state-abandoned-text);
+}

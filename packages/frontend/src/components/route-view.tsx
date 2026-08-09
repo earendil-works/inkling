@@ -13,6 +13,7 @@ import { LabelsScreen } from "../labels-screen.tsx";
 import { TrashScreen } from "../trash-screen.tsx";
 import { WorkspaceScreen } from "../workspace-screen.tsx";
 import { Button } from "./button.tsx";
+import styles from "./route-view.module.css";
 import { SharePasswordScreen } from "./share-password-screen.tsx";
 
 const loadEditorScreen = () =>
@@ -67,9 +68,9 @@ export function RouteView({ navigationKey, refresh, state }: RouteViewProps): Re
   if (model === undefined) {
     if (state.status === "failure") {
       return (
-        <main className="fatal-layout" id="app" tabIndex={-1}>
+        <main className={styles["fatal"]} id="app" tabIndex={-1}>
           <section>
-            <p className="eyebrow">Runtime failure</p>
+            <p className={styles["eyebrow"]}>Runtime failure</p>
             <h1>Inkling could not open.</h1>
             <p>{state.error.message}</p>
             <Button variant="primary" data-retry="" onClick={refresh}>
@@ -79,7 +80,7 @@ export function RouteView({ navigationKey, refresh, state }: RouteViewProps): Re
         </main>
       );
     }
-    return <main aria-busy="true" className="route-loading" id="app" tabIndex={-1} />;
+    return <main aria-busy="true" className={styles["loading"]} id="app" tabIndex={-1} />;
   }
 
   switch (model.screen) {
@@ -109,7 +110,7 @@ export function RouteView({ navigationKey, refresh, state }: RouteViewProps): Re
       );
     case "reader":
       return (
-        <Suspense fallback={<main aria-busy="true" className="route-loading" id="app" />}>
+        <Suspense fallback={<main aria-busy="true" className={styles["loading"]} id="app" />}>
           <ReaderScreen
             document={model.document}
             publicDocument={model.publicDocument}
@@ -119,7 +120,7 @@ export function RouteView({ navigationKey, refresh, state }: RouteViewProps): Re
       );
     case "editor":
       return (
-        <Suspense fallback={<main aria-busy="true" className="route-loading" id="app" />}>
+        <Suspense fallback={<main aria-busy="true" className={styles["loading"]} id="app" />}>
           <EditorScreen
             account={model.account}
             api={model.api}
