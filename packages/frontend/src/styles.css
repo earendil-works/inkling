@@ -2226,7 +2226,7 @@ select:disabled {
 }
 
 .markdown-body h1 {
-  font-size: clamp(2.25rem, 4vw, 3.5rem);
+  font-size: clamp(1.9rem, 1.75rem + 0.5vw, 2.2rem);
   font-weight: 500;
 }
 

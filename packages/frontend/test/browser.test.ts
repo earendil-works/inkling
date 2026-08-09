@@ -451,17 +451,28 @@ test(
       const typography = await first.evaluate(() => {
         const editor = document.querySelector<HTMLElement>(".cm-scroller");
         const code = document.querySelector<HTMLElement>("[data-preview] pre");
+        const markdownBody = document.querySelector<HTMLElement>("[data-preview].markdown-body");
+        const heading2 = markdownBody?.querySelector<HTMLElement>("h2");
         if (editor === null) throw new Error("Editor scroller is missing.");
         if (code === null) throw new Error("Preview code block is missing.");
+        if (markdownBody === null || heading2 === null) throw new Error("Preview body is missing.");
+        const heading1 = document.createElement("h1");
+        markdownBody.append(heading1);
+        const heading1Size = Number.parseFloat(getComputedStyle(heading1).fontSize);
+        heading1.remove();
         return {
           code: getComputedStyle(code).fontFamily,
           editor: getComputedStyle(editor).fontFamily,
+          heading1: heading1Size,
+          heading2: Number.parseFloat(getComputedStyle(heading2).fontSize),
           prose: getComputedStyle(document.body).fontFamily,
         };
       });
       assert.match(typography.prose, /Newsreader/u);
       assert.match(typography.editor, /JetBrains Mono/u);
       assert.equal(typography.code, typography.editor);
+      assert.ok(typography.heading1 > typography.heading2);
+      assert.ok(typography.heading1 <= 36);
       const editorAppearance = await first.evaluate(async () => {
         const editor = document.querySelector<HTMLElement>(".cm-editor");
         const content = document.querySelector<HTMLElement>(".cm-content");
