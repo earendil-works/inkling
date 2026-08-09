@@ -10,9 +10,16 @@ import type { AccountControlProps } from "./account-control.tsx";
 import { Button } from "./button.tsx";
 import { ButtonLink } from "./button-link.tsx";
 
+export interface BreadcrumbItem {
+  readonly href?: string | undefined;
+  readonly label: string;
+  readonly truncate?: boolean | undefined;
+}
+
 export interface AppHeaderProps {
   readonly account: AccountControlProps["account"] | undefined;
   readonly api: ApiClientService | undefined;
+  readonly breadcrumbs: readonly BreadcrumbItem[];
   readonly participants: readonly PresenceDto[];
   readonly status: AppStatus | undefined;
 }
@@ -20,6 +27,7 @@ export interface AppHeaderProps {
 export function AppHeader({
   account,
   api,
+  breadcrumbs,
   participants,
   status,
 }: AppHeaderProps): React.JSX.Element {
@@ -44,9 +52,47 @@ export function AppHeader({
 
   return (
     <header className="masthead">
-      <a className="wordmark" href="/" aria-label="Inkling home">
-        Inkling
-      </a>
+      <nav className="breadcrumbs" aria-label="Breadcrumb" data-breadcrumbs="">
+        <ol>
+          {breadcrumbs.map((breadcrumb, index) => {
+            const current = index === breadcrumbs.length - 1;
+            const className = index === 0 ? "wordmark" : "breadcrumb-label";
+            return (
+              <li
+                className={breadcrumb.truncate === true ? "breadcrumb-item--truncate" : undefined}
+                key={`${index}:${breadcrumb.label}`}
+              >
+                {index === 0 ? null : (
+                  <span className="breadcrumb-separator" aria-hidden="true">
+                    /
+                  </span>
+                )}
+                {breadcrumb.href === undefined ? (
+                  <span
+                    aria-current={current ? "page" : undefined}
+                    className={className}
+                    data-breadcrumb=""
+                    title={breadcrumb.truncate === true ? breadcrumb.label : undefined}
+                  >
+                    {breadcrumb.label}
+                  </span>
+                ) : (
+                  <a
+                    aria-current={current ? "page" : undefined}
+                    aria-label={index === 0 ? "Inkling home" : undefined}
+                    className={className}
+                    data-breadcrumb=""
+                    href={breadcrumb.href}
+                    title={breadcrumb.truncate === true ? breadcrumb.label : undefined}
+                  >
+                    {breadcrumb.label}
+                  </a>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      </nav>
       <div className="masthead__right">
         <div className="participants" data-participants="" aria-label="Connected participants">
           {participants.map((participant) => (

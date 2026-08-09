@@ -110,6 +110,12 @@ test(
         () => document.querySelector("[data-save-state]")?.textContent === "Saved",
       );
       assert.equal(await first.title(), "Browser collaboration");
+      assert.deepEqual(await first.locator("[data-breadcrumb]").allTextContents(), [
+        "Inkling",
+        "Notes",
+        "Browser collaboration",
+        "Edit",
+      ]);
       const titleLine = first.locator(".cm-line").filter({ hasText: "# Browser collaboration" });
       await titleLine.click();
       await first.keyboard.press("End");
@@ -120,6 +126,17 @@ test(
       assert.equal(await titleLine.textContent(), "# Browser collaboration");
       await first.keyboard.insertText("# Temporary browser title");
       await first.waitForFunction(() => document.title === "Temporary browser title");
+      await first.waitForFunction(
+        () =>
+          document.querySelectorAll("[data-breadcrumb]")[2]?.textContent ===
+          "Temporary browser title",
+      );
+      assert.deepEqual(await first.locator("[data-breadcrumb]").allTextContents(), [
+        "Inkling",
+        "Notes",
+        "Temporary browser title",
+        "Edit",
+      ]);
       const temporaryTitleLine = first
         .locator(".cm-line")
         .filter({ hasText: "# Temporary browser title" });
@@ -184,9 +201,15 @@ test(
       await first.waitForURL(/\/rfcs\/0001\/edit$/u);
       await first.waitForFunction(
         () =>
-          document.querySelector(".document-bar .document-identity > span")?.textContent ===
-          "RFC 0001",
+          document.querySelectorAll("[data-breadcrumb]")[2]?.textContent ===
+          "0001 - Browser collaboration",
       );
+      assert.deepEqual(await first.locator("[data-breadcrumb]").allTextContents(), [
+        "Inkling",
+        "RFCs",
+        "0001 - Browser collaboration",
+        "Edit",
+      ]);
       assert.equal(await first.locator("[data-allocate-rfc]").count(), 0);
       const labelsLine = first.locator(".cm-line").filter({ hasText: "labels: []" });
       await labelsLine.click();
@@ -361,6 +384,11 @@ test(
         "same-document",
       );
       await first.waitForSelector("[data-reader]");
+      assert.deepEqual(await first.locator("[data-breadcrumb]").allTextContents(), [
+        "Inkling",
+        "RFCs",
+        "0001 - Browser collaboration",
+      ]);
       await first.waitForSelector("[data-reader-toc]");
       assert.match(
         await first.locator("[data-reader] [data-document-metadata]").innerText(),
@@ -410,8 +438,21 @@ test(
       await first.waitForURL(/\/labels$/u);
       await first.waitForSelector("[data-label-index]");
       assert.equal(await first.locator(".workspace-heading h1").textContent(), "Labels");
+      assert.deepEqual(await first.locator("[data-breadcrumb]").allTextContents(), [
+        "Inkling",
+        "Labels",
+      ]);
+      assert.equal(await first.locator(".labels-heading .eyebrow").count(), 0);
       await first.getByRole("link", { name: /platform/u }).click();
       assert.equal(new URL(first.url()).searchParams.get("label"), "platform");
+      await first.waitForFunction(
+        () => document.querySelectorAll("[data-breadcrumb]")[2]?.textContent === "platform",
+      );
+      assert.deepEqual(await first.locator("[data-breadcrumb]").allTextContents(), [
+        "Inkling",
+        "Labels",
+        "platform",
+      ]);
       assert.match(await first.locator("[data-catalog]").innerText(), /Browser collaboration/u);
       assert.equal(await first.locator("[data-pending-edits]").count(), 0);
       await first.getByRole("link", { name: "All documents" }).click();

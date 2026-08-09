@@ -10,7 +10,6 @@ import { AllocateRfcButton } from "./allocate-rfc-button.tsx";
 import { AttachmentButton } from "./attachment-button.tsx";
 import { ButtonLink } from "./button-link.tsx";
 import { Button } from "./button.tsx";
-import { DocumentIdentity } from "./document-identity.tsx";
 import { PublishButton } from "./publish-button.tsx";
 import type { PublishButtonProps } from "./publish-button.tsx";
 import { SharingControl } from "./sharing-control.tsx";
@@ -32,7 +31,6 @@ export interface EditorToolbarProps {
   readonly publishDisabledLabel?: string | undefined;
   readonly publicationMetadata: DocumentMetadataDto;
   readonly shared: boolean;
-  readonly title: string;
 }
 
 export function EditorToolbar({
@@ -52,11 +50,9 @@ export function EditorToolbar({
   publishDisabledLabel,
   publicationMetadata,
   shared,
-  title,
 }: EditorToolbarProps): React.JSX.Element {
   return (
     <section className="document-bar">
-      <DocumentIdentity rfcNumber={metadata.rfcNumber} title={title} />
       <div className="document-actions">
         <Button
           aria-pressed={previewOpen}

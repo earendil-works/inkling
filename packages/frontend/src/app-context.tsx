@@ -13,9 +13,16 @@ export interface AppStatus {
 
 export type ToastKind = "error" | "success";
 
+export interface HeaderDocument {
+  readonly id: string;
+  readonly rfcNumber?: number | undefined;
+  readonly title: string;
+}
+
 export interface AppContextValue {
   readonly navigate: (destination: string | URL, options?: NavigateOptions) => void;
   readonly refreshRoute: () => void;
+  readonly setHeaderDocument: Dispatch<SetStateAction<HeaderDocument | undefined>>;
   readonly setParticipants: Dispatch<SetStateAction<readonly PresenceDto[]>>;
   readonly setStatus: Dispatch<SetStateAction<AppStatus | undefined>>;
   readonly showToast: (message: string, kind: ToastKind) => void;

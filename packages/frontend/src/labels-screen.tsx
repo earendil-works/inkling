@@ -29,9 +29,6 @@ export function LabelsScreen({
     <main className="workspace-layout labels-layout" id="app" tabIndex={-1}>
       <section className="workspace-heading labels-heading">
         <div>
-          <p className="eyebrow">
-            <a href="/">Inkling</a> / Labels
-          </p>
           <h1>{selectedLabel ?? "Labels"}</h1>
         </div>
         <ButtonLink href="/" variant="text">

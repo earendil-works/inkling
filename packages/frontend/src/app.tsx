@@ -11,8 +11,9 @@ import type {
 import { ApiError, makeApiClient } from "./api.ts";
 import type { ApiClientService } from "./api.ts";
 import { AppContext } from "./app-context.tsx";
-import type { AppContextValue, AppStatus, ToastKind } from "./app-context.tsx";
+import type { AppContextValue, AppStatus, HeaderDocument, ToastKind } from "./app-context.tsx";
 import { AppHeader } from "./components/app-header.tsx";
+import type { BreadcrumbItem } from "./components/app-header.tsx";
 import { preloadDocumentScreen, RouteView } from "./components/route-view.tsx";
 import type { RouteModel } from "./components/route-view.tsx";
 import { ToastRegion } from "./components/toast-region.tsx";
@@ -34,6 +35,7 @@ export function App(): React.JSX.Element {
   }));
   const routerRef = useRef<ClientRouter | undefined>(undefined);
   const [status, setStatus] = useState<AppStatus>();
+  const [headerDocument, setHeaderDocument] = useState<HeaderDocument>();
   const [participants, setParticipants] = useState<readonly PresenceDto[]>([]);
   const toastRef = useRef<ToastController>(null);
 
@@ -71,9 +73,13 @@ export function App(): React.JSX.Element {
     `${locationState.url.href}:${locationState.generation}`,
   );
   const navigating = route.state.status === "loading";
+  const breadcrumbs = breadcrumbsForRoute(route.state.data, locationState.url, headerDocument);
   const pageTitle =
     route.state.data?.screen === "editor" || route.state.data?.screen === "reader"
-      ? route.state.data.document.metadata.title
+      ? route.state.data.screen === "editor" &&
+        headerDocument?.id === route.state.data.document.metadata.id
+        ? headerDocument.title
+        : route.state.data.document.metadata.title
       : "Inkling";
 
   useEffect(() => {
@@ -108,7 +114,14 @@ export function App(): React.JSX.Element {
   }, [route.state, showToast]);
 
   const context = useMemo<AppContextValue>(
-    () => ({ navigate, refreshRoute, setParticipants, setStatus, showToast }),
+    () => ({
+      navigate,
+      refreshRoute,
+      setHeaderDocument,
+      setParticipants,
+      setStatus,
+      showToast,
+    }),
     [navigate, refreshRoute, showToast],
   );
 
@@ -117,6 +130,7 @@ export function App(): React.JSX.Element {
       <AppHeader
         account={route.state.data?.account}
         api={route.state.data?.api}
+        breadcrumbs={breadcrumbs}
         participants={participants}
         status={status}
       />
@@ -128,6 +142,58 @@ export function App(): React.JSX.Element {
       <ToastRegion ref={toastRef} />
     </AppContext.Provider>
   );
+}
+
+function breadcrumbsForRoute(
+  model: RouteModel | undefined,
+  url: URL,
+  headerDocument: HeaderDocument | undefined,
+): readonly BreadcrumbItem[] {
+  const home: BreadcrumbItem = { href: "/", label: "Inkling" };
+  if (model === undefined) return [home];
+
+  if (model.screen === "labels") {
+    const labels: BreadcrumbItem = {
+      href: model.selectedLabel === undefined ? undefined : "/labels",
+      label: "Labels",
+    };
+    return model.selectedLabel === undefined
+      ? [home, labels]
+      : [home, labels, { label: model.selectedLabel, truncate: true }];
+  }
+
+  if (model.screen === "workspace") {
+    const query = url.searchParams.get("q")?.trim().toLocaleLowerCase("en");
+    if (query === "is:rfc") return [home, { label: "RFCs" }];
+    if (query === "is:note") return [home, { label: "Notes" }];
+    return [home];
+  }
+
+  if (model.screen === "share-password") {
+    return [home, { label: "Shared document" }];
+  }
+
+  const initial = model.document.metadata;
+  const document =
+    model.screen === "editor" && headerDocument?.id === initial.id ? headerDocument : initial;
+  const rfc = document.rfcNumber;
+  const section: BreadcrumbItem = {
+    href: `/?q=${encodeURIComponent(rfc === undefined ? "is:note" : "is:rfc")}`,
+    label: rfc === undefined ? "Notes" : "RFCs",
+  };
+  const documentLabel =
+    rfc === undefined ? document.title : `${String(rfc).padStart(4, "0")} - ${document.title}`;
+  const documentBreadcrumb: BreadcrumbItem = {
+    href:
+      model.screen === "editor"
+        ? `${url.pathname.replace(/\/edit\/?$/u, "")}${url.search}`
+        : undefined,
+    label: documentLabel,
+    truncate: true,
+  };
+  return model.screen === "editor"
+    ? [home, section, documentBreadcrumb, { label: "Edit" }]
+    : [home, section, documentBreadcrumb];
 }
 
 function loadRoute(url: URL): Effect.Effect<RouteModel, ApiError> {

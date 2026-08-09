@@ -35,7 +35,7 @@ export function EditorScreen({
   frontmatterVocabulary,
   shared,
 }: EditorScreenProps): React.JSX.Element {
-  const { navigate, setParticipants, setStatus, showToast } = useAppContext();
+  const { navigate, setHeaderDocument, setParticipants, setStatus, showToast } = useAppContext();
   const previewRef = useRef<HTMLElement>(null);
   const editorCommentsRef = useRef<EditorCommentsHandle>(null);
   const [metadata, setMetadata] = useState(initial.metadata);
@@ -109,7 +109,13 @@ export function EditorScreen({
 
   useEffect(() => {
     document.title = previewMetadata.title;
-  }, [previewMetadata.title]);
+    setHeaderDocument({
+      id: previewMetadata.id,
+      rfcNumber: previewMetadata.rfcNumber,
+      title: previewMetadata.title,
+    });
+  }, [previewMetadata.id, previewMetadata.rfcNumber, previewMetadata.title, setHeaderDocument]);
+  useEffect(() => () => setHeaderDocument(undefined), [setHeaderDocument]);
 
   const openCount = comments.threads.filter((thread) => !thread.resolved).length;
   const layoutClass = `editor-layout ${canEdit ? "is-editable" : "is-reader"}${previewOpen ? " preview-open" : ""}`;
@@ -156,7 +162,6 @@ export function EditorScreen({
         publishDisabledLabel={publishDisabledLabel}
         publicationMetadata={previewMetadata}
         shared={shared}
-        title={previewMetadata.title}
       />
       <EditorWorkbench
         connectionState={connectionState}
