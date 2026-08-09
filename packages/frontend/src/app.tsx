@@ -87,11 +87,19 @@ export function App(): React.JSX.Element {
     }
   }, [status]);
   useEffect(() => {
+    const root = document.documentElement;
+    let completionTimer: ReturnType<typeof setTimeout> | undefined;
     if (navigating) {
-      document.documentElement.dataset["navigating"] = "";
-    } else {
-      delete document.documentElement.dataset["navigating"];
+      delete root.dataset["navigationComplete"];
+      root.dataset["navigating"] = "";
+    } else if (root.dataset["navigating"] !== undefined) {
+      delete root.dataset["navigating"];
+      root.dataset["navigationComplete"] = "";
+      completionTimer = setTimeout(() => delete root.dataset["navigationComplete"], 180);
     }
+    return () => {
+      if (completionTimer !== undefined) clearTimeout(completionTimer);
+    };
   }, [navigating]);
   useEffect(() => {
     if (route.state.status === "failure" && route.state.data !== undefined) {

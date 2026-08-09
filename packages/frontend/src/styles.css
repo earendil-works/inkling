@@ -270,16 +270,24 @@ select:disabled {
   background: var(--accent);
   content: "";
   opacity: 0;
-  transform: scaleX(0.2);
+  transform: scaleX(0.08);
   transform-origin: left;
-  transition:
-    opacity 120ms ease,
-    transform 500ms ease;
 }
 
 :root[data-navigating] .masthead::after {
   opacity: 1;
-  transform: scaleX(0.82);
+  transform: scaleX(0.86);
+  transition:
+    opacity 60ms ease,
+    transform 180ms ease-out;
+}
+
+:root[data-navigation-complete] .masthead::after {
+  opacity: 0;
+  transform: scaleX(1);
+  transition:
+    opacity 80ms ease 90ms,
+    transform 70ms ease-out;
 }
 
 .masthead__right,
