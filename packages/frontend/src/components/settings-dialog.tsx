@@ -13,16 +13,11 @@ import { ModalDialog } from "./modal-dialog.tsx";
 import { TextField } from "./text-field.tsx";
 
 export interface SettingsDialogProps {
-  readonly accountName: string;
   readonly api: ApiClientService;
   readonly onClose: () => void;
 }
 
-export function SettingsDialog({
-  accountName,
-  api,
-  onClose,
-}: SettingsDialogProps): React.JSX.Element {
+export function SettingsDialog({ api, onClose }: SettingsDialogProps): React.JSX.Element {
   const [label, setLabel] = useState("My agent");
   const [keys, setKeys] = useState<readonly ApiKeyDto[]>([]);
   const [revealedKey, setRevealedKey] = useState<string>();
@@ -79,7 +74,6 @@ export function SettingsDialog({
         <form data-settings-form="" onSubmit={submit}>
           <DialogHeader
             closeLabel="Close API keys"
-            eyebrow={`${accountName} / personal access`}
             onClose={onClose}
             title="API keys"
             titleId="settings-dialog-title"

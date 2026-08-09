@@ -112,7 +112,11 @@ export function App(): React.JSX.Element {
         participants={participants}
         status={status}
       />
-      <RouteView refresh={route.refresh} state={route.state} />
+      <RouteView
+        navigationKey={locationState.generation}
+        refresh={route.refresh}
+        state={route.state}
+      />
       <ToastRegion ref={toastRef} />
     </AppContext.Provider>
   );

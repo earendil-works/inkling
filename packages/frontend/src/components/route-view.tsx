@@ -47,11 +47,12 @@ export type RouteModel =
     });
 
 export interface RouteViewProps {
+  readonly navigationKey: number;
   readonly refresh: () => void;
   readonly state: EffectQueryState<RouteModel, ApiError>;
 }
 
-export function RouteView({ refresh, state }: RouteViewProps): React.JSX.Element {
+export function RouteView({ navigationKey, refresh, state }: RouteViewProps): React.JSX.Element {
   const model = state.data;
   if (model === undefined) {
     if (state.status === "failure") {
@@ -77,6 +78,7 @@ export function RouteView({ refresh, state }: RouteViewProps): React.JSX.Element
         <WorkspaceScreen
           api={model.api}
           initialCatalog={model.catalog}
+          key={navigationKey}
           publicCatalog={model.publicCatalog}
         />
       );

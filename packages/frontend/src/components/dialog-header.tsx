@@ -6,7 +6,7 @@ export interface DialogHeaderProps {
   readonly className?: string | undefined;
   readonly closeLabel: string;
   readonly disabled?: boolean | undefined;
-  readonly eyebrow: string;
+  readonly eyebrow?: string | undefined;
   readonly onClose: () => void;
   readonly title: string;
   readonly titleDataAttributes?: Readonly<Record<`data-${string}`, string>> | undefined;
@@ -28,7 +28,7 @@ export function DialogHeader({
   return (
     <div className={className}>
       <div>
-        <p className="eyebrow">{eyebrow}</p>
+        {eyebrow === undefined ? null : <p className="eyebrow">{eyebrow}</p>}
         <h2 {...titleDataAttributes} {...titleProps} id={titleId}>
           {title}
         </h2>

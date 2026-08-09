@@ -74,9 +74,7 @@ export function AccountControl({ account, api }: AccountControlProps): React.JSX
           <LogoutButton api={api} role="menuitem" />
         </div>
       </details>
-      {apiKeysOpen ? (
-        <SettingsDialog accountName={accountName} api={api} onClose={() => setApiKeysOpen(false)} />
-      ) : null}
+      {apiKeysOpen ? <SettingsDialog api={api} onClose={() => setApiKeysOpen(false)} /> : null}
     </>
   );
 }

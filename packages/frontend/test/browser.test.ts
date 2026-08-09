@@ -56,7 +56,9 @@ test(
       );
       await first.getByRole("link", { name: "Sign in" }).click();
       await first.waitForSelector("[data-new-document]");
+      await first.waitForSelector("main.workspace-layout:not([data-public-catalog])");
       assert.equal(await first.title(), "Inkling");
+      assert.equal(await first.locator(".workspace-heading > div > .eyebrow").count(), 0);
       assert.equal(await first.locator(".workspace-heading h1").textContent(), "Inkling");
       assert.equal(await first.locator(".wordmark").textContent(), "Inkling");
       assert.equal(await first.locator("[data-account-name]").textContent(), "Browser Admin");
@@ -69,6 +71,10 @@ test(
         "Sign out",
       ]);
       await first.locator("[data-open-api-keys]").click();
+      assert.equal(
+        await first.locator("[data-settings-dialog] .dialog-heading .eyebrow").count(),
+        0,
+      );
       assert.equal(await first.locator("[data-settings-dialog] h2").textContent(), "API keys");
       assert.match(
         (await first.locator("[data-settings-dialog] .dialog-note").textContent()) ?? "",
@@ -460,6 +466,14 @@ test(
         await documentSearch.evaluate((input) => [input.selectionStart, input.selectionEnd]),
         [9, 9],
       );
+      await first.locator(".wordmark").click();
+      await first.waitForFunction(
+        () =>
+          new URL(location.href).searchParams.get("q") === null &&
+          document.querySelector<HTMLInputElement>("[data-search]")?.value === "" &&
+          document.querySelector("[data-document-search]")?.getAttribute("aria-busy") === "false",
+      );
+      assert.equal(await first.locator(".catalog-row").count(), 2);
       await documentSearch.fill("author:browser@");
       await documentSearch.press("Tab");
       assert.equal(await documentSearch.inputValue(), "author:browser@example.com ");

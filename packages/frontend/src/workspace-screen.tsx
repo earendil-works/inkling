@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { CatalogResponse } from "@earendil-works/inkling-protocol";
 
@@ -20,6 +20,8 @@ export function WorkspaceScreen({
 }: WorkspaceScreenProps): React.JSX.Element {
   const [catalog, setCatalog] = useState(initialCatalog);
 
+  useEffect(() => setCatalog(initialCatalog), [initialCatalog]);
+
   return (
     <main
       className="workspace-layout"
@@ -29,9 +31,7 @@ export function WorkspaceScreen({
     >
       <section className="workspace-heading">
         <div>
-          <p className="eyebrow">
-            {publicCatalog ? "Public archive / published revisions" : "Workspace / notes & RFCs"}
-          </p>
+          {publicCatalog ? <p className="eyebrow">Public archive / published revisions</p> : null}
           <h1>Inkling</h1>
         </div>
         {publicCatalog ? null : <NewDocumentControl api={api} />}
