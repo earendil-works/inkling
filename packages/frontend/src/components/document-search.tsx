@@ -3,6 +3,7 @@ import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "r
 import type { CatalogResponse } from "@earendil-works/inkling-protocol";
 
 import type { ApiClientService } from "../api.ts";
+import styles from "./document-search.module.css";
 import { useEffectQuery } from "../effect-hooks.ts";
 
 interface SearchCompletion {
@@ -98,16 +99,16 @@ export function DocumentSearch({
   return (
     <div
       aria-busy={pending}
-      className="document-search"
+      className={styles["root"]}
       data-document-search=""
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
       }}
     >
-      <label className="document-search__label" htmlFor={inputId}>
+      <label className={styles["label"]} htmlFor={inputId}>
         Search Inkling
       </label>
-      <div className="document-search__control">
+      <div className={styles["control"]}>
         <svg aria-hidden="true" viewBox="0 0 24 24">
           <circle cx="10.5" cy="10.5" r="6.5" />
           <path d="m15.5 15.5 5 5" />
@@ -161,13 +162,13 @@ export function DocumentSearch({
       {panelOpen ? (
         <div
           aria-label="Search suggestions"
-          className="document-search__panel"
+          className={styles["panel"]}
           data-search-panel=""
           id={panelId}
           role="dialog"
         >
           {completions.length === 0 ? null : (
-            <div className="document-search__completions" data-search-completions="">
+            <div className={styles["completions"]} data-search-completions="">
               <span>{query.trim() === "" ? "Search syntax" : "Complete query"}</span>
               <div>
                 {completions.map((completion) => (
@@ -185,12 +186,12 @@ export function DocumentSearch({
             </div>
           )}
           {search.state.status === "failure" && !pending ? (
-            <p className="document-search__message is-error" role="alert">
+            <p className={`${styles["message"]} ${styles["error"]}`} role="alert">
               {search.state.error.message}
             </p>
           ) : null}
           {publicCatalog ? null : (
-            <p className="document-search__syntax-hint">
+            <p className={styles["syntaxHint"]}>
               Combine filters with spaces. Quote phrases. Prefix any term with <code>-</code> to
               exclude it.
             </p>

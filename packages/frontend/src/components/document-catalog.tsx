@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { CatalogResponse } from "@earendil-works/inkling-protocol";
 
+import styles from "./document-catalog.module.css";
 import { DocumentCatalogRow } from "./document-catalog-row.tsx";
+import emptyStateStyles from "./empty-state.module.css";
 
 export interface DocumentCatalogProps {
   readonly catalog: CatalogResponse;
@@ -79,8 +81,8 @@ export function DocumentCatalog({
 
   if (catalog.documents.length === 0) {
     return (
-      <section className="catalog" data-catalog="" aria-live="polite">
-        <div className="empty-state">
+      <section className={styles["catalog"]} data-catalog="" aria-live="polite">
+        <div className={emptyStateStyles["root"]} data-empty-state="">
           <span>Ø</span>
           <h2>No notes or RFCs found.</h2>
           <p>
@@ -94,7 +96,7 @@ export function DocumentCatalog({
   }
 
   return (
-    <section className="catalog" data-catalog="" aria-live="polite">
+    <section className={styles["catalog"]} data-catalog="" aria-live="polite">
       {catalog.documents.map((document) => (
         <DocumentCatalogRow
           document={document}

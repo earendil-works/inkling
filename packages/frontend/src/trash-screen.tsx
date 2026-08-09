@@ -9,7 +9,10 @@ import { documentHref } from "./ui.ts";
 import { ButtonLink } from "./components/button-link.tsx";
 import { Button } from "./components/button.tsx";
 import { ConfirmationDialog } from "./components/confirmation-dialog.tsx";
+import emptyStateStyles from "./components/empty-state.module.css";
 import { useEffectAction } from "./effect-hooks.ts";
+import styles from "./trash-screen.module.css";
+import workspaceStyles from "./workspace.module.css";
 
 export interface TrashScreenProps {
   readonly api: ApiClientService;
@@ -42,8 +45,17 @@ export function TrashScreen({ api, initialCatalog }: TrashScreenProps): React.JS
 
   return (
     <>
-      <main className="workspace-layout trash-layout" data-trash="" id="app" tabIndex={-1}>
-        <section className="workspace-heading trash-heading">
+      <main
+        className={workspaceStyles["layout"]}
+        data-trash=""
+        data-workspace-layout=""
+        id="app"
+        tabIndex={-1}
+      >
+        <section
+          className={`${workspaceStyles["heading"]} ${styles["heading"]}`}
+          data-workspace-heading=""
+        >
           <div>
             <h1>Trash</h1>
             <p>Documents are permanently deleted 30 days after they enter Trash.</p>
@@ -53,22 +65,26 @@ export function TrashScreen({ api, initialCatalog }: TrashScreenProps): React.JS
           </ButtonLink>
         </section>
         {catalog.documents.length === 0 ? (
-          <section className="catalog" data-trash-catalog="">
-            <div className="empty-state">
+          <section className={styles["emptyCatalog"]} data-trash-catalog="">
+            <div className={emptyStateStyles["root"]} data-empty-state="">
               <span>Ø</span>
               <h2>Trash is empty.</h2>
               <p>Deleted documents will remain here for 30 days.</p>
             </div>
           </section>
         ) : (
-          <section className="trash-catalog" data-trash-catalog="">
+          <section className={styles["catalog"]} data-trash-catalog="">
             {catalog.documents.map((document) => {
               const metadata = document.metadata;
               const expiresAt = documentTrashExpiresAt(metadata);
               return (
-                <article className="trash-row" data-trash-document={metadata.id} key={metadata.id}>
-                  <div className="trash-row__identity">
-                    <span className="folio">
+                <article
+                  className={styles["row"]}
+                  data-trash-document={metadata.id}
+                  key={metadata.id}
+                >
+                  <div className={styles["identity"]}>
+                    <span className={styles["folio"]}>
                       {metadata.rfcNumber === undefined
                         ? "Note"
                         : `RFC ${String(metadata.rfcNumber).padStart(4, "0")}`}
@@ -89,7 +105,7 @@ export function TrashScreen({ api, initialCatalog }: TrashScreenProps): React.JS
                       </p>
                     </div>
                   </div>
-                  <div className="trash-row__actions">
+                  <div className={styles["actions"]}>
                     <ButtonLink
                       data-edit-trashed-document={metadata.id}
                       href={documentHref(metadata.id, metadata.rfcNumber, false, "edit")}
@@ -120,7 +136,7 @@ export function TrashScreen({ api, initialCatalog }: TrashScreenProps): React.JS
                       Restore
                     </Button>
                     <Button
-                      className="trash-row__delete"
+                      className={styles["delete"]}
                       data-hard-delete-document={metadata.id}
                       disabled={restoreDocument.state.pending || hardDeleteDocument.state.pending}
                       onClick={() => setPermanentCandidate(document)}

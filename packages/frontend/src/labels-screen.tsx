@@ -4,6 +4,9 @@ import type { CatalogResponse } from "@earendil-works/inkling-protocol";
 
 import { ButtonLink } from "./components/button-link.tsx";
 import { DocumentCatalog } from "./components/document-catalog.tsx";
+import emptyStateStyles from "./components/empty-state.module.css";
+import styles from "./labels-screen.module.css";
+import workspaceStyles from "./workspace.module.css";
 
 export interface LabelsScreenProps {
   readonly catalog: CatalogResponse;
@@ -26,8 +29,8 @@ export function LabelsScreen({
     selectedLabel === undefined ? undefined : groups.find((group) => group.label === selectedLabel);
 
   return (
-    <main className="workspace-layout labels-layout" id="app" tabIndex={-1}>
-      <section className="workspace-heading labels-heading">
+    <main className={workspaceStyles["layout"]} data-workspace-layout="" id="app" tabIndex={-1}>
+      <section className={workspaceStyles["heading"]} data-workspace-heading="">
         <div>
           <h1>{selectedLabel ?? "Labels"}</h1>
         </div>
@@ -38,8 +41,8 @@ export function LabelsScreen({
       {selectedLabel === undefined ? (
         <LabelIndex groups={groups} />
       ) : (
-        <section className="label-results" aria-live="polite">
-          <div className="label-results__heading">
+        <section aria-live="polite">
+          <div className={styles["resultsHeading"]}>
             <p>
               {selected === undefined
                 ? "No notes or RFCs use this label."
@@ -62,7 +65,7 @@ export function LabelsScreen({
 function LabelIndex({ groups }: { readonly groups: readonly LabelGroup[] }): React.JSX.Element {
   if (groups.length === 0) {
     return (
-      <section className="empty-state" data-label-index="">
+      <section className={emptyStateStyles["root"]} data-empty-state="" data-label-index="">
         <span>Ø</span>
         <h2>No labels yet.</h2>
         <p>Add labels in a note or RFC’s Markdown frontmatter.</p>
@@ -71,21 +74,21 @@ function LabelIndex({ groups }: { readonly groups: readonly LabelGroup[] }): Rea
   }
 
   return (
-    <section className="label-index" data-label-index="" aria-label="Labels">
+    <section className={styles["index"]} data-label-index="" aria-label="Labels">
       {groups.map((group) => (
         <a
-          className="label-index__item"
+          className={styles["item"]}
           href={`/labels?label=${encodeURIComponent(group.label)}`}
           key={group.label}
         >
-          <span className="label-index__name">{group.label}</span>
-          <span className="label-index__documents">
+          <span className={styles["name"]}>{group.label}</span>
+          <span className={styles["documents"]}>
             {group.documents
               .slice(0, 3)
               .map((document) => document.metadata.title)
               .join(" · ")}
           </span>
-          <span className="label-index__count">
+          <span className={styles["count"]}>
             {group.documents.length} {group.documents.length === 1 ? "entry" : "entries"}
           </span>
         </a>

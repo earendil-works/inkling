@@ -2,6 +2,7 @@ import type { CatalogResponse } from "@earendil-works/inkling-protocol";
 
 import type { ApiClientService } from "../api.ts";
 import { ButtonLink } from "./button-link.tsx";
+import styles from "./catalog-controls.module.css";
 import { DocumentSearch } from "./document-search.tsx";
 
 export interface CatalogControlsProps {
@@ -20,14 +21,14 @@ export function CatalogControls({
   showTrash = false,
 }: CatalogControlsProps): React.JSX.Element {
   return (
-    <section className="catalog-tools" aria-label="Document tools">
+    <section className={styles["tools"]} data-catalog-tools="" aria-label="Document tools">
       <DocumentSearch
         api={api}
         initialCatalog={initialCatalog}
         onResultsChange={onResultsChange}
         publicCatalog={publicCatalog}
       />
-      <div className="catalog-tool-links">
+      <div className={styles["links"]} data-catalog-tool-links="">
         <ButtonLink href="/labels" variant="text">
           Browse labels
         </ButtonLink>

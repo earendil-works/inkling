@@ -6,6 +6,7 @@ import type { ApiClientService } from "./api.ts";
 import { CatalogControls } from "./components/catalog-controls.tsx";
 import { DocumentCatalog } from "./components/document-catalog.tsx";
 import { NewDocumentControl } from "./components/new-document-control.tsx";
+import styles from "./workspace.module.css";
 
 export interface WorkspaceScreenProps {
   readonly api: ApiClientService;
@@ -26,14 +27,17 @@ export function WorkspaceScreen({
 
   return (
     <main
-      className="workspace-layout"
+      className={styles["layout"]}
       data-public-catalog={publicCatalog ? "" : undefined}
+      data-workspace-layout=""
       id="app"
       tabIndex={-1}
     >
-      <section className="workspace-heading">
+      <section className={styles["heading"]} data-workspace-heading="">
         <div>
-          {publicCatalog ? <p className="eyebrow">Public archive / published revisions</p> : null}
+          {publicCatalog ? (
+            <p className={styles["eyebrow"]}>Public archive / published revisions</p>
+          ) : null}
           <h1>Inkling</h1>
         </div>
         {publicCatalog ? null : <NewDocumentControl api={api} />}

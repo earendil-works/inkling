@@ -2,6 +2,7 @@ import { hasPendingPublicationChanges } from "@earendil-works/inkling-core";
 import type { CatalogResponse } from "@earendil-works/inkling-protocol";
 
 import { documentHref, formatDate, publicDocumentHref } from "../ui.ts";
+import styles from "./document-catalog.module.css";
 import { LifecycleStateChip } from "./lifecycle-state-chip.tsx";
 
 export interface DocumentCatalogRowProps {
@@ -25,7 +26,7 @@ export function DocumentCatalogRow({
 
   return (
     <a
-      className="catalog-row"
+      className={styles["row"]}
       data-catalog-document-id={metadata.id}
       data-catalog-selected={selected ? "" : undefined}
       data-document-visibility={metadata.visibility}
@@ -38,23 +39,29 @@ export function DocumentCatalogRow({
       onFocus={onSelect}
       onPointerMove={onSelect}
     >
-      <span className="catalog-row__folio">{number}</span>
-      <span className="catalog-row__main">
-        <span className="catalog-row__title">
+      <span className={styles["folio"]} data-catalog-folio="">
+        {number}
+      </span>
+      <span className={styles["main"]}>
+        <span className={styles["title"]}>
           <strong>{metadata.title}</strong>
           {!publicDocument && hasPendingPublicationChanges(metadata) ? (
-            <span className="catalog-row__pending" data-pending-edits="">
+            <span className={styles["pending"]} data-pending-edits="">
               Pending edits
             </span>
           ) : null}
         </span>
         <small>{excerpt || "No body text yet"}</small>
       </span>
-      <span className="catalog-row__meta">
-        <span className="catalog-row__visibility" data-document-visibility={metadata.visibility}>
+      <span className={styles["meta"]} data-catalog-metadata="">
+        <span
+          className={styles["visibility"]}
+          data-catalog-visibility=""
+          data-document-visibility={metadata.visibility}
+        >
           {metadata.visibility}
         </span>
-        <LifecycleStateChip className="catalog-row__state" state={metadata.lifecycleState} />
+        <LifecycleStateChip className={styles["state"]} state={metadata.lifecycleState} />
         <time dateTime={metadata.updatedAt}>{formatDate(metadata.updatedAt)}</time>
       </span>
     </a>

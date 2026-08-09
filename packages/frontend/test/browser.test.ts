@@ -47,24 +47,24 @@ test(
       await first.goto(baseUrl);
       await first.waitForSelector("[data-public-catalog]");
       assert.equal(
-        await first.locator(".workspace-heading .eyebrow").textContent(),
+        await first.locator("[data-workspace-heading] p").textContent(),
         "Public archive / published revisions",
       );
       assert.match(
-        (await first.locator(".empty-state").textContent()) ?? "",
+        (await first.locator("[data-empty-state]").textContent()) ?? "",
         /No public revisions have been published yet/u,
       );
       await first.getByRole("link", { name: "Sign in" }).click();
       await first.waitForSelector("[data-new-document]");
-      await first.waitForSelector("main.workspace-layout:not([data-public-catalog])");
+      await first.waitForSelector("main[data-workspace-layout]:not([data-public-catalog])");
       assert.equal(await first.title(), "Inkling");
-      assert.equal(await first.locator(".workspace-heading > div > .eyebrow").count(), 0);
-      assert.equal(await first.locator(".workspace-heading h1").textContent(), "Inkling");
+      assert.equal(await first.locator("[data-workspace-heading] > div > p").count(), 0);
+      assert.equal(await first.locator("[data-workspace-heading] h1").textContent(), "Inkling");
       assert.equal(await first.locator(".wordmark").textContent(), "Inkling");
       assert.equal(await first.locator("[data-account-name]").textContent(), "Browser Admin");
       assert.equal(await first.locator("[data-api-status]").count(), 0);
-      assert.equal(await first.locator(".catalog-tools [data-logout]").count(), 0);
-      assert.deepEqual(await first.locator(".catalog-tool-links a").allTextContents(), [
+      assert.equal(await first.locator("[data-catalog-tools] [data-logout]").count(), 0);
+      assert.deepEqual(await first.locator("[data-catalog-tool-links] a").allTextContents(), [
         "Browse labels",
         "Trash",
       ]);
@@ -259,10 +259,12 @@ test(
       assert.equal(await first.title(), "Inkling");
       await first.getByRole("link", { name: "Browse labels" }).click();
       await first.getByRole("link", { name: /platform/u }).click();
-      const workingLabelRow = first.locator(".catalog-row", { hasText: "Browser collaboration" });
-      assert.equal(await workingLabelRow.locator(".catalog-row__folio").textContent(), "RFC 0001");
+      const workingLabelRow = first.locator("[data-catalog-document-id]", {
+        hasText: "Browser collaboration",
+      });
+      assert.equal(await workingLabelRow.locator("[data-catalog-folio]").textContent(), "RFC 0001");
       assert.equal(
-        await workingLabelRow.locator(".catalog-row__visibility").textContent(),
+        await workingLabelRow.locator("[data-catalog-visibility]").textContent(),
         "private",
       );
       assert.notEqual(
@@ -271,8 +273,10 @@ test(
       );
       const visibilityBackgrounds = await first.evaluate(() =>
         ["public", "private", "confidential"].map((visibility) => {
+          const source = document.querySelector<HTMLElement>("[data-catalog-document-id]");
+          if (source === null) throw new Error("Missing catalog row");
           const row = document.createElement("a");
-          row.className = "catalog-row";
+          row.className = source.className;
           row.dataset.documentVisibility = visibility;
           document.body.append(row);
           const background = getComputedStyle(row).backgroundColor;
@@ -441,12 +445,12 @@ test(
       await first.getByRole("link", { name: "Browse labels" }).click();
       await first.waitForURL(/\/labels$/u);
       await first.waitForSelector("[data-label-index]");
-      assert.equal(await first.locator(".workspace-heading h1").textContent(), "Labels");
+      assert.equal(await first.locator("[data-workspace-heading] h1").textContent(), "Labels");
       assert.deepEqual(await first.locator("[data-breadcrumb]").allTextContents(), [
         "Inkling",
         "Labels",
       ]);
-      assert.equal(await first.locator(".labels-heading .eyebrow").count(), 0);
+      assert.equal(await first.locator("[data-workspace-heading] p").count(), 0);
       await first.getByRole("link", { name: /platform/u }).click();
       assert.equal(new URL(first.url()).searchParams.get("label"), "platform");
       await first.waitForFunction(
@@ -474,19 +478,19 @@ test(
       );
       await first.locator(".wordmark").click();
       await first.waitForSelector("[data-document-search]");
-      assert.equal(await first.locator(".catalog-row").count(), 2);
+      assert.equal(await first.locator("[data-catalog-document-id]").count(), 2);
       await first.keyboard.press("j");
       const firstKeyboardSelection = await first
-        .locator(".catalog-row[data-catalog-selected]")
+        .locator("[data-catalog-document-id][data-catalog-selected]")
         .innerText();
       await first.keyboard.press("j");
       const secondKeyboardSelection = await first
-        .locator(".catalog-row[data-catalog-selected]")
+        .locator("[data-catalog-document-id][data-catalog-selected]")
         .innerText();
       assert.notEqual(secondKeyboardSelection, firstKeyboardSelection);
       await first.keyboard.press("k");
       assert.equal(
-        await first.locator(".catalog-row[data-catalog-selected]").innerText(),
+        await first.locator("[data-catalog-document-id][data-catalog-selected]").innerText(),
         firstKeyboardSelection,
       );
       await first.keyboard.press("/");
@@ -503,7 +507,7 @@ test(
         () =>
           document.querySelector("[data-document-search]")?.getAttribute("aria-busy") === "false",
       );
-      assert.equal(await first.locator(".catalog-row").count(), 2);
+      assert.equal(await first.locator("[data-catalog-document-id]").count(), 2);
       await documentSearch.press("Enter");
       assert.equal(await first.locator("[data-search-panel]").count(), 0);
       assert.equal(await documentSearch.inputValue(), "author:me");
@@ -518,7 +522,7 @@ test(
           document.querySelector<HTMLInputElement>("[data-search]")?.value === "" &&
           document.querySelector("[data-document-search]")?.getAttribute("aria-busy") === "false",
       );
-      assert.equal(await first.locator(".catalog-row").count(), 2);
+      assert.equal(await first.locator("[data-catalog-document-id]").count(), 2);
       await documentSearch.fill("author:browser@");
       await documentSearch.press("Tab");
       assert.equal(await documentSearch.inputValue(), "author:browser@example.com ");
@@ -545,9 +549,12 @@ test(
         () =>
           document.querySelector("[data-document-search]")?.getAttribute("aria-busy") === "false",
       );
-      assert.equal(await first.locator(".catalog-row").count(), 1);
-      assert.match(await first.locator(".catalog-row").innerText(), /Browser collaboration/u);
-      assert.match(await first.locator(".catalog-row").innerText(), /answer/u);
+      assert.equal(await first.locator("[data-catalog-document-id]").count(), 1);
+      assert.match(
+        await first.locator("[data-catalog-document-id]").innerText(),
+        /Browser collaboration/u,
+      );
+      assert.match(await first.locator("[data-catalog-document-id]").innerText(), /answer/u);
       assert.equal(new URL(first.url()).searchParams.get("q"), "rfc:1 answer");
       await first.route("**/api/documents?q=*", async (route) => {
         if (new URL(route.request().url()).searchParams.get("q") === 'rfc:1 "answer"') {
@@ -560,17 +567,20 @@ test(
         () =>
           document.querySelector("[data-document-search]")?.getAttribute("aria-busy") === "true",
       );
-      assert.equal(await first.locator(".catalog-row").count(), 1);
+      assert.equal(await first.locator("[data-catalog-document-id]").count(), 1);
       await first.waitForFunction(
         () =>
           document.querySelector("[data-document-search]")?.getAttribute("aria-busy") === "false",
       );
-      assert.equal(await first.locator(".catalog-row").count(), 1);
+      assert.equal(await first.locator("[data-catalog-document-id]").count(), 1);
       await documentSearch.press("ArrowDown");
-      assert.equal(await first.locator(".catalog-row[data-catalog-selected]").count(), 1);
+      assert.equal(
+        await first.locator("[data-catalog-document-id][data-catalog-selected]").count(),
+        1,
+      );
       await documentSearch.press("Enter");
       assert.match(first.url(), /\?q=rfc%3A1(?:\+|%20)%22answer%22$/u);
-      await first.locator(".catalog-row[data-catalog-selected]").click();
+      await first.locator("[data-catalog-document-id][data-catalog-selected]").click();
       await first.waitForURL(/\/rfcs\/0001$/u);
       await first.locator("[data-open-editor]").click();
       await first.waitForURL(/\/rfcs\/0001\/edit$/u);
@@ -1353,7 +1363,9 @@ test(
       await first.getByRole("link", { name: "Sign in" }).waitFor();
       assert.equal(await first.locator("[data-account]").count(), 0);
       assert.equal(await first.locator("[data-api-status]").count(), 0);
-      const publicNoteLink = first.locator(".catalog-row", { hasText: "Public browser note" });
+      const publicNoteLink = first.locator("[data-catalog-document-id]", {
+        hasText: "Public browser note",
+      });
       assert.equal(await publicNoteLink.getAttribute("data-native-navigation"), "");
       await publicNoteLink.click();
       await first.waitForURL(
