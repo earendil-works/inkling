@@ -10,6 +10,7 @@ import { AllocateRfcButton } from "./allocate-rfc-button.tsx";
 import { AttachmentButton } from "./attachment-button.tsx";
 import { ButtonLink } from "./button-link.tsx";
 import { Button } from "./button.tsx";
+import styles from "./editor.module.css";
 import { PublishButton } from "./publish-button.tsx";
 import type { PublishButtonProps } from "./publish-button.tsx";
 import { SharingControl } from "./sharing-control.tsx";
@@ -57,17 +58,20 @@ export function EditorToolbar({
 }: EditorToolbarProps): React.JSX.Element {
   const trashed = metadata.deletedAt !== undefined;
   return (
-    <section className={`document-bar${trashed ? " is-trashed" : ""}`}>
+    <section
+      className={`${styles["bar"]}${trashed ? ` ${styles["trashedBar"]}` : ""}`}
+      data-editor-toolbar=""
+    >
       {trashed ? (
-        <p className="document-trash-indicator" data-document-trashed="">
+        <p className={styles["trashIndicator"]} data-document-trashed="">
           <a href="/trash">In Trash</a>
           <span>Changes are still saved.</span>
         </p>
       ) : null}
-      <div className="document-actions">
+      <div className={styles["actions"]} data-document-actions="">
         <Button
           aria-pressed={previewOpen}
-          className="preview-toggle"
+          className={styles["previewToggle"]}
           variant="toolbar"
           data-preview-toggle=""
           onClick={onTogglePreview}
@@ -82,7 +86,7 @@ export function EditorToolbar({
         />
         <Button variant="toolbar" onClick={onOpenComments}>
           Comments{" "}
-          <span className="comment-count" data-comment-count="">
+          <span className={styles["commentCount"]} data-comment-count="">
             {openCommentCount}
           </span>
         </Button>
@@ -101,7 +105,7 @@ export function EditorToolbar({
           />
         )}
         <ButtonLink
-          className="document-mode-link"
+          className={styles["modeLink"]}
           href={documentHref(metadata.id, metadata.rfcNumber, shared, "read")}
           variant="toolbar"
         >
@@ -120,7 +124,7 @@ export function EditorToolbar({
         )}
         {canDelete && !trashed ? (
           <Button
-            className="document-delete"
+            className={styles["delete"]}
             data-delete-document=""
             onClick={onDelete}
             variant="toolbar"

@@ -1,0 +1,358 @@
+.layout {
+  position: relative;
+  display: grid;
+  height: calc(100dvh - var(--masthead-height));
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.bar {
+  z-index: 5;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1.5rem;
+  padding: 0.8rem var(--page-padding);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.trashedBar {
+  justify-content: space-between;
+}
+
+.trashIndicator {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 0.65rem;
+  margin: 0;
+  color: var(--muted);
+  font: var(--font-caption) / 1.3 var(--sans);
+}
+
+.trashIndicator a {
+  flex: none;
+  color: var(--danger);
+  font: 600 var(--font-caption) / 1 var(--mono);
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.trashIndicator a:hover {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 0.16em;
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+}
+
+.previewToggle {
+  display: none;
+}
+
+.attachment {
+  display: inline-flex;
+  min-height: 2.05rem;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  font: var(--font-caption) var(--mono);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.attachment:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.attachment input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.attachment:has(input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.attachment:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.commentCount {
+  min-width: 1.15rem;
+  padding: 0.05rem 0.3rem;
+  border-radius: 1rem;
+  background: var(--surface-muted);
+  color: var(--text);
+  text-align: center;
+}
+
+.modeLink {
+  justify-content: center;
+  text-decoration: none;
+}
+
+.delete {
+  color: var(--danger);
+}
+
+.workbench {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  background: var(--surface);
+}
+
+.sourcePane,
+.previewPane {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: 2.35rem minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.sourcePane {
+  background: var(--editor-background);
+}
+
+.previewPane {
+  border-left: 1px solid var(--border);
+  background: var(--page);
+}
+
+.paneLabel {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-muted);
+  color: var(--muted);
+  font: var(--font-caption) / 1.3 var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.closePreview {
+  display: none;
+}
+
+.previewPage {
+  min-width: 0;
+  min-height: 0;
+  padding: 1rem;
+  overflow: auto;
+}
+
+.previewPaper {
+  width: min(100%, 72rem);
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 7%);
+}
+
+.editorHost,
+.editorHost > :global(.cm-editor) {
+  min-height: 0;
+  height: 100%;
+}
+
+.editorHost :global(.cm-editor) {
+  background: var(--editor-background);
+  font-size: 0.95rem;
+}
+
+.editorHost :global(.cm-scroller) {
+  font-family: var(--mono);
+  line-height: 1.65;
+}
+
+.editorHost :global(.cm-content) {
+  padding: 0.75rem 1rem 2rem;
+}
+
+.editorHost :global(.cm-line) {
+  padding-inline: 0;
+}
+
+.editorHost :global(.cm-gutters) {
+  display: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+}
+
+.editorHost :global(.cm-activeLine) {
+  background: var(--editor-active-line-background);
+}
+
+.editorHost :global(.cm-editor.cm-focused) {
+  outline: 0;
+}
+
+.remoteSelection {
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--remote-color) 28%, transparent);
+  box-shadow: inset 0 -1px color-mix(in oklab, var(--remote-color) 72%, transparent);
+}
+
+.remoteCursor {
+  position: relative;
+  display: inline;
+  margin-inline: -1px;
+  border-left: 2px solid var(--remote-color);
+  pointer-events: none;
+}
+
+.remoteCursorLabel {
+  position: absolute;
+  z-index: 20;
+  bottom: calc(100% + 0.2rem);
+  left: -2px;
+  padding: 0.2rem 0.35rem;
+  border-radius: 2px 2px 2px 0;
+  background: var(--remote-color);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 18%);
+  color: oklch(18% 0.02 260);
+  font: 650 var(--font-caption) / 1.15 var(--mono);
+  white-space: nowrap;
+}
+
+.readerMode {
+  height: auto;
+  min-height: calc(100dvh - var(--masthead-height));
+  overflow: visible;
+}
+
+.readerMode .workbench {
+  display: block;
+  overflow: visible;
+}
+
+.readerMode .sourcePane,
+.readerMode .previewPane > .paneLabel,
+.readerMode .attachment,
+.readerMode .previewToggle {
+  display: none;
+}
+
+.readerMode .previewPane {
+  display: block;
+  min-height: calc(100dvh - 8rem);
+  overflow: visible;
+  border-left: 0;
+  background: var(--surface);
+}
+
+@media (width <= 68rem) {
+  .bar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (width <= 52rem) {
+  .layout {
+    height: calc(100dvh - var(--masthead-height));
+  }
+
+  .actions {
+    overflow-x: auto;
+    padding-bottom: 0.15rem;
+  }
+
+  .trashedBar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+
+  .trashedBar .actions {
+    width: 100%;
+  }
+
+  .previewToggle {
+    display: inline-flex;
+  }
+
+  .workbench {
+    position: relative;
+    display: block;
+  }
+
+  .sourcePane,
+  .previewPane {
+    position: absolute;
+    inset: 0;
+  }
+
+  .previewPane {
+    z-index: 5;
+    display: none;
+    border-left: 0;
+  }
+
+  .previewOpen .previewPane {
+    display: grid;
+  }
+
+  .previewPane .closePreview {
+    display: inline-grid;
+  }
+
+  .readerMode {
+    height: auto;
+  }
+
+  .readerMode .workbench,
+  .readerMode .previewPane {
+    position: static;
+    display: block;
+  }
+}
+
+@media (width <= 34rem) {
+  .previewPage {
+    padding: 0;
+  }
+
+  .previewPaper {
+    padding: 1rem;
+    border: 0;
+    box-shadow: none;
+  }
+}

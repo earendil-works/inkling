@@ -5,6 +5,8 @@ import type { DecorationSet } from "@codemirror/view";
 
 import type { PresenceDto } from "@earendil-works/inkling-protocol";
 
+import styles from "./components/editor.module.css";
+
 interface PositionedPresence {
   readonly anchor: number;
   readonly color: string;
@@ -40,14 +42,15 @@ class RemoteCursorWidget extends WidgetType {
 
   override toDOM(): HTMLElement {
     const cursor = document.createElement("span");
-    cursor.className = "cm-remote-cursor";
+    cursor.className = styles["remoteCursor"] ?? "";
+    cursor.dataset["remoteCursor"] = "";
     cursor.dataset["remoteName"] = this.presence.displayName;
     cursor.dataset["remoteParticipant"] = this.presence.participantId;
     cursor.style.setProperty("--remote-color", this.presence.color);
     cursor.append(document.createTextNode("\u2060"));
 
     const label = document.createElement("span");
-    label.className = "cm-remote-cursor__label";
+    label.className = styles["remoteCursorLabel"] ?? "";
     label.textContent = this.presence.displayName;
     cursor.append(label);
     return cursor;
@@ -141,11 +144,14 @@ function presenceDecorations(participants: ReadonlyMap<string, PositionedPresenc
     const to = Math.max(presence.anchor, presence.head);
     const attributes = {
       "data-remote-name": presence.displayName,
+      "data-remote-selection": "",
       "data-remote-participant": presence.participantId,
       style: `--remote-color: ${presence.color}`,
     };
     if (from !== to) {
-      ranges.push(Decoration.mark({ attributes, class: "cm-remote-selection" }).range(from, to));
+      ranges.push(
+        Decoration.mark({ attributes, class: styles["remoteSelection"] ?? "" }).range(from, to),
+      );
     }
     ranges.push(
       Decoration.widget({

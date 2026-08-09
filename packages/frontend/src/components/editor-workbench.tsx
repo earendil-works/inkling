@@ -12,6 +12,7 @@ import { browserRuntime } from "../effect-runtime.ts";
 import { renderMermaid } from "../markdown.tsx";
 import { Button } from "./button.tsx";
 import { DocumentPage } from "./document-page.tsx";
+import styles from "./editor.module.css";
 import markdownStyles from "./markdown-article.module.css";
 
 export interface EditorWorkbenchProps {
@@ -72,19 +73,20 @@ export function EditorWorkbench({
   };
 
   return (
-    <section className="workbench">
-      <div className="source-pane" data-source-pane="">
-        <div className="pane-label">
+    <section className={styles["workbench"]}>
+      <div className={styles["sourcePane"]} data-source-pane="">
+        <div className={styles["paneLabel"]} data-pane-label="">
           <span>Markdown</span>
           <span data-save-state="">{connectionLabel(connectionState)}</span>
         </div>
-        <div className="editor-host" data-editor="" ref={editorHostRef} />
+        <div className={styles["editorHost"]} data-editor="" ref={editorHostRef} />
       </div>
-      <div className="preview-pane" data-preview-pane="">
-        <div className="pane-label">
+      <div className={styles["previewPane"]} data-preview-pane="">
+        <div className={styles["paneLabel"]} data-pane-label="">
           <span>Preview</span>
           <Button
             aria-label="Close preview"
+            className={styles["closePreview"]}
             variant="icon"
             data-preview-close=""
             onClick={onClosePreview}
@@ -92,8 +94,8 @@ export function EditorWorkbench({
             ×
           </Button>
         </div>
-        <div className="editor-preview-page" data-preview-scroller="" ref={previewScrollerRef}>
-          <div className="editor-preview-page__paper">
+        <div className={styles["previewPage"]} data-preview-scroller="" ref={previewScrollerRef}>
+          <div className={styles["previewPaper"]}>
             <DocumentPage headings={previewHeadings} metadata={metadata} presentation="preview">
               <article
                 aria-label="Rendered document preview"

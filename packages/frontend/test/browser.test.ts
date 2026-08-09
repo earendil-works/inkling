@@ -359,7 +359,7 @@ test(
         () => document.querySelector("[data-publish]")?.textContent === "Publish Changes",
       );
       const documentActionLabels = await first
-        .locator(".document-actions > a, .document-actions > button")
+        .locator("[data-document-actions] > a, [data-document-actions] > button")
         .allTextContents();
       const shareActionIndex = documentActionLabels.indexOf("Share");
       assert.deepEqual(documentActionLabels.slice(shareActionIndex, shareActionIndex + 3), [
@@ -589,7 +589,7 @@ test(
       );
       assert.equal(await first.locator("[data-api-status]").textContent(), "Saved");
       assert.equal(
-        await first.locator("[data-source-pane] .pane-label span").first().textContent(),
+        await first.locator("[data-source-pane] [data-pane-label] span").first().textContent(),
         "Markdown",
       );
       await first.waitForSelector(".cm-content .tok-keyword");
@@ -837,7 +837,7 @@ test(
       await second.waitForSelector(".cm-content");
       await first.locator(".cm-content").click();
       await first.keyboard.press("ControlOrMeta+End");
-      const adminCursor = second.locator('.cm-remote-cursor[data-remote-name="Browser Admin"]');
+      const adminCursor = second.locator('[data-remote-cursor][data-remote-name="Browser Admin"]');
       await adminCursor.waitFor();
       const adminPresenceColor = await adminCursor.evaluate((cursor) =>
         getComputedStyle(cursor).getPropertyValue("--remote-color").trim(),
@@ -846,7 +846,7 @@ test(
       await first.keyboard.press("Shift+Home");
       await second.bringToFront();
       const adminSelection = second.locator(
-        '.cm-remote-selection[data-remote-name="Browser Admin"]',
+        '[data-remote-selection][data-remote-name="Browser Admin"]',
       );
       await adminSelection.waitFor();
       assert.match(
@@ -1052,7 +1052,9 @@ test(
       );
       await shared.locator(".cm-content").click();
       await shared.keyboard.press("ControlOrMeta+End");
-      const guestCursor = first.locator('.cm-remote-cursor[data-remote-name="Browser reviewer"]');
+      const guestCursor = first.locator(
+        '[data-remote-cursor][data-remote-name="Browser reviewer"]',
+      );
       await guestCursor.waitFor();
       const guestPresenceColor = await guestCursor.evaluate((cursor) =>
         getComputedStyle(cursor).getPropertyValue("--remote-color").trim(),
@@ -1109,12 +1111,7 @@ test(
 
       await first.setViewportSize({ height: 844, width: 390 });
       await first.locator("[data-preview-toggle]").click();
-      assert.equal(
-        await first
-          .locator("#app")
-          .evaluate((element) => element.classList.contains("preview-open")),
-        true,
-      );
+      assert.equal(await first.locator("#app").getAttribute("data-preview-open"), "");
       await sharedContext.close();
 
       await first.setViewportSize({ height: 900, width: 1600 });

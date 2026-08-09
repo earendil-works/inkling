@@ -19,6 +19,7 @@ import { useRenderedMarkdown } from "./markdown.tsx";
 import { documentHref, storedGuestName, storeGuestName } from "./ui.ts";
 import type { FrontmatterVocabulary } from "./frontmatter-completion.ts";
 import { useEditorSession } from "./use-editor-session.ts";
+import styles from "./components/editor.module.css";
 
 export interface EditorScreenProps {
   readonly account?: NonNullable<AuthenticationStatus["principal"]> | undefined;
@@ -127,11 +128,18 @@ export function EditorScreen({
   useEffect(() => () => setHeaderDocument(undefined), [setHeaderDocument]);
 
   const openCount = comments.threads.filter((thread) => !thread.resolved).length;
-  const layoutClass = `editor-layout ${canEdit ? "is-editable" : "is-reader"}${previewOpen ? " preview-open" : ""}`;
+  const layoutClass = [
+    styles["layout"],
+    canEdit ? undefined : styles["readerMode"],
+    previewOpen ? styles["previewOpen"] : undefined,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <main
       className={layoutClass}
+      data-preview-open={previewOpen ? "" : undefined}
       id="app"
       onClick={(event) => editorCommentsRef.current?.handleWorkbenchClick(event.target)}
       tabIndex={-1}

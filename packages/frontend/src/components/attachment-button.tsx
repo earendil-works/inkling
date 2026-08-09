@@ -3,6 +3,7 @@ import type { AttachmentMetadataDto } from "@earendil-works/inkling-protocol";
 import type { ApiClientService, ApiError } from "../api.ts";
 import { useAppContext } from "../app-context.tsx";
 import { useEffectAction } from "../effect-hooks.ts";
+import styles from "./editor.module.css";
 
 const acceptedTypes = "image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain";
 
@@ -25,7 +26,7 @@ export function AttachmentButton({
   );
 
   return (
-    <label className="toolbar-button attachment-button">
+    <label className={styles["attachment"]}>
       {upload.state.pending ? "Uploading…" : "Attach"}
       <input
         accept={acceptedTypes}
