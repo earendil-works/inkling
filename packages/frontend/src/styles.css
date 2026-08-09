@@ -692,7 +692,6 @@ select:disabled {
 }
 
 .document-search__completions > span,
-.document-search__result-heading,
 .document-search__syntax-hint {
   color: var(--muted);
   font: var(--font-caption)/1.3 var(--mono);
@@ -733,82 +732,6 @@ select:disabled {
   font: var(--font-caption)/1.2 var(--mono);
 }
 
-.document-search__result-heading {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.6rem 0.75rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.document-search__result-heading small {
-  font: inherit;
-}
-
-.document-search__result {
-  display: grid;
-  gap: 0.3rem;
-  padding: 0.8rem 0.85rem 0.75rem;
-  border-bottom: 1px solid var(--border);
-  border-left: 3px solid transparent;
-  text-decoration: none;
-}
-
-.document-search__result:hover,
-.document-search__result[aria-selected="true"] {
-  border-left-color: var(--accent);
-  background: var(--accent-soft);
-}
-
-.document-search__result-title {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.document-search__result-title b {
-  overflow: hidden;
-  font-size: 1rem;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.document-search__result-title em {
-  flex: none;
-  color: var(--accent);
-  font: var(--font-caption)/1 var(--mono);
-  font-style: normal;
-  letter-spacing: 0.06em;
-}
-
-.document-search__result-excerpt {
-  display: -webkit-box;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: var(--font-ui);
-  line-height: 1.35;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.document-search__result-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-}
-
-.document-search__result-meta i {
-  padding: 0.15rem 0.32rem;
-  border: 1px solid var(--border);
-  border-radius: 2px;
-  color: var(--muted);
-  font: var(--font-caption)/1.2 var(--mono);
-  font-style: normal;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
 .document-search__message {
   padding: 1.25rem 0.85rem;
   color: var(--muted);
@@ -839,6 +762,12 @@ select:disabled {
   border-bottom: 1px solid var(--border);
   border-left: 2px solid transparent;
   text-decoration: none;
+}
+
+.catalog-row[data-catalog-selected] {
+  position: relative;
+  z-index: 1;
+  box-shadow: inset 0 0 0 2px var(--accent);
 }
 
 .catalog-row[data-document-visibility="public"] {

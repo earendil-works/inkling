@@ -3,10 +3,7 @@ import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "r
 import type { CatalogResponse } from "@earendil-works/inkling-protocol";
 
 import type { ApiClientService } from "../api.ts";
-import { useAppContext } from "../app-context.tsx";
 import { useEffectQuery } from "../effect-hooks.ts";
-import { documentHref, publicDocumentHref } from "../ui.ts";
-import { LifecycleStateChip } from "./lifecycle-state-chip.tsx";
 
 interface SearchCompletion {
   readonly complete: boolean;
@@ -42,39 +39,29 @@ export function DocumentSearch({
   onResultsChange,
   publicCatalog = false,
 }: DocumentSearchProps): React.JSX.Element {
-  const { navigate } = useAppContext();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState(() => new URL(location.href).searchParams.get("q") ?? "");
   const [focused, setFocused] = useState(false);
-  const [activeResult, setActiveResult] = useState(-1);
   const deferredQuery = useDeferredValue(query);
   const search = useEffectQuery(
     publicCatalog ? api.listPublicDocuments(deferredQuery) : api.listDocuments(deferredQuery),
     `document-search:${publicCatalog ? "public" : "workspace"}:${deferredQuery}`,
   );
   const inputId = useId();
-  const listboxId = `${inputId}-results`;
+  const panelId = `${inputId}-suggestions`;
   const pending = deferredQuery !== query || search.state.status === "loading";
-  const displayedCatalog = search.state.data ?? initialCatalog;
-  const topResults = useMemo(
-    () => displayedCatalog.documents.slice(0, 8),
-    [displayedCatalog.documents],
-  );
   const completions = useMemo(
     () => (publicCatalog ? [] : searchCompletions(query, initialCatalog, currentUserEmail)),
     [currentUserEmail, initialCatalog, publicCatalog, query],
   );
-  const panelOpen = focused && (query.trim() !== "" || completions.length > 0);
+  const failed = search.state.status === "failure" && !pending;
+  const panelOpen = focused && (completions.length > 0 || failed);
 
   useEffect(() => {
     if (deferredQuery === query && search.state.status === "success") {
       onResultsChange(search.state.data);
     }
   }, [deferredQuery, onResultsChange, query, search.state]);
-
-  useEffect(() => {
-    setActiveResult(topResults.length === 0 ? -1 : 0);
-  }, [topResults]);
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent): void => {
@@ -110,21 +97,9 @@ export function DocumentSearch({
     });
   };
 
-  const resultHref = (document: CatalogResponse["documents"][number]): string =>
-    publicCatalog
-      ? publicDocumentHref(document.metadata.id, document.metadata.rfcNumber)
-      : documentHref(document.metadata.id, document.metadata.rfcNumber, false, "read", "");
-
-  const openResult = (index: number): void => {
-    const result = topResults[index];
-    if (result === undefined) return;
-    const href = resultHref(result);
-    if (publicCatalog) location.assign(href);
-    else navigate(href);
-  };
-
   return (
     <div
+      aria-busy={pending}
       className="document-search"
       data-document-search=""
       onBlur={(event) => {
@@ -140,13 +115,10 @@ export function DocumentSearch({
           <path d="m15.5 15.5 5 5" />
         </svg>
         <input
-          aria-activedescendant={
-            activeResult === -1 ? undefined : `${listboxId}-result-${activeResult}`
-          }
           aria-autocomplete="list"
-          aria-controls={listboxId}
+          aria-controls={panelId}
           aria-expanded={panelOpen}
-          aria-haspopup="listbox"
+          aria-haspopup="dialog"
           autoComplete="off"
           data-search=""
           id={inputId}
@@ -165,24 +137,12 @@ export function DocumentSearch({
               return;
             }
             if (event.key === "Enter") {
-              if (activeResult !== -1) {
-                event.preventDefault();
-                openResult(activeResult);
+              event.preventDefault();
+              if (isCurrentUserAlias(query) && completions[0] !== undefined) {
+                completeSearch(completions[0]);
               }
-              return;
+              setFocused(false);
             }
-            if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-            if (topResults.length === 0) return;
-            event.preventDefault();
-            setActiveResult((current) =>
-              event.key === "ArrowDown"
-                ? current < topResults.length - 1
-                  ? current + 1
-                  : 0
-                : current > 0
-                  ? current - 1
-                  : topResults.length - 1,
-            );
           }}
           placeholder={
             publicCatalog
@@ -204,7 +164,13 @@ export function DocumentSearch({
         )}
       </div>
       {panelOpen ? (
-        <div className="document-search__panel" data-search-panel="">
+        <div
+          aria-label="Search suggestions"
+          className="document-search__panel"
+          data-search-panel=""
+          id={panelId}
+          role="dialog"
+        >
           {completions.length === 0 ? null : (
             <div className="document-search__completions" data-search-completions="">
               <span>{query.trim() === "" ? "Search syntax" : "Complete query"}</span>
@@ -223,68 +189,11 @@ export function DocumentSearch({
               </div>
             </div>
           )}
-          <div
-            aria-busy={pending}
-            aria-label="Document search results"
-            className="document-search__results"
-            id={listboxId}
-            role="listbox"
-          >
-            {query.trim() === "" ? null : search.state.status === "failure" && !pending ? (
-              <p className="document-search__message is-error" role="alert">
-                {search.state.error.message}
-              </p>
-            ) : topResults.length === 0 ? (
-              <p aria-live="polite" className="document-search__message">
-                {pending
-                  ? publicCatalog
-                    ? "Searching published documents…"
-                    : "Searching titles, metadata, and complete working heads…"
-                  : "No document matches this query."}
-              </p>
-            ) : (
-              <>
-                <div className="document-search__result-heading">
-                  <span>Top matches</span>
-                  <small>{displayedCatalog.documents.length} found</small>
-                </div>
-                {topResults.map((document, index) => {
-                  const { metadata } = document;
-                  const folio =
-                    metadata.rfcNumber === undefined
-                      ? "NOTE"
-                      : `RFC ${String(metadata.rfcNumber).padStart(4, "0")}`;
-                  return (
-                    <a
-                      aria-selected={activeResult === index}
-                      className="document-search__result"
-                      data-native-navigation={publicCatalog ? "" : undefined}
-                      data-search-result=""
-                      href={resultHref(document)}
-                      id={`${listboxId}-result-${index}`}
-                      key={metadata.id}
-                      onPointerMove={() => setActiveResult(index)}
-                      role="option"
-                    >
-                      <span className="document-search__result-title">
-                        <b>{metadata.title}</b>
-                        <em>{folio}</em>
-                      </span>
-                      <span className="document-search__result-excerpt">
-                        {document.excerpt || "No body text yet"}
-                      </span>
-                      <span className="document-search__result-meta">
-                        <LifecycleStateChip state={metadata.lifecycleState} />
-                        {metadata.labels.slice(0, 3).map((label) => (
-                          <i key={label}>{label}</i>
-                        ))}
-                      </span>
-                    </a>
-                  );
-                })}
-              </>
-            )}
-          </div>
+          {search.state.status === "failure" && !pending ? (
+            <p className="document-search__message is-error" role="alert">
+              {search.state.error.message}
+            </p>
+          ) : null}
           {publicCatalog ? null : (
             <p className="document-search__syntax-hint">
               Combine filters with spaces. Quote phrases. Prefix any term with <code>-</code> to
@@ -401,6 +310,10 @@ function searchCompletions(
 
 function trailingSearchFragment(query: string): string {
   return /(?:^|\s)(\S*)$/u.exec(query)?.[1] ?? "";
+}
+
+function isCurrentUserAlias(query: string): boolean {
+  return /^-?(?:author|from):me$/iu.test(trailingSearchFragment(query));
 }
 
 function quoteSearchValue(value: string): string {

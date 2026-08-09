@@ -6,12 +6,16 @@ import { LifecycleStateChip } from "./lifecycle-state-chip.tsx";
 
 export interface DocumentCatalogRowProps {
   readonly document: CatalogResponse["documents"][number];
+  readonly onSelect?: (() => void) | undefined;
   readonly publicDocument?: boolean | undefined;
+  readonly selected?: boolean | undefined;
 }
 
 export function DocumentCatalogRow({
   document,
+  onSelect,
   publicDocument = false,
+  selected = false,
 }: DocumentCatalogRowProps): React.JSX.Element {
   const { excerpt, metadata } = document;
   const number =
@@ -22,6 +26,8 @@ export function DocumentCatalogRow({
   return (
     <a
       className="catalog-row"
+      data-catalog-document-id={metadata.id}
+      data-catalog-selected={selected ? "" : undefined}
       data-document-visibility={metadata.visibility}
       data-native-navigation={publicDocument ? "" : undefined}
       href={
@@ -29,6 +35,8 @@ export function DocumentCatalogRow({
           ? publicDocumentHref(metadata.id, metadata.rfcNumber)
           : documentHref(metadata.id, metadata.rfcNumber, false, "read", "")
       }
+      onFocus={onSelect}
+      onPointerMove={onSelect}
     >
       <span className="catalog-row__folio">{number}</span>
       <span className="catalog-row__main">

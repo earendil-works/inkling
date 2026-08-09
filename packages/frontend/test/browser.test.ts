@@ -410,6 +410,34 @@ test(
       assert.equal(await first.locator("[data-pending-edits]").count(), 0);
       await first.getByRole("link", { name: "All documents" }).click();
       await first.waitForSelector("[data-document-search]");
+      await first.locator("[data-new-document]").click();
+      await first.locator('input[name="title"]').fill("Keyboard selection target");
+      await first
+        .locator("[data-new-form]")
+        .evaluate((form: HTMLFormElement) =>
+          form.requestSubmit(form.querySelector('button[type="submit"]')),
+        );
+      await first.waitForURL(/\/documents\/[^/]+\/edit$/u);
+      await first.waitForFunction(
+        () => document.querySelector("[data-save-state]")?.textContent === "Saved",
+      );
+      await first.locator(".wordmark").click();
+      await first.waitForSelector("[data-document-search]");
+      assert.equal(await first.locator(".catalog-row").count(), 2);
+      await first.keyboard.press("j");
+      const firstKeyboardSelection = await first
+        .locator(".catalog-row[data-catalog-selected]")
+        .innerText();
+      await first.keyboard.press("j");
+      const secondKeyboardSelection = await first
+        .locator(".catalog-row[data-catalog-selected]")
+        .innerText();
+      assert.notEqual(secondKeyboardSelection, firstKeyboardSelection);
+      await first.keyboard.press("k");
+      assert.equal(
+        await first.locator(".catalog-row[data-catalog-selected]").innerText(),
+        firstKeyboardSelection,
+      );
       await first.keyboard.press("/");
       const documentSearch = first.locator("[data-search]");
       assert.equal(
@@ -423,7 +451,8 @@ test(
         await currentAuthorCompletion.locator("code").textContent(),
         "author:browser@example.com",
       );
-      await currentAuthorCompletion.click();
+      await documentSearch.press("Enter");
+      assert.equal(await first.locator("[data-search-panel]").count(), 0);
       assert.equal(await documentSearch.inputValue(), "author:browser@example.com ");
       assert.deepEqual(
         await documentSearch.evaluate((input) => [input.selectionStart, input.selectionEnd]),
@@ -442,16 +471,22 @@ test(
         await first.locator("[data-search-completions] code").first().textContent(),
         "label:",
       );
+      await documentSearch.press("Enter");
+      assert.equal(await first.locator("[data-search-panel]").count(), 0);
+      await first.waitForFunction(
+        () =>
+          document.querySelector("[data-document-search]")?.getAttribute("aria-busy") === "false",
+      );
+      assert.match(await first.locator("[data-catalog]").innerText(), /Browser collaboration/u);
+      assert.equal(await first.locator("[data-search-result]").count(), 0);
       await documentSearch.fill("rfc:1 answer");
       await first.waitForFunction(
-        () => document.querySelector('[role="listbox"]')?.getAttribute("aria-busy") === "false",
+        () =>
+          document.querySelector("[data-document-search]")?.getAttribute("aria-busy") === "false",
       );
-      await first.waitForSelector("[data-search-result]");
-      assert.match(
-        await first.locator("[data-search-result]").first().innerText(),
-        /Browser collaboration/u,
-      );
-      assert.match(await first.locator("[data-search-result]").first().innerText(), /answer/u);
+      assert.equal(await first.locator(".catalog-row").count(), 1);
+      assert.match(await first.locator(".catalog-row").innerText(), /Browser collaboration/u);
+      assert.match(await first.locator(".catalog-row").innerText(), /answer/u);
       assert.equal(new URL(first.url()).searchParams.get("q"), "rfc:1 answer");
       await first.route("**/api/documents?q=*", async (route) => {
         if (new URL(route.request().url()).searchParams.get("q") === 'rfc:1 "answer"') {
@@ -461,14 +496,20 @@ test(
       });
       await documentSearch.fill('rfc:1 "answer"');
       await first.waitForFunction(
-        () => document.querySelector('[role="listbox"]')?.getAttribute("aria-busy") === "true",
+        () =>
+          document.querySelector("[data-document-search]")?.getAttribute("aria-busy") === "true",
       );
-      assert.equal(await first.locator("[data-search-result]").count(), 1);
+      assert.equal(await first.locator(".catalog-row").count(), 1);
       await first.waitForFunction(
-        () => document.querySelector('[role="listbox"]')?.getAttribute("aria-busy") === "false",
+        () =>
+          document.querySelector("[data-document-search]")?.getAttribute("aria-busy") === "false",
       );
-      assert.equal(await first.locator("[data-search-result]").count(), 1);
+      assert.equal(await first.locator(".catalog-row").count(), 1);
+      await documentSearch.press("ArrowDown");
+      assert.equal(await first.locator(".catalog-row[data-catalog-selected]").count(), 1);
       await documentSearch.press("Enter");
+      assert.match(first.url(), /\?q=rfc%3A1(?:\+|%20)%22answer%22$/u);
+      await first.locator(".catalog-row[data-catalog-selected]").click();
       await first.waitForURL(/\/rfcs\/0001$/u);
       await first.locator("[data-open-editor]").click();
       await first.waitForURL(/\/rfcs\/0001\/edit$/u);
