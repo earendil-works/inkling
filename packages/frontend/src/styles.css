@@ -16,6 +16,7 @@
   --accent: #353431;
   --accent-contrast: #faf9f6;
   --accent-soft: #e8e6e0;
+  --focus-ring: #9b6b4a;
   --danger: #a44335;
   --state-draft-bg: light-dark(#ece7de, #28251f);
   --state-draft-border: light-dark(#d9cfc0, #454036);
@@ -66,6 +67,7 @@
   --accent: #f8f7f4;
   --accent-contrast: #2e2d2b;
   --accent-soft: #44423e;
+  --focus-ring: #d5a27c;
   --danger: #ef806c;
   --shadow: 0 18px 48px rgb(0 0 0 / 32%);
 }
@@ -85,6 +87,7 @@
     --accent: #f8f7f4;
     --accent-contrast: #2e2d2b;
     --accent-soft: #44423e;
+    --focus-ring: #d5a27c;
     --danger: #ef806c;
     --shadow: 0 18px 48px rgb(0 0 0 / 32%);
   }
@@ -185,7 +188,7 @@ select:disabled {
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -614,8 +617,8 @@ select:disabled {
 }
 
 .document-search__control:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 1px var(--focus-ring);
 }
 
 .document-search__control svg {
@@ -716,9 +719,13 @@ select:disabled {
   color: var(--muted);
 }
 
-.document-search__completions button:hover,
-.document-search__completions button:focus-visible {
+.document-search__completions button:hover {
   border-color: var(--accent);
+  color: var(--text);
+}
+
+.document-search__completions button:focus-visible {
+  border-color: var(--focus-ring);
   color: var(--text);
 }
 
@@ -767,7 +774,7 @@ select:disabled {
 .catalog-row[data-catalog-selected] {
   position: relative;
   z-index: 1;
-  box-shadow: inset 0 0 0 2px var(--accent);
+  box-shadow: inset 0 0 0 2px var(--focus-ring);
 }
 
 .catalog-row[data-document-visibility="public"] {
@@ -1479,7 +1486,7 @@ select:disabled {
 }
 
 .attachment-button:has(input:focus-visible) {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
