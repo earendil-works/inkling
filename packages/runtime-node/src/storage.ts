@@ -277,6 +277,13 @@ export function journalLayer(
               Effect.map((entries) => entries.filter((entry) => entry.sequence > sequence)),
             ),
           ),
+        delete: (documentId) =>
+          mutex.withPermits(1)(
+            fileSystem.remove(path.join(root, `${documentId}.jsonl`), { force: true }).pipe(
+              Effect.mapError((cause) => storageFailure("delete journal", cause)),
+              Effect.tap(() => Effect.sync(() => cache.delete(documentId))),
+            ),
+          ),
         truncateThrough: (documentId, sequence) =>
           mutex.withPermits(1)(
             Effect.gen(function* () {

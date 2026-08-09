@@ -24,6 +24,8 @@ export type LifecycleState = KnownLifecycleState | (string & {});
 export type Visibility = "public" | "private" | "confidential";
 export type CapabilityAccess = "disabled" | "view" | "comment" | "edit";
 
+export const documentTrashRetentionMilliseconds = 30 * 24 * 60 * 60 * 1_000;
+
 export interface PersonReference {
   readonly id: PersonId;
   readonly displayName: string;
@@ -427,6 +429,16 @@ export function markDeleted(
   now: string,
 ): Effect.Effect<DocumentMetadata, DomainError> {
   return Effect.gen(function* () {
+    if (metadata.deletedAt !== undefined) {
+      if (
+        expectedRevision === metadata.headRevision ||
+        expectedRevision === metadata.headRevision - 1
+      ) {
+        return metadata;
+      }
+      yield* requireRevision(metadata, expectedRevision);
+      return metadata;
+    }
     yield* requireRevision(metadata, expectedRevision);
     const deletedAt = yield* fromEither(validateDate(now, "deletion date"));
     return {
@@ -440,6 +452,43 @@ export function markDeleted(
       updatedAt: deletedAt,
     };
   });
+}
+
+export function markRestored(
+  metadata: DocumentMetadata,
+  expectedRevision: number,
+  now: string,
+): Effect.Effect<DocumentMetadata, DomainError> {
+  return Effect.gen(function* () {
+    yield* requireRevision(metadata, expectedRevision);
+    if (metadata.deletedAt === undefined) {
+      return yield* fail("document_not_deleted", "The document is not in the trash.");
+    }
+    const restoredAt = yield* fromEither(validateDate(now, "restoration date"));
+    return {
+      ...metadata,
+      deletedAt: undefined,
+      headRevision: nextDocumentRevision(metadata.headRevision),
+      updatedAt: restoredAt,
+    };
+  });
+}
+
+export function documentTrashExpiresAt(
+  metadata: Pick<DocumentMetadata, "deletedAt">,
+): string | undefined {
+  if (metadata.deletedAt === undefined) return undefined;
+  return new Date(
+    Date.parse(metadata.deletedAt) + documentTrashRetentionMilliseconds,
+  ).toISOString();
+}
+
+export function isDocumentTrashExpired(
+  metadata: Pick<DocumentMetadata, "deletedAt">,
+  now: string,
+): boolean {
+  const expiresAt = documentTrashExpiresAt(metadata);
+  return expiresAt !== undefined && Date.parse(expiresAt) <= Date.parse(now);
 }
 
 export function requireRevision(

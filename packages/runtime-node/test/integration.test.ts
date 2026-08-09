@@ -12,6 +12,7 @@ import { InklingApplication } from "@earendil-works/inkling-backend";
 import { personId } from "@earendil-works/inkling-core";
 
 import { startServer } from "../src/server.ts";
+import type { RunningServer } from "../src/server.ts";
 
 test(
   "local HTTP, WebSocket, publication, attachment, and restart behavior",
@@ -504,6 +505,213 @@ test(
   },
 );
 
+test("documents move through Trash, restore, and permanent deletion", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "inkling-trash-"));
+  try {
+    const first = await withServer(directory, async (baseUrl, session, running) => {
+      const authorization = await setupApiKey(baseUrl, "trash operator", session);
+      const createdResponse = await fetch(`${baseUrl}/api/documents`, {
+        body: JSON.stringify({
+          body: "Body retained while recoverable",
+          creationKey: "trash-document",
+          title: "Recoverable document",
+        }),
+        headers: { ...authorization, "Content-Type": "application/json" },
+        method: "POST",
+      });
+      assert.equal(createdResponse.status, 200);
+      let document = (await createdResponse.json()) as DocumentWire;
+      const publicBody = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/edits`, {
+        body: JSON.stringify({
+          edits: [{ newText: "visibility: public", oldText: "visibility: private" }],
+          expectedRevision: document.metadata.headRevision,
+        }),
+        headers: { ...authorization, "Content-Type": "application/json" },
+        method: "POST",
+      });
+      assert.equal(publicBody.status, 200);
+      assert.equal(
+        (
+          await fetch(`${baseUrl}/api/documents/${document.metadata.id}/publish`, {
+            headers: authorization,
+            method: "POST",
+          })
+        ).status,
+        200,
+      );
+      document = await readDocument(baseUrl, document.metadata.id, authorization);
+      assert.equal(
+        (await fetch(`${baseUrl}/api/public/documents/${document.metadata.id}`)).status,
+        200,
+      );
+
+      const deleted = await fetch(
+        `${baseUrl}/api/documents/${document.metadata.id}?expectedRevision=${document.metadata.headRevision}`,
+        { headers: authorization, method: "DELETE" },
+      );
+      assert.equal(deleted.status, 200);
+      assert.equal(
+        (
+          await fetch(
+            `${baseUrl}/api/documents/${document.metadata.id}?expectedRevision=${document.metadata.headRevision}`,
+            { headers: authorization, method: "DELETE" },
+          )
+        ).status,
+        200,
+      );
+      assert.equal(
+        (
+          (await (await fetch(`${baseUrl}/api/documents`, { headers: authorization })).json()) as {
+            documents: unknown[];
+          }
+        ).documents.length,
+        0,
+      );
+      const trashResponse = await fetch(`${baseUrl}/api/trash`, { headers: authorization });
+      assert.equal(trashResponse.status, 200);
+      const trash = (await trashResponse.json()) as { documents: DocumentWire[] };
+      assert.equal(trash.documents.length, 1);
+      assert.equal(trash.documents[0]?.metadata.id, document.metadata.id);
+      assert.ok(trash.documents[0]?.metadata.deletedAt);
+      assert.equal(
+        (await fetch(`${baseUrl}/api/public/documents/${document.metadata.id}`)).status,
+        404,
+      );
+
+      const trashed = trash.documents[0];
+      assert.ok(trashed);
+      const deletedReader = await fetch(
+        `${baseUrl}/api/documents/${document.metadata.id}?published=true`,
+        { headers: authorization },
+      );
+      assert.equal(deletedReader.status, 200);
+      assert.equal(((await deletedReader.json()) as DocumentWire).body, "");
+      const trashEdit = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/edits`, {
+        body: JSON.stringify({
+          edits: [
+            {
+              newText: "Body edited while in Trash",
+              oldText: "Body retained while recoverable",
+            },
+          ],
+          expectedRevision: trashed.metadata.headRevision,
+        }),
+        headers: { ...authorization, "Content-Type": "application/json" },
+        method: "POST",
+      });
+      assert.equal(trashEdit.status, 200);
+      const editedInTrash = (await trashEdit.json()) as DocumentWire;
+      assert.ok(editedInTrash.metadata.deletedAt);
+      const restoredResponse = await fetch(
+        `${baseUrl}/api/documents/${document.metadata.id}/restore?expectedRevision=${editedInTrash.metadata.headRevision}`,
+        { headers: authorization, method: "POST" },
+      );
+      assert.equal(restoredResponse.status, 200);
+      const restored = (await restoredResponse.json()) as DocumentWire["metadata"];
+      assert.equal(restored.deletedAt, undefined);
+      document = await readDocument(baseUrl, document.metadata.id, authorization);
+      assert.match(document.body, /Body edited while in Trash/u);
+      assert.equal(
+        (await fetch(`${baseUrl}/api/public/documents/${document.metadata.id}`)).status,
+        200,
+      );
+
+      const deletedAgain = await fetch(
+        `${baseUrl}/api/documents/${document.metadata.id}?expectedRevision=${document.metadata.headRevision}`,
+        { headers: authorization, method: "DELETE" },
+      );
+      assert.equal(deletedAgain.status, 200);
+      const trashedAgain = (await (
+        await fetch(`${baseUrl}/api/trash`, { headers: authorization })
+      ).json()) as { documents: DocumentWire[] };
+      const permanentCandidate = trashedAgain.documents[0];
+      assert.ok(permanentCandidate);
+      const permanent = await fetch(
+        `${baseUrl}/api/documents/${document.metadata.id}/permanent?expectedRevision=${permanentCandidate.metadata.headRevision}`,
+        { headers: authorization, method: "DELETE" },
+      );
+      assert.equal(permanent.status, 200);
+      assert.equal(
+        (
+          await fetch(
+            `${baseUrl}/api/documents/${document.metadata.id}/permanent?expectedRevision=${permanentCandidate.metadata.headRevision}`,
+            { headers: authorization, method: "DELETE" },
+          )
+        ).status,
+        200,
+      );
+      assert.equal(
+        (
+          (await (await fetch(`${baseUrl}/api/trash`, { headers: authorization })).json()) as {
+            documents: unknown[];
+          }
+        ).documents.length,
+        0,
+      );
+      assert.equal(
+        (
+          await fetch(`${baseUrl}/api/documents/${document.metadata.id}`, {
+            headers: authorization,
+          })
+        ).status,
+        404,
+      );
+
+      const expiringResponse = await fetch(`${baseUrl}/api/documents`, {
+        body: JSON.stringify({
+          body: "Automatically expires",
+          creationKey: "expiring-trash-document",
+          title: "Expiring trash document",
+        }),
+        headers: { ...authorization, "Content-Type": "application/json" },
+        method: "POST",
+      });
+      assert.equal(expiringResponse.status, 200);
+      const expiring = (await expiringResponse.json()) as DocumentWire;
+      assert.equal(
+        (
+          await fetch(
+            `${baseUrl}/api/documents/${expiring.metadata.id}?expectedRevision=${expiring.metadata.headRevision}`,
+            { headers: authorization, method: "DELETE" },
+          )
+        ).status,
+        200,
+      );
+      const purged = await running.runtime.runPromise(
+        Effect.flatMap(InklingApplication, (application) =>
+          application.purgeExpiredDocuments("2100-01-01T00:00:00.000Z"),
+        ),
+      );
+      assert.deepEqual(purged, [expiring.metadata.id]);
+      assert.equal(
+        (
+          await fetch(`${baseUrl}/api/documents/${expiring.metadata.id}`, {
+            headers: authorization,
+          })
+        ).status,
+        404,
+      );
+      return { authorization, documentId: document.metadata.id };
+    });
+
+    await withServer(directory, async (baseUrl) => {
+      assert.equal(
+        (
+          await fetch(`${baseUrl}/api/documents/${first.documentId}`, {
+            headers: first.authorization,
+          })
+        ).status,
+        404,
+      );
+      const trash = await fetch(`${baseUrl}/api/trash`, { headers: first.authorization });
+      assert.equal(trash.status, 200);
+      assert.deepEqual((await trash.json()) as { documents: unknown[] }, { documents: [] });
+    });
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
+});
+
 test("backup corruption is rejected and a fresh installation restores portably", async () => {
   const sourceDirectory = await mkdtemp(path.join(tmpdir(), "inkling-backup-source-"));
   const targetDirectory = await mkdtemp(path.join(tmpdir(), "inkling-backup-target-"));
@@ -581,6 +789,7 @@ interface DocumentWire {
       readonly email: string;
       readonly id: string;
     }[];
+    readonly deletedAt?: string | undefined;
     readonly headRevision: number;
     readonly id: string;
     readonly publishedRevision?: number | undefined;
@@ -596,7 +805,7 @@ interface TestSession {
 
 async function withServer<A>(
   directory: string,
-  callback: (baseUrl: string, session: TestSession) => Promise<A>,
+  callback: (baseUrl: string, session: TestSession, running: RunningServer) => Promise<A>,
 ): Promise<A> {
   return Effect.runPromise(
     Effect.scoped(
@@ -622,10 +831,14 @@ async function withServer<A>(
         return yield* Effect.tryPromise({
           catch: (cause) => cause,
           try: () =>
-            callback(`http://127.0.0.1:${address.port}`, {
-              cookieHeader: `inkling_session=${session.sessionToken}; inkling_csrf=${session.csrfToken}`,
-              csrf: session.csrfToken,
-            }),
+            callback(
+              `http://127.0.0.1:${address.port}`,
+              {
+                cookieHeader: `inkling_session=${session.sessionToken}; inkling_csrf=${session.csrfToken}`,
+                csrf: session.csrfToken,
+              },
+              running,
+            ),
         });
       }),
     ),

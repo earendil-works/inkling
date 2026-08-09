@@ -42,6 +42,8 @@ const expectedHelpTopics = [
   "share",
   "share-instance",
   "thread-delete",
+  "trash",
+  "undelete",
   "unpublish",
   "use",
   "verify",

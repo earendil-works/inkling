@@ -280,6 +280,100 @@ test(
         );
         assert.match(persistedSecond.body, /---\n\n# Cloudflare second\n\ninitial second$/u);
         assert.equal(persistedSecond.metadata.rfcNumber, 2);
+
+        const deleted = await fetch(
+          `${running.baseUrl}/api/documents/${second.metadata.id}?expectedRevision=${persistedSecond.metadata.headRevision}`,
+          { headers: authorization, method: "DELETE" },
+        );
+        assert.equal(deleted.status, 200);
+        const trashResponse = await fetch(`${running.baseUrl}/api/trash`, {
+          headers: authorization,
+        });
+        assert.equal(trashResponse.status, 200);
+        let trash = (await trashResponse.json()) as { documents: DocumentWire[] };
+        assert.equal(trash.documents[0]?.metadata.id, second.metadata.id);
+        assert.ok(trash.documents[0]?.metadata.deletedAt);
+        const trashed = trash.documents[0];
+        assert.ok(trashed);
+        const deletedReader = await fetch(
+          `${running.baseUrl}/api/documents/${second.metadata.id}?published=true`,
+          { headers: authorization },
+        );
+        assert.equal(deletedReader.status, 200);
+        assert.equal(((await deletedReader.json()) as DocumentWire).body, "");
+        const trashEdit = await fetch(
+          `${running.baseUrl}/api/documents/${second.metadata.id}/edits`,
+          {
+            body: JSON.stringify({
+              edits: [{ newText: "edited in Trash", oldText: "initial second" }],
+              expectedRevision: trashed.metadata.headRevision,
+            }),
+            headers: { ...authorization, "Content-Type": "application/json" },
+            method: "POST",
+          },
+        );
+        assert.equal(trashEdit.status, 200);
+        const editedInTrash = (await trashEdit.json()) as DocumentWire;
+        assert.ok(editedInTrash.metadata.deletedAt);
+
+        const restored = await fetch(
+          `${running.baseUrl}/api/documents/${second.metadata.id}/restore?expectedRevision=${editedInTrash.metadata.headRevision}`,
+          { headers: authorization, method: "POST" },
+        );
+        assert.equal(restored.status, 200);
+        const restoredMetadata = (await restored.json()) as DocumentWire["metadata"];
+        assert.equal(restoredMetadata.deletedAt, undefined);
+        const restoredDocument = await readDocument(
+          running.baseUrl,
+          second.metadata.id,
+          authorization,
+        );
+        assert.match(restoredDocument.body, /edited in Trash$/u);
+
+        const deletedAgain = await fetch(
+          `${running.baseUrl}/api/documents/${second.metadata.id}?expectedRevision=${restoredDocument.metadata.headRevision}`,
+          { headers: authorization, method: "DELETE" },
+        );
+        assert.equal(deletedAgain.status, 200);
+        trash = (await (
+          await fetch(`${running.baseUrl}/api/trash`, { headers: authorization })
+        ).json()) as { documents: DocumentWire[] };
+        const permanentCandidate = trash.documents.find(
+          (document) => document.metadata.id === second.metadata.id,
+        );
+        assert.ok(permanentCandidate);
+        const permanent = await fetch(
+          `${running.baseUrl}/api/documents/${second.metadata.id}/permanent?expectedRevision=${permanentCandidate.metadata.headRevision}`,
+          { headers: authorization, method: "DELETE" },
+        );
+        assert.equal(permanent.status, 200);
+        assert.equal(
+          (
+            await fetch(
+              `${running.baseUrl}/api/documents/${second.metadata.id}/permanent?expectedRevision=${permanentCandidate.metadata.headRevision}`,
+              { headers: authorization, method: "DELETE" },
+            )
+          ).status,
+          200,
+        );
+        assert.equal(
+          (
+            await fetch(`${running.baseUrl}/api/documents/${second.metadata.id}`, {
+              headers: authorization,
+            })
+          ).status,
+          404,
+        );
+        assert.equal(
+          (
+            (await (
+              await fetch(`${running.baseUrl}/api/trash`, { headers: authorization })
+            ).json()) as {
+              documents: DocumentWire[];
+            }
+          ).documents.some((document) => document.metadata.id === second.metadata.id),
+          false,
+        );
       } finally {
         await running.stop();
         running = undefined;
@@ -300,6 +394,7 @@ interface DocumentWire {
       readonly email: string;
       readonly id: string;
     }[];
+    readonly deletedAt?: string | undefined;
     readonly headRevision: number;
     readonly id: string;
     readonly labels: readonly string[];

@@ -7,7 +7,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { NodeFileSystem } from "@effect/platform-node";
 import { Effect, Layer, ManagedRuntime, type Scope } from "effect";
 
-import { createBackendApp } from "@earendil-works/inkling-backend";
+import { createBackendApp, InklingApplication } from "@earendil-works/inkling-backend";
 import type {
   GoogleAuthenticationEnvironment,
   InklingApplicationService,
@@ -63,6 +63,24 @@ export function startServer(
       try: () => runtime.runtime(),
     });
 
+    yield* Effect.gen(function* () {
+      while (true) {
+        yield* Effect.tryPromise({
+          catch: (error) => error,
+          try: () =>
+            runtime.runPromise(
+              Effect.flatMap(InklingApplication, (application) =>
+                application.purgeExpiredDocuments(new Date().toISOString()),
+              ),
+            ),
+        }).pipe(
+          Effect.tapError((error) => Effect.logError("Inkling trash cleanup failed", error)),
+          Effect.ignore,
+        );
+        yield* Effect.sleep("1 hour");
+      }
+    }).pipe(Effect.forkScoped);
+
     const app = createBackendApp({
       googleAuthentication: options.googleAuthentication ?? googleAuthenticationFromEnvironment(),
       runtime,
@@ -72,6 +90,7 @@ export function startServer(
       path.dirname(fileURLToPath(import.meta.url)),
       "../../frontend/dist",
     );
+    app.get("/trash", serveStatic({ path: "index.html", root: frontendRoot }));
     app.get("/documents/*", serveStatic({ path: "index.html", root: frontendRoot }));
     app.get("/rfcs/*", serveStatic({ path: "index.html", root: frontendRoot }));
     app.get("/share/*", serveStatic({ path: "index.html", root: frontendRoot }));

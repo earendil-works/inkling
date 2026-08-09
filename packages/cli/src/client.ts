@@ -56,6 +56,7 @@ export interface CliClient {
     request: ImportDocumentRequest,
   ) => Effect.Effect<DocumentResponse, ClientError>;
   readonly list: (query: string) => Effect.Effect<CatalogResponse, ClientError>;
+  readonly listDeleted: Effect.Effect<CatalogResponse, ClientError>;
   readonly read: (
     documentId: string,
     range?: { readonly start: number; readonly end: number },
@@ -81,6 +82,14 @@ export interface CliClient {
     patch: Readonly<Record<string, unknown>>,
   ) => Effect.Effect<DocumentMetadataDto, ClientError>;
   readonly remove: (
+    documentId: string,
+    expectedRevision: number,
+  ) => Effect.Effect<void, ClientError>;
+  readonly restoreDocument: (
+    documentId: string,
+    expectedRevision: number,
+  ) => Effect.Effect<DocumentMetadataDto, ClientError>;
+  readonly hardDeleteDocument: (
     documentId: string,
     expectedRevision: number,
   ) => Effect.Effect<void, ClientError>;
@@ -385,6 +394,7 @@ export function makeCliClient(instance: Instance): CliClient {
     importDocument: (input) => mutate("/api/admin/import", DocumentResponseSchema, "POST", input),
     list: (query) =>
       request(`/api/documents?q=${encodeURIComponent(query)}`, CatalogResponseSchema),
+    listDeleted: request("/api/trash", CatalogResponseSchema),
     metadata: (documentId, patch) =>
       assertDocument(documentId).pipe(
         Effect.zipRight(
@@ -414,6 +424,18 @@ export function makeCliClient(instance: Instance): CliClient {
     remove: (documentId, expectedRevision) =>
       mutate(
         `/api/documents/${encodeURIComponent(documentId)}?expectedRevision=${expectedRevision}`,
+        Schema.Unknown,
+        "DELETE",
+      ).pipe(Effect.asVoid),
+    restoreDocument: (documentId, expectedRevision) =>
+      mutate(
+        `/api/documents/${encodeURIComponent(documentId)}/restore?expectedRevision=${expectedRevision}`,
+        DocumentMetadataSchema,
+        "POST",
+      ),
+    hardDeleteDocument: (documentId, expectedRevision) =>
+      mutate(
+        `/api/documents/${encodeURIComponent(documentId)}/permanent?expectedRevision=${expectedRevision}`,
         Schema.Unknown,
         "DELETE",
       ).pipe(Effect.asVoid),

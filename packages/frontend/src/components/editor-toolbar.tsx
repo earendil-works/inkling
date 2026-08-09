@@ -17,10 +17,12 @@ import { SharingControl } from "./sharing-control.tsx";
 export interface EditorToolbarProps {
   readonly api: ApiClientService;
   readonly beforePublish: PublishButtonProps["beforePublish"];
+  readonly canDelete: boolean;
   readonly canEdit: boolean;
   readonly canEditMetadata: boolean;
   readonly metadata: DocumentMetadataDto;
   readonly onAttachment: (attachment: AttachmentMetadataDto) => void;
+  readonly onDelete: () => void;
   readonly onMetadataChanged: (metadata: DocumentMetadataDto) => void;
   readonly onOpenComments: () => void;
   readonly onSharingChanged: (response: ShareLinksResponse) => void;
@@ -36,10 +38,12 @@ export interface EditorToolbarProps {
 export function EditorToolbar({
   api,
   beforePublish,
+  canDelete,
   canEdit,
   canEditMetadata,
   metadata,
   onAttachment,
+  onDelete,
   onMetadataChanged,
   onOpenComments,
   onSharingChanged,
@@ -51,8 +55,15 @@ export function EditorToolbar({
   publicationMetadata,
   shared,
 }: EditorToolbarProps): React.JSX.Element {
+  const trashed = metadata.deletedAt !== undefined;
   return (
-    <section className="document-bar">
+    <section className={`document-bar${trashed ? " is-trashed" : ""}`}>
+      {trashed ? (
+        <p className="document-trash-indicator" data-document-trashed="">
+          <a href="/trash">In Trash</a>
+          <span>Changes are still saved.</span>
+        </p>
+      ) : null}
       <div className="document-actions">
         <Button
           aria-pressed={previewOpen}
@@ -81,7 +92,7 @@ export function EditorToolbar({
           metadata={metadata}
           onAllocated={onMetadataChanged}
         />
-        {shared ? null : (
+        {shared || trashed ? null : (
           <SharingControl
             access={metadata.sharing.access}
             api={api}
@@ -96,7 +107,7 @@ export function EditorToolbar({
         >
           View
         </ButtonLink>
-        {shared ? null : (
+        {shared || trashed ? null : (
           <PublishButton
             api={api}
             beforePublish={beforePublish}
@@ -107,6 +118,16 @@ export function EditorToolbar({
             published={metadata.publishedRevision !== undefined}
           />
         )}
+        {canDelete && !trashed ? (
+          <Button
+            className="document-delete"
+            data-delete-document=""
+            onClick={onDelete}
+            variant="toolbar"
+          >
+            Trash
+          </Button>
+        ) : null}
       </div>
     </section>
   );

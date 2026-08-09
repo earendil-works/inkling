@@ -64,6 +64,10 @@ test(
       assert.equal(await first.locator("[data-account-name]").textContent(), "Browser Admin");
       assert.equal(await first.locator("[data-api-status]").count(), 0);
       assert.equal(await first.locator(".catalog-tools [data-logout]").count(), 0);
+      assert.deepEqual(await first.locator(".catalog-tool-links a").allTextContents(), [
+        "Browse labels",
+        "Trash",
+      ]);
       assert.equal(await first.locator("[data-account-menu]").isVisible(), false);
       await first.locator(".account-control__trigger").click();
       assert.deepEqual(await first.locator("[data-account-menu] button").allTextContents(), [
@@ -1223,6 +1227,91 @@ test(
           Math.round(wrappedScrollAlignment.sourceBase + offset),
         ),
       );
+
+      const trashDocumentId = await first.evaluate(async () => {
+        const csrf = document.cookie
+          .split(";")
+          .map((part) => part.trim())
+          .find((part) => part.startsWith("inkling_csrf="))
+          ?.slice("inkling_csrf=".length);
+        const response = await fetch("/api/documents", {
+          body: JSON.stringify({
+            body: "A document that can be restored.",
+            creationKey: "browser-trash-note",
+            title: "Browser trash note",
+          }),
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf ?? "" },
+          method: "POST",
+        });
+        const created = (await response.json()) as { metadata: { id: string } };
+        return created.metadata.id;
+      });
+      await first.goto(`${baseUrl}/documents/${trashDocumentId}/edit`);
+      await first.waitForSelector("[data-delete-document]");
+      await first.locator("[data-delete-document]").click();
+      await first.getByRole("button", { name: "Move to trash" }).click();
+      await first.waitForURL(`${baseUrl}/`);
+      await first.getByRole("link", { name: "Trash", exact: true }).click();
+      await first.waitForURL(`${baseUrl}/trash`);
+      await first.waitForSelector(`[data-trash-document="${trashDocumentId}"]`);
+      const trashRow = first.locator(`[data-trash-document="${trashDocumentId}"]`);
+      assert.match(await trashRow.innerText(), /Permanently deletes/u);
+      assert.equal(
+        await trashRow
+          .locator(`[data-edit-trashed-document="${trashDocumentId}"]`)
+          .getAttribute("href"),
+        `/documents/${trashDocumentId}/edit`,
+      );
+      await first.goto(`${baseUrl}/documents/${trashDocumentId}`);
+      await first.waitForSelector("[data-trashed]");
+      assert.match(await first.locator("[data-trashed]").innerText(), /in trash/iu);
+      assert.deepEqual(await first.locator("[data-breadcrumb]").allTextContents(), [
+        "Inkling",
+        "Trash",
+        "Browser trash note",
+      ]);
+      await first.locator("[data-open-editor]").click();
+      await first.waitForURL(`${baseUrl}/documents/${trashDocumentId}/edit`);
+      await first.waitForSelector("[data-document-trashed]");
+      assert.match(
+        await first.locator("[data-document-trashed]").innerText(),
+        /in trash\s*changes are still saved\./iu,
+      );
+      assert.equal(await first.locator("[data-delete-document]").count(), 0);
+      assert.equal(await first.locator("[data-publish]").count(), 0);
+      assert.equal(await first.locator("[data-share]").count(), 0);
+      const trashedBodyLine = first
+        .locator(".cm-line")
+        .filter({ hasText: "A document that can be restored." });
+      await trashedBodyLine.click();
+      await first.keyboard.press("End");
+      await first.keyboard.insertText(" It remains editable.");
+      await first.waitForFunction(
+        () => document.querySelector("[data-save-state]")?.textContent === "Saved",
+      );
+      await first.getByRole("link", { name: "In Trash", exact: true }).click();
+      await first.waitForURL(`${baseUrl}/trash`);
+      await first.locator(`[data-restore-document="${trashDocumentId}"]`).click();
+      await first.waitForSelector(`[data-trash-document="${trashDocumentId}"]`, {
+        state: "detached",
+      });
+
+      await first.goto(`${baseUrl}/documents/${trashDocumentId}/edit`);
+      await first.waitForSelector("[data-delete-document]");
+      assert.match(await first.locator(".cm-content").innerText(), /It remains editable\./u);
+      await first.locator("[data-delete-document]").click();
+      await first.getByRole("button", { name: "Move to trash" }).click();
+      await first.waitForURL(`${baseUrl}/`);
+      await first.getByRole("link", { name: "Trash", exact: true }).click();
+      await first.waitForSelector(`[data-hard-delete-document="${trashDocumentId}"]`);
+      await first.locator(`[data-hard-delete-document="${trashDocumentId}"]`).click();
+      await first
+        .locator(".confirmation-dialog")
+        .getByRole("button", { name: "Delete forever" })
+        .click();
+      await first.waitForSelector(`[data-trash-document="${trashDocumentId}"]`, {
+        state: "detached",
+      });
 
       const publicNote = await first.evaluate(async () => {
         const csrf = document.cookie

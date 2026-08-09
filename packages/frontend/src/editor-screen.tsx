@@ -3,16 +3,18 @@ import { Effect } from "effect";
 
 import type { AuthenticationStatus, DocumentResponse } from "@earendil-works/inkling-protocol";
 
-import type { ApiClientService } from "./api.ts";
+import type { ApiClientService, ApiError } from "./api.ts";
 import { useAppContext } from "./app-context.tsx";
 import { CollaborationClientError } from "./collaboration.ts";
 import type { ConnectionState } from "./collaboration.ts";
+import { ConfirmationDialog } from "./components/confirmation-dialog.tsx";
 import { metadataWithFrontmatter } from "./components/document-metadata.ts";
 import { EditorComments } from "./components/editor-comments.tsx";
 import type { EditorCommentsHandle } from "./components/editor-comments.tsx";
 import { EditorToolbar } from "./components/editor-toolbar.tsx";
 import { connectionLabel, EditorWorkbench } from "./components/editor-workbench.tsx";
 import { GuestIdentityDialog } from "./components/guest-identity-dialog.tsx";
+import { useEffectAction } from "./effect-hooks.ts";
 import { useRenderedMarkdown } from "./markdown.tsx";
 import { documentHref, storedGuestName, storeGuestName } from "./ui.ts";
 import type { FrontmatterVocabulary } from "./frontmatter-completion.ts";
@@ -46,7 +48,13 @@ export function EditorScreen({
   const [permissions, setPermissions] = useState<readonly string[]>();
   const [previewRevision, setPreviewRevision] = useState(0);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
+  const deleteDocument = useEffectAction<
+    { readonly documentId: string; readonly expectedRevision: number },
+    void,
+    ApiError
+  >(({ documentId, expectedRevision }) => api.deleteDocument(documentId, expectedRevision));
   const initiallyEditable = !shared || initial.metadata.sharing.access === "edit";
   const { body, editorHostRef, sessionRef, sessionRevision, yRevision } = useEditorSession({
     capabilityToken,
@@ -81,6 +89,7 @@ export function EditorScreen({
 
   const canEdit = permissions?.includes("edit-body") ?? initiallyEditable;
   const canComment = permissions?.includes("comment") ?? false;
+  const canDelete = permissions?.includes("delete") ?? false;
   const canEditMetadata = permissions?.includes("edit-metadata") ?? !shared;
   const rendered = useRenderedMarkdown(body, true);
   const publishDisabledLabel =
@@ -130,6 +139,7 @@ export function EditorScreen({
       <EditorToolbar
         api={api}
         beforePublish={saveBeforePublish}
+        canDelete={canDelete}
         canEdit={canEdit}
         canEditMetadata={canEditMetadata}
         metadata={metadata}
@@ -146,6 +156,7 @@ export function EditorScreen({
             selection: { anchor: selection.from + insertedMarkdown.length },
           });
         }}
+        onDelete={() => setDeleteOpen(true)}
         onMetadataChanged={setMetadata}
         onOpenComments={() => editorCommentsRef.current?.openControls()}
         onSharingChanged={(response) =>
@@ -192,6 +203,30 @@ export function EditorScreen({
           yRevision={yRevision}
         />
       )}
+      <ConfirmationDialog
+        confirmLabel="Move to trash"
+        description="The document will disappear from the workspace and be permanently deleted after 30 days. You can restore it from Trash until then."
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={() =>
+          deleteDocument.execute(
+            { documentId: metadata.id, expectedRevision: metadata.headRevision },
+            {
+              onFailure: (error) => {
+                setDeleteOpen(false);
+                showToast(error.message, "error");
+              },
+              onSuccess: () => {
+                showToast("Document moved to Trash.", "success");
+                navigate("/");
+              },
+            },
+          )
+        }
+        open={deleteOpen}
+        pending={deleteDocument.state.pending}
+        title="Move this document to Trash?"
+        tone="danger"
+      />
       {shared && displayName === undefined ? (
         <GuestIdentityDialog
           onCancel={() => navigate(documentHref(metadata.id, metadata.rfcNumber, true, "read"))}

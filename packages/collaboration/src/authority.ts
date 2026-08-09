@@ -15,6 +15,7 @@ import {
   emptyCommentState,
   markDeleted,
   markPublished,
+  markRestored,
   markUnpublished,
   nextDocumentRevision,
   normalizeDocumentMetadata,
@@ -231,6 +232,11 @@ export interface DocumentAuthorityService {
     now: string,
   ) => Effect.Effect<CommentState, AuthorityError>;
   readonly deleteDocument: (
+    principal: Principal,
+    expectedRevision: number,
+    now: string,
+  ) => Effect.Effect<DocumentMetadata, AuthorityError>;
+  readonly restoreDocument: (
     principal: Principal,
     expectedRevision: number,
     now: string,
@@ -523,6 +529,7 @@ export function makeDocumentAuthority(
           Effect.gen(function* () {
             yield* authorizeDocument(principal, "delete", state.metadata, now);
             const metadata = yield* markDeleted(state.metadata, expectedRevision, now);
+            if (metadata === state.metadata) return metadata;
             const entry = yield* persist("metadata-event", metadata, state.comments, undefined);
             state = { ...state, dirty: true, metadata, sequence: entry.sequence };
             yield* PubSub.publish(pubsub, { metadata, type: "metadata-changed" });
@@ -551,6 +558,17 @@ export function makeDocumentAuthority(
             const entry = yield* persist("publication-event", metadata, state.comments, undefined);
             state = { ...state, dirty: true, metadata, sequence: entry.sequence };
             yield* PubSub.publish(pubsub, { metadata, type: "published" });
+            return metadata;
+          }),
+        ),
+      restoreDocument: (principal, expectedRevision, now) =>
+        withLock(
+          Effect.gen(function* () {
+            yield* authorizeDocument(principal, "restore", state.metadata, now);
+            const metadata = yield* markRestored(state.metadata, expectedRevision, now);
+            const entry = yield* persist("metadata-event", metadata, state.comments, undefined);
+            state = { ...state, dirty: true, metadata, sequence: entry.sequence };
+            yield* PubSub.publish(pubsub, { metadata, type: "metadata-changed" });
             return metadata;
           }),
         ),

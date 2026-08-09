@@ -9,6 +9,7 @@ export interface CatalogControlsProps {
   readonly initialCatalog: CatalogResponse;
   readonly onResultsChange: (catalog: CatalogResponse) => void;
   readonly publicCatalog?: boolean | undefined;
+  readonly showTrash?: boolean | undefined;
 }
 
 export function CatalogControls({
@@ -16,6 +17,7 @@ export function CatalogControls({
   initialCatalog,
   onResultsChange,
   publicCatalog = false,
+  showTrash = false,
 }: CatalogControlsProps): React.JSX.Element {
   return (
     <section className="catalog-tools" aria-label="Document tools">
@@ -29,6 +31,11 @@ export function CatalogControls({
         <ButtonLink href="/labels" variant="text">
           Browse labels
         </ButtonLink>
+        {showTrash ? (
+          <ButtonLink href="/trash" variant="text">
+            Trash
+          </ButtonLink>
+        ) : null}
       </div>
     </section>
   );

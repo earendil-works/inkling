@@ -11,7 +11,7 @@ import type {
   Visibility,
 } from "./document.ts";
 
-export type RegistryStatus = "pending" | "active" | "deleted";
+export type RegistryStatus = "pending" | "active" | "deleted" | "purged";
 
 export interface CatalogSummary {
   readonly documentId: DocumentId;
@@ -66,6 +66,7 @@ export interface RfcAllocation {
 export interface CatalogSearchOptions {
   readonly currentPersonId?: PersonId | undefined;
   readonly includeDeleted?: boolean | undefined;
+  readonly onlyDeleted?: boolean | undefined;
   readonly publicOnly?: boolean | undefined;
   readonly limit?: number | undefined;
 }
@@ -179,7 +180,10 @@ export function activateDocument(
   state: WorkspaceCatalogState,
   document: DocumentId,
 ): Effect.Effect<WorkspaceCatalogState, DomainError> {
-  return updateEntry(state, document, (entry) => ({ ...entry, status: "active" }));
+  const entry = state.entries.find((candidate) => candidate.documentId === document);
+  return entry?.status === "purged"
+    ? failure("document_purged", "The document was permanently deleted.")
+    : updateEntry(state, document, (candidate) => ({ ...candidate, status: "active" }));
 }
 
 export function allocateRfcNumber(
@@ -217,7 +221,28 @@ export function tombstoneDocument(
   state: WorkspaceCatalogState,
   document: DocumentId,
 ): Effect.Effect<WorkspaceCatalogState, DomainError> {
-  return updateEntry(state, document, (entry) => ({ ...entry, status: "deleted" }));
+  return updateEntry(state, document, (entry) =>
+    entry.status === "purged" ? entry : { ...entry, status: "deleted" },
+  );
+}
+
+export function purgeDocument(
+  state: WorkspaceCatalogState,
+  document: DocumentId,
+): Effect.Effect<WorkspaceCatalogState, DomainError> {
+  return Effect.succeed({
+    ...state,
+    entries: state.entries.map((entry) =>
+      entry.documentId === document
+        ? {
+            creationKey: entry.creationKey,
+            documentId: entry.documentId,
+            rfcNumber: entry.rfcNumber,
+            status: "purged" as const,
+          }
+        : entry,
+    ),
+  });
 }
 
 export function applyCatalogSummary(
@@ -225,7 +250,8 @@ export function applyCatalogSummary(
   summary: CatalogSummary,
 ): Effect.Effect<WorkspaceCatalogState, DomainError> {
   return updateEntry(state, summary.documentId, (entry) =>
-    entry.summary !== undefined && entry.summary.revision >= summary.revision
+    entry.status === "purged" ||
+    (entry.summary !== undefined && entry.summary.revision >= summary.revision)
       ? entry
       : { ...entry, rfcNumber: summary.rfcNumber ?? entry.rfcNumber, summary },
   );
@@ -239,7 +265,11 @@ export function searchCatalog(
   const parsed = parseCatalogSearchQuery(query);
   const limit = Math.max(1, Math.min(options.limit ?? 100, 500));
   const matches = state.entries
-    .filter((entry) => options.includeDeleted === true || entry.status === "active")
+    .filter((entry) =>
+      options.onlyDeleted === true
+        ? entry.status === "deleted"
+        : options.includeDeleted === true || entry.status === "active",
+    )
     .flatMap((entry) => (entry.summary === undefined ? [] : [entry.summary]))
     .filter(
       (summary) =>
@@ -252,7 +282,11 @@ export function searchCatalog(
     });
   const summaries =
     parsed.terms.length === 0
-      ? orderCatalog(matches.map(({ summary }) => summary))
+      ? options.onlyDeleted === true
+        ? matches
+            .map(({ summary }) => summary)
+            .toSorted((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
+        : orderCatalog(matches.map(({ summary }) => summary))
       : matches
           .toSorted(
             (left, right) =>

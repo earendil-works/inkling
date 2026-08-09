@@ -10,6 +10,7 @@ import type { ApiClientService, ApiError } from "../api.ts";
 import type { FrontmatterVocabulary } from "../frontmatter-completion.ts";
 import type { EffectQueryState } from "../effect-hooks.ts";
 import { LabelsScreen } from "../labels-screen.tsx";
+import { TrashScreen } from "../trash-screen.tsx";
 import { WorkspaceScreen } from "../workspace-screen.tsx";
 import { Button } from "./button.tsx";
 import { SharePasswordScreen } from "./share-password-screen.tsx";
@@ -45,6 +46,10 @@ export type RouteModel =
       readonly catalog: CatalogResponse;
       readonly publicCatalog: boolean;
       readonly screen: "workspace";
+    })
+  | (RouteBase & {
+      readonly catalog: CatalogResponse;
+      readonly screen: "trash";
     })
   | (RouteBase & {
       readonly documentId: string;
@@ -89,8 +94,11 @@ export function RouteView({ navigationKey, refresh, state }: RouteViewProps): Re
           initialCatalog={model.catalog}
           key={navigationKey}
           publicCatalog={model.publicCatalog}
+          showTrash={model.account?.role === "administrator"}
         />
       );
+    case "trash":
+      return <TrashScreen api={model.api} initialCatalog={model.catalog} />;
     case "labels":
       return (
         <LabelsScreen

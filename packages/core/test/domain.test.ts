@@ -19,14 +19,19 @@ import {
   authenticateSession,
   documentId,
   documentTitleFromMarkdown,
+  documentTrashExpiresAt,
   emptyCommentState,
   encodeBase62,
   IdGenerator,
+  isDocumentTrashExpired,
+  markDeleted,
   markPublished,
+  markRestored,
   normalizeDocumentMetadata,
   normalizeSearchText,
   parseCatalogSearchQuery,
   personId,
+  purgeDocument,
   reserveDocument,
   resolveAuthorsByEmail,
   revokeApiKey,
@@ -38,6 +43,7 @@ import {
   hasPendingPublicationChanges,
   identifierTag,
   taggedId,
+  tombstoneDocument,
   updateDocumentMetadata,
   updateSharingPolicy,
   uuidV7Bytes,
@@ -311,6 +317,97 @@ test("private and confidential visibility share workspace-only authorization", a
     updateDocumentMetadata(confidential, { visibility: "public" }, 2, now),
   );
   await Effect.runPromise(authorizeDocument(anonymous, "read-published", publicMetadata, now));
+});
+
+test("deleted documents remain restorable for 30 days before permanent deletion", async () => {
+  const metadata = await Effect.runPromise(
+    createDocumentMetadata({ id: "document_trash_test", rfcNumber: 7, title: "Recoverable" }, now),
+  );
+  const administratorId = await Effect.runPromise(personId("admin@example.com"));
+  const memberId = await Effect.runPromise(personId("member@example.com"));
+  const administrator: Principal = {
+    kind: "workspace",
+    personId: administratorId,
+    role: "administrator",
+  };
+  const member: Principal = { kind: "workspace", personId: memberId, role: "member" };
+  const deleted = await Effect.runPromise(markDeleted(metadata, 0, now));
+
+  assert.equal(deleted.deletedAt, now);
+  assert.equal(deleted.sharing.access, "disabled");
+  assert.equal(await Effect.runPromise(markDeleted(deleted, 0, now)), deleted);
+  assert.equal(documentTrashExpiresAt(deleted), "2026-02-01T03:04:05.000Z");
+  assert.equal(isDocumentTrashExpired(deleted, "2026-02-01T03:04:04.999Z"), false);
+  assert.equal(isDocumentTrashExpired(deleted, "2026-02-01T03:04:05.000Z"), true);
+  await Effect.runPromise(authorizeDocument(administrator, "read-working", deleted, now));
+  await Effect.runPromise(authorizeDocument(administrator, "edit-body", deleted, now));
+  await Effect.runPromise(authorizeDocument(member, "read-working", deleted, now));
+  await Effect.runPromise(authorizeDocument(member, "edit-body", deleted, now));
+  await Effect.runPromise(authorizeDocument(administrator, "restore", deleted, now));
+  await Effect.runPromise(authorizeDocument(administrator, "hard-delete", deleted, now));
+  assert.equal(
+    Either.isLeft(
+      await Effect.runPromise(
+        authorizeDocument(member, "restore", deleted, now).pipe(Effect.either),
+      ),
+    ),
+    true,
+  );
+  assert.equal(
+    Either.isLeft(
+      await Effect.runPromise(
+        authorizeDocument(administrator, "publish", deleted, now).pipe(Effect.either),
+      ),
+    ),
+    true,
+  );
+
+  const restored = await Effect.runPromise(
+    markRestored(deleted, deleted.headRevision, "2026-01-03T00:00:00.000Z"),
+  );
+  assert.equal(restored.deletedAt, undefined);
+  assert.equal(restored.headRevision, 2);
+  assert.equal(
+    Either.isLeft(
+      await Effect.runPromise(
+        markRestored(restored, restored.headRevision, now).pipe(Effect.either),
+      ),
+    ),
+    true,
+  );
+
+  const reserved = await Effect.runPromise(
+    reserveDocument(emptyWorkspaceCatalog(), {
+      allocateRfc: false,
+      creationKey: "trash-test",
+      documentId: metadata.id,
+      requestedRfcNumber: 7,
+    }),
+  );
+  const active = await Effect.runPromise(activateDocument(reserved.state, metadata.id));
+  const projected = await Effect.runPromise(
+    applyCatalogSummary(active, catalogSummary(deleted, "Recoverable body")),
+  );
+  const trashed = await Effect.runPromise(tombstoneDocument(projected, metadata.id));
+  assert.deepEqual(
+    searchCatalog(trashed, "", { onlyDeleted: true }).map((summary) => summary.documentId),
+    [metadata.id],
+  );
+  assert.deepEqual(searchCatalog(trashed, ""), []);
+  const purged = await Effect.runPromise(purgeDocument(trashed, metadata.id));
+  assert.equal(purged.entries.length, 1);
+  assert.equal(purged.entries[0]?.status, "purged");
+  assert.equal(purged.entries[0]?.summary, undefined);
+  assert.equal(purged.nextRfcNumber, trashed.nextRfcNumber);
+  const reusedNumber = await Effect.runPromise(
+    reserveDocument(purged, {
+      allocateRfc: false,
+      creationKey: "replacement",
+      documentId: "document_replacement",
+      requestedRfcNumber: 7,
+    }).pipe(Effect.either),
+  );
+  assert.equal(Either.isLeft(reusedNumber) && reusedNumber.left.code, "duplicate_rfc_number");
 });
 
 test("capability generations revoke existing principals", async () => {

@@ -3,6 +3,7 @@ import { Effect, Layer, ManagedRuntime } from "effect";
 import type { ManagedRuntime as ManagedRuntimeType } from "effect";
 
 import {
+  documentTrashRetentionMilliseconds,
   DurableDocumentJournal,
   ObjectStore,
   WorkspaceStateStore,
@@ -206,11 +207,29 @@ export class WorkspaceDurableObject extends DurableObject<CloudflareEnvironment>
     );
   }
 
-  async markDeleted(documentId: string): Promise<RpcResult<boolean>> {
+  async markDeleted(document: DocumentResponse): Promise<RpcResult<boolean>> {
     return runRpc(
       this.#runtime,
       Effect.flatMap(InklingApplication, (application) =>
-        application.markCatalogDeleted(documentId).pipe(Effect.as(true)),
+        application.markCatalogDeleted(document).pipe(Effect.as(true)),
+      ),
+    );
+  }
+
+  async markRestored(document: DocumentResponse): Promise<RpcResult<boolean>> {
+    return runRpc(
+      this.#runtime,
+      Effect.flatMap(InklingApplication, (application) =>
+        application.markCatalogRestored(document).pipe(Effect.as(true)),
+      ),
+    );
+  }
+
+  async markPurged(documentId: string): Promise<RpcResult<boolean>> {
+    return runRpc(
+      this.#runtime,
+      Effect.flatMap(InklingApplication, (application) =>
+        application.markCatalogPurged(documentId).pipe(Effect.as(true)),
       ),
     );
   }
@@ -371,23 +390,26 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
 
     const response = await app.fetch(request);
     if (isMutation(request) && response.ok) {
-      if (
-        request.method === "DELETE" &&
-        url.pathname === `/api/documents/${encodeURIComponent(configuration.documentId)}`
-      ) {
-        this.#state.waitUntil(this.#queueDeletion(configuration.documentId));
+      const base = `/api/documents/${encodeURIComponent(configuration.documentId)}`;
+      if (request.method === "DELETE" && url.pathname === `${base}/permanent`) {
+        await this.#queuePurge(configuration.documentId);
         await this.#requestResynchronization();
       } else {
-        const projection = runtime.runPromise(
+        const projection = await runtime.runPromise(
           Effect.flatMap(InklingApplication, (application) =>
             application.currentDocumentProjection(configuration.documentId),
           ),
         );
-        this.#state.waitUntil(projection.then((document) => this.#queueProjection(document)));
+        if (request.method === "DELETE" && url.pathname === base) {
+          await this.#queueDeletion(projection);
+        } else if (request.method === "POST" && url.pathname === `${base}/restore`) {
+          await this.#queueRestoration(projection);
+        } else {
+          this.#state.waitUntil(this.#queueProjection(projection));
+        }
         if (isPublicationMutation(url.pathname, configuration.documentId)) {
-          const document = await projection;
           await Effect.runPromise(
-            this.#broadcast({ metadata: document.metadata, type: "metadata-changed" }).pipe(
+            this.#broadcast({ metadata: projection.metadata, type: "metadata-changed" }).pipe(
               Effect.catchAll(() => Effect.void),
             ),
           );
@@ -404,12 +426,27 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
     if (configuration === undefined) return;
     await this.#ensureRuntime(configuration);
     const runtime = this.#runtime;
-    if (runtime !== undefined) {
-      await runtime.runPromise(
-        Effect.flatMap(InklingApplication, (application) => application.checkpointAll()),
-      );
-      await this.#flushCatalogOutbox();
+    if (runtime === undefined) return;
+    const purged = await runtime.runPromise(
+      Effect.flatMap(InklingApplication, (application) =>
+        application.purgeExpiredDocuments(new Date().toISOString()),
+      ),
+    );
+    if (purged.includes(configuration.documentId)) {
+      await this.#queuePurge(configuration.documentId);
+      return;
     }
+    await runtime.runPromise(
+      Effect.flatMap(InklingApplication, (application) => application.checkpointAll()),
+    );
+    const finalized = await this.#flushCatalogOutbox();
+    if (finalized) return;
+    const projection = await runtime.runPromise(
+      Effect.flatMap(InklingApplication, (application) =>
+        application.currentDocumentProjection(configuration.documentId),
+      ),
+    );
+    await this.#scheduleTrashPurge(projection.metadata.deletedAt);
   }
 
   override async webSocketMessage(
@@ -599,10 +636,14 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
 
   async #queueProjection(projection: DocumentResponse): Promise<void> {
     await this.#state.storage.transaction(async (transaction) => {
-      const deletion = await transaction.get<string>("catalog:deletion");
+      const deletion = await transaction.get<DocumentResponse>("catalog:deletion");
+      const restoration = await transaction.get<DocumentResponse>("catalog:restoration");
+      const purge = await transaction.get<string>("catalog:purge");
       const pending = await transaction.get<DocumentResponse>("catalog:projection");
       if (
         deletion === undefined &&
+        restoration === undefined &&
+        purge === undefined &&
         (pending === undefined || pending.metadata.headRevision <= projection.metadata.headRevision)
       ) {
         await transaction.put("catalog:projection", projection);
@@ -612,26 +653,66 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
     await this.#flushCatalogOutbox();
   }
 
-  async #queueDeletion(documentId: string): Promise<void> {
+  async #queueDeletion(document: DocumentResponse): Promise<void> {
     await this.#state.storage.transaction(async (transaction) => {
-      await transaction.delete("catalog:projection");
-      await transaction.put("catalog:deletion", documentId);
+      await transaction.delete(["catalog:projection", "catalog:restoration"]);
+      await transaction.put("catalog:deletion", document);
     });
     await this.#state.storage.setAlarm(Date.now() + 2_000);
     await this.#flushCatalogOutbox();
   }
 
-  async #flushCatalogOutbox(): Promise<void> {
+  async #queueRestoration(document: DocumentResponse): Promise<void> {
+    await this.#state.storage.transaction(async (transaction) => {
+      await transaction.delete(["catalog:deletion", "catalog:projection"]);
+      await transaction.put("catalog:restoration", document);
+    });
+    await this.#state.storage.setAlarm(Date.now() + 2_000);
+    await this.#flushCatalogOutbox();
+  }
+
+  async #queuePurge(documentId: string): Promise<void> {
+    await this.#state.storage.transaction(async (transaction) => {
+      await transaction.delete(["catalog:deletion", "catalog:projection", "catalog:restoration"]);
+      await transaction.put("catalog:purge", documentId);
+    });
+    await this.#state.storage.setAlarm(Date.now() + 2_000);
+    await this.#flushCatalogOutbox();
+  }
+
+  async #flushCatalogOutbox(): Promise<boolean> {
     const workspace = workspaceStub(this.#environment);
-    const deletion = await this.#state.storage.get<string>("catalog:deletion");
+    const purge = await this.#state.storage.get<string>("catalog:purge");
+    const deletion = await this.#state.storage.get<DocumentResponse>("catalog:deletion");
+    const restoration = await this.#state.storage.get<DocumentResponse>("catalog:restoration");
     const projection = await this.#state.storage.get<DocumentResponse>("catalog:projection");
     let retry = false;
-    if (deletion !== undefined) {
+    if (purge !== undefined) {
+      const result = await workspace.markPurged(purge);
+      if (result.ok) {
+        await this.#finalizePurge();
+        return true;
+      }
+      retry = true;
+    } else if (deletion !== undefined) {
       const result = await workspace.markDeleted(deletion);
       if (result.ok) {
         await this.#state.storage.transaction(async (transaction) => {
-          const pending = await transaction.get<string>("catalog:deletion");
-          if (pending === deletion) await transaction.delete("catalog:deletion");
+          const pending = await transaction.get<DocumentResponse>("catalog:deletion");
+          if (pending?.metadata.headRevision === deletion.metadata.headRevision) {
+            await transaction.delete("catalog:deletion");
+          }
+        });
+        await this.#scheduleTrashPurge(deletion.metadata.deletedAt);
+      } else retry = true;
+    } else if (restoration !== undefined) {
+      const result = await workspace.markRestored(restoration);
+      if (result.ok) {
+        await this.#state.storage.transaction(async (transaction) => {
+          const pending = await transaction.get<DocumentResponse>("catalog:restoration");
+          if (pending?.metadata.headRevision === restoration.metadata.headRevision) {
+            await transaction.delete("catalog:restoration");
+          }
         });
       } else retry = true;
     } else if (projection !== undefined) {
@@ -649,6 +730,23 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
       } else retry = true;
     }
     if (retry) await this.#state.storage.setAlarm(Date.now() + 5_000);
+    return false;
+  }
+
+  async #scheduleTrashPurge(deletedAt: string | undefined): Promise<void> {
+    if (deletedAt === undefined) return;
+    const expiresAt = Date.parse(deletedAt) + documentTrashRetentionMilliseconds;
+    await this.#state.storage.setAlarm(Math.max(Date.now() + 100, expiresAt));
+  }
+
+  async #finalizePurge(): Promise<void> {
+    for (const socket of this.#state.getWebSockets()) socket.close(1001, "document_deleted");
+    const runtime = this.#runtime;
+    this.#runtime = undefined;
+    this.#app = undefined;
+    this.#configuration = undefined;
+    if (runtime !== undefined) await runtime.dispose();
+    await this.#state.storage.deleteAll();
   }
 
   #broadcast(
@@ -774,7 +872,25 @@ async function dispatchDocument(
     knownConfiguration === undefined
       ? await workspaceStub(environment).configuration(documentId)
       : ({ ok: true, value: knownConfiguration } as const);
-  if (!configurationResult.ok) return protocolErrorResponse(configurationResult.error);
+  if (!configurationResult.ok) {
+    const permanentPath = `/api/documents/${encodeURIComponent(documentId)}/permanent`;
+    if (request.method === "DELETE" && new URL(request.url).pathname === permanentPath) {
+      const protectionError = mutationProtectionError(request);
+      if (protectionError !== undefined) return protocolErrorResponse(protectionError);
+      const authorized = await workspaceStub(environment).authorize(
+        credentials(request),
+        documentId,
+      );
+      if (!authorized.ok) return protocolErrorResponse(authorized.error);
+      if (
+        (authorized.value.kind === "workspace" || authorized.value.kind === "api-key") &&
+        authorized.value.role === "administrator"
+      ) {
+        return Response.json({}, { headers: { "Cache-Control": "no-store" } });
+      }
+    }
+    return protocolErrorResponse(configurationResult.error);
+  }
   const document = environment.INKLING_DOCUMENTS.get(
     environment.INKLING_DOCUMENTS.idFromName(documentId),
   );

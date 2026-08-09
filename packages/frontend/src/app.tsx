@@ -162,6 +162,10 @@ function breadcrumbsForRoute(
       : [home, labels, { label: model.selectedLabel, truncate: true }];
   }
 
+  if (model.screen === "trash") {
+    return [home, { label: "Trash" }];
+  }
+
   if (model.screen === "workspace") {
     const query = url.searchParams.get("q")?.trim().toLocaleLowerCase("en");
     if (query === "is:rfc") return [home, { label: "RFCs" }];
@@ -177,10 +181,13 @@ function breadcrumbsForRoute(
   const document =
     model.screen === "editor" && headerDocument?.id === initial.id ? headerDocument : initial;
   const rfc = document.rfcNumber;
-  const section: BreadcrumbItem = {
-    href: `/?q=${encodeURIComponent(rfc === undefined ? "is:note" : "is:rfc")}`,
-    label: rfc === undefined ? "Notes" : "RFCs",
-  };
+  const deleted = initial.deletedAt !== undefined;
+  const section: BreadcrumbItem = deleted
+    ? { href: "/trash", label: "Trash" }
+    : {
+        href: `/?q=${encodeURIComponent(rfc === undefined ? "is:note" : "is:rfc")}`,
+        label: rfc === undefined ? "Notes" : "RFCs",
+      };
   const documentLabel =
     rfc === undefined ? document.title : `${String(rfc).padStart(4, "0")} - ${document.title}`;
   const documentBreadcrumb: BreadcrumbItem = {
@@ -249,6 +256,17 @@ function loadRoute(url: URL): Effect.Effect<RouteModel, ApiError> {
     Effect.flatMap((authentication) => {
       const publicCatalog = !authentication.authenticated;
       const loadCatalog = publicCatalog ? api.listPublicDocuments : api.listDocuments;
+      if (url.pathname === "/trash") {
+        return api.listDeletedDocuments.pipe(
+          Effect.map((catalog): RouteModel => ({
+            account: authentication.principal,
+            api,
+            capabilityToken,
+            catalog,
+            screen: "trash",
+          })),
+        );
+      }
       if (url.pathname === "/labels") {
         return loadCatalog().pipe(
           Effect.map((catalog): RouteModel => ({
@@ -420,6 +438,7 @@ function isApplicationUrl(url: URL): boolean {
     url.origin === location.origin &&
     (url.pathname === "/" ||
       url.pathname === "/labels" ||
+      url.pathname === "/trash" ||
       url.pathname.startsWith("/documents/") ||
       url.pathname.startsWith("/rfcs/") ||
       url.pathname.startsWith("/share/"))

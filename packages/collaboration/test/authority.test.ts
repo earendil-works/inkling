@@ -81,6 +81,11 @@ function memoryStorage(): {
         Effect.succeed(
           state.entries.filter((entry) => entry.documentId === id && entry.sequence > sequence),
         ),
+      delete: (id) =>
+        Effect.sync(() => {
+          const retained = state.entries.filter((entry) => entry.documentId !== id);
+          state.entries.splice(0, state.entries.length, ...retained);
+        }),
       truncateThrough: (id, sequence) => {
         if (state.failTruncate) {
           return Effect.fail(
@@ -174,6 +179,32 @@ test("accepted body updates derive the document title from the top-level heading
   );
   const after = await Effect.runPromise(authority.snapshot(fixtureValue.principal, now));
   assert.equal(after.metadata.title, "Derived title");
+});
+
+test("deleted authorities remain editable and can be restored by administrators", async () => {
+  const fixtureValue = await fixture();
+  const authority = await fixtureValue.make();
+  const deleted = await Effect.runPromise(
+    authority.deleteDocument(fixtureValue.principal, fixtureValue.metadata.headRevision, now),
+  );
+  assert.equal(deleted.deletedAt, now);
+  const trashed = await Effect.runPromise(authority.snapshot(fixtureValue.principal, now));
+  assert.equal(trashed.metadata.deletedAt, now);
+  await Effect.runPromise(
+    authority.applyTextEdits(
+      fixtureValue.principal,
+      [{ newText: "hello from Trash", oldText: "hello" }],
+      deleted.headRevision,
+      now,
+    ),
+  );
+  const edited = await Effect.runPromise(authority.snapshot(fixtureValue.principal, now));
+  assert.equal(edited.body, "hello from Trash");
+  const restored = await Effect.runPromise(
+    authority.restoreDocument(fixtureValue.principal, edited.metadata.headRevision, now),
+  );
+  assert.equal(restored.deletedAt, undefined);
+  assert.equal(restored.headRevision, edited.metadata.headRevision + 1);
 });
 
 test("checkpoint plus durable tail recovers every acknowledged update", async () => {

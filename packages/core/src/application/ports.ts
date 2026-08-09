@@ -64,6 +64,7 @@ export interface DurableDocumentJournalService {
     documentId: DocumentId,
     sequence: number,
   ) => Effect.Effect<readonly JournalEntry[], StorageError>;
+  readonly delete: (documentId: DocumentId) => Effect.Effect<void, StorageError>;
   readonly truncateThrough: (
     documentId: DocumentId,
     sequence: number,

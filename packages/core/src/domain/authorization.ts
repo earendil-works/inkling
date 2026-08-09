@@ -39,6 +39,7 @@ export const documentActions = [
   "manage-sharing",
   "publish",
   "delete",
+  "hard-delete",
   "restore",
 ] as const;
 
@@ -92,10 +93,28 @@ export function isDocumentActionAllowed(
   now: string,
 ): boolean {
   if (metadata.deletedAt !== undefined) {
-    return (action === "restore" || action === "discover") && isAdministrator(principal);
+    if (principal.kind !== "workspace" && principal.kind !== "api-key") return false;
+    switch (action) {
+      case "comment":
+      case "discover":
+      case "edit-body":
+      case "edit-metadata":
+      case "read-working":
+        return true;
+      case "delete":
+      case "hard-delete":
+      case "manage-comments":
+      case "restore":
+        return principal.role === "administrator";
+      case "manage-sharing":
+      case "publish":
+      case "read-published":
+        return false;
+    }
   }
 
   if (principal.kind === "workspace" || principal.kind === "api-key") {
+    if (action === "hard-delete") return false;
     if (
       action === "manage-comments" ||
       action === "manage-sharing" ||
@@ -136,6 +155,7 @@ export function isDocumentActionAllowed(
       return metadata.visibility === "public" && metadata.publishedRevision !== undefined;
     case "delete":
     case "edit-metadata":
+    case "hard-delete":
     case "manage-comments":
     case "manage-sharing":
     case "publish":

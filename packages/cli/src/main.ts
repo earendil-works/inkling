@@ -199,9 +199,37 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
       }
       case "delete": {
         const id = yield* documentArgument(instance, arguments_, 1);
+        if (arguments_.includes("--hard")) {
+          const trash = yield* client.listDeleted;
+          const document = trash.documents.find((candidate) => candidate.metadata.id === id);
+          if (document === undefined) {
+            return yield* usageFailure("Only documents in Trash can be permanently deleted.");
+          }
+          yield* client.hardDeleteDocument(id, document.metadata.headRevision);
+          console.log(`Permanently deleted ${id}.`);
+          return;
+        }
         const current = yield* client.read(id);
         yield* client.remove(id, current.metadata.headRevision);
-        console.log(`Deleted ${id}.`);
+        console.log(`Moved ${id} to Trash.`);
+        return;
+      }
+      case "trash": {
+        const result = yield* client.listDeleted;
+        for (const document of result.documents) {
+          console.log(
+            `${document.metadata.id}\t${document.metadata.deletedAt ?? "unknown"}\t${document.metadata.title}`,
+          );
+        }
+        return;
+      }
+      case "undelete": {
+        const id = yield* documentArgument(instance, arguments_, 1);
+        const trash = yield* client.listDeleted;
+        const document = trash.documents.find((candidate) => candidate.metadata.id === id);
+        if (document === undefined) return yield* usageFailure("The document is not in Trash.");
+        yield* client.restoreDocument(id, document.metadata.headRevision);
+        console.log(`Restored ${id}.`);
         return;
       }
       case "publish": {

@@ -137,7 +137,16 @@ export interface InklingApplicationService {
   readonly resolvePeople: (
     emails: readonly string[],
   ) => Effect.Effect<readonly PersonReference[], ApplicationError>;
-  readonly markCatalogDeleted: (documentId: string) => Effect.Effect<void, ApplicationError>;
+  readonly markCatalogDeleted: (
+    document: DocumentResponse,
+  ) => Effect.Effect<void, ApplicationError>;
+  readonly markCatalogRestored: (
+    document: DocumentResponse,
+  ) => Effect.Effect<void, ApplicationError>;
+  readonly markCatalogPurged: (documentId: string) => Effect.Effect<void, ApplicationError>;
+  readonly purgeExpiredDocuments: (
+    now: string,
+  ) => Effect.Effect<readonly string[], ApplicationError>;
   readonly releaseDocumentRoom: (documentId: string) => Effect.Effect<void>;
   /** Flushes all active document rooms to immutable checkpoints. */
   readonly checkpointAll: () => Effect.Effect<void, ApplicationError>;
@@ -190,6 +199,9 @@ export interface InklingApplicationService {
     credentials: RequestCredentials,
     query: string,
   ) => Effect.Effect<CatalogResponse, ApplicationError>;
+  readonly listDeletedDocuments: (
+    credentials: RequestCredentials,
+  ) => Effect.Effect<CatalogResponse, ApplicationError>;
   readonly listPublicDocuments: (
     query: string,
     lifecycleState?: string,
@@ -235,6 +247,16 @@ export interface InklingApplicationService {
     request: ReplaceBodyRequest,
   ) => Effect.Effect<DocumentResponse, ApplicationError>;
   readonly deleteDocument: (
+    credentials: RequestCredentials,
+    documentId: string,
+    expectedRevision: number,
+  ) => Effect.Effect<void, ApplicationError>;
+  readonly restoreDocument: (
+    credentials: RequestCredentials,
+    documentId: string,
+    expectedRevision: number,
+  ) => Effect.Effect<DocumentMetadataDto, ApplicationError>;
+  readonly hardDeleteDocument: (
     credentials: RequestCredentials,
     documentId: string,
     expectedRevision: number,

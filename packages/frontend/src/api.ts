@@ -45,6 +45,7 @@ export interface ApiClientService {
   readonly revokeApiKey: (keyId: string) => Effect.Effect<void, ApiError>;
   readonly logout: Effect.Effect<void, ApiError>;
   readonly listDocuments: (query?: string) => Effect.Effect<CatalogResponse, ApiError>;
+  readonly listDeletedDocuments: Effect.Effect<CatalogResponse, ApiError>;
   readonly listPublicDocuments: (query?: string) => Effect.Effect<CatalogResponse, ApiError>;
   readonly createDocument: (
     request: CreateDocumentRequest,
@@ -83,6 +84,18 @@ export interface ApiClientService {
     documentId: string,
     threadId: string,
   ) => Effect.Effect<CommentStateDto, ApiError>;
+  readonly deleteDocument: (
+    documentId: string,
+    expectedRevision: number,
+  ) => Effect.Effect<void, ApiError>;
+  readonly restoreDocument: (
+    documentId: string,
+    expectedRevision: number,
+  ) => Effect.Effect<DocumentMetadataDto, ApiError>;
+  readonly hardDeleteDocument: (
+    documentId: string,
+    expectedRevision: number,
+  ) => Effect.Effect<void, ApiError>;
   readonly reply: (
     documentId: string,
     threadId: string,
@@ -259,6 +272,18 @@ export function makeApiClient(capabilityToken?: string): ApiClientService {
         CommentStateSchema,
         "DELETE",
       ),
+    deleteDocument: (documentId, expectedRevision) =>
+      mutation(
+        `/api/documents/${encodeURIComponent(documentId)}?expectedRevision=${expectedRevision}`,
+        Schema.Unknown,
+        "DELETE",
+      ).pipe(Effect.asVoid),
+    hardDeleteDocument: (documentId, expectedRevision) =>
+      mutation(
+        `/api/documents/${encodeURIComponent(documentId)}/permanent?expectedRevision=${expectedRevision}`,
+        Schema.Unknown,
+        "DELETE",
+      ).pipe(Effect.asVoid),
     editMessage: (documentId, threadId, messageId, body) =>
       mutation(
         `/api/documents/${encodeURIComponent(documentId)}/comments/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(messageId)}`,
@@ -267,6 +292,7 @@ export function makeApiClient(capabilityToken?: string): ApiClientService {
         { body },
       ),
     listApiKeys: request("/api/api-keys", Schema.Array(ApiKeySchema)),
+    listDeletedDocuments: request("/api/trash", CatalogResponseSchema),
     listDocuments: (query = "") =>
       request(`/api/documents?q=${encodeURIComponent(query)}`, CatalogResponseSchema),
     listPublicDocuments: (query = "") =>
@@ -301,6 +327,12 @@ export function makeApiClient(capabilityToken?: string): ApiClientService {
         CommentStateSchema,
         "PATCH",
         { resolved },
+      ),
+    restoreDocument: (documentId, expectedRevision) =>
+      mutation(
+        `/api/documents/${encodeURIComponent(documentId)}/restore?expectedRevision=${expectedRevision}`,
+        DocumentMetadataSchema,
+        "POST",
       ),
     unpublish: (documentId) =>
       mutation(

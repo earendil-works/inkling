@@ -116,6 +116,15 @@ export function makeDurableObjectJournal(
           [...entries.values()].toSorted((left, right) => left.sequence - right.sequence),
         ),
       ),
+    delete: (documentId) =>
+      cloudflareCall("delete Durable Object journal", async () => {
+        const [journalEntries, idempotencyEntries] = await Promise.all([
+          storage.list({ prefix: `journal:${documentId}:` }),
+          storage.list({ prefix: `idempotency:${documentId}:` }),
+        ]);
+        const keys = [...journalEntries.keys(), ...idempotencyEntries.keys()];
+        if (keys.length > 0) await storage.delete(keys);
+      }),
     truncateThrough: (documentId, sequence) =>
       cloudflareCall("truncate Durable Object journal", async () => {
         const entries = await storage.list<JournalEntry>({

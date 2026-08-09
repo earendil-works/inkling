@@ -173,6 +173,10 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
     ),
   );
 
+  app.get("/api/trash", (context) =>
+    execute(context, options, (service) => service.listDeletedDocuments(credentials(context))),
+  );
+
   app.post("/api/documents", (context) =>
     execute(context, options, (service) =>
       mutation(context, readJson(context, CreateDocumentRequestSchema)).pipe(
@@ -300,16 +304,52 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
   );
 
   app.delete("/api/documents/:documentId", (context) =>
+    execute(
+      context,
+      options,
+      (service) =>
+        mutation(context, requiredRevision(context)).pipe(
+          Effect.flatMap((expectedRevision) =>
+            service.deleteDocument(
+              credentials(context),
+              context.req.param("documentId"),
+              expectedRevision,
+            ),
+          ),
+        ),
+      () => context.json({}),
+    ),
+  );
+
+  app.post("/api/documents/:documentId/restore", (context) =>
     execute(context, options, (service) =>
       mutation(context, requiredRevision(context)).pipe(
         Effect.flatMap((expectedRevision) =>
-          service.deleteDocument(
+          service.restoreDocument(
             credentials(context),
             context.req.param("documentId"),
             expectedRevision,
           ),
         ),
       ),
+    ),
+  );
+
+  app.delete("/api/documents/:documentId/permanent", (context) =>
+    execute(
+      context,
+      options,
+      (service) =>
+        mutation(context, requiredRevision(context)).pipe(
+          Effect.flatMap((expectedRevision) =>
+            service.hardDeleteDocument(
+              credentials(context),
+              context.req.param("documentId"),
+              expectedRevision,
+            ),
+          ),
+        ),
+      () => context.json({}),
     ),
   );
 
@@ -716,6 +756,9 @@ inkling create 'Proposal title' --rfc
 inkling edit DOCUMENT_ID 'unique old text' 'replacement text'
 inkling comment DOCUMENT_ID START_OFFSET END_OFFSET 'Review comment'
 inkling publish DOCUMENT_ID
+inkling delete DOCUMENT_ID
+inkling trash
+inkling undelete DOCUMENT_ID
 \`\`\`
 
 Follow these rules:
@@ -725,6 +768,7 @@ Follow these rules:
 - Use \`inkling replace\` only when the user explicitly wants a full-body replacement.
 - Preserve the frontmatter and top-level title conventions shown in the document.
 - Use thread and message IDs printed by \`inkling read\` for replies and comment management.
+- \`inkling delete\` moves a document to Trash for 30 days. Use \`inkling undelete\` to restore it. Never use \`inkling delete --hard\` unless the user explicitly requests irreversible deletion.
 - Never print, commit, log, or embed API keys or capability URLs.
 
 ## Create a reusable agent skill

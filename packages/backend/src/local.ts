@@ -29,11 +29,14 @@ import {
   ObjectStore,
   personId,
   publicCatalog,
+  purgeDocument,
   readLineRange,
   reserveDocument,
+  requireRevision,
   resolveAuthorsByEmail,
   revokeApiKey,
   searchCatalog,
+  isDocumentTrashExpired,
   SecretHasher,
   SecureToken,
   StorageError,
@@ -266,7 +269,8 @@ export function makeLocalInklingApplication(
             return existing;
           }
           const registered = state.catalog.entries.find(
-            (entry) => entry.documentId === id && entry.status !== "pending",
+            (entry) =>
+              entry.documentId === id && (entry.status === "active" || entry.status === "deleted"),
           );
           if (registered === undefined) {
             return yield* applicationFailure("not_found", "The document does not exist.", 404);
@@ -415,6 +419,13 @@ export function makeLocalInklingApplication(
           current.metadata,
           now,
         ).pipe(Effect.mapError(toApplicationError));
+        if (current.metadata.deletedAt !== undefined) {
+          return {
+            ...toDocumentResponse(current),
+            body: "",
+            comments: { revision: current.comments.revision, threads: [] },
+          };
+        }
         const publishedRevision = current.metadata.publishedRevision;
         if (publishedRevision === undefined) {
           return {
@@ -461,6 +472,77 @@ export function makeLocalInklingApplication(
           ),
         ),
       );
+
+    const projectDocumentStatus = (
+      room: DocumentAuthorityService,
+      status: "active" | "deleted",
+    ): Effect.Effect<void, ApplicationError> =>
+      room.snapshot(systemPrincipal, new Date().toISOString()).pipe(
+        Effect.mapError(toApplicationError),
+        Effect.flatMap(summaryFromSnapshot),
+        Effect.flatMap((summary) =>
+          withState(
+            applyCatalogSummary(state.catalog, summary).pipe(
+              Effect.flatMap((catalog) =>
+                status === "active"
+                  ? activateDocument(catalog, room.documentId)
+                  : tombstoneDocument(catalog, room.documentId),
+              ),
+              Effect.mapError(toApplicationError),
+              Effect.flatMap((catalog) =>
+                saveState({ ...state, catalog }).pipe(Effect.mapError(toApplicationError)),
+              ),
+            ),
+          ),
+        ),
+      );
+
+    const releaseDocumentRoom = (rawDocumentId: string): Effect.Effect<void> =>
+      Effect.gen(function* () {
+        const room = rooms.get(rawDocumentId);
+        const checkpointFiber = checkpointFibers.get(rawDocumentId);
+        if (checkpointFiber !== undefined) yield* Fiber.interrupt(checkpointFiber);
+        if (room !== undefined) yield* room.close;
+        checkpointFibers.delete(rawDocumentId);
+        dirtySince.delete(rawDocumentId);
+        rooms.delete(rawDocumentId);
+      });
+
+    const removeDocumentState = (rawDocumentId: string): Effect.Effect<void, ApplicationError> =>
+      Effect.gen(function* () {
+        const id = yield* documentId(rawDocumentId).pipe(Effect.mapError(toApplicationError));
+        yield* withState(
+          purgeDocument(state.catalog, id).pipe(
+            Effect.mapError(toApplicationError),
+            Effect.flatMap((catalog) => {
+              const { [id]: _removedAttachments, ...attachments } = state.attachments;
+              return saveState({
+                ...state,
+                attachments,
+                capabilities: state.capabilities.filter(
+                  (capability) => capability.documentId !== id,
+                ),
+                catalog,
+              }).pipe(Effect.mapError(toApplicationError));
+            }),
+          ),
+        );
+      });
+
+    const purgeDocumentData = (rawDocumentId: string): Effect.Effect<void, ApplicationError> =>
+      Effect.gen(function* () {
+        const id = yield* documentId(rawDocumentId).pipe(Effect.mapError(toApplicationError));
+        yield* releaseDocumentRoom(id);
+        const prefix = `workspaces/${state.workspaceId}/documents/${id}/`;
+        const keys = yield* objectStore.list(prefix).pipe(Effect.mapError(toApplicationError));
+        yield* Effect.forEach(
+          keys,
+          (key) => objectStore.delete(key).pipe(Effect.mapError(toApplicationError)),
+          { concurrency: 16, discard: true },
+        );
+        yield* journal.delete(id).pipe(Effect.mapError(toApplicationError));
+        yield* removeDocumentState(id);
+      });
 
     const afterMutation = (
       room: DocumentAuthorityService,
@@ -510,13 +592,20 @@ export function makeLocalInklingApplication(
       Effect.gen(function* () {
         const id = yield* documentId(rawDocumentId).pipe(Effect.mapError(toApplicationError));
         const entry = state.catalog.entries.find(
-          (candidate) => candidate.documentId === id && candidate.status === "active",
+          (candidate) =>
+            candidate.documentId === id &&
+            (candidate.status === "active" || candidate.status === "deleted"),
         );
         if (entry === undefined) {
           return yield* applicationFailure("not_found", "The document does not exist.", 404);
         }
         return {
-          capabilities: state.capabilities.filter((capability) => capability.documentId === id),
+          capabilities: state.capabilities.filter(
+            (capability) =>
+              capability.documentId === id &&
+              (entry.summary?.metadata === undefined ||
+                capability.generation === entry.summary.metadata.sharing.generation),
+          ),
           documentId: id,
           rfcNumber: entry.rfcNumber,
           summary: entry.summary,
@@ -565,7 +654,11 @@ export function makeLocalInklingApplication(
           .snapshot(systemPrincipal, new Date().toISOString())
           .pipe(Effect.mapError(toApplicationError));
         const publishedRevision = current.metadata.publishedRevision;
-        if (current.metadata.visibility !== "public" || publishedRevision === undefined) {
+        if (
+          current.metadata.deletedAt !== undefined ||
+          current.metadata.visibility !== "public" ||
+          publishedRevision === undefined
+        ) {
           return yield* applicationFailure(
             "not_found",
             "The published document does not exist.",
@@ -618,27 +711,49 @@ export function makeLocalInklingApplication(
           ),
         ),
       resolvePeople,
-      releaseDocumentRoom: (rawDocumentId) =>
-        Effect.gen(function* () {
-          const room = rooms.get(rawDocumentId);
-          const checkpointFiber = checkpointFibers.get(rawDocumentId);
-          if (checkpointFiber !== undefined) yield* Fiber.interrupt(checkpointFiber);
-          if (room !== undefined) yield* room.close;
-          checkpointFibers.delete(rawDocumentId);
-          dirtySince.delete(rawDocumentId);
-          rooms.delete(rawDocumentId);
-        }),
-      markCatalogDeleted: (rawDocumentId) =>
-        Effect.gen(function* () {
-          const id = yield* documentId(rawDocumentId).pipe(Effect.mapError(toApplicationError));
-          yield* withState(
-            tombstoneDocument(state.catalog, id).pipe(
-              Effect.mapError(toApplicationError),
-              Effect.flatMap((catalog) =>
-                saveState({ ...state, catalog }).pipe(Effect.mapError(toApplicationError)),
+      releaseDocumentRoom,
+      markCatalogDeleted: (document) =>
+        summaryFromDocument(document).pipe(
+          Effect.flatMap((summary) =>
+            withState(
+              applyCatalogSummary(state.catalog, summary).pipe(
+                Effect.flatMap((catalog) => tombstoneDocument(catalog, summary.documentId)),
+                Effect.mapError(toApplicationError),
+                Effect.flatMap((catalog) =>
+                  saveState({ ...state, catalog }).pipe(Effect.mapError(toApplicationError)),
+                ),
               ),
             ),
+          ),
+        ),
+      markCatalogRestored: (document) =>
+        summaryFromDocument(document).pipe(
+          Effect.flatMap((summary) =>
+            withState(
+              applyCatalogSummary(state.catalog, summary).pipe(
+                Effect.flatMap((catalog) => activateDocument(catalog, summary.documentId)),
+                Effect.mapError(toApplicationError),
+                Effect.flatMap((catalog) =>
+                  saveState({ ...state, catalog }).pipe(Effect.mapError(toApplicationError)),
+                ),
+              ),
+            ),
+          ),
+        ),
+      markCatalogPurged: removeDocumentState,
+      purgeExpiredDocuments: (now) =>
+        Effect.gen(function* () {
+          const expired = state.catalog.entries.filter(
+            (entry) =>
+              entry.status === "deleted" &&
+              entry.summary?.metadata !== undefined &&
+              isDocumentTrashExpired(entry.summary.metadata, now),
           );
+          yield* Effect.forEach(expired, (entry) => purgeDocumentData(entry.documentId), {
+            concurrency: 1,
+            discard: true,
+          });
+          return expired.map((entry) => entry.documentId);
         }),
       diagnostics: (credentials) =>
         Effect.gen(function* () {
@@ -733,20 +848,20 @@ export function makeLocalInklingApplication(
               }),
             ),
           ].toSorted();
-          const deletedEntries = state.catalog.entries.filter(
-            (entry) => entry.status === "deleted",
+          const retainedEntries = state.catalog.entries.filter(
+            (entry) => entry.status === "deleted" || entry.status === "purged",
           );
           let rebuilt: WorkspaceCatalogState = {
-            entries: deletedEntries,
+            entries: retainedEntries,
             nextRfcNumber: Math.max(
-              1,
-              ...deletedEntries.map((entry) => (entry.rfcNumber ?? 0) + 1),
+              state.catalog.nextRfcNumber,
+              ...retainedEntries.map((entry) => (entry.rfcNumber ?? 0) + 1),
             ),
             people: state.catalog.people,
           };
           const errors: string[] = [];
           for (const rawDocumentId of documentIds) {
-            if (deletedEntries.some((entry) => entry.documentId === rawDocumentId)) continue;
+            if (retainedEntries.some((entry) => entry.documentId === rawDocumentId)) continue;
             const recovered = yield* provideAuthorityDependencies(
               makeDocumentAuthority({
                 documentId: yield* documentId(rawDocumentId).pipe(
@@ -1194,6 +1309,17 @@ export function makeLocalInklingApplication(
               ),
             ),
           );
+          if (reservation.entry.status === "active") {
+            const existing = yield* getRoom(reservation.entry.documentId);
+            return yield* snapshotFor(existing, principal);
+          }
+          if (reservation.entry.status === "deleted" || reservation.entry.status === "purged") {
+            return yield* applicationFailure(
+              "creation_key_retired",
+              "This creation key belongs to a deleted document and cannot be reused.",
+              409,
+            );
+          }
           const author =
             principal.kind === "workspace" || principal.kind === "api-key"
               ? workspacePeople(state.catalog, state.authentication).find(
@@ -1259,6 +1385,13 @@ export function makeLocalInklingApplication(
           if (reservation.entry.status === "active") {
             const existing = yield* getRoom(reservation.entry.documentId);
             return yield* snapshotFor(existing, systemPrincipal);
+          }
+          if (reservation.entry.status === "deleted" || reservation.entry.status === "purged") {
+            return yield* applicationFailure(
+              "creation_key_retired",
+              "This import belongs to a deleted document and cannot be reused.",
+              409,
+            );
           }
           const importedAt = request.metadata.updatedAt ?? new Date().toISOString();
           const metadata = yield* createDocumentMetadata(
@@ -1430,20 +1563,56 @@ export function makeLocalInklingApplication(
         Effect.gen(function* () {
           const room = yield* getRoom(rawDocumentId);
           const principal = yield* resolvePrincipal(credentials, rawDocumentId);
+          const now = new Date().toISOString();
           yield* room
-            .deleteDocument(principal, expectedRevision, new Date().toISOString())
+            .deleteDocument(principal, expectedRevision, now)
             .pipe(Effect.mapError(toApplicationError));
-          yield* withState(
-            tombstoneDocument(state.catalog, room.documentId).pipe(
+          yield* projectDocumentStatus(room, "deleted");
+          yield* room.checkpoint(now).pipe(Effect.mapError(toApplicationError));
+        }),
+      restoreDocument: (credentials, rawDocumentId, expectedRevision) =>
+        Effect.gen(function* () {
+          const room = yield* getRoom(rawDocumentId);
+          const principal = yield* resolvePrincipal(credentials, rawDocumentId);
+          const now = new Date().toISOString();
+          const metadata = yield* room
+            .restoreDocument(principal, expectedRevision, now)
+            .pipe(Effect.mapError(toApplicationError));
+          yield* projectDocumentStatus(room, "active");
+          yield* room.checkpoint(now).pipe(Effect.mapError(toApplicationError));
+          return metadata as DocumentMetadataDto;
+        }),
+      hardDeleteDocument: (credentials, rawDocumentId, expectedRevision) =>
+        Effect.gen(function* () {
+          const id = yield* documentId(rawDocumentId).pipe(Effect.mapError(toApplicationError));
+          const principal = yield* resolvePrincipal(credentials, rawDocumentId);
+          yield* requireAdministrator(principal);
+          const entry = state.catalog.entries.find((candidate) => candidate.documentId === id);
+          if (entry === undefined || entry.status === "purged") return;
+          if (entry.status !== "deleted") {
+            return yield* applicationFailure(
+              "document_not_deleted",
+              "Only documents in the trash can be permanently deleted.",
+              409,
+            );
+          }
+          const metadata =
+            entry.summary?.metadata ??
+            (yield* getRoom(rawDocumentId).pipe(
+              Effect.flatMap((room) => room.snapshot(systemPrincipal, new Date().toISOString())),
               Effect.mapError(toApplicationError),
-              Effect.flatMap((catalog) =>
-                saveState({ ...state, catalog }).pipe(Effect.mapError(toApplicationError)),
-              ),
-            ),
+              Effect.map((snapshot) => snapshot.metadata),
+            ));
+          yield* authorizeDocument(
+            principal,
+            "hard-delete",
+            metadata,
+            new Date().toISOString(),
+          ).pipe(Effect.mapError(toApplicationError));
+          yield* requireRevision(metadata, expectedRevision).pipe(
+            Effect.mapError(toApplicationError),
           );
-          yield* room
-            .checkpoint(new Date().toISOString())
-            .pipe(Effect.mapError(toApplicationError));
+          yield* purgeDocumentData(id);
         }),
       deleteMessage: (credentials, rawDocumentId, threadId, messageId) =>
         Effect.gen(function* () {
@@ -1591,6 +1760,33 @@ export function makeLocalInklingApplication(
               (person) => person as DocumentMetadataDto["authors"][number],
             ),
           } satisfies CatalogResponse;
+        }),
+      listDeletedDocuments: (credentials) =>
+        Effect.gen(function* () {
+          const principal = yield* resolvePrincipal(credentials);
+          yield* requireAdministrator(principal);
+          const summaries = searchCatalog(state.catalog, "", {
+            limit: 500,
+            onlyDeleted: true,
+          });
+          const documents = yield* Effect.forEach(summaries, (summary) =>
+            summary.metadata === undefined
+              ? getRoom(summary.documentId).pipe(
+                  Effect.flatMap((room) =>
+                    room.snapshot(systemPrincipal, new Date().toISOString()),
+                  ),
+                  Effect.mapError(toApplicationError),
+                  Effect.map((snapshot) => ({
+                    excerpt: summary.excerpt,
+                    metadata: snapshot.metadata as DocumentMetadataDto,
+                  })),
+                )
+              : Effect.succeed({
+                  excerpt: summary.excerpt,
+                  metadata: summary.metadata as DocumentMetadataDto,
+                }),
+          );
+          return { documents } satisfies CatalogResponse;
         }),
       loginWorkspaceIdentity: (identity, directoryPeople = []) =>
         withState(
@@ -1838,7 +2034,9 @@ export function makeLocalInklingApplication(
               shareLinksResponse(
                 snapshot.metadata,
                 state.capabilities.filter(
-                  (capability) => capability.documentId === room.documentId,
+                  (capability) =>
+                    capability.documentId === room.documentId &&
+                    capability.generation === snapshot.metadata.sharing.generation,
                 ),
                 baseUrl,
               ),
@@ -1858,7 +2056,11 @@ export function makeLocalInklingApplication(
           );
           const existing = yield* withState(
             Effect.succeed(
-              state.capabilities.filter((capability) => capability.documentId === room.documentId),
+              state.capabilities.filter(
+                (capability) =>
+                  capability.documentId === room.documentId &&
+                  capability.generation === snapshot.metadata.sharing.generation,
+              ),
             ),
           );
           if (existing.some((capability) => sameShareConfiguration(capability, request))) {
@@ -1931,7 +2133,11 @@ export function makeLocalInklingApplication(
           );
           const existing = yield* withState(
             Effect.succeed(
-              state.capabilities.filter((capability) => capability.documentId === room.documentId),
+              state.capabilities.filter(
+                (capability) =>
+                  capability.documentId === room.documentId &&
+                  capability.generation === snapshot.metadata.sharing.generation,
+              ),
             ),
           );
           if (!existing.some((capability) => capability.id === shareId)) {

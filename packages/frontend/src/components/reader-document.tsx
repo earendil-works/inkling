@@ -11,6 +11,16 @@ export interface ReaderDocumentProps {
 
 export function ReaderDocument({ document }: ReaderDocumentProps): React.JSX.Element {
   const rendered = useRenderedMarkdown(document.body, true);
+  if (document.metadata.deletedAt !== undefined) {
+    return (
+      <section className="empty-state reader-trashed" data-reader="" data-trashed="">
+        <span>×</span>
+        <p className="eyebrow">In Trash</p>
+        <h1>{document.metadata.title}</h1>
+        <p>Open the editor to inspect or change this document before it is permanently deleted.</p>
+      </section>
+    );
+  }
   if (document.metadata.publishedRevision === undefined) {
     return (
       <section className="empty-state reader-unpublished" data-reader="" data-unpublished="">
