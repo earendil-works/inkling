@@ -142,29 +142,33 @@ function useSynchronizedScrolling(
     }
 
     let scrollMap: readonly ScrollMapPoint[] | undefined;
+    let scrollMapSourceHeight: number | undefined;
     let syncFrame: number | undefined;
-    let releaseFrame: number | undefined;
-    let programmaticTarget: HTMLElement | undefined;
+    const programmaticScrollTops = new WeakMap<HTMLElement, number>();
     const invalidateScrollMap = (): void => {
       scrollMap = undefined;
+      scrollMapSourceHeight = undefined;
     };
     const currentScrollMap = (): readonly ScrollMapPoint[] => {
-      scrollMap ??= collectScrollMap(editor, preview, previewScroller);
+      const sourceHeight = editor.contentHeight;
+      if (scrollMap === undefined || scrollMapSourceHeight !== sourceHeight) {
+        scrollMap = collectScrollMap(editor, preview, previewScroller);
+        scrollMapSourceHeight = sourceHeight;
+      }
       return scrollMap;
     };
 
     const queueSync = (source: HTMLElement, target: HTMLElement, synchronize: () => void): void => {
-      if (programmaticTarget === source) return;
+      const expectedScrollTop = programmaticScrollTops.get(source);
+      if (expectedScrollTop !== undefined) {
+        if (Math.abs(source.scrollTop - expectedScrollTop) < 1) return;
+        programmaticScrollTops.delete(source);
+      }
       if (syncFrame !== undefined) cancelAnimationFrame(syncFrame);
       syncFrame = requestAnimationFrame(() => {
         syncFrame = undefined;
-        programmaticTarget = target;
         synchronize();
-        if (releaseFrame !== undefined) cancelAnimationFrame(releaseFrame);
-        releaseFrame = requestAnimationFrame(() => {
-          releaseFrame = undefined;
-          if (programmaticTarget === target) programmaticTarget = undefined;
-        });
+        programmaticScrollTops.set(target, target.scrollTop);
       });
     };
 
@@ -195,6 +199,9 @@ function useSynchronizedScrolling(
     const mutationObserver = new MutationObserver(invalidateScrollMap);
     mutationObserver.observe(preview, { childList: true, subtree: true });
     const resizeObserver = new ResizeObserver(invalidateScrollMap);
+    // CodeMirror refines estimated offscreen and wrapped-line heights as they enter
+    // the viewport. The map must follow the content box, not only the fixed scroller.
+    resizeObserver.observe(editor.contentDOM);
     resizeObserver.observe(editor.scrollDOM);
     resizeObserver.observe(preview);
     resizeObserver.observe(previewScroller);
@@ -206,7 +213,6 @@ function useSynchronizedScrolling(
       editorHost.removeEventListener("scroll", synchronizeFromSource, true);
       previewScroller.removeEventListener("scroll", synchronizeFromPreview);
       if (syncFrame !== undefined) cancelAnimationFrame(syncFrame);
-      if (releaseFrame !== undefined) cancelAnimationFrame(releaseFrame);
     };
   }, [editor, editorHostRef, previewRef, previewScrollerRef]);
 }
@@ -226,20 +232,25 @@ function collectScrollMap(
   const segments = collectPreviewSourceSegments(preview, previewScroller);
   const candidates: ScrollMapPoint[] = [];
 
-  // Each point describes the moment a sampled source line reaches the three-line
-  // anchor. Sampling every three lines lets the scroll position between that line
-  // and the line six rows from the viewport top be interpolated continuously.
-  for (let lineNumber = 1; lineNumber <= editor.state.doc.lines; lineNumber += 3) {
-    const line = editor.state.doc.line(lineNumber);
+  // Each point describes the moment a sampled visual source line reaches the
+  // three-line anchor. The next sample is three visual rows farther down, at about
+  // six rows from the viewport top, so interpolation also accounts for wrapped
+  // Markdown lines instead of drifting according to logical line numbers.
+  for (
+    let documentHeight = sourceAnchor;
+    documentHeight <= editor.contentHeight;
+    documentHeight += sourceAnchor
+  ) {
+    const position = editorPositionAtDocumentHeight(editor, documentHeight);
     candidates.push({
       preview:
         previewPositionForSource(
-          line.from,
+          position,
           segments,
           editor.state.doc.length,
           previewScroller.scrollHeight,
         ) - previewAnchor,
-      source: editorDocumentPosition(editor, line.from) - sourceAnchor,
+      source: documentHeight - sourceAnchor,
     });
   }
 
@@ -361,12 +372,12 @@ function interpolate(start: number, end: number, progress: number): number {
   return start + (end - start) * Math.max(0, Math.min(1, progress));
 }
 
-function editorDocumentPosition(editor: EditorView, position: number): number {
-  const clamped = Math.max(0, Math.min(editor.state.doc.length, position));
-  const line = editor.state.doc.lineAt(clamped);
-  const block = editor.lineBlockAt(clamped);
-  const progress = line.length === 0 ? 0 : (clamped - line.from) / line.length;
-  return interpolate(block.top, block.top + block.height, progress);
+function editorPositionAtDocumentHeight(editor: EditorView, documentHeight: number): number {
+  const block = editor.lineBlockAtHeight(
+    Math.max(0, Math.min(editor.contentHeight, documentHeight)),
+  );
+  const progress = block.height === 0 ? 0 : (documentHeight - block.top) / block.height;
+  return Math.round(interpolate(block.from, block.to, progress));
 }
 
 function measuredLineHeight(element: HTMLElement, fallback: number): number {

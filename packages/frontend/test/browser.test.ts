@@ -894,6 +894,128 @@ test(
         true,
       );
       await sharedContext.close();
+
+      await first.setViewportSize({ height: 900, width: 1600 });
+      const wrappedDocumentId = await first.evaluate(async () => {
+        const csrf = document.cookie
+          .split(";")
+          .map((part) => part.trim())
+          .find((part) => part.startsWith("inkling_csrf="))
+          ?.slice("inkling_csrf=".length);
+        const paragraphs = Array.from({ length: 31 }, (_, index) =>
+          index === 15
+            ? "## Wrapped source alignment"
+            : `Wrapped paragraph ${index} deliberately occupies one logical Markdown line while wrapping across several visual editor rows. Its rendered counterpart uses different font metrics and line breaks so stale CodeMirror height estimates would accumulate visible synchronization drift.`,
+        ).join("\n\n");
+        const response = await fetch("/api/documents", {
+          body: JSON.stringify({
+            body: `---\nauthors: []\nstate: draft\nvisibility: private\nlabels: []\n---\n# Wrapped scrolling fixture\n\n${paragraphs}`,
+            creationKey: "browser-wrapped-scroll-fixture",
+            title: "Wrapped scrolling fixture",
+          }),
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf ?? "" },
+          method: "POST",
+        });
+        return ((await response.json()) as { metadata: { id: string } }).metadata.id;
+      });
+      await first.goto(`${baseUrl}/documents/${wrappedDocumentId}/edit`);
+      await first.waitForFunction(
+        () => document.querySelector("[data-save-state]")?.textContent === "Saved",
+      );
+      await first.evaluate(async () => {
+        const source = document.querySelector<HTMLElement>(".cm-scroller");
+        if (source === null) throw new Error("Editor scroller is missing.");
+        source.scrollTop = 4;
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        source.scrollTop = 0;
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        const content = source.querySelector<HTMLElement>(".cm-content");
+        if (content === null) throw new Error("Editor content is missing.");
+        content.style.fontSize = "18px";
+        await new Promise((resolve) => setTimeout(resolve, 160));
+      });
+      await first.locator(".cm-content").click();
+      await first.keyboard.press("ControlOrMeta+f");
+      await first.locator(".cm-search input[name=search]").fill("Wrapped source alignment");
+      await first.locator(".cm-search button[name=next]").click();
+      await first.waitForFunction(() =>
+        [...document.querySelectorAll(".cm-line")].some(
+          (line) => line.textContent === "## Wrapped source alignment",
+        ),
+      );
+      await first.keyboard.press("Escape");
+      const wrappedScrollAlignment = await first.evaluate(async () => {
+        const source = document.querySelector<HTMLElement>(".cm-scroller");
+        const preview = document.querySelector<HTMLElement>(".editor-preview-page");
+        const previewBody = document.querySelector<HTMLElement>("[data-preview]");
+        const sourceHeading = [...document.querySelectorAll<HTMLElement>(".cm-line")].find(
+          (line) => line.textContent === "## Wrapped source alignment",
+        );
+        const previewHeading = [
+          ...document.querySelectorAll<HTMLElement>("[data-preview] h2"),
+        ].find((heading) => heading.textContent === "Wrapped source alignment");
+        if (
+          source === null ||
+          preview === null ||
+          previewBody === null ||
+          sourceHeading === undefined ||
+          previewHeading === undefined
+        ) {
+          throw new Error("Wrapped scroll headings are missing.");
+        }
+        const sourceAnchor = Number.parseFloat(getComputedStyle(sourceHeading).lineHeight) * 3;
+        const previewAnchor = Number.parseFloat(getComputedStyle(previewBody).lineHeight) * 3;
+        source.scrollTop +=
+          sourceHeading.getBoundingClientRect().top -
+          source.getBoundingClientRect().top -
+          sourceAnchor;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        const sourceToPreview = {
+          preview: previewHeading.getBoundingClientRect().top - preview.getBoundingClientRect().top,
+          source: sourceHeading.getBoundingClientRect().top - source.getBoundingClientRect().top,
+        };
+        const sourcePositions: number[] = [];
+        const sourceSteps: number[] = [];
+        const sourceBase = source.scrollTop;
+        let chain = Promise.resolve();
+        for (const offset of [0, 4, 8, 12, 16, 20, 24]) {
+          chain = chain.then(
+            () =>
+              new Promise<void>((resolve) => {
+                source.scrollTop = sourceBase + offset;
+                setTimeout(() => {
+                  sourcePositions.push(source.scrollTop);
+                  sourceSteps.push(preview.scrollTop);
+                  resolve();
+                }, 80);
+              }),
+          );
+        }
+        await chain;
+        return {
+          previewAnchor,
+          sourceAnchor,
+          sourceBase,
+          sourcePositions,
+          sourceSteps,
+          sourceToPreview,
+        };
+      });
+      assert.ok(
+        Math.abs(
+          wrappedScrollAlignment.sourceToPreview.source -
+            wrappedScrollAlignment.sourceAnchor -
+            (wrappedScrollAlignment.sourceToPreview.preview - wrappedScrollAlignment.previewAnchor),
+        ) < 30,
+      );
+      assert.ok(strictlyIncreasing(wrappedScrollAlignment.sourceSteps));
+      assert.deepEqual(
+        wrappedScrollAlignment.sourcePositions.map((position) => Math.round(position)),
+        [0, 4, 8, 12, 16, 20, 24].map((offset) =>
+          Math.round(wrappedScrollAlignment.sourceBase + offset),
+        ),
+      );
+
       const publicNote = await first.evaluate(async () => {
         const csrf = document.cookie
           .split(";")
