@@ -23,6 +23,7 @@ import { CommentControls } from "./comment-controls.tsx";
 import type { CommentControlsHandle } from "./comment-controls.tsx";
 import { CommentThreadCard } from "./comment-thread-card.tsx";
 import { ConfirmationDialog } from "./confirmation-dialog.tsx";
+import styles from "./comments.module.css";
 
 type ComposerRequest =
   | { readonly kind: "create"; readonly quote: string; readonly range: PreviewSourceRange }
@@ -312,7 +313,7 @@ export function EditorComments({
         anchorRef={activeAnchorRef}
         anchorRevision={activeAnchorRevision}
         aria-label="New comment"
-        className="comment-composer-popover"
+        className={styles["composerPopover"]}
         data-comment-composer-popover=""
         open={createRequest !== undefined}
       >

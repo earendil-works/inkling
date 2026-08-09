@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import type { ComponentPropsWithoutRef, ReactNode, RefObject } from "react";
 
+import styles from "./comments.module.css";
+
 export interface AnchoredPopoverProps extends Omit<
   ComponentPropsWithoutRef<"aside">,
   "children" | "popover"
@@ -75,7 +77,7 @@ export function AnchoredPopover({
   return (
     <aside
       {...props}
-      className={["anchored-popover", className].filter(Boolean).join(" ")}
+      className={[styles["anchoredPopover"], className].filter(Boolean).join(" ")}
       popover="manual"
       ref={popoverRef}
     >

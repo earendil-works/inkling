@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "./button.tsx";
+import styles from "./comments.module.css";
 import { DialogHeader } from "./dialog-header.tsx";
 import { ModalDialog } from "./modal-dialog.tsx";
 import { TextareaField } from "./textarea-field.tsx";
@@ -50,7 +51,7 @@ export function CommentComposer({
   const form = (
     <form
       aria-labelledby={titleId}
-      className={presentation === "inline" ? "comment-inline-composer" : "comment-composer-form"}
+      className={presentation === "inline" ? styles["inlineComposer"] : styles["composerForm"]}
       data-comment-composer-form=""
       data-comment-composer-inline={presentation === "inline" ? "" : undefined}
       onSubmit={(event) => {
@@ -60,7 +61,7 @@ export function CommentComposer({
     >
       {presentation === "dialog" ? (
         <DialogHeader
-          className="comment-composer-heading"
+          className={styles["composerHeading"]}
           closeLabel="Cancel comment"
           disabled={pending}
           eyebrow="Discussion"
@@ -70,9 +71,9 @@ export function CommentComposer({
           titleId={titleId}
         />
       ) : (
-        <div className="comment-inline-composer__heading">
+        <div className={styles["inlineHeading"]}>
           <div>
-            <p className="eyebrow">Discussion</p>
+            <p className={styles["eyebrow"]}>Discussion</p>
             <h3 id={titleId}>{title}</h3>
           </div>
           <Button aria-label="Cancel comment" variant="icon" disabled={pending} onClick={onCancel}>
@@ -85,7 +86,7 @@ export function CommentComposer({
       )}
       <TextareaField
         aria-invalid={invalid}
-        className="comment-composer-field"
+        className={styles["composerField"]}
         data-comment-body=""
         error={invalid ? "Enter a comment before submitting." : undefined}
         label="Comment"
@@ -106,7 +107,7 @@ export function CommentComposer({
         rows={presentation === "inline" ? 3 : 7}
         value={body}
       />
-      <div className="comment-composer-footer">
+      <div className={styles["composerFooter"]}>
         <span>
           <kbd>⌘</kbd>
           <kbd>Enter</kbd> to submit
@@ -140,7 +141,7 @@ export function CommentComposer({
   ) : (
     <ModalDialog
       aria-labelledby={titleId}
-      className="comment-composer-dialog"
+      className={styles["composerDialog"]}
       data-comment-composer-dialog=""
       onDismiss={onCancel}
       open

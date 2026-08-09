@@ -1,0 +1,454 @@
+.menu,
+.card,
+.composerPopover {
+  margin: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--text);
+}
+
+.menu {
+  position: fixed;
+  inset: calc(var(--masthead-height) + 4.5rem) var(--page-padding) auto auto;
+  width: min(22rem, calc(100vw - 2rem));
+  padding: 1rem;
+}
+
+.menu:popover-open {
+  display: grid;
+  gap: 1rem;
+}
+
+.menu::backdrop,
+.card::backdrop,
+.composerPopover::backdrop {
+  background: transparent;
+}
+
+.composerPopover {
+  width: min(24rem, calc(100vw - 2rem));
+  max-height: min(32rem, calc(100dvh - 2rem));
+  padding: 0;
+  overflow: auto;
+}
+
+.composerDialog {
+  width: min(34rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  padding: 0;
+  overflow: auto;
+  border-radius: 6px;
+}
+
+.composerDialog::backdrop {
+  background: rgb(10 15 12 / 32%);
+  backdrop-filter: blur(2px);
+}
+
+.composerForm,
+.inlineComposer {
+  display: grid;
+  gap: 1rem;
+  padding: 1.2rem;
+}
+
+.inlineComposer {
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.composerHeading,
+.inlineHeading,
+.composerFooter,
+.composerFooter > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.composerHeading,
+.inlineHeading {
+  align-items: flex-start;
+}
+
+.composerHeading h2,
+.inlineHeading h3 {
+  margin-top: 0.15rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.composerForm blockquote,
+.inlineComposer blockquote {
+  max-height: 6rem;
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  overflow: auto;
+  border-left: 2px solid var(--accent);
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: var(--font-ui);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.composerField {
+  color: var(--accent);
+}
+
+.composerField textarea {
+  min-height: 10rem;
+  padding: 0.9rem;
+  color: var(--text);
+  font: 0.95rem/1.55 var(--serif);
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.inlineComposer .composerField textarea {
+  min-height: 6rem;
+}
+
+.composerFooter {
+  padding-top: 0.2rem;
+}
+
+.composerFooter > span {
+  color: var(--muted);
+  font: var(--font-caption) / 1.4 var(--mono);
+}
+
+.composerFooter kbd {
+  padding: 0.1rem 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--surface-muted);
+}
+
+.eyebrow,
+.menuHeading {
+  font: var(--font-caption) / 1.3 var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--accent);
+}
+
+.menuHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.menuHeading b {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--text);
+  font: 600 1rem/1.3 var(--serif);
+  letter-spacing: -0.02em;
+  text-transform: none;
+}
+
+.menu > p,
+.orphaned > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--font-ui);
+  line-height: 1.5;
+}
+
+.resolvedToggle {
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--border);
+}
+
+.orphaned {
+  display: grid;
+  gap: 0.45rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+
+.orphaned[hidden] {
+  display: none;
+}
+
+.orphaned button {
+  display: grid;
+  width: 100%;
+  gap: 0.15rem;
+  padding: 0.65rem;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--surface-muted);
+  color: var(--text);
+  font-size: var(--font-small);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.orphaned button span {
+  color: var(--accent);
+  font: var(--font-caption) / 1.3 var(--mono);
+  text-transform: uppercase;
+}
+
+.anchoredPopover {
+  position: fixed;
+  inset: var(--anchored-popover-top, 6rem) auto auto var(--anchored-popover-left, 50%);
+}
+
+.card {
+  width: min(23rem, calc(100vw - 2rem));
+  max-height: min(36rem, calc(100dvh - 2rem));
+  padding: 0;
+  overflow: auto;
+}
+
+.thread {
+  padding: 1rem;
+  background: var(--surface);
+}
+
+.threadHeading {
+  display: flex;
+  min-height: 2rem;
+  align-items: center;
+  justify-content: space-between;
+  margin: -0.4rem -0.3rem 0.45rem 0;
+  color: var(--muted);
+  font: var(--font-caption) / 1.3 var(--mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.resolved {
+  opacity: 0.68;
+}
+
+.thread blockquote {
+  margin: 0 0 0.7rem;
+  padding: 0.55rem 0.65rem;
+  overflow: hidden;
+  border-left: 2px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--muted);
+  font-size: var(--font-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message {
+  padding: 0.65rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.message b,
+.actions button,
+.message button {
+  font: var(--font-caption) / 1.3 var(--mono);
+  text-transform: uppercase;
+}
+
+.message p {
+  margin-top: 0.3rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.message button,
+.actions button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+}
+
+.message span,
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.55rem;
+}
+
+.thread > .inlineComposer {
+  margin-top: 0.75rem;
+  padding: 0.85rem 0 0;
+  border-top: 1px solid var(--border);
+}
+
+.commentAnchor {
+  border-bottom: 2px solid var(--accent);
+  background: var(--accent-soft);
+}
+
+.commentSlot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: 0.45rem;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+:global(.inkling-code),
+:global(.inkling-mermaid) {
+  position: relative;
+}
+
+:global(.inkling-code) > .commentSlot,
+:global(.inkling-mermaid) > .commentSlot {
+  position: absolute;
+  z-index: 3;
+  top: 0.55rem;
+  right: 0.55rem;
+  margin: 0;
+}
+
+.commentBubble,
+.composerBubble {
+  position: relative;
+  display: inline-flex;
+  width: max-content;
+  min-width: 2.7rem;
+  height: 1.65rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.28rem;
+  padding: 0.18rem 0.4rem 0.18rem 0.22rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: 0 3px 10px rgb(24 32 28 / 10%);
+  color: var(--muted);
+  font: var(--font-caption) / 1 var(--mono);
+  vertical-align: middle;
+}
+
+.commentBubble::after,
+.composerBubble::after {
+  position: absolute;
+  bottom: -0.22rem;
+  left: 0.55rem;
+  width: 0.38rem;
+  height: 0.38rem;
+  border-right: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+  background: inherit;
+  content: "";
+  transform: rotate(45deg);
+}
+
+.commentBubble:hover,
+.activeBubble,
+.composerBubble:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  transform: translateY(-1px);
+}
+
+.activeBubble {
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.bubbleAvatar {
+  display: grid;
+  width: 1.1rem;
+  height: 1.1rem;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 0.55rem;
+  font-weight: 800;
+}
+
+.bubbleCount {
+  min-width: 0.7rem;
+  text-align: center;
+}
+
+.composerBubble {
+  border-color: var(--accent);
+  border-style: dashed;
+  color: var(--accent);
+  opacity: 0.48;
+}
+
+.composerBubble:hover {
+  opacity: 1;
+}
+
+.composerBubble .bubbleAvatar {
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+}
+
+.editorBubbleAnchor {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.35rem;
+  line-height: 1;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+:global(.cm-content) .commentBubble {
+  z-index: 3;
+  min-width: 2.35rem;
+  height: 1.35rem;
+  margin: 0;
+  opacity: 0.88;
+}
+
+:global(.cm-content) .composerBubble {
+  opacity: 0.48;
+}
+
+:global(.cm-content) .commentBubble:hover,
+:global(.cm-content) .activeBubble {
+  opacity: 1;
+}
+
+:global(.cm-content) .bubbleAvatar {
+  width: 0.9rem;
+  height: 0.9rem;
+  font-size: 0.5rem;
+}
+
+@media (width <= 52rem) {
+  .menu,
+  .card,
+  .composerPopover {
+    position: fixed;
+    inset: auto 0.5rem 0.5rem;
+    width: auto;
+    max-height: min(75dvh, 40rem);
+    border-radius: 6px;
+  }
+
+  .card::backdrop {
+    background: rgb(12 18 15 / 18%);
+  }
+
+  .composerFooter {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .composerFooter > div {
+    justify-content: flex-end;
+  }
+}

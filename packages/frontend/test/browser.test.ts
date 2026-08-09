@@ -896,17 +896,17 @@ test(
           method: "POST",
         });
       }, documentId);
-      await second.waitForSelector('.segment-comment-bubble[data-comment-surface="source"]');
+      await second.waitForSelector('[data-comment-bubble][data-comment-surface="source"]');
       await second.waitForSelector(
-        '[data-preview] .segment-comment-bubble[data-comment-surface="preview"]',
+        '[data-preview] [data-comment-bubble][data-comment-surface="preview"]',
       );
       assert.ok(
-        (await second.locator(".cm-comment-anchor").first().textContent()).startsWith(
+        (await second.locator("[data-comment-thread]").first().textContent()).startsWith(
           "Shared starting body",
         ),
       );
       const sourceBubbleLayout = await second
-        .locator('.segment-comment-bubble[data-comment-surface="source"]')
+        .locator('[data-comment-bubble][data-comment-surface="source"]')
         .evaluate((bubble) => {
           const anchor = bubble.parentElement;
           const bubbleBounds = bubble.getBoundingClientRect();
@@ -935,14 +935,14 @@ test(
       );
       assert.deepEqual(editorGeometryAfterComment, editorGeometryBeforeComment);
       const previewPlacement = await second
-        .locator('[data-preview] .segment-comment-bubble[data-comment-surface="preview"]')
+        .locator('[data-preview] [data-comment-bubble][data-comment-surface="preview"]')
         .evaluate((bubble) => ({
           display: getComputedStyle(bubble.parentElement as HTMLElement).display,
           parentTag: bubble.parentElement?.parentElement?.tagName,
         }));
       assert.deepEqual(previewPlacement, { display: "inline-flex", parentTag: "P" });
       await second
-        .locator('[data-preview] .segment-comment-bubble[data-comment-surface="preview"]')
+        .locator('[data-preview] [data-comment-bubble][data-comment-surface="preview"]')
         .click();
       await second.waitForFunction(
         () =>
@@ -961,7 +961,7 @@ test(
           page.waitForFunction(
             () =>
               document
-                .querySelector(".cm-comment-anchor")
+                .querySelector("[data-comment-thread]")
                 ?.textContent?.startsWith("Shared starting body") === true,
           ),
         ),

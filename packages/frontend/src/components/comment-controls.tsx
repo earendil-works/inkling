@@ -3,6 +3,7 @@ import { useImperativeHandle, useRef } from "react";
 import type { ProjectedCommentThread } from "../comments.ts";
 import { Button } from "./button.tsx";
 import { CheckboxField } from "./checkbox-field.tsx";
+import styles from "./comments.module.css";
 
 export interface CommentControlsHandle {
   readonly close: () => void;
@@ -36,14 +37,14 @@ export function CommentControls({
   return (
     <div
       aria-label="Comment controls"
-      className="comment-menu"
+      className={styles["menu"]}
       id="comment-menu"
       popover="auto"
       ref={menuRef}
     >
-      <div className="comment-menu__heading">
+      <div className={styles["menuHeading"]}>
         <div>
-          <p className="eyebrow">Anchored discussion</p>
+          <p className={styles["eyebrow"]}>Anchored discussion</p>
           <b>Comments in context</b>
         </div>
         <Button
@@ -57,12 +58,12 @@ export function CommentControls({
       <p>Select Markdown or rendered text to reveal its inline comment control.</p>
       <CheckboxField
         checked={showResolved}
-        className="resolved-toggle"
+        className={styles["resolvedToggle"]}
         data-show-resolved=""
         label="Show resolved threads"
         onChange={(event) => onShowResolvedChange(event.currentTarget.checked)}
       />
-      <div className="orphaned-comments" data-orphaned-comments="" hidden={orphaned.length === 0}>
+      <div className={styles["orphaned"]} data-orphaned-comments="" hidden={orphaned.length === 0}>
         {orphaned.length === 0 ? null : (
           <p>
             <b>

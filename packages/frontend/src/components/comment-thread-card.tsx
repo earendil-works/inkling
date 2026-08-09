@@ -5,6 +5,7 @@ import type { CommentThreadDto } from "@earendil-works/inkling-protocol";
 import { AnchoredPopover } from "./anchored-popover.tsx";
 import { Button } from "./button.tsx";
 import { CommentComposer } from "./comment-composer.tsx";
+import styles from "./comments.module.css";
 
 export interface CommentThreadCardProps {
   readonly anchorRef: React.RefObject<HTMLElement | undefined>;
@@ -44,14 +45,14 @@ export function CommentThreadCard({
   useEffect(() => {
     document.querySelectorAll<HTMLElement>("[data-comment-bubble]").forEach((bubble) => {
       bubble.classList.toggle(
-        "is-active",
+        styles["activeBubble"] ?? "",
         thread !== undefined && bubble.dataset["commentBubble"] === thread.id,
       );
     });
     return () => {
       document
-        .querySelectorAll(".segment-comment-bubble.is-active")
-        .forEach((bubble) => bubble.classList.remove("is-active"));
+        .querySelectorAll("[data-comment-bubble]")
+        .forEach((bubble) => bubble.classList.remove(styles["activeBubble"] ?? ""));
     };
   }, [thread]);
 
@@ -60,13 +61,15 @@ export function CommentThreadCard({
       anchorRef={anchorRef}
       anchorRevision={anchorRevision}
       aria-label="Comment thread"
-      className="comment-card"
+      className={styles["card"]}
       data-comment-card=""
       open={thread !== undefined}
     >
       {thread === undefined ? null : (
-        <section className={`comment-thread ${thread.resolved ? "is-resolved" : ""}`}>
-          <div className="comment-thread__heading">
+        <section
+          className={`${styles["thread"]}${thread.resolved ? ` ${styles["resolved"]}` : ""}`}
+        >
+          <div className={styles["threadHeading"]}>
             <span>Thread</span>
             <Button
               aria-label="Close comment thread"
@@ -79,7 +82,7 @@ export function CommentThreadCard({
           </div>
           <blockquote>{thread.anchor.quote || "Orphaned selection"}</blockquote>
           {thread.messages.map((message) => (
-            <div className="comment-message" key={message.id}>
+            <div className={styles["message"]} key={message.id}>
               <b>{message.authorDisplayName}</b>
               <p>{message.body}</p>
               <span>
@@ -108,7 +111,7 @@ export function CommentThreadCard({
               title="Reply to thread"
             />
           )}
-          <div className="comment-actions">
+          <div className={styles["actions"]}>
             {canReply && replyComposer === undefined ? (
               <Button data-reply-thread={thread.id} onClick={onReply}>
                 Reply

@@ -5,6 +5,8 @@ import type { DecorationSet } from "@codemirror/view";
 
 import type { CommentThreadDto } from "@earendil-works/inkling-protocol";
 
+import styles from "./components/comments.module.css";
+
 export interface ProjectedCommentThread {
   readonly end: number;
   readonly orphaned: boolean;
@@ -40,7 +42,7 @@ class CommentBubbleWidget extends WidgetType {
 
   toDOM(): HTMLElement {
     const anchor = document.createElement("span");
-    anchor.className = "cm-comment-bubble-anchor";
+    anchor.className = styles["editorBubbleAnchor"] ?? "";
     anchor.append(makeCommentBubble(this.thread, "source"));
     return anchor;
   }
@@ -66,7 +68,7 @@ class CommentComposerBubbleWidget extends WidgetType {
 
   toDOM(): HTMLElement {
     const anchor = document.createElement("span");
-    anchor.className = "cm-comment-bubble-anchor";
+    anchor.className = styles["editorBubbleAnchor"] ?? "";
     anchor.append(makeCommentComposerBubble(this.start, this.end, "source"));
     return anchor;
   }
@@ -100,7 +102,7 @@ const commentDecorationField = StateField.define<DecorationSet>({
             "data-comment-thread": projection.thread.id,
             title: `Comment by ${rootAuthor(projection.thread)}`,
           },
-          class: "cm-comment-anchor",
+          class: styles["commentAnchor"] ?? "",
         }).range(from, to);
         return [mark, widget];
       });
@@ -207,7 +209,7 @@ export function renderPreviewCommentBubbles(
     if (projection.orphaned) continue;
     const segment = findSourceSegment(preview, projection.start, projection.end);
     if (segment === undefined) continue;
-    segment.classList.add("has-comment-anchor");
+    segment.dataset["commentAnchor"] = "";
     const target = attachmentTarget(segment);
     let slot = slots.get(target);
     if (slot === undefined) {
@@ -265,7 +267,7 @@ function makeCommentComposerBubble(
   surface: "preview" | "source",
 ): HTMLElement {
   const button = document.createElement("button");
-  button.className = "segment-comment-bubble comment-composer-bubble";
+  button.className = `${styles["commentBubble"] ?? ""} ${styles["composerBubble"] ?? ""}`;
   button.dataset["commentComposer"] = "";
   button.dataset["commentSurface"] = surface;
   button.dataset["sourceEnd"] = String(end);
@@ -275,10 +277,10 @@ function makeCommentComposerBubble(
   button.title = "Comment on selection";
 
   const avatar = document.createElement("span");
-  avatar.className = "segment-comment-bubble__avatar";
+  avatar.className = styles["bubbleAvatar"] ?? "";
   avatar.textContent = "+";
   const label = document.createElement("span");
-  label.className = "segment-comment-bubble__count";
+  label.className = styles["bubbleCount"] ?? "";
   label.textContent = "New";
   button.append(avatar, label);
   return button;
@@ -286,7 +288,7 @@ function makeCommentComposerBubble(
 
 function makeCommentBubble(thread: CommentThreadDto, surface: "preview" | "source"): HTMLElement {
   const button = document.createElement("button");
-  button.className = "segment-comment-bubble";
+  button.className = styles["commentBubble"] ?? "";
   button.dataset["commentBubble"] = thread.id;
   button.dataset["commentSurface"] = surface;
   button.type = "button";
@@ -297,10 +299,10 @@ function makeCommentBubble(thread: CommentThreadDto, surface: "preview" | "sourc
   button.title = thread.messages[0]?.body ?? "Open comment thread";
 
   const avatar = document.createElement("span");
-  avatar.className = "segment-comment-bubble__avatar";
+  avatar.className = styles["bubbleAvatar"] ?? "";
   avatar.textContent = initials(rootAuthor(thread));
   const count = document.createElement("span");
-  count.className = "segment-comment-bubble__count";
+  count.className = styles["bubbleCount"] ?? "";
   count.textContent = String(thread.messages.length);
   button.append(avatar, count);
   return button;
@@ -308,7 +310,7 @@ function makeCommentBubble(thread: CommentThreadDto, surface: "preview" | "sourc
 
 function makeCommentSlot(target: HTMLElement): HTMLElement {
   const slot = document.createElement("span");
-  slot.className = "segment-comment-slot";
+  slot.className = styles["commentSlot"] ?? "";
   slot.dataset["commentSlot"] = "";
   slot.setAttribute("aria-label", "Comments attached to this text");
   target.append(slot);
@@ -324,8 +326,8 @@ function existingCommentSlot(target: HTMLElement): HTMLElement | undefined {
 
 function clearPreviewCommentSlots(preview: HTMLElement): void {
   for (const slot of preview.querySelectorAll("[data-comment-slot]")) slot.remove();
-  for (const segment of preview.querySelectorAll(".has-comment-anchor")) {
-    segment.classList.remove("has-comment-anchor");
+  for (const segment of preview.querySelectorAll<HTMLElement>("[data-comment-anchor]")) {
+    delete segment.dataset["commentAnchor"];
   }
 }
 
