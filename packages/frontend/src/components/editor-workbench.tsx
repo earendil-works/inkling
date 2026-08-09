@@ -72,7 +72,7 @@ export function EditorWorkbench({
     <section className="workbench">
       <div className="source-pane" data-source-pane="">
         <div className="pane-label">
-          <span>Markdown + frontmatter</span>
+          <span>Markdown</span>
           <span data-save-state="">{connectionLabel(connectionState)}</span>
         </div>
         <div className="editor-host" data-editor="" ref={editorHostRef} />

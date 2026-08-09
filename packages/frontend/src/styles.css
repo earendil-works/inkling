@@ -7,6 +7,8 @@
   --page: #faf9f6;
   --surface: #fffefa;
   --surface-muted: #f1f0ec;
+  --editor-background: color-mix(in oklab, var(--page) 96%, var(--text));
+  --editor-active-line-background: color-mix(in oklab, var(--editor-background) 96%, var(--text));
   --text: #353431;
   --muted: #74716c;
   --border: #d8d5cf;
@@ -55,6 +57,8 @@
   --page: #2e2d2b;
   --surface: #343330;
   --surface-muted: #3a3936;
+  --editor-background: color-mix(in oklab, var(--page) 96%, var(--text));
+  --editor-active-line-background: color-mix(in oklab, var(--editor-background) 96%, var(--text));
   --text: #f8f7f4;
   --muted: #aaa7a1;
   --border: #4a4844;
@@ -72,6 +76,8 @@
     --page: #2e2d2b;
     --surface: #343330;
     --surface-muted: #3a3936;
+    --editor-background: color-mix(in oklab, var(--page) 96%, var(--text));
+    --editor-active-line-background: color-mix(in oklab, var(--editor-background) 96%, var(--text));
     --text: #f8f7f4;
     --muted: #aaa7a1;
     --border: #4a4844;
@@ -1550,6 +1556,10 @@ select:disabled {
   overflow: hidden;
 }
 
+.source-pane {
+  background: var(--editor-background);
+}
+
 .preview-pane {
   border-left: 1px solid var(--border);
   background: var(--page);
@@ -1658,13 +1668,29 @@ select:disabled {
 }
 
 .cm-editor {
-  background: var(--surface);
+  background: var(--editor-background);
   font-size: 0.95rem;
 }
 
 .editor-host .cm-editor .cm-scroller {
   font-family: var(--mono);
   line-height: 1.65;
+}
+
+.editor-host .cm-content {
+  padding: 0.75rem 1rem 2rem;
+}
+
+.editor-host .cm-line {
+  padding-inline: 0;
+}
+
+.editor-host .cm-editor .cm-gutters {
+  display: none;
+}
+
+.editor-host .cm-editor .cm-activeLine {
+  background: var(--editor-active-line-background);
 }
 
 .cm-editor.cm-focused {

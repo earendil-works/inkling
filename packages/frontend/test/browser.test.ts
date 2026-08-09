@@ -443,6 +443,10 @@ test(
         () => document.querySelector("[data-save-state]")?.textContent === "Saved",
       );
       assert.equal(await first.locator("[data-api-status]").textContent(), "Saved");
+      assert.equal(
+        await first.locator("[data-source-pane] .pane-label span").first().textContent(),
+        "Markdown",
+      );
       await first.waitForSelector(".cm-content .tok-keyword");
       const typography = await first.evaluate(() => {
         const editor = document.querySelector<HTMLElement>(".cm-scroller");
@@ -458,6 +462,54 @@ test(
       assert.match(typography.prose, /Newsreader/u);
       assert.match(typography.editor, /JetBrains Mono/u);
       assert.equal(typography.code, typography.editor);
+      const editorAppearance = await first.evaluate(async () => {
+        const editor = document.querySelector<HTMLElement>(".cm-editor");
+        const content = document.querySelector<HTMLElement>(".cm-content");
+        const gutter = document.querySelector<HTMLElement>(".cm-gutters");
+        const activeLine = document.querySelector<HTMLElement>(".cm-activeLine");
+        if (editor === null || content === null || gutter === null || activeLine === null) {
+          throw new Error("Editor appearance elements are missing.");
+        }
+        const originalTheme = document.documentElement.dataset["theme"];
+        const canvasContext = document.createElement("canvas").getContext("2d");
+        if (canvasContext === null) throw new Error("Canvas is unavailable.");
+        const brightness = (color: string): number => {
+          canvasContext.fillStyle = color;
+          canvasContext.fillRect(0, 0, 1, 1);
+          const [red = 0, green = 0, blue = 0] = canvasContext.getImageData(0, 0, 1, 1).data;
+          return red + green + blue;
+        };
+        const sampleTheme = (theme: "dark" | "light") => {
+          document.documentElement.dataset["theme"] = theme;
+          return {
+            activeLine: brightness(getComputedStyle(activeLine).backgroundColor),
+            editor: brightness(getComputedStyle(editor).backgroundColor),
+            page: brightness(getComputedStyle(document.documentElement).backgroundColor),
+          };
+        };
+        const light = sampleTheme("light");
+        const dark = sampleTheme("dark");
+        if (originalTheme === undefined) delete document.documentElement.dataset["theme"];
+        else document.documentElement.dataset["theme"] = originalTheme;
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        });
+        const contentStyle = getComputedStyle(content);
+        return {
+          dark,
+          light,
+          gutter: getComputedStyle(gutter).display,
+          paddingLeft: Number.parseFloat(contentStyle.paddingLeft),
+          paddingTop: Number.parseFloat(contentStyle.paddingTop),
+        };
+      });
+      assert.equal(editorAppearance.gutter, "none");
+      assert.ok(editorAppearance.paddingLeft >= 12);
+      assert.ok(editorAppearance.paddingTop >= 10);
+      assert.ok(editorAppearance.light.editor < editorAppearance.light.page);
+      assert.ok(editorAppearance.light.activeLine < editorAppearance.light.editor);
+      assert.ok(editorAppearance.dark.editor > editorAppearance.dark.page);
+      assert.ok(editorAppearance.dark.activeLine > editorAppearance.dark.editor);
       const compactToc = await first
         .locator(".editor-preview-page [data-reader-toc]")
         .evaluate((toc) => {
