@@ -12,6 +12,7 @@ import { browserRuntime } from "../effect-runtime.ts";
 import { renderMermaid } from "../markdown.tsx";
 import { Button } from "./button.tsx";
 import { DocumentPage } from "./document-page.tsx";
+import markdownStyles from "./markdown-article.module.css";
 
 export interface EditorWorkbenchProps {
   readonly connectionState: ConnectionState;
@@ -24,6 +25,7 @@ export interface EditorWorkbenchProps {
   readonly previewHtml: string;
   readonly previewRef: React.RefObject<HTMLElement | null>;
   readonly metadata: DocumentMetadataDto;
+  readonly readOnly: boolean;
 }
 
 export function EditorWorkbench({
@@ -37,6 +39,7 @@ export function EditorWorkbench({
   previewHtml,
   previewRef,
   metadata,
+  readOnly,
 }: EditorWorkbenchProps): React.JSX.Element {
   const renderedCallbackRef = useRef(onPreviewRendered);
   const previewScrollerRef = useRef<HTMLDivElement>(null);
@@ -89,12 +92,14 @@ export function EditorWorkbench({
             ×
           </Button>
         </div>
-        <div className="editor-preview-page" ref={previewScrollerRef}>
+        <div className="editor-preview-page" data-preview-scroller="" ref={previewScrollerRef}>
           <div className="editor-preview-page__paper">
-            <DocumentPage headings={previewHeadings} metadata={metadata}>
+            <DocumentPage headings={previewHeadings} metadata={metadata} presentation="preview">
               <article
                 aria-label="Rendered document preview"
-                className="markdown-body reader-body editor-preview-body"
+                className={`${markdownStyles["body"]} ${markdownStyles["documentBody"]}${
+                  readOnly ? ` ${markdownStyles["readOnly"]}` : ""
+                }`}
                 data-preview=""
                 onPointerUp={capturePreviewSelection}
                 ref={previewRef}

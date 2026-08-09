@@ -185,6 +185,7 @@ export function EditorScreen({
         previewHtml={rendered.html}
         previewRef={previewRef}
         metadata={previewMetadata}
+        readOnly={!canEdit}
       />
       {displayName === undefined ? null : (
         <EditorComments

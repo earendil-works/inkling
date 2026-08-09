@@ -6,17 +6,20 @@ import type { RenderHeading } from "@earendil-works/inkling-renderer";
 import { formatDate } from "../ui.ts";
 import { DocumentTableOfContents } from "./document-table-of-contents.tsx";
 import { LifecycleStateChip } from "./lifecycle-state-chip.tsx";
+import styles from "./reader.module.css";
 
 export interface DocumentPageProps {
   readonly children: ReactNode;
   readonly headings: readonly RenderHeading[];
   readonly metadata: DocumentMetadataDto;
+  readonly presentation?: "preview" | "reader" | undefined;
 }
 
 export function DocumentPage({
   children,
   headings,
   metadata,
+  presentation = "reader",
 }: DocumentPageProps): React.JSX.Element {
   const folio =
     metadata.rfcNumber === undefined
@@ -25,18 +28,21 @@ export function DocumentPage({
   const visibilityQuery = `visibility:${metadata.visibility}`;
 
   return (
-    <div className="document-page" data-document-page="">
-      <header className="reader-heading">
-        <p className="reader-folio">{folio}</p>
-        <div className="reader-heading__main">
-          <div className="reader-heading__badges">
+    <div
+      className={`${styles["page"]}${presentation === "preview" ? ` ${styles["preview"]}` : ""}`}
+      data-document-page=""
+    >
+      <header className={styles["heading"]}>
+        <p className={styles["folio"]}>{folio}</p>
+        <div className={styles["headingMain"]}>
+          <div className={styles["badges"]}>
             <LifecycleStateChip
-              className="reader-state-chip"
+              className={styles["stateChip"]}
               href={`/?q=${encodeURIComponent(`state:${metadata.lifecycleState}`)}`}
               state={metadata.lifecycleState}
             />
             <a
-              className="reader-visibility-chip"
+              className={styles["visibilityChip"]}
               data-document-visibility={metadata.visibility}
               href={`/?q=${encodeURIComponent(visibilityQuery)}`}
             >
@@ -45,7 +51,7 @@ export function DocumentPage({
           </div>
           <h1>{metadata.title}</h1>
           {metadata.labels.length === 0 ? null : (
-            <div className="reader-labels" aria-label="Labels">
+            <div className={styles["labels"]} aria-label="Labels">
               {metadata.labels.map((label) => (
                 <a href={`/labels?label=${encodeURIComponent(label)}`} key={label}>
                   {label}
@@ -56,7 +62,7 @@ export function DocumentPage({
         </div>
       </header>
       <DocumentMetadata metadata={metadata} />
-      <div className="reader-content-grid">
+      <div className={styles["contentGrid"]}>
         {children}
         <DocumentTableOfContents headings={headings} />
       </div>
@@ -70,10 +76,10 @@ function DocumentMetadata({
   readonly metadata: DocumentMetadataDto;
 }): React.JSX.Element {
   return (
-    <dl className="reader-metadata" data-document-metadata="">
+    <dl className={styles["metadata"]} data-document-metadata="">
       <MetadataRow label="Authors">
         {metadata.authors.length === 0 ? (
-          <span className="reader-metadata__empty">Not specified</span>
+          <span className={styles["metadataEmpty"]}>Not specified</span>
         ) : (
           <PeopleList people={metadata.authors} />
         )}
@@ -113,7 +119,7 @@ function MetadataRow({
   readonly label: string;
 }): React.JSX.Element {
   return (
-    <div className="reader-metadata__row">
+    <div className={styles["metadataRow"]}>
       <dt>{label}</dt>
       <dd>{children}</dd>
     </div>

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 
 import type { RenderHeading } from "@earendil-works/inkling-renderer";
 
+import styles from "./reader.module.css";
+
 export interface DocumentTableOfContentsProps {
   readonly headings: readonly RenderHeading[];
 }
@@ -22,7 +24,7 @@ export function DocumentTableOfContents({
   return (
     <nav
       aria-label="On this page"
-      className="reader-toc"
+      className={styles["toc"]}
       data-reader-toc=""
       ref={tableOfContentsRef}
     >
@@ -33,7 +35,9 @@ export function DocumentTableOfContents({
           const current = heading.id === currentHeadingId;
           return (
             <li
-              className={`reader-toc__level-${level}`}
+              className={
+                level === 2 ? styles["tocLevel2"] : level === 3 ? styles["tocLevel3"] : undefined
+              }
               data-current-heading={current ? "" : undefined}
               key={heading.id}
             >
@@ -58,7 +62,7 @@ function useActiveHeading(
     const documentPage = tableOfContents?.closest<HTMLElement>("[data-document-page]");
     if (tableOfContents === null || documentPage === null || documentPage === undefined) return;
 
-    const scrollContainer = tableOfContents.closest<HTMLElement>(".editor-preview-page");
+    const scrollContainer = tableOfContents.closest<HTMLElement>("[data-preview-scroller]");
     const scrollTarget: HTMLElement | Window = scrollContainer ?? window;
     let frame: number | undefined;
     let headingElements: readonly HTMLElement[] = [];

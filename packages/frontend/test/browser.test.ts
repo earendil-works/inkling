@@ -170,7 +170,7 @@ test(
         await first.locator(".cm-content").innerText(),
         /---\s+authors:\s+- browser@example\.com\s+state: draft\s+visibility: private\s+labels: \[\]\s+---/u,
       );
-      const draftStateChip = first.locator(".editor-preview-page .reader-state-chip");
+      const draftStateChip = first.locator("[data-preview-scroller] [data-lifecycle-state]");
       await draftStateChip.waitFor();
       assert.equal(await draftStateChip.getAttribute("data-lifecycle-state"), "draft");
       const draftStateBackground = await draftStateChip.evaluate(
@@ -190,7 +190,7 @@ test(
       await first.keyboard.press("Shift+Home");
       await first.keyboard.insertText("state: accepted");
       const acceptedStateChip = first.locator(
-        '.editor-preview-page .reader-state-chip[data-lifecycle-state="accepted"]',
+        '[data-preview-scroller] [data-lifecycle-state="accepted"]',
       );
       await acceptedStateChip.waitFor();
       assert.notEqual(
@@ -223,7 +223,7 @@ test(
       await first.waitForTimeout(100);
       assert.equal(await first.locator("[data-toasts] .toast").count(), 0);
       assert.equal(
-        await first.locator(".editor-preview-page [data-document-page] h1").textContent(),
+        await first.locator("[data-preview-scroller] [data-document-page] h1").textContent(),
         "Browser collaboration",
       );
       const invalidLabelsLine = first.locator(".cm-line").filter({ hasText: "labels: [] invalid" });
@@ -232,16 +232,16 @@ test(
       await first.keyboard.press("Shift+Home");
       await first.keyboard.insertText("labels:\n  - architecture\n  - platform");
       assert.equal(
-        await first.locator(".editor-preview-page [data-document-page] h1").textContent(),
+        await first.locator("[data-preview-scroller] [data-document-page] h1").textContent(),
         "Browser collaboration",
       );
       assert.match(
-        await first.locator(".editor-preview-page [data-document-metadata]").innerText(),
+        await first.locator("[data-preview-scroller] [data-document-metadata]").innerText(),
         /Authors\s+Browser Admin[\s\S]+Created[\s\S]+Updated/iu,
       );
       assert.equal(
         await first
-          .locator('.editor-preview-page .reader-labels a[href="/labels?label=platform"]')
+          .locator('[data-preview-scroller] a[href="/labels?label=platform"]')
           .textContent(),
         "platform",
       );
@@ -436,7 +436,7 @@ test(
       assert.equal(await renderedKeyword.textContent(), "const");
       assert.equal(await renderedKeyword.getAttribute("class"), editorKeywordClass);
       assert.equal(await first.locator(".reader-back-link").count(), 0);
-      const readerState = first.locator(".reader-state-chip");
+      const readerState = first.locator("[data-reader] [data-lifecycle-state]");
       assert.equal(await readerState.getAttribute("href"), "/?q=state%3Adraft");
       await readerState.click();
       await first.waitForURL(/\?q=state%3Adraft$/u);
@@ -596,7 +596,7 @@ test(
       const typography = await first.evaluate(() => {
         const editor = document.querySelector<HTMLElement>(".cm-scroller");
         const code = document.querySelector<HTMLElement>("[data-preview] pre");
-        const markdownBody = document.querySelector<HTMLElement>("[data-preview].markdown-body");
+        const markdownBody = document.querySelector<HTMLElement>("article[data-preview]");
         const heading2 = markdownBody?.querySelector<HTMLElement>("h2");
         if (editor === null) throw new Error("Editor scroller is missing.");
         if (code === null) throw new Error("Preview code block is missing.");
@@ -667,7 +667,7 @@ test(
       assert.ok(editorAppearance.dark.editor > editorAppearance.dark.page);
       assert.ok(editorAppearance.dark.activeLine > editorAppearance.dark.editor);
       const compactToc = await first
-        .locator(".editor-preview-page [data-reader-toc]")
+        .locator("[data-preview-scroller] [data-reader-toc]")
         .evaluate((toc) => {
           const list = toc.querySelector("ol");
           const link = toc.querySelector("a");
@@ -685,7 +685,7 @@ test(
       });
       const synchronizedScroll = await first.evaluate(async () => {
         const source = document.querySelector<HTMLElement>(".cm-scroller");
-        const preview = document.querySelector<HTMLElement>(".editor-preview-page");
+        const preview = document.querySelector<HTMLElement>("[data-preview-scroller]");
         const previewBody = document.querySelector<HTMLElement>("[data-preview]");
         const sourceHeading = [...document.querySelectorAll<HTMLElement>(".cm-line")].find(
           (line) => line.textContent === "## Architecture",
@@ -1168,7 +1168,7 @@ test(
       await first.keyboard.press("Escape");
       const wrappedScrollAlignment = await first.evaluate(async () => {
         const source = document.querySelector<HTMLElement>(".cm-scroller");
-        const preview = document.querySelector<HTMLElement>(".editor-preview-page");
+        const preview = document.querySelector<HTMLElement>("[data-preview-scroller]");
         const previewBody = document.querySelector<HTMLElement>("[data-preview]");
         const sourceHeading = [...document.querySelectorAll<HTMLElement>(".cm-line")].find(
           (line) => line.textContent === "## Wrapped source alignment",

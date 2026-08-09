@@ -4,6 +4,7 @@ import type { DocumentResponse } from "@earendil-works/inkling-protocol";
 
 import { useAppContext } from "./app-context.tsx";
 import { ReaderDocument } from "./components/reader-document.tsx";
+import styles from "./components/reader.module.css";
 import { ReaderToolbar } from "./components/reader-toolbar.tsx";
 
 export interface ReaderScreenProps {
@@ -23,8 +24,8 @@ export function ReaderScreen({
   }, [setParticipants]);
 
   return (
-    <main className="reader-layout" id="app" tabIndex={-1}>
-      <div className="reader-paper">
+    <main className={styles["layout"]} id="app" tabIndex={-1}>
+      <div className={styles["paper"]}>
         <ReaderToolbar
           metadata={document.metadata}
           publicDocument={publicDocument}

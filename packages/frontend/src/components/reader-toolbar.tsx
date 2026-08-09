@@ -2,6 +2,7 @@ import type { DocumentMetadataDto } from "@earendil-works/inkling-protocol";
 
 import { documentHref } from "../ui.ts";
 import { ButtonLink } from "./button-link.tsx";
+import styles from "./reader.module.css";
 
 export interface ReaderToolbarProps {
   readonly metadata: DocumentMetadataDto;
@@ -18,9 +19,9 @@ export function ReaderToolbar({
   if (!canEdit) return null;
 
   return (
-    <nav className="document-bar reader-toolbar" aria-label="Document navigation">
+    <nav className={styles["toolbar"]} aria-label="Document navigation">
       <ButtonLink
-        className="document-mode-link"
+        className={styles["modeLink"]}
         data-open-editor=""
         href={documentHref(metadata.id, metadata.rfcNumber, shared, "edit")}
         size="small"

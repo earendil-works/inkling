@@ -1,0 +1,168 @@
+.body {
+  width: 100%;
+  max-width: 52rem;
+  min-width: 0;
+  margin: 0 auto;
+  padding: clamp(2rem, 5vw, 4.5rem);
+  overflow: auto;
+  font-size: clamp(1.0625rem, 1rem + 0.18vw, 1.1875rem);
+  line-height: 1.62;
+}
+
+.documentBody {
+  max-width: 47rem;
+  min-height: 0;
+  margin: 0;
+  padding: 0 0 2.5rem;
+  overflow: visible;
+}
+
+.readOnly {
+  max-width: 58rem;
+  min-height: 100%;
+  padding-block: clamp(4rem, 9vw, 8rem);
+  overflow: visible;
+}
+
+.body > :first-child {
+  margin-top: 0;
+}
+
+.body :where(h1, h2, h3, h4) {
+  margin: 0.9em 0 0.35em;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+  scroll-margin-top: 5rem;
+  text-wrap: balance;
+}
+
+.body h1 {
+  font-size: clamp(1.9rem, 1.75rem + 0.5vw, 2.2rem);
+  font-weight: 500;
+}
+
+.body h2 {
+  font-size: 1.7rem;
+}
+
+.body h3 {
+  font-size: 1.3rem;
+}
+
+.body h4 {
+  font-size: 1.08rem;
+}
+
+.body :where(p, ul, ol, table, pre, blockquote) {
+  margin: 1em 0;
+}
+
+.body a {
+  color: var(--accent);
+  text-underline-offset: 0.2em;
+}
+
+.body :where(img, svg) {
+  max-width: 100%;
+}
+
+.body blockquote {
+  padding-left: 1rem;
+  border-left: 3px solid var(--border-strong);
+  color: var(--muted);
+}
+
+.body pre {
+  overflow: auto;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--code-background);
+  color: var(--code-text);
+  font: var(--font-ui) / 1.55 var(--mono);
+}
+
+.body :not(pre) > code {
+  padding: 0.1em 0.3em;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--surface-muted);
+  font-family: var(--mono);
+  font-size: 0.85em;
+}
+
+.body table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.body :where(td, th) {
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+.body :global(.inkling-mermaid) {
+  position: relative;
+  min-height: 12rem;
+  overflow: hidden;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  background: white;
+}
+
+.body :global(.inkling-mermaid[data-mermaid-error]) {
+  min-height: 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+}
+
+.body :global(.inkling-mermaid > .inkling-mermaid__error) {
+  margin: 0 0 0.5rem;
+  color: var(--danger);
+  font: var(--font-caption) / 1.4 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.body :global(.inkling-mermaid[data-mermaid-error] > pre) {
+  margin-top: 0;
+}
+
+.body :global(.mermaid-viewport) {
+  cursor: grab;
+  transform-origin: center;
+  touch-action: none;
+}
+
+.body :global(.mermaid-viewport:active) {
+  cursor: grabbing;
+}
+
+.body :global(.inkling-mermaid__controls) {
+  position: absolute;
+  right: 0.6rem;
+  bottom: 0.6rem;
+  display: flex;
+  gap: 0.25rem;
+}
+
+.body :global(.inkling-mermaid__controls button) {
+  padding: 0.35rem 0.55rem;
+  border: 1px solid #777;
+  background: #fff;
+  color: #111;
+}
+
+@media (width <= 52rem) {
+  .documentBody {
+    padding-bottom: 1.5rem;
+  }
+
+  .readOnly {
+    padding-block: 3.5rem;
+  }
+}
