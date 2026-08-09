@@ -160,6 +160,7 @@ export function EditorScreen({
       />
       <EditorWorkbench
         connectionState={connectionState}
+        editor={sessionRef.current?.editor}
         editorHostRef={editorHostRef}
         onClosePreview={() => setPreviewOpen(false)}
         onPreviewRendered={() => setPreviewRevision((revision) => revision + 1)}

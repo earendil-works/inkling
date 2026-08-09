@@ -475,38 +475,55 @@ test(
         overflowX: "auto",
         whiteSpace: "nowrap",
       });
-      const synchronizedScroll = await first.evaluate(async () => {
+      const sourceToPreviewAlignment = await first.evaluate(async () => {
         const source = document.querySelector<HTMLElement>(".cm-scroller");
         const preview = document.querySelector<HTMLElement>(".editor-preview-page");
-        if (source === null || preview === null) throw new Error("Editor panes are missing.");
-        source.scrollTop = 0;
-        await new Promise<void>((resolve) =>
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        const sourceHeading = [...document.querySelectorAll<HTMLElement>(".cm-line")].find(
+          (line) => line.textContent === "## Architecture",
         );
-        source.scrollTop = source.scrollHeight;
-        await new Promise<void>((resolve) =>
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-        );
-        const downward = {
-          preview: preview.scrollTop / (preview.scrollHeight - preview.clientHeight),
-          source: source.scrollTop / (source.scrollHeight - source.clientHeight),
-        };
-        preview.scrollTop = 0;
-        await new Promise<void>((resolve) =>
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-        );
+        const previewHeading = [
+          ...document.querySelectorAll<HTMLElement>("[data-preview] h2"),
+        ].find((heading) => heading.textContent === "Architecture");
+        if (
+          source === null ||
+          preview === null ||
+          sourceHeading === undefined ||
+          previewHeading === undefined
+        ) {
+          throw new Error("Mapped editor headings are missing.");
+        }
+        sourceHeading.scrollIntoView({ block: "center" });
+        await new Promise((resolve) => setTimeout(resolve, 80));
         return {
-          downward,
-          upward: {
-            preview: preview.scrollTop / (preview.scrollHeight - preview.clientHeight),
-            source: source.scrollTop / (source.scrollHeight - source.clientHeight),
-          },
+          preview: previewHeading.getBoundingClientRect().top - preview.getBoundingClientRect().top,
+          source: sourceHeading.getBoundingClientRect().top - source.getBoundingClientRect().top,
         };
       });
-      assert.ok(synchronizedScroll.downward.source > 0.95);
-      assert.ok(synchronizedScroll.downward.preview > 0.9);
-      assert.ok(synchronizedScroll.upward.source < 0.1);
-      assert.ok(synchronizedScroll.upward.preview < 0.1);
+      assert.ok(Math.abs(sourceToPreviewAlignment.source - sourceToPreviewAlignment.preview) < 35);
+
+      const previewToSourceAlignment = await first.evaluate(async () => {
+        const source = document.querySelector<HTMLElement>(".cm-scroller");
+        const preview = document.querySelector<HTMLElement>(".editor-preview-page");
+        const previewHeading = [
+          ...document.querySelectorAll<HTMLElement>("[data-preview] h2"),
+        ].find((heading) => heading.textContent === "Architecture");
+        if (source === null || preview === null || previewHeading === undefined) {
+          throw new Error("Mapped editor headings are missing.");
+        }
+        preview.scrollTop = preview.scrollHeight;
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        previewHeading.scrollIntoView({ block: "center" });
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        const sourceHeading = [...document.querySelectorAll<HTMLElement>(".cm-line")].find(
+          (line) => line.textContent === "## Architecture",
+        );
+        if (sourceHeading === undefined) throw new Error("Mapped source heading is missing.");
+        return {
+          preview: previewHeading.getBoundingClientRect().top - preview.getBoundingClientRect().top,
+          source: sourceHeading.getBoundingClientRect().top - source.getBoundingClientRect().top,
+        };
+      });
+      assert.ok(Math.abs(previewToSourceAlignment.source - previewToSourceAlignment.preview) < 35);
 
       await first.locator(".cm-content").click();
       await first.keyboard.press("ControlOrMeta+Home");
