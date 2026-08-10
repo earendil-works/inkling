@@ -67,30 +67,45 @@ export function saveConfig(config: Config): Effect.Effect<void, ConfigError> {
   });
 }
 
-export function selectedInstance(config: Config): Effect.Effect<Instance, ConfigError> {
-  const name = process.env["INKLING_INSTANCE"] ?? config.active;
-  const instance =
-    name === undefined && config.instances.length === 1
-      ? config.instances[0]
-      : config.instances.find((item) => item.name === name);
+export function configuredWorkspace(
+  config: Config,
+  workspace: string,
+): Effect.Effect<Instance, ConfigError> {
+  const matches = config.instances.filter(
+    (instance) => instance.apiKey !== undefined && workspaceName(instance.baseUrl) === workspace,
+  );
+  if (matches.length > 1) {
+    return Effect.fail(
+      new ConfigError({
+        message: `Multiple API keys are configured for ${workspace}. Run \`inkling workspace add URL API_KEY\` to select one.`,
+      }),
+    );
+  }
+  const instance = matches[0];
   return instance === undefined
     ? Effect.fail(
         new ConfigError({
-          message: "No Inkling instance is selected. Run `inkling instance add` and `inkling use`.",
+          message: `No Inkling workspace is configured as ${workspace}. Run \`inkling workspace add URL API_KEY\`.`,
         }),
       )
-    : Effect.succeed(instance);
+    : Effect.succeed({ ...instance, name: workspace });
 }
 
-export function upsertInstance(config: Config, instance: Instance): Config {
+export function upsertWorkspace(config: Config, instance: Instance): Config {
+  const workspace = workspaceName(instance.baseUrl);
   return {
-    ...config,
-    active: config.active ?? instance.name,
     instances: [
-      ...config.instances.filter((existing) => existing.name !== instance.name),
-      instance,
-    ].toSorted((left, right) => left.name.localeCompare(right.name)),
+      ...config.instances.filter((existing) => workspaceName(existing.baseUrl) !== workspace),
+      { ...instance, name: workspace },
+    ].toSorted((left, right) =>
+      workspaceName(left.baseUrl).localeCompare(workspaceName(right.baseUrl)),
+    ),
+    version: 1,
   };
+}
+
+export function workspaceName(baseUrl: string): string {
+  return URL.parse(baseUrl)?.host ?? baseUrl;
 }
 
 function configPath(): string {

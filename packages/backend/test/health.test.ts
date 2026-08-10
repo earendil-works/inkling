@@ -23,7 +23,10 @@ test("served agent instructions explain personal API keys and safe CLI use", asy
   assert.match(body, /base URL is https:\/\/rfcs\.example\.com/u);
   assert.match(body, /account menu.*API keys/su);
   assert.match(body, /Reuse an active key.*click \*\*Show\*\*/su);
+  assert.match(body, /inkling workspace add https:\/\/rfcs\.example\.com API_KEY/u);
   assert.match(body, /inkling read https:\/\/rfcs\.example\.com\/rfcs\/0057/u);
+  assert.match(body, /inkling read rfcs\.example\.com DOCUMENT_ID/u);
+  assert.match(body, /Capability .* URLs.*without configuring a workspace/u);
   assert.match(body, /API keys belong to the user who created them/u);
   assert.match(body, /\.agents\/skills\/inkling\/SKILL\.md/u);
   assert.match(body, /never contain an API key/u);

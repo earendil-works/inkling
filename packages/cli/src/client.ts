@@ -267,7 +267,7 @@ export function makeCliClient(instance: Instance): CliClient {
       : Effect.fail(
           new ClientError({
             code: "shared_document_mismatch",
-            message: `Instance ${instance.name} grants access only to ${instance.documentId}.`,
+            message: `This capability grants access only to ${instance.documentId}.`,
             status: 403,
           }),
         );

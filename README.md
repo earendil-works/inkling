@@ -26,12 +26,12 @@ It's built to easily deploy to Cloudflare but can also be run locally.
 
 ## Authoring
 
-RFCs and notes use markdown as syntax.  RFC numbers are allocated monotonically
-and have canonical routes such as `/rfcs/0042`.  Notes are more informal and
-always have their own internal document IDs as URL.  They are for meeting notes
+RFCs and notes use markdown as syntax. RFC numbers are allocated monotonically
+and have canonical routes such as `/rfcs/0042`. Notes are more informal and
+always have their own internal document IDs as URL. They are for meeting notes
 and other throwaway documents that do not need to live forever.
 
-The first top-level Markdown heading is the document title.  Publication
+The first top-level Markdown heading is the document title. Publication
 metadata lives in YAML frontmatter at the beginning of the collaborative source:
 
 ```yaml
@@ -46,18 +46,18 @@ labels:
 ---
 ```
 
-Frontmatter does not itself change authorization or publish a working draft.  An
+Frontmatter does not itself change authorization or publish a working draft. An
 authorized user must explicitly publish it, which validates the frontmatter and
 creates an immutable published revision.
 
 The public landing page lists public, published RFCs and notes without requiring
-sign-in.  Anonymous readers see only those published revisions.
+sign-in. Anonymous readers see only those published revisions.
 
 ## Finding documents
 
 Press `/` or <kbd>Cmd/Ctrl</kbd>+<kbd>K</kbd> from the workspace to focus
-search.  Plain terms search titles, complete working-draft bodies, RFC numbers,
-labels, states, and people.  Terms are combined with AND.  Quote a phrase to
+search. Plain terms search titles, complete working-draft bodies, RFC numbers,
+labels, states, and people. Terms are combined with AND. Quote a phrase to
 keep it together and prefix a term or filter with `-` to exclude it.
 
 Search supports Gmail-style filters:
@@ -72,10 +72,9 @@ Search supports Gmail-style filters:
 | Document kind   | `is:rfc`, `is:note`, `is:published`, or `is:unpublished`                    |
 | Presence        | `has:rfc` or `has:publication`                                              |
 
-
 ## Working With Agents
 
-The command-line executable is named `inkling`.  Open the account menu and choose
+The command-line executable is named `inkling`. Open the account menu and choose
 **API keys**.
 
 ```sh
@@ -94,7 +93,7 @@ node packages/cli/src/main.ts --help
 ```
 
 Each Inkling instance serves an origin-aware
-[`/AGENTS.md`](http://localhost:8787/AGENTS.md).  Point a coding agent at that
+[`/AGENTS.md`](http://localhost:8787/AGENTS.md). Point a coding agent at that
 URL to give it current CLI setup, safe editing guidance, and a reusable Agent
 Skills template. The served instructions never contain credentials.
 
@@ -104,6 +103,6 @@ to set the guest comment name.
 ## Deployment
 
 Inkling can run as a self-contained Node.js service backed by the filesystem or
-on Cloudflare using Durable Objects and R2.  See [`DEPLOYMENT.md`](DEPLOYMENT.md)
+on Cloudflare using Durable Objects and R2. See [`DEPLOYMENT.md`](DEPLOYMENT.md)
 for local setup, Google OAuth configuration, Docker, and production deployment
 instructions.

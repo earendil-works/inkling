@@ -7,13 +7,23 @@ interface HelpTopic {
   readonly usage: readonly string[];
 }
 
+const workspaceArgument = [
+  [
+    "WORKSPACE",
+    "Configured domain and optional port, such as inkling.example.com or localhost:8787.",
+  ],
+] as const;
+
+const documentTargetArguments = [
+  ["WORKSPACE_OR_URL", "Complete Inkling document URL, or a configured DOMAIN[:PORT]."],
+  ["DOCUMENT_ID", "Document ID; required after a workspace and omitted after a URL."],
+] as const;
+
 const helpTopics: Readonly<Record<string, HelpTopic>> = {
   "": {
     commands: [
       ["serve", "Start a local Inkling server."],
-      ["instance", "Manage named API-key instances."],
-      ["share-instance", "Register a shared document URL."],
-      ["use", "Select the active instance."],
+      ["workspace", "Manage URL-derived workspace connections."],
       ["list", "List workspace documents."],
       ["search", "Search workspace documents."],
       ["read", "Read a working document and its comments."],
@@ -37,7 +47,8 @@ const helpTopics: Readonly<Record<string, HelpTopic>> = {
     description: "Multiplayer Markdown for people and agents.",
     notes: [
       "Run `inkling <command> --help` for command-specific help.",
-      "INKLING_INSTANCE overrides the active instance. INKLING_AUTHOR names guest comments.",
+      "Complete document URLs imply their workspace. Document IDs require DOMAIN[:PORT].",
+      "INKLING_AUTHOR names guest comments.",
     ],
     usage: ["inkling <command> [options]", "inkling help [command [subcommand]]"],
   },
@@ -49,109 +60,106 @@ const helpTopics: Readonly<Record<string, HelpTopic>> = {
     ],
     usage: ["inkling serve [--port PORT] [--data-dir PATH]"],
   },
-  instance: {
+  workspace: {
     commands: [
-      ["add NAME URL API_KEY", "Register or replace a named authenticated instance."],
-      ["remove NAME", "Remove a named instance."],
-      ["list", "List configured instances and mark the active one."],
+      ["add URL API_KEY", "Connect or replace a workspace derived from URL."],
+      ["remove DOMAIN[:PORT]", "Remove a workspace connection."],
+      ["list", "List configured workspace domains and base URLs."],
     ],
-    description: "Manage named authenticated Inkling instances.",
-    usage: ["inkling instance <command>"],
+    description: "Manage authenticated Inkling workspace connections.",
+    usage: ["inkling workspace <command>"],
   },
-  "instance add": {
+  "workspace add": {
     arguments: [
-      ["NAME", "Local name for the instance."],
-      ["URL", "HTTP or HTTPS base URL of the Inkling deployment."],
+      ["URL", "HTTP or HTTPS origin of the Inkling deployment."],
       ["API_KEY", "Personal API key created from the browser account menu."],
     ],
-    description: "Register or replace a named authenticated Inkling instance.",
+    description: "Connect a workspace using its domain and optional port as its local identifier.",
     notes: ["The API key is stored in Inkling's user-only configuration file."],
-    usage: ["inkling instance add NAME URL API_KEY"],
+    usage: ["inkling workspace add URL API_KEY"],
   },
-  "instance remove": {
-    arguments: [["NAME", "Configured instance name to remove."]],
-    description: "Remove a named instance from the local configuration.",
-    usage: ["inkling instance remove NAME"],
+  "workspace remove": {
+    arguments: [["DOMAIN[:PORT]", "Configured workspace domain and optional port."]],
+    description: "Remove a workspace connection from the local configuration.",
+    usage: ["inkling workspace remove DOMAIN[:PORT]"],
   },
-  "instance list": {
-    description: "List configured instances. The active instance is marked with an asterisk.",
-    usage: ["inkling instance list"],
-  },
-  "share-instance": {
-    arguments: [
-      ["NAME", "Local name for the shared document."],
-      ["CAPABILITY_URL", "Full Inkling /share/ URL, including its capability token."],
-    ],
-    description: "Register a capability-shared document as a named instance.",
-    usage: ["inkling share-instance NAME CAPABILITY_URL"],
-  },
-  use: {
-    arguments: [["NAME", "Configured instance name to make active."]],
-    description: "Select the default instance used by API commands.",
-    usage: ["inkling use NAME"],
+  "workspace list": {
+    description: "List configured workspace domains and their base URLs.",
+    usage: ["inkling workspace list"],
   },
   list: {
-    description: "List documents visible to the selected instance.",
-    usage: ["inkling list"],
+    arguments: workspaceArgument,
+    description: "List documents visible to a workspace.",
+    usage: ["inkling list WORKSPACE"],
   },
   search: {
-    arguments: [["QUERY", "Search expression. Quote it when it contains shell metacharacters."]],
-    description: "Search documents visible to the selected instance.",
-    usage: ["inkling search QUERY"],
+    arguments: [
+      ...workspaceArgument,
+      ["QUERY", "Search expression. Quote it when it contains shell metacharacters."],
+    ],
+    description: "Search documents visible to a workspace.",
+    usage: ["inkling search WORKSPACE QUERY"],
   },
   "import-rfc": {
-    arguments: [["MARKDOWN", "Path to an Earendil RFC Markdown file."]],
+    arguments: [...workspaceArgument, ["MARKDOWN", "Path to an Earendil RFC Markdown file."]],
     description: "Import an Earendil RFC and its referenced local attachments.",
     options: [
       ["--people PEOPLE_JSON", "Use a JSON people directory while normalizing identities."],
       ["--publish", "Publish the imported revision even when it is not public."],
     ],
-    usage: ["inkling import-rfc MARKDOWN [--people PEOPLE_JSON] [--publish]"],
+    usage: ["inkling import-rfc WORKSPACE MARKDOWN [--people PEOPLE_JSON] [--publish]"],
   },
   "import-jot": {
     arguments: [
+      ...workspaceArgument,
       ["MARKDOWN", "Path to a legacy Jot Markdown file."],
       ["SIDECAR_JSON", "Path to its metadata sidecar JSON file."],
     ],
     description: "Import a legacy Jot document and its metadata.",
     options: [["--publish", "Publish the imported revision even when it is not public."]],
-    usage: ["inkling import-jot MARKDOWN SIDECAR_JSON [--publish]"],
+    usage: ["inkling import-jot WORKSPACE MARKDOWN SIDECAR_JSON [--publish]"],
   },
   backup: {
-    arguments: [["DESTINATION", "Path where the binary backup archive will be written."]],
-    description: "Export a portable workspace backup from the selected instance.",
-    usage: ["inkling backup DESTINATION"],
+    arguments: [
+      ...workspaceArgument,
+      ["DESTINATION", "Path where the binary backup archive will be written."],
+    ],
+    description: "Export a portable workspace backup.",
+    usage: ["inkling backup WORKSPACE DESTINATION"],
   },
   restore: {
-    arguments: [["BACKUP", "Path to a binary Inkling backup archive."]],
-    description: "Restore and verify a workspace backup on the selected instance.",
-    usage: ["inkling restore BACKUP"],
+    arguments: [...workspaceArgument, ["BACKUP", "Path to a binary Inkling backup archive."]],
+    description: "Restore and verify a workspace backup.",
+    usage: ["inkling restore WORKSPACE BACKUP"],
   },
   verify: {
-    description: "Verify the selected workspace's durable objects and projections.",
-    usage: ["inkling verify"],
+    arguments: workspaceArgument,
+    description: "Verify a workspace's durable objects and projections.",
+    usage: ["inkling verify WORKSPACE"],
   },
   repair: {
-    description: "Rebuild the selected workspace catalog from document checkpoints.",
-    usage: ["inkling repair"],
+    arguments: workspaceArgument,
+    description: "Rebuild a workspace catalog from document checkpoints.",
+    usage: ["inkling repair WORKSPACE"],
   },
   read: {
-    arguments: [
-      [
-        "DOCUMENT",
-        "Document ID or complete Inkling URL. Omit it when using a shared-document instance.",
-      ],
-    ],
+    arguments: documentTargetArguments,
     description: "Read a document, its metadata, and comment identifiers.",
     notes: [
       "A reader URL returns its published revision; an /edit URL returns the working head.",
-      "URL origins select a matching configured instance automatically.",
+      "Capability URLs are used directly and do not need a workspace connection.",
     ],
     options: [["--lines START:END", "Print only the inclusive one-based line range."]],
-    usage: ["inkling read [DOCUMENT|URL] [--lines START:END]"],
+    usage: [
+      "inkling read URL [--lines START:END]",
+      "inkling read WORKSPACE DOCUMENT_ID [--lines START:END]",
+    ],
   },
   create: {
-    arguments: [["TITLE", "Title used for the document's initial top-level heading."]],
+    arguments: [
+      ...workspaceArgument,
+      ["TITLE", "Title used for the document's initial top-level heading."],
+    ],
     description: "Create a new note or numbered RFC.",
     notes: [
       "Without --body, Markdown is read from standard input; a terminal supplies an empty body.",
@@ -160,28 +168,34 @@ const helpTopics: Readonly<Record<string, HelpTopic>> = {
       ["--rfc", "Allocate the next RFC number."],
       ["--body MARKDOWN", "Use MARKDOWN instead of reading standard input."],
     ],
-    usage: ["inkling create TITLE [--rfc] [--body MARKDOWN]"],
+    usage: ["inkling create WORKSPACE TITLE [--rfc] [--body MARKDOWN]"],
   },
   edit: {
     arguments: [
-      ["DOCUMENT", "Document ID. Omit it when using a shared-document instance."],
+      ...documentTargetArguments,
       ["OLD_TEXT", "Existing text that must occur exactly once."],
       ["NEW_TEXT", "Replacement text."],
     ],
     description: "Safely replace one unique text occurrence in the working document.",
-    usage: ["inkling edit [DOCUMENT] OLD_TEXT NEW_TEXT"],
+    usage: [
+      "inkling edit URL OLD_TEXT NEW_TEXT",
+      "inkling edit WORKSPACE DOCUMENT_ID OLD_TEXT NEW_TEXT",
+    ],
   },
   replace: {
     arguments: [
-      ["DOCUMENT", "Document ID. Omit it when using a shared-document instance."],
+      ...documentTargetArguments,
       ["MARKDOWN_PATH", "Markdown file path, or - to read standard input."],
     ],
     description: "Replace the complete collaborative Markdown body.",
-    usage: ["inkling replace [DOCUMENT] MARKDOWN_PATH|-"],
+    usage: [
+      "inkling replace URL MARKDOWN_PATH|-",
+      "inkling replace WORKSPACE DOCUMENT_ID MARKDOWN_PATH|-",
+    ],
   },
   metadata: {
     arguments: [
-      ["DOCUMENT", "Document ID. Omit it when using a shared-document instance."],
+      ...documentTargetArguments,
       ["FIELD", "Structured metadata field to update."],
       ["VALUE", "New field value."],
     ],
@@ -190,97 +204,113 @@ const helpTopics: Readonly<Record<string, HelpTopic>> = {
       "Fields: authors, reviewers, approvers, labels, relatedDocuments, targetDecisionDate, legacySourceUrl, lifecycleState, visibility.",
       "People use `Name <email>` entries separated by commas. Use `none` to clear optional scalar fields.",
     ],
-    usage: ["inkling metadata [DOCUMENT] FIELD VALUE"],
+    usage: [
+      "inkling metadata URL FIELD VALUE",
+      "inkling metadata WORKSPACE DOCUMENT_ID FIELD VALUE",
+    ],
   },
   delete: {
-    arguments: [["DOCUMENT", "Document ID. Omit it when using a shared-document instance."]],
+    arguments: documentTargetArguments,
     description: "Move a document to Trash, or permanently delete one already in Trash.",
     notes: ["Documents in Trash are permanently deleted automatically after 30 days."],
     options: [["--hard", "Permanently delete a document already in Trash."]],
-    usage: ["inkling delete [DOCUMENT] [--hard]"],
+    usage: ["inkling delete URL [--hard]", "inkling delete WORKSPACE DOCUMENT_ID [--hard]"],
   },
   trash: {
+    arguments: workspaceArgument,
     description: "List documents in Trash and their deletion timestamps.",
-    usage: ["inkling trash"],
+    usage: ["inkling trash WORKSPACE"],
   },
   undelete: documentCommand("Restore a document from Trash.", "undelete"),
   publish: documentCommand("Publish the current working revision.", "publish"),
   unpublish: documentCommand("Remove the document's published revision from readers.", "unpublish"),
   share: {
     arguments: [
-      ["DOCUMENT", "Document ID. Omit it when using a shared-document instance."],
+      ...documentTargetArguments,
       ["ACCESS", "One of view, comment, or edit. Omit to list links; disabled deletes all."],
     ],
     description: "List, create, or delete a document's capability links.",
-    usage: ["inkling share [DOCUMENT] [disabled|view|comment|edit]"],
+    usage: [
+      "inkling share URL [disabled|view|comment|edit]",
+      "inkling share WORKSPACE DOCUMENT_ID [disabled|view|comment|edit]",
+    ],
   },
   attachment: {
     commands: [
-      ["list [DOCUMENT]", "List document attachments."],
-      ["upload FILE [DOCUMENT]", "Upload an immutable attachment."],
-      ["download ATTACHMENT_ID DESTINATION [DOCUMENT]", "Download attachment bytes."],
+      ["list TARGET", "List document attachments."],
+      ["upload TARGET FILE", "Upload an immutable attachment."],
+      ["download TARGET ATTACHMENT_ID DESTINATION", "Download attachment bytes."],
     ],
     description: "Manage document attachments.",
     usage: ["inkling attachment <command>"],
   },
   "attachment list": {
-    arguments: [["DOCUMENT", "Document ID. Omit it when using a shared-document instance."]],
+    arguments: documentTargetArguments,
     description: "List a document's attachments with IDs, sizes, media types, and filenames.",
-    usage: ["inkling attachment list [DOCUMENT]"],
+    usage: ["inkling attachment list URL", "inkling attachment list WORKSPACE DOCUMENT_ID"],
   },
   "attachment upload": {
-    arguments: [
-      ["FILE", "Local file to upload."],
-      ["DOCUMENT", "Document ID. Omit it when using a shared-document instance."],
-    ],
+    arguments: [...documentTargetArguments, ["FILE", "Local file to upload."]],
     description: "Upload an immutable attachment to a document.",
     options: [["--type MEDIA_TYPE", "Override the media type inferred from the filename."]],
-    usage: ["inkling attachment upload FILE [DOCUMENT] [--type MEDIA_TYPE]"],
+    usage: [
+      "inkling attachment upload URL FILE [--type MEDIA_TYPE]",
+      "inkling attachment upload WORKSPACE DOCUMENT_ID FILE [--type MEDIA_TYPE]",
+    ],
   },
   "attachment download": {
     arguments: [
+      ...documentTargetArguments,
       ["ATTACHMENT_ID", "Attachment identifier returned by list or upload."],
       ["DESTINATION", "Local path where the bytes will be written."],
-      ["DOCUMENT", "Document ID. Omit it when using a shared-document instance."],
     ],
     description: "Download an attachment from a document.",
-    usage: ["inkling attachment download ATTACHMENT_ID DESTINATION [DOCUMENT]"],
+    usage: [
+      "inkling attachment download URL ATTACHMENT_ID DESTINATION",
+      "inkling attachment download WORKSPACE DOCUMENT_ID ATTACHMENT_ID DESTINATION",
+    ],
   },
   comment: {
     arguments: [
-      ["DOCUMENT", "Document ID. Omit it when using a shared-document instance."],
+      ...documentTargetArguments,
       ["START_OFFSET", "Zero-based inclusive source character offset."],
       ["END_OFFSET", "Zero-based exclusive source character offset."],
       ["BODY", "Root comment message."],
     ],
     description: "Create a comment thread anchored to a Markdown source range.",
-    usage: ["inkling comment [DOCUMENT] START_OFFSET END_OFFSET BODY"],
+    usage: [
+      "inkling comment URL START_OFFSET END_OFFSET BODY",
+      "inkling comment WORKSPACE DOCUMENT_ID START_OFFSET END_OFFSET BODY",
+    ],
   },
   reply: {
     arguments: [
-      ["DOCUMENT", "Document ID. Omit it when using a shared-document instance."],
+      ...documentTargetArguments,
       ["THREAD_ID", "Thread identifier shown by read."],
       ["PARENT_MESSAGE_ID", "Message identifier to reply to."],
       ["BODY", "Reply message."],
     ],
     description: "Reply to a message in an existing comment thread.",
-    usage: ["inkling reply [DOCUMENT] THREAD_ID PARENT_MESSAGE_ID BODY"],
+    usage: [
+      "inkling reply URL THREAD_ID PARENT_MESSAGE_ID BODY",
+      "inkling reply WORKSPACE DOCUMENT_ID THREAD_ID PARENT_MESSAGE_ID BODY",
+    ],
   },
   "comment-edit": commentMessageCommand("Edit an existing comment message.", true),
   "comment-delete": commentMessageCommand("Delete an existing comment message.", false),
   "thread-delete": {
-    arguments: [
-      ["DOCUMENT", "Document ID. Omit it when using a shared-document instance."],
-      ["THREAD_ID", "Thread identifier shown by read."],
-    ],
+    arguments: [...documentTargetArguments, ["THREAD_ID", "Thread identifier shown by read."]],
     description: "Delete a complete comment thread.",
-    usage: ["inkling thread-delete [DOCUMENT] THREAD_ID"],
+    usage: [
+      "inkling thread-delete URL THREAD_ID",
+      "inkling thread-delete WORKSPACE DOCUMENT_ID THREAD_ID",
+    ],
   },
   resolve: threadStateCommand("Mark a comment thread as resolved.", "resolve"),
   reopen: threadStateCommand("Reopen a resolved comment thread.", "reopen"),
 };
 
-const nestedCommands = new Set(["attachment", "instance"]);
+const nestedCommands = new Set(["attachment", "workspace"]);
 
 export interface HelpRequest {
   readonly topic: string;
@@ -316,9 +346,9 @@ export const helpTopicNames: readonly string[] = Object.keys(helpTopics);
 
 function documentCommand(description: string, command: string): HelpTopic {
   return {
-    arguments: [["DOCUMENT", "Document ID. Omit it when using a shared-document instance."]],
+    arguments: documentTargetArguments,
     description,
-    usage: [`inkling ${command} [DOCUMENT]`],
+    usage: [`inkling ${command} URL`, `inkling ${command} WORKSPACE DOCUMENT_ID`],
   };
 }
 
@@ -326,24 +356,27 @@ function commentMessageCommand(description: string, includesBody: boolean): Help
   const command = includesBody ? "comment-edit" : "comment-delete";
   return {
     arguments: [
-      ["DOCUMENT", "Document ID. Omit it when using a shared-document instance."],
+      ...documentTargetArguments,
       ["THREAD_ID", "Thread identifier shown by read."],
       ["MESSAGE_ID", "Message identifier shown by read."],
       ...(includesBody ? ([["BODY", "Replacement message body."]] as const) : []),
     ],
     description,
-    usage: [`inkling ${command} [DOCUMENT] THREAD_ID MESSAGE_ID${includesBody ? " BODY" : ""}`],
+    usage: [
+      `inkling ${command} URL THREAD_ID MESSAGE_ID${includesBody ? " BODY" : ""}`,
+      `inkling ${command} WORKSPACE DOCUMENT_ID THREAD_ID MESSAGE_ID${includesBody ? " BODY" : ""}`,
+    ],
   };
 }
 
 function threadStateCommand(description: string, command: string): HelpTopic {
   return {
-    arguments: [
-      ["DOCUMENT", "Document ID. Omit it when using a shared-document instance."],
-      ["THREAD_ID", "Thread identifier shown by read."],
-    ],
+    arguments: [...documentTargetArguments, ["THREAD_ID", "Thread identifier shown by read."]],
     description,
-    usage: [`inkling ${command} [DOCUMENT] THREAD_ID`],
+    usage: [
+      `inkling ${command} URL THREAD_ID`,
+      `inkling ${command} WORKSPACE DOCUMENT_ID THREAD_ID`,
+    ],
   };
 }
 

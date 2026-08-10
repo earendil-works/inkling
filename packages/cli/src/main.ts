@@ -13,7 +13,13 @@ import type { DocumentResponse } from "@earendil-works/inkling-protocol";
 
 import { makeCliClient } from "./client.ts";
 import type { CliClient } from "./client.ts";
-import { loadConfig, saveConfig, selectedInstance, upsertInstance } from "./config.ts";
+import {
+  configuredWorkspace,
+  loadConfig,
+  saveConfig,
+  upsertWorkspace,
+  workspaceName,
+} from "./config.ts";
 import type { Config, Instance } from "./config.ts";
 import { renderHelp, requestedHelp } from "./help.ts";
 
@@ -51,11 +57,7 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
         )
       : usageFailure("--port must be an integer between 1 and 65535.");
   }
-  if (command === "instance") return instanceCommand(arguments_.slice(1));
-  if (command === "share-instance") return shareInstanceCommand(arguments_.slice(1));
-  if (command === "use") {
-    return argument(arguments_, 1, "instance name").pipe(Effect.flatMap(useCommand));
-  }
+  if (command === "workspace") return workspaceCommand(arguments_.slice(1));
 
   return Effect.gen(function* () {
     const config = yield* loadConfig();
@@ -64,7 +66,7 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
 
     switch (command) {
       case "import-rfc": {
-        const source = yield* argument(arguments_, 1, "Markdown path");
+        const source = yield* argument(arguments_, 2, "Markdown path");
         const markdown = yield* fileOperation("read RFC Markdown", () => readFile(source, "utf8"));
         const peoplePath = option(arguments_, "--people");
         const people =
@@ -80,8 +82,8 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
         return;
       }
       case "import-jot": {
-        const source = yield* argument(arguments_, 1, "Markdown path");
-        const sidecarPath = yield* argument(arguments_, 2, "metadata sidecar path");
+        const source = yield* argument(arguments_, 2, "Markdown path");
+        const sidecarPath = yield* argument(arguments_, 3, "metadata sidecar path");
         const markdown = yield* fileOperation("read legacy Jot Markdown", () =>
           readFile(source, "utf8"),
         );
@@ -94,14 +96,14 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
         return;
       }
       case "backup": {
-        const destination = yield* argument(arguments_, 1, "destination path");
+        const destination = yield* argument(arguments_, 2, "destination path");
         const archive = yield* client.exportWorkspace;
         yield* fileOperation("write backup", () => writeFile(destination, archive));
         console.log(`Wrote ${archive.byteLength} bytes to ${destination}.`);
         return;
       }
       case "restore": {
-        const source = yield* argument(arguments_, 1, "backup path");
+        const source = yield* argument(arguments_, 2, "backup path");
         const archive = yield* fileOperation("read backup", () => readFile(source));
         const result = yield* client.restoreWorkspace(archive);
         console.log(`Restored and verified ${result.checkedObjects} objects.`);
@@ -131,7 +133,7 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
       }
       case "list":
       case "search": {
-        const query = command === "search" ? arguments_.slice(1).join(" ") : "";
+        const query = command === "search" ? arguments_.slice(2).join(" ") : "";
         const result = yield* client.list(query);
         for (const document of result.documents) {
           const number =
@@ -145,20 +147,20 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
         return;
       }
       case "read": {
-        const target = yield* readTarget(client, instance, arguments_, 1);
+        const target = yield* documentTarget(client, arguments_, 1);
         const range = yield* parseRange(option(arguments_, "--lines"));
         printDocument(yield* client.read(target.documentId, range, target.published));
         return;
       }
       case "create": {
-        const title = yield* argument(arguments_, 1, "title");
+        const title = yield* argument(arguments_, 2, "title");
         const body = option(arguments_, "--body") ?? (yield* readStandardInput());
         const created = yield* client.create(title, body, arguments_.includes("--rfc"));
         console.log(`${created.metadata.id}\t${created.metadata.title}`);
         return;
       }
       case "edit": {
-        const target = yield* documentTarget(instance, arguments_, 1);
+        const target = yield* documentTarget(client, arguments_, 1);
         const id = target.documentId;
         const oldText = yield* argument(arguments_, target.nextIndex, "existing text");
         const newText = yield* argument(arguments_, target.nextIndex + 1, "replacement text");
@@ -168,7 +170,7 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
         return;
       }
       case "replace": {
-        const target = yield* documentTarget(instance, arguments_, 1);
+        const target = yield* documentTarget(client, arguments_, 1);
         const source = yield* argument(arguments_, target.nextIndex, "Markdown path or -");
         const body =
           source === "-"
@@ -184,7 +186,7 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
         return;
       }
       case "metadata": {
-        const target = yield* documentTarget(instance, arguments_, 1);
+        const target = yield* documentTarget(client, arguments_, 1);
         const id = target.documentId;
         const field = yield* argument(arguments_, target.nextIndex, "field");
         const value = yield* argument(arguments_, target.nextIndex + 1, "value");
@@ -198,7 +200,7 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
         return;
       }
       case "delete": {
-        const id = yield* documentArgument(instance, arguments_, 1);
+        const id = (yield* documentTarget(client, arguments_, 1)).documentId;
         if (arguments_.includes("--hard")) {
           const trash = yield* client.listDeleted;
           const document = trash.documents.find((candidate) => candidate.metadata.id === id);
@@ -224,7 +226,7 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
         return;
       }
       case "undelete": {
-        const id = yield* documentArgument(instance, arguments_, 1);
+        const id = (yield* documentTarget(client, arguments_, 1)).documentId;
         const trash = yield* client.listDeleted;
         const document = trash.documents.find((candidate) => candidate.metadata.id === id);
         if (document === undefined) return yield* usageFailure("The document is not in Trash.");
@@ -233,19 +235,19 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
         return;
       }
       case "publish": {
-        const id = yield* documentArgument(instance, arguments_, 1);
+        const id = (yield* documentTarget(client, arguments_, 1)).documentId;
         const metadata = yield* client.publish(id);
         console.log(`Published ${id} at revision ${metadata.publishedRevision}.`);
         return;
       }
       case "unpublish": {
-        const id = yield* documentArgument(instance, arguments_, 1);
+        const id = (yield* documentTarget(client, arguments_, 1)).documentId;
         yield* client.unpublish(id);
         console.log(`Unpublished ${id}.`);
         return;
       }
       case "share": {
-        const target = yield* documentTarget(instance, arguments_, 1);
+        const target = yield* documentTarget(client, arguments_, 1);
         const id = target.documentId;
         const access = arguments_[target.nextIndex];
         const active = yield* client.listShareLinks(id);
@@ -281,7 +283,7 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
       case "attachment": {
         const action = yield* argument(arguments_, 1, "attachment action");
         if (action === "list") {
-          const id = yield* documentArgument(instance, arguments_, 2);
+          const id = (yield* documentTarget(client, arguments_, 2)).documentId;
           const attachments = yield* client.listAttachments(id);
           for (const attachment of attachments) {
             console.log(
@@ -291,8 +293,9 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
           return;
         }
         if (action === "upload") {
-          const source = yield* argument(arguments_, 2, "file path");
-          const id = yield* documentArgument(instance, arguments_, 3);
+          const target = yield* documentTarget(client, arguments_, 2);
+          const source = yield* argument(arguments_, target.nextIndex, "file path");
+          const id = target.documentId;
           const bytes = yield* fileOperation("read attachment", () => readFile(source));
           const mediaType = option(arguments_, "--type") ?? attachmentMediaType(source);
           const attachment = yield* client.uploadAttachment(
@@ -305,9 +308,10 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
           return;
         }
         if (action === "download") {
-          const attachmentId = yield* argument(arguments_, 2, "attachment id");
-          const destination = yield* argument(arguments_, 3, "destination path");
-          const id = yield* documentArgument(instance, arguments_, 4);
+          const target = yield* documentTarget(client, arguments_, 2);
+          const attachmentId = yield* argument(arguments_, target.nextIndex, "attachment id");
+          const destination = yield* argument(arguments_, target.nextIndex + 1, "destination path");
+          const id = target.documentId;
           const bytes = yield* client.downloadAttachment(id, attachmentId);
           yield* fileOperation("write attachment", () => writeFile(destination, bytes));
           console.log(`Wrote ${bytes.byteLength} bytes to ${destination}.`);
@@ -316,7 +320,7 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
         return yield* usageFailure("Attachment action must be list, upload, or download.");
       }
       case "comment": {
-        const target = yield* documentTarget(instance, arguments_, 1);
+        const target = yield* documentTarget(client, arguments_, 1);
         const id = target.documentId;
         const start = yield* argument(arguments_, target.nextIndex, "start offset").pipe(
           Effect.flatMap((value) => positiveInteger(value, "start offset", true)),
@@ -330,7 +334,7 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
         return;
       }
       case "reply": {
-        const target = yield* documentTarget(instance, arguments_, 1);
+        const target = yield* documentTarget(client, arguments_, 1);
         const id = target.documentId;
         const threadId = yield* argument(arguments_, target.nextIndex, "thread id");
         const parentId = yield* argument(arguments_, target.nextIndex + 1, "parent message id");
@@ -341,7 +345,7 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
         return;
       }
       case "comment-edit": {
-        const target = yield* documentTarget(instance, arguments_, 1);
+        const target = yield* documentTarget(client, arguments_, 1);
         const threadId = yield* argument(arguments_, target.nextIndex, "thread id");
         const messageId = yield* argument(arguments_, target.nextIndex + 1, "message id");
         const body = yield* argument(arguments_, target.nextIndex + 2, "comment body");
@@ -350,7 +354,7 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
         return;
       }
       case "comment-delete": {
-        const target = yield* documentTarget(instance, arguments_, 1);
+        const target = yield* documentTarget(client, arguments_, 1);
         const threadId = yield* argument(arguments_, target.nextIndex, "thread id");
         const messageId = yield* argument(arguments_, target.nextIndex + 1, "message id");
         yield* client.deleteComment(target.documentId, threadId, messageId);
@@ -358,7 +362,7 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
         return;
       }
       case "thread-delete": {
-        const target = yield* documentTarget(instance, arguments_, 1);
+        const target = yield* documentTarget(client, arguments_, 1);
         const threadId = yield* argument(arguments_, target.nextIndex, "thread id");
         yield* client.deleteThread(target.documentId, threadId);
         console.log(`Deleted ${threadId}.`);
@@ -366,7 +370,7 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
       }
       case "resolve":
       case "reopen": {
-        const target = yield* documentTarget(instance, arguments_, 1);
+        const target = yield* documentTarget(client, arguments_, 1);
         const id = target.documentId;
         const threadId = yield* argument(arguments_, target.nextIndex, "thread id");
         yield* client.resolve(id, threadId, command === "resolve");
@@ -379,72 +383,40 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
   });
 }
 
-function instanceCommand(arguments_: readonly string[]): Effect.Effect<void, unknown> {
+function workspaceCommand(arguments_: readonly string[]): Effect.Effect<void, unknown> {
   const action = arguments_[0];
   return Effect.gen(function* () {
     const config = yield* loadConfig();
     if (action === "list") {
-      for (const instance of config.instances) {
-        console.log(
-          `${instance.name === config.active ? "*" : " "} ${instance.name}\t${instance.baseUrl}`,
-        );
+      for (const instance of config.instances.filter(
+        (candidate) => candidate.apiKey !== undefined,
+      )) {
+        console.log(`${workspaceName(instance.baseUrl)}\t${instance.baseUrl}`);
       }
       return;
     }
     if (action === "add") {
-      const name = yield* argument(arguments_, 1, "name");
-      const baseUrl = yield* argument(arguments_, 2, "URL").pipe(Effect.flatMap(normalizedBaseUrl));
-      const apiKey = yield* argument(arguments_, 3, "API key");
-      yield* saveConfig(upsertInstance(config, { apiKey, baseUrl, name }));
-      console.log(`Registered ${name}.`);
+      const baseUrl = yield* argument(arguments_, 1, "URL").pipe(Effect.flatMap(normalizedBaseUrl));
+      const apiKey = yield* argument(arguments_, 2, "API key");
+      const workspace = workspaceName(baseUrl);
+      yield* saveConfig(upsertWorkspace(config, { apiKey, baseUrl, name: workspace }));
+      console.log(`Registered ${workspace}.`);
       return;
     }
     if (action === "remove") {
-      const name = yield* argument(arguments_, 1, "name");
+      const workspace = yield* argument(arguments_, 1, "workspace").pipe(
+        Effect.flatMap(normalizedWorkspaceName),
+      );
       yield* saveConfig({
-        ...config,
-        active: config.active === name ? undefined : config.active,
-        instances: config.instances.filter((instance) => instance.name !== name),
+        instances: config.instances.filter(
+          (instance) => workspaceName(instance.baseUrl) !== workspace,
+        ),
+        version: 1,
       });
-      console.log(`Removed ${name}.`);
+      console.log(`Removed ${workspace}.`);
       return;
     }
-    return yield* usageFailure("Usage: inkling instance add|remove|list");
-  });
-}
-
-function shareInstanceCommand(arguments_: readonly string[]): Effect.Effect<void, unknown> {
-  return Effect.gen(function* () {
-    const name = yield* argument(arguments_, 0, "name");
-    const capabilityUrl = yield* argument(arguments_, 1, "capability URL").pipe(
-      Effect.flatMap(parseUrl),
-    );
-    const match = /^\/share\/([^/]+)$/u.exec(capabilityUrl.pathname);
-    const capabilityToken = capabilityUrl.searchParams.get("cap");
-    if (match?.[1] === undefined || capabilityToken === null) {
-      return yield* usageFailure("The shared URL is not an Inkling capability URL.");
-    }
-    const config = yield* loadConfig();
-    yield* saveConfig(
-      upsertInstance(config, {
-        baseUrl: capabilityUrl.origin,
-        capabilityToken,
-        documentId: decodeURIComponent(match[1]),
-        name,
-      }),
-    );
-    console.log(`Registered shared document as ${name}.`);
-  });
-}
-
-function useCommand(name: string): Effect.Effect<void, unknown> {
-  return Effect.gen(function* () {
-    const config = yield* loadConfig();
-    if (!config.instances.some((instance) => instance.name === name)) {
-      return yield* usageFailure(`Unknown instance: ${name}`);
-    }
-    yield* saveConfig({ ...config, active: name });
-    console.log(`Using ${name}.`);
+    return yield* usageFailure("Usage: inkling workspace add|remove|list");
   });
 }
 
@@ -536,74 +508,46 @@ function commandInstance(
   command: string,
   arguments_: readonly string[],
 ): Effect.Effect<Instance, Error> {
-  const url = command === "read" ? optionalHttpUrl(arguments_[1]) : undefined;
-  if (url === undefined) return selectedInstance(config);
-  const matching = config.instances.filter((instance) => {
-    try {
-      return new URL(instance.baseUrl).origin === url.origin;
-    } catch {
-      return false;
-    }
-  });
-  const apiKeyMatches = matching.filter((candidate) => candidate.apiKey !== undefined);
-  const eligible = url.pathname.startsWith("/share/")
-    ? matching
-    : apiKeyMatches.length > 0
-      ? apiKeyMatches
-      : url.pathname.startsWith("/rfcs/")
-        ? []
-        : matching;
-  const requestedName = process.env["INKLING_INSTANCE"] ?? config.active;
-  const instance = eligible.find((candidate) => candidate.name === requestedName) ?? eligible[0];
-  return instance === undefined
-    ? usageFailure(
-        `No Inkling instance is configured for ${url.origin}. Read ${url.origin}/AGENTS.md and ask the user to connect it.`,
-      )
-    : Effect.succeed(instance);
-}
-
-function readTarget(
-  client: CliClient,
-  instance: Instance,
-  arguments_: readonly string[],
-  index: number,
-): Effect.Effect<{ readonly documentId: string; readonly published: boolean }, Error> {
-  if (instance.documentId !== undefined && arguments_[index] === undefined) {
-    return Effect.succeed({ documentId: instance.documentId, published: false });
-  }
-  return argument(arguments_, index, "document id or URL").pipe(
+  const index = command === "attachment" ? 2 : 1;
+  return argument(arguments_, index, "workspace or document URL").pipe(
     Effect.flatMap((value) => {
       const url = optionalHttpUrl(value);
-      if (url === undefined) return Effect.succeed({ documentId: value, published: false });
-      const document = /^\/(?:public\/)?documents\/([^/]+)(?:\/(edit))?\/?$/u.exec(url.pathname);
-      const shared = /^\/share\/([^/]+)(?:\/(edit))?\/?$/u.exec(url.pathname);
-      const direct = document ?? shared;
-      if (direct?.[1] !== undefined) {
-        try {
-          return Effect.succeed({
-            documentId: decodeURIComponent(direct[1]),
-            published: direct[2] !== "edit",
-          });
-        } catch {
-          return usageFailure("The Inkling document URL is invalid.");
+      if (url === undefined) {
+        return normalizedWorkspaceName(value).pipe(
+          Effect.flatMap((workspace) => configuredWorkspace(config, workspace)),
+        );
+      }
+
+      const shared = /^\/share\/([^/]+)(?:\/edit)?\/?$/u.exec(url.pathname);
+      if (url.pathname.startsWith("/share/")) {
+        const capabilityToken = url.searchParams.get("cap");
+        if (shared?.[1] === undefined || capabilityToken === null || capabilityToken === "") {
+          return usageFailure("The shared URL is not an Inkling capability URL.");
         }
+        return decodeDocumentId(shared[1]).pipe(
+          Effect.map((documentId) => ({
+            baseUrl: url.origin,
+            capabilityToken,
+            documentId,
+            name: url.host,
+          })),
+        );
       }
-      const rfc = /^\/rfcs\/(\d+)(?:\/(edit))?\/?$/u.exec(url.pathname);
-      const number = Number(rfc?.[1]);
-      if (rfc?.[1] === undefined || !Number.isSafeInteger(number) || number < 1) {
-        return usageFailure("The URL is not a supported Inkling document URL.");
-      }
-      return client.list(`rfc:${number}`).pipe(
-        Effect.flatMap((catalog) => {
-          const match = catalog.documents.find(
-            (candidate) => candidate.metadata.rfcNumber === number,
-          );
-          return match === undefined
-            ? usageFailure(`RFC ${String(number).padStart(4, "0")} is not available.`)
-            : Effect.succeed({
-                documentId: match.metadata.id,
-                published: rfc[2] !== "edit",
-              });
+
+      return configuredWorkspace(config, url.host).pipe(
+        Effect.mapError(
+          () =>
+            new Error(
+              `No Inkling workspace is configured for ${url.origin}. Read ${url.origin}/AGENTS.md and ask the user to connect it.`,
+            ),
+        ),
+        Effect.flatMap((instance) => {
+          const configuredOrigin = URL.parse(instance.baseUrl)?.origin;
+          return configuredOrigin === url.origin
+            ? Effect.succeed(instance)
+            : usageFailure(
+                `Workspace ${url.host} is configured at ${configuredOrigin ?? instance.baseUrl}, not ${url.origin}.`,
+              );
         }),
       );
     }),
@@ -621,25 +565,67 @@ function optionalHttpUrl(value: string | undefined): URL | undefined {
 }
 
 function documentTarget(
-  instance: Instance,
+  client: CliClient,
   arguments_: readonly string[],
   index: number,
-): Effect.Effect<{ readonly documentId: string; readonly nextIndex: number }, Error> {
-  return instance.documentId === undefined
-    ? argument(arguments_, index, "document id").pipe(
-        Effect.map((documentId) => ({ documentId, nextIndex: index + 1 })),
-      )
-    : Effect.succeed({ documentId: instance.documentId, nextIndex: index });
+): Effect.Effect<
+  { readonly documentId: string; readonly nextIndex: number; readonly published: boolean },
+  Error
+> {
+  return argument(arguments_, index, "workspace or document URL").pipe(
+    Effect.flatMap((value) => {
+      const url = optionalHttpUrl(value);
+      if (url === undefined) {
+        return argument(arguments_, index + 1, "document ID").pipe(
+          Effect.map((documentId) => ({
+            documentId,
+            nextIndex: index + 2,
+            published: false,
+          })),
+        );
+      }
+
+      const document = /^\/(?:public\/)?documents\/([^/]+)(?:\/(edit))?\/?$/u.exec(url.pathname);
+      const shared = /^\/share\/([^/]+)(?:\/(edit))?\/?$/u.exec(url.pathname);
+      const direct = document ?? shared;
+      if (direct?.[1] !== undefined) {
+        return decodeDocumentId(direct[1]).pipe(
+          Effect.map((documentId) => ({
+            documentId,
+            nextIndex: index + 1,
+            published: direct[2] !== "edit",
+          })),
+        );
+      }
+
+      const rfc = /^\/rfcs\/(\d+)(?:\/(edit))?\/?$/u.exec(url.pathname);
+      const number = Number(rfc?.[1]);
+      if (rfc?.[1] === undefined || !Number.isSafeInteger(number) || number < 1) {
+        return usageFailure("The URL is not a supported Inkling document URL.");
+      }
+      return client.list(`rfc:${number}`).pipe(
+        Effect.flatMap((catalog) => {
+          const match = catalog.documents.find(
+            (candidate) => candidate.metadata.rfcNumber === number,
+          );
+          return match === undefined
+            ? usageFailure(`RFC ${String(number).padStart(4, "0")} is not available.`)
+            : Effect.succeed({
+                documentId: match.metadata.id,
+                nextIndex: index + 1,
+                published: rfc[2] !== "edit",
+              });
+        }),
+      );
+    }),
+  );
 }
 
-function documentArgument(
-  instance: Instance,
-  arguments_: readonly string[],
-  index: number,
-): Effect.Effect<string, Error> {
-  return instance.documentId === undefined
-    ? argument(arguments_, index, "document id")
-    : Effect.succeed(instance.documentId);
+function decodeDocumentId(value: string): Effect.Effect<string, Error> {
+  return Effect.try({
+    catch: () => new Error("The Inkling document URL is invalid."),
+    try: () => decodeURIComponent(value),
+  });
 }
 
 function option(arguments_: readonly string[], name: string): string | undefined {
@@ -678,12 +664,34 @@ function parseUrl(value: string): Effect.Effect<URL, Error> {
 
 function normalizedBaseUrl(value: string): Effect.Effect<string, Error> {
   return parseUrl(value).pipe(
-    Effect.flatMap((url) =>
-      url.protocol === "http:" || url.protocol === "https:"
-        ? Effect.succeed(url.href)
-        : usageFailure("Inkling instance URLs must use HTTP or HTTPS."),
-    ),
+    Effect.flatMap((url) => {
+      if (url.protocol !== "http:" && url.protocol !== "https:") {
+        return usageFailure("Inkling workspace URLs must use HTTP or HTTPS.");
+      }
+      if (
+        url.username !== "" ||
+        url.password !== "" ||
+        url.pathname !== "/" ||
+        url.search !== "" ||
+        url.hash !== ""
+      ) {
+        return usageFailure("Inkling workspace URLs must contain only an origin.");
+      }
+      return Effect.succeed(url.origin);
+    }),
   );
+}
+
+function normalizedWorkspaceName(value: string): Effect.Effect<string, Error> {
+  const url = optionalHttpUrl(value) ?? optionalHttpUrl(`https://${value}`);
+  return url === undefined ||
+    url.username !== "" ||
+    url.password !== "" ||
+    url.pathname !== "/" ||
+    url.search !== "" ||
+    url.hash !== ""
+    ? usageFailure("Workspace selectors must use DOMAIN or DOMAIN:PORT.")
+    : Effect.succeed(url.host);
 }
 
 function uploadImportedDocument(

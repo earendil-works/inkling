@@ -740,6 +740,7 @@ export function agentResourceUnavailableResponse(requestUrl: string): Response {
 }
 
 function agentInstructions(baseUrl: string): string {
+  const workspace = new URL(baseUrl).host;
   return `# Inkling agent instructions
 
 This server is an Inkling workspace for collaborative Markdown notes and RFCs.
@@ -749,10 +750,10 @@ Use the \`inkling\` command-line client for workspace operations. Do not scrape 
 
 ## Connect your CLI
 
-First check whether a workspace is already configured:
+First check whether the workspace domain is already configured:
 
 \`\`\`sh
-inkling instance list
+inkling workspace list
 inkling --help
 \`\`\`
 
@@ -764,29 +765,28 @@ If this server is not configured, ask the user to connect it:
 4. In the agent's terminal, substitute the copied key for \`API_KEY\` and run:
 
 \`\`\`sh
-inkling instance add workspace ${baseUrl} API_KEY
-inkling use workspace
+inkling workspace add ${baseUrl} API_KEY
 \`\`\`
 
 Do not paste the key into source files, chat transcripts, AGENTS.md, or skills. The command stores it in Inkling's user-only CLI configuration. API keys belong to the user who created them and have that user's workspace permissions. The signed-in user can reveal a retained key again from the API keys dialog.
 
 ## Open a linked Inkling URL
 
-Pass the complete URL directly to the CLI. It selects a configured instance by origin and resolves RFC URLs without scraping the browser UI:
+Pass the complete URL directly to the CLI. Its domain and optional port select the configured workspace automatically, and RFC URLs are resolved without scraping the browser UI:
 
 \`\`\`sh
 inkling read ${baseUrl}/rfcs/0057
 inkling read ${baseUrl}/rfcs/0057/edit
 \`\`\`
 
-A reader URL returns its published revision. An \`/edit\` URL returns the working head. If no instance is configured for the URL's origin, ask the user to connect it using the steps above.
+A reader URL returns its published revision. An \`/edit\` URL returns the working head. Capability \`/share/\` URLs carry their own document-scoped access and can be used directly without configuring a workspace. If no workspace is configured for any other URL's origin, ask the user to connect it using the steps above.
 
-Select the instance when necessary:
+Commands without a document URL require the workspace domain. A document ID also requires the workspace domain before it:
 
 \`\`\`sh
-inkling use workspace
-# Alternatively, set INKLING_INSTANCE for one command.
-INKLING_INSTANCE=workspace inkling list
+inkling list ${workspace}
+inkling read ${workspace} DOCUMENT_ID
+inkling edit ${workspace} DOCUMENT_ID 'unique old text' 'replacement text'
 \`\`\`
 
 If \`inkling\` is not on \`PATH\`, ask the user how the Inkling CLI is installed in their environment. In an Inkling source checkout it can be run as \`node packages/cli/src/main.ts\`.
@@ -796,17 +796,17 @@ If \`inkling\` is not on \`PATH\`, ask the user how the Inkling CLI is installed
 Run \`inkling --help\` for the complete, current command list. Common operations include:
 
 \`\`\`sh
-inkling list
-inkling search 'state:discussion label:platform'
-inkling read DOCUMENT_ID
-inkling read DOCUMENT_ID --lines 1:120
-inkling create 'Proposal title' --rfc
-inkling edit DOCUMENT_ID 'unique old text' 'replacement text'
-inkling comment DOCUMENT_ID START_OFFSET END_OFFSET 'Review comment'
-inkling publish DOCUMENT_ID
-inkling delete DOCUMENT_ID
-inkling trash
-inkling undelete DOCUMENT_ID
+inkling list ${workspace}
+inkling search ${workspace} 'state:discussion label:platform'
+inkling read ${baseUrl}/rfcs/0057/edit
+inkling read ${workspace} DOCUMENT_ID --lines 1:120
+inkling create ${workspace} 'Proposal title' --rfc
+inkling edit ${workspace} DOCUMENT_ID 'unique old text' 'replacement text'
+inkling comment ${workspace} DOCUMENT_ID START_OFFSET END_OFFSET 'Review comment'
+inkling publish ${workspace} DOCUMENT_ID
+inkling delete ${workspace} DOCUMENT_ID
+inkling trash ${workspace}
+inkling undelete ${workspace} DOCUMENT_ID
 \`\`\`
 
 Follow these rules:
@@ -832,13 +832,13 @@ description: Work with Inkling Markdown workspaces through the inkling CLI. Use 
 # Inkling
 
 - Run \`inkling --help\` for the current CLI contract.
-- Run \`inkling instance list\` before work and select the intended instance.
+- Run \`inkling workspace list\` before work and use complete document URLs when available.
 - Read before editing; use unique-text edits and re-read after conflicts.
 - Keep credentials only in Inkling's CLI config, never in this skill.
 - Workspace agent instructions: ${baseUrl}/AGENTS.md
 \`\`\`
 
-The skill may record the non-secret base URL and preferred instance name, but it must never contain an API key. Keep detailed command documentation here at ${baseUrl}/AGENTS.md so the skill does not become stale.
+The skill may record the non-secret base URL and workspace domain \`${workspace}\`, but it must never contain an API key. Keep detailed command documentation here at ${baseUrl}/AGENTS.md so the skill does not become stale.
 `;
 }
 
