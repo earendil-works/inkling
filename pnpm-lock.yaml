@@ -229,9 +229,18 @@ importers:
       '@cloudflare/workers-types':
         specifier: 5.20260804.1
         version: 5.20260804.1
+      '@types/ws':
+        specifier: 8.18.1
+        version: 8.18.1
       wrangler:
         specifier: 4.118.0
         version: 4.118.0(@cloudflare/workers-types@5.20260804.1)
+      ws:
+        specifier: 8.18.3
+        version: 8.18.3
+      yjs:
+        specifier: 13.6.32
+        version: 13.6.32
 
   packages/runtime-node:
     dependencies:

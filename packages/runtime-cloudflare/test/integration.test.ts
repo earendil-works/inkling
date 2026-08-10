@@ -8,6 +8,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { WebSocket } from "ws";
+import * as Y from "yjs";
+
 interface RunningWrangler {
   readonly baseUrl: string;
   readonly stop: () => Promise<void>;
@@ -100,6 +103,18 @@ test(
         (await readDocument(running.baseUrl, second.metadata.id, authorization)).metadata.rfcNumber,
         2,
       );
+
+      const collaborationSocket = await connectWebSocket(
+        running.baseUrl,
+        first.metadata.id,
+        cookie,
+      );
+      const collaborationDocument = new Y.Doc();
+      Y.applyUpdate(
+        collaborationDocument,
+        Buffer.from(collaborationSocket.welcomeStateUpdate, "base64"),
+      );
+      const liveUpdate = nextSocketMessage(collaborationSocket.socket);
       const edited = await fetch(`${running.baseUrl}/api/documents/${first.metadata.id}/edits`, {
         body: JSON.stringify({
           edits: [
@@ -119,6 +134,16 @@ test(
       assert.equal(edited.status, 200);
       let changed = (await edited.json()) as DocumentWire;
       assert.match(changed.body, /---\n\n# Cloudflare first\n\ndurable first$/u);
+      const acceptedLiveUpdate = await liveUpdate;
+      assert.equal(acceptedLiveUpdate["type"], "update-accepted");
+      assert.equal(typeof acceptedLiveUpdate["update"], "string");
+      Y.applyUpdate(
+        collaborationDocument,
+        Buffer.from(String(acceptedLiveUpdate["update"]), "base64"),
+      );
+      assert.equal(collaborationDocument.getText("body").toString(), changed.body);
+      collaborationSocket.socket.close();
+      collaborationDocument.destroy();
       assert.match(
         (await readDocument(running.baseUrl, second.metadata.id, authorization)).body,
         /---\n\n# Cloudflare second\n\ninitial second$/u,
@@ -385,6 +410,39 @@ test(
     }
   },
 );
+
+async function connectWebSocket(
+  baseUrl: string,
+  documentId: string,
+  cookie: string,
+): Promise<{ readonly socket: WebSocket; readonly welcomeStateUpdate: string }> {
+  const socket = new WebSocket(
+    `${baseUrl.replace(/^http/u, "ws")}/api/documents/${documentId}/ws`,
+    { headers: { Cookie: cookie, Origin: baseUrl } },
+  );
+  await new Promise<void>((resolve, reject) => {
+    socket.once("open", resolve);
+    socket.once("error", reject);
+  });
+  socket.send(JSON.stringify({ protocolVersion: 1, type: "hello" }));
+  const welcome = await nextSocketMessage(socket);
+  assert.equal(welcome["type"], "welcome");
+  assert.equal(typeof welcome["stateUpdate"], "string");
+  return { socket, welcomeStateUpdate: String(welcome["stateUpdate"]) };
+}
+
+function nextSocketMessage(socket: WebSocket): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    socket.once("message", (data) => {
+      try {
+        resolve(JSON.parse(data.toString()) as Record<string, unknown>);
+      } catch (error) {
+        reject(error);
+      }
+    });
+    socket.once("error", reject);
+  });
+}
 
 interface DocumentWire {
   readonly body: string;

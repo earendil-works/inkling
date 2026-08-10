@@ -408,7 +408,9 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
         } else {
           this.#state.waitUntil(this.#queueProjection(projection));
         }
-        if (isPublicationMutation(url.pathname, configuration.documentId)) {
+        if (isBodyMutation(request.method, url.pathname, configuration.documentId)) {
+          await this.#broadcastBodyMutation(request, configuration.documentId, projection);
+        } else if (isPublicationMutation(url.pathname, configuration.documentId)) {
           await Effect.runPromise(
             this.#broadcast({ metadata: projection.metadata, type: "metadata-changed" }).pipe(
               Effect.catchAll(() => Effect.void),
@@ -781,6 +783,45 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
     );
   }
 
+  async #broadcastBodyMutation(
+    request: Request,
+    documentId: string,
+    projection: DocumentResponse,
+  ): Promise<void> {
+    const runtime = this.#runtime;
+    if (runtime === undefined) return this.#requestResynchronization();
+    try {
+      const connection = await runtime.runPromise(
+        Effect.flatMap(InklingApplication, (application) =>
+          application.connectCollaboration(credentials(request), documentId),
+        ),
+      );
+      if (connection.welcome.type !== "welcome") {
+        return this.#requestResynchronization();
+      }
+      await Effect.runPromise(
+        this.#broadcast({
+          clientUpdateId: `api-${connection.welcome.sequence}`,
+          documentRevision: projection.metadata.headRevision,
+          serverSequence: connection.welcome.sequence,
+          type: "update-accepted",
+          update: connection.welcome.stateUpdate,
+        }).pipe(Effect.catchAll(() => Effect.void)),
+      );
+      if (isBodyReplacement(request.method, new URL(request.url).pathname, documentId)) {
+        await Effect.runPromise(
+          this.#broadcast({
+            comments: projection.comments,
+            revision: projection.metadata.headRevision,
+            type: "comments-changed",
+          }).pipe(Effect.catchAll(() => Effect.void)),
+        );
+      }
+    } catch {
+      await this.#requestResynchronization();
+    }
+  }
+
   async #requestResynchronization(): Promise<void> {
     await Effect.runPromise(
       this.#broadcast({ reason: "document_changed", type: "resynchronize" }).pipe(
@@ -1143,6 +1184,19 @@ function isSameOrigin(origin: string | null, requestUrl: string): boolean {
 
 function isMutation(request: Request): boolean {
   return request.method !== "GET" && request.method !== "HEAD" && request.method !== "OPTIONS";
+}
+
+function isBodyMutation(method: string, pathname: string, documentId: string): boolean {
+  const base = `/api/documents/${encodeURIComponent(documentId)}`;
+  return (
+    (method === "POST" && pathname === `${base}/edits`) ||
+    (method === "PUT" && pathname === `${base}/body`)
+  );
+}
+
+function isBodyReplacement(method: string, pathname: string, documentId: string): boolean {
+  const base = `/api/documents/${encodeURIComponent(documentId)}`;
+  return method === "PUT" && pathname === `${base}/body`;
 }
 
 function isPublicationMutation(pathname: string, documentId: string): boolean {
