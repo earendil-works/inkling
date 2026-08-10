@@ -21,6 +21,8 @@ test("served agent instructions explain personal API keys and safe CLI use", asy
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/markdown/u);
   assert.match(body, /base URL is https:\/\/rfcs\.example\.com/u);
+  assert.match(body, /npm install --global @earendil-works\/inkling-cli/u);
+  assert.ok(body.indexOf("npm install") < body.indexOf("inkling workspace list"));
   assert.match(body, /account menu.*API keys/su);
   assert.match(body, /Reuse an active key.*click \*\*Show\*\*/su);
   assert.match(body, /inkling workspace add https:\/\/rfcs\.example\.com API_KEY/u);

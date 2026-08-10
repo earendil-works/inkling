@@ -748,6 +748,17 @@ Its base URL is ${baseUrl}.
 
 Use the \`inkling\` command-line client for workspace operations. Do not scrape the browser UI or call private storage directly.
 
+## Install the CLI if needed
+
+First check whether \`inkling\` is available. If it is not on \`PATH\`, install the published CLI from npm. It requires Node.js 24 or newer:
+
+\`\`\`sh
+if ! command -v inkling >/dev/null 2>&1; then
+  npm install --global @earendil-works/inkling-cli
+fi
+inkling --help
+\`\`\`
+
 ## Connect your CLI
 
 First check whether the workspace domain is already configured:
@@ -788,8 +799,6 @@ inkling list ${workspace}
 inkling read ${workspace} DOCUMENT_ID
 inkling edit ${workspace} DOCUMENT_ID 'unique old text' 'replacement text'
 \`\`\`
-
-If \`inkling\` is not on \`PATH\`, ask the user how the Inkling CLI is installed in their environment. In an Inkling source checkout it can be run as \`node packages/cli/src/main.ts\`.
 
 ## Safe command-line workflow
 
