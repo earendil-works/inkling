@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
@@ -63,18 +65,26 @@ test("every CLI command and subcommand has command-specific help", () => {
   }
 });
 
-test("help accepts a command path and the local wrapper handles nested help before arguments", async () => {
+test("help accepts a command path and the local wrapper works through a symlink", async () => {
   const output = await captureOutput(main(["help", "instance", "add"]));
   assert.match(output, /inkling instance add NAME URL API_KEY/u);
 
   const wrapper = path.resolve(import.meta.dirname, "../../../bin/inkling");
-  const result = spawnSync(wrapper, ["instance", "add", "--help"], {
-    encoding: "utf8",
-    env: { ...process.env, INKLING_CONFIG: path.join(import.meta.dirname, "not-used.json") },
-  });
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /inkling instance add NAME URL API_KEY/u);
-  assert.doesNotMatch(result.stderr, /Missing name/u);
+  const directory = mkdtempSync(path.join(tmpdir(), "inkling-cli-"));
+  const linkedWrapper = path.join(directory, "inkling");
+  symlinkSync(wrapper, linkedWrapper);
+
+  try {
+    const result = spawnSync(linkedWrapper, ["instance", "add", "--help"], {
+      encoding: "utf8",
+      env: { ...process.env, INKLING_CONFIG: path.join(import.meta.dirname, "not-used.json") },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /inkling instance add NAME URL API_KEY/u);
+    assert.doesNotMatch(result.stderr, /Missing name/u);
+  } finally {
+    rmSync(directory, { recursive: true });
+  }
 });
 
 async function captureOutput(effect: Effect.Effect<void, unknown>): Promise<string> {
