@@ -8,6 +8,7 @@ import {
   createDocumentMetadata,
   Digest,
   documentId,
+  documentRevision,
   DurableDocumentJournal,
   ObjectStore,
   personId,
@@ -26,6 +27,8 @@ import {
   applyDocumentUpdate,
   createCollaborativeDocument,
   encodeMissingState,
+  listDocumentHistoryEvents,
+  loadDocumentHistoryRevision,
   makeDocumentAuthority,
 } from "../src/index.ts";
 
@@ -35,6 +38,7 @@ interface MemoryStorage {
   readonly objects: Map<string, StoredObject>;
   readonly entries: JournalEntry[];
   failAppend: boolean;
+  failHistoryPut: boolean;
   failTruncate: boolean;
 }
 
@@ -47,6 +51,7 @@ function memoryStorage(): {
   const state: MemoryStorage = {
     entries: [],
     failAppend: false,
+    failHistoryPut: false,
     failTruncate: false,
     objects: new Map(),
   };
@@ -109,9 +114,17 @@ function memoryStorage(): {
       list: (prefix) =>
         Effect.succeed([...state.objects.keys()].filter((key) => key.startsWith(prefix))),
       put: (key, bytes, options) =>
-        Effect.sync(() => {
-          state.objects.set(key, { bytes: new Uint8Array(bytes), digest: options.digest });
-        }),
+        state.failHistoryPut && key.includes("/history/")
+          ? Effect.fail(
+              new StorageError({
+                message: "Injected history write failure",
+                operation: "write history",
+                retryable: true,
+              }),
+            )
+          : Effect.sync(() => {
+              state.objects.set(key, { bytes: new Uint8Array(bytes), digest: options.digest });
+            }),
     },
     state,
   };
@@ -234,6 +247,152 @@ test("checkpoint plus durable tail recovers every acknowledged update", async ()
   const recovered = await fixtureValue.make(false);
   const snapshot = await Effect.runPromise(recovered.snapshot(fixtureValue.principal, now));
   assert.equal(snapshot.body, "hello durable tail");
+});
+
+test("compressed update segments reconstruct every archived document revision", async () => {
+  const fixtureValue = await fixture();
+  const authority = await fixtureValue.make();
+  await Effect.runPromise(authority.checkpoint(now));
+
+  await Effect.runPromise(
+    authority.applyTextEdits(
+      fixtureValue.principal,
+      [{ newText: "hello one", oldText: "hello" }],
+      fixtureValue.metadata.headRevision,
+      "2026-01-02T03:05:00.000Z",
+    ),
+  );
+  await Effect.runPromise(authority.checkpoint("2026-01-02T03:05:01.000Z"));
+  await Effect.runPromise(
+    authority.applyTextEdits(
+      fixtureValue.principal,
+      [{ newText: "hello two", oldText: "hello one" }],
+      await Effect.runPromise(documentRevision(1)),
+      "2026-01-02T03:06:00.000Z",
+    ),
+  );
+  await Effect.runPromise(authority.checkpoint("2026-01-02T03:06:01.000Z"));
+
+  const historyEffect = <A, E>(
+    effect: Effect.Effect<A, E, typeof ObjectStore.Service | typeof Digest.Service>,
+  ) =>
+    Effect.runPromise(
+      effect.pipe(
+        Effect.provideService(ObjectStore, fixtureValue.storage.objects),
+        Effect.provideService(Digest, fixtureValue.storage.digest),
+      ),
+    );
+  const events = await historyEffect(
+    listDocumentHistoryEvents({ documentId: fixtureValue.id, workspaceId: "test" }),
+  );
+  assert.deepEqual(
+    events.map((event) => ({
+      actor: event.actor?.id,
+      occurredAt: event.occurredAt,
+      revision: event.revision,
+      source: event.source,
+    })),
+    [
+      {
+        actor: "admin@example.com",
+        occurredAt: "2026-01-02T03:05:00.000Z",
+        revision: 1,
+        source: "command",
+      },
+      {
+        actor: "admin@example.com",
+        occurredAt: "2026-01-02T03:06:00.000Z",
+        revision: 2,
+        source: "command",
+      },
+    ],
+  );
+  const first = await historyEffect(
+    loadDocumentHistoryRevision(
+      { documentId: fixtureValue.id, workspaceId: "test" },
+      await Effect.runPromise(documentRevision(1)),
+    ),
+  );
+  const second = await historyEffect(
+    loadDocumentHistoryRevision(
+      { documentId: fixtureValue.id, workspaceId: "test" },
+      await Effect.runPromise(documentRevision(2)),
+    ),
+  );
+  assert.equal(first.body, "hello one");
+  assert.equal(second.body, "hello two");
+
+  const historyObjects = [...fixtureValue.storage.state.objects.entries()].filter(([key]) =>
+    key.includes("/history/"),
+  );
+  assert.equal(historyObjects.filter(([key]) => key.includes("/checkpoints/")).length, 1);
+  assert.equal(historyObjects.filter(([key]) => key.includes("/segments/")).length, 2);
+  for (const [, stored] of historyObjects) {
+    assert.deepEqual(Array.from(stored.bytes.slice(0, 2)), [0x1f, 0x8b]);
+  }
+});
+
+test("long update logs gain periodic history snapshots", async () => {
+  const fixtureValue = await fixture();
+  const authority = await fixtureValue.make();
+  await Effect.runPromise(authority.checkpoint(now));
+  await Effect.runPromise(
+    Effect.forEach(
+      Array.from({ length: 100 }, (_, revision) => revision),
+      (revision) =>
+        documentRevision(revision).pipe(
+          Effect.flatMap((expectedRevision) =>
+            authority.applyTextEdits(
+              fixtureValue.principal,
+              [
+                {
+                  newText: `hello${"x".repeat(revision + 1)}`,
+                  oldText: `hello${"x".repeat(revision)}`,
+                },
+              ],
+              expectedRevision,
+              new Date(Date.parse(now) + revision * 1_000).toISOString(),
+            ),
+          ),
+        ),
+      { discard: true },
+    ),
+  );
+  await Effect.runPromise(authority.checkpoint("2026-01-02T05:00:00.000Z"));
+
+  const checkpointKeys = [...fixtureValue.storage.state.objects.keys()].filter((key) =>
+    key.includes("/history/checkpoints/"),
+  );
+  assert.equal(checkpointKeys.length, 2);
+  const middle = await Effect.runPromise(
+    loadDocumentHistoryRevision(
+      { documentId: fixtureValue.id, workspaceId: "test" },
+      await Effect.runPromise(documentRevision(50)),
+    ).pipe(
+      Effect.provideService(ObjectStore, fixtureValue.storage.objects),
+      Effect.provideService(Digest, fixtureValue.storage.digest),
+    ),
+  );
+  assert.equal(middle.body, `hello${"x".repeat(50)}`);
+});
+
+test("history archival succeeds before the hot journal is truncated", async () => {
+  const fixtureValue = await fixture();
+  const authority = await fixtureValue.make();
+  await Effect.runPromise(authority.checkpoint(now));
+  await Effect.runPromise(
+    authority.applyTextEdits(
+      fixtureValue.principal,
+      [{ newText: "retained edit", oldText: "hello" }],
+      fixtureValue.metadata.headRevision,
+      "2026-01-02T03:05:00.000Z",
+    ),
+  );
+
+  fixtureValue.storage.state.failHistoryPut = true;
+  const checkpoint = await Effect.runPromise(authority.checkpoint(now).pipe(Effect.either));
+  assert.equal(Either.isLeft(checkpoint), true);
+  assert.equal(fixtureValue.storage.state.entries.length, 1);
 });
 
 test("recovery tolerates checkpoint success followed by journal truncation failure", async () => {

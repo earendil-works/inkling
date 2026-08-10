@@ -296,11 +296,11 @@ export function makeLocalInklingApplication(
 
     const scheduleCheckpoint = (room: DocumentAuthorityService): Effect.Effect<void> =>
       Effect.gen(function* () {
+        const started = dirtySince.get(room.documentId) ?? Date.now();
         const existing = checkpointFibers.get(room.documentId);
         if (existing !== undefined) {
           yield* Fiber.interrupt(existing);
         }
-        const started = dirtySince.get(room.documentId) ?? Date.now();
         dirtySince.set(room.documentId, started);
         const delay = Date.now() - started >= 30_000 ? 0 : 1_500;
         const fiber = yield* room.checkpoint(new Date().toISOString()).pipe(

@@ -3,11 +3,14 @@ export type {
   AuthorityError,
   AuthorityEvent,
   DocumentAuthorityService,
+  DocumentHistoryEvent,
   DocumentSnapshot,
   MakeDocumentAuthorityOptions,
 } from "./authority.ts";
 export {
   DocumentAuthority,
+  listDocumentHistoryEvents,
+  loadDocumentHistoryRevision,
   loadDocumentRevision,
   makeDocumentAuthority,
   RecoveryError,

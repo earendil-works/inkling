@@ -23,6 +23,7 @@ import {
   replaceCommentAnchor,
   replyToCommentThread,
   setCommentThreadResolution,
+  StorageError,
   updateDocumentMetadata,
   updateSharingPolicy,
 } from "@earendil-works/inkling-core";
@@ -36,11 +37,12 @@ import type {
   DocumentId,
   DocumentMetadata,
   DocumentRevision,
+  JournalActor,
   JournalEntry,
   JournalEntryKind,
+  JournalEntrySource,
   MetadataPatch,
   Principal,
-  StorageError,
   TextReplacement,
 } from "@earendil-works/inkling-core";
 
@@ -67,6 +69,25 @@ const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 const maxUpdateBytes = 1_000_000;
 const maxDocumentBytes = 5_000_000;
+const historySegmentEntryLimit = 16;
+const historySnapshotInterval = 100;
+const historySequenceWidth = 16;
+
+const journalActorWireSchema = Schema.Struct({
+  displayName: Schema.optional(Schema.String),
+  id: Schema.optional(Schema.String),
+  kind: Schema.Literal("anonymous", "api-key", "capability", "workspace"),
+});
+
+const journalEntryKindWireSchema = Schema.Literal(
+  "body-update",
+  "metadata-event",
+  "comment-event",
+  "sharing-event",
+  "publication-event",
+);
+
+const journalEntrySourceWireSchema = Schema.Literal("collaboration", "command");
 
 const checkpointWireSchema = Schema.Struct({
   body: Schema.optional(Schema.String),
@@ -74,6 +95,7 @@ const checkpointWireSchema = Schema.Struct({
   capturedAt: Schema.String,
   comments: Schema.Unknown,
   documentId: Schema.String,
+  historySnapshotSequence: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.nonNegative())),
   metadata: Schema.Unknown,
   schemaVersion: Schema.Literal(1),
   sequence: Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
@@ -86,7 +108,29 @@ const journalWireSchema = Schema.Struct({
   metadata: Schema.Unknown,
 });
 
+const historyEntryWireSchema = Schema.Struct({
+  actor: Schema.optional(journalActorWireSchema),
+  idempotencyKey: Schema.optional(Schema.String),
+  kind: journalEntryKindWireSchema,
+  occurredAt: Schema.optional(Schema.String),
+  payload: journalWireSchema,
+  revision: Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
+  sequence: Schema.Number.pipe(Schema.int(), Schema.positive()),
+  source: Schema.optional(journalEntrySourceWireSchema),
+});
+
+const historySegmentWireSchema = Schema.Struct({
+  documentId: Schema.String,
+  entries: Schema.Array(historyEntryWireSchema),
+  firstSequence: Schema.Number.pipe(Schema.int(), Schema.positive()),
+  lastSequence: Schema.Number.pipe(Schema.int(), Schema.positive()),
+  schemaVersion: Schema.Literal(1),
+  workspaceId: Schema.String,
+});
+
 type CheckpointWire = typeof checkpointWireSchema.Type;
+type HistoryEntryWire = typeof historyEntryWireSchema.Type;
+type HistorySegmentWire = typeof historySegmentWireSchema.Type;
 
 export interface DocumentSnapshot {
   readonly body: string;
@@ -95,6 +139,15 @@ export interface DocumentSnapshot {
   readonly sequence: number;
   readonly stateUpdate: Uint8Array;
   readonly stateVector: Uint8Array;
+}
+
+export interface DocumentHistoryEvent {
+  readonly actor?: JournalActor | undefined;
+  readonly kind: JournalEntryKind;
+  readonly occurredAt?: string | undefined;
+  readonly revision: DocumentRevision;
+  readonly sequence: number;
+  readonly source?: JournalEntrySource | undefined;
 }
 
 export interface AcceptedBodyUpdate {
@@ -271,6 +324,7 @@ interface MutableState {
   comments: CommentState;
   sequence: number;
   checkpointSequence: number;
+  historySnapshotSequence: number | undefined;
   dirty: boolean;
 }
 
@@ -286,6 +340,7 @@ export function makeDocumentAuthority(
     const journal = yield* DurableDocumentJournal;
     const digest = yield* Digest;
     const mutex = yield* Effect.makeSemaphore(1);
+    const checkpointMutex = yield* Effect.makeSemaphore(1);
     const pubsub = yield* PubSub.unbounded<AuthorityEvent>();
     let state = yield* recoverState(options, objectStore, journal, digest);
 
@@ -296,21 +351,29 @@ export function makeDocumentAuthority(
       metadata: DocumentMetadata,
       comments: CommentState,
       bodyUpdate: Uint8Array | undefined,
+      principal: Principal,
+      occurredAt: string,
+      source: JournalEntrySource,
       idempotencyKey?: string,
     ): Effect.Effect<JournalEntry, StorageError> =>
       journal.append({
+        actor: journalActor(principal),
         documentId: options.documentId,
         idempotencyKey,
         kind,
+        occurredAt,
         payload: encodeJournalWire(metadata, comments, bodyUpdate),
         previousSequence: state.sequence,
         revision: metadata.headRevision,
+        source,
       });
 
     const commitBodyUpdateUnlocked = (
+      principal: Principal,
       update: Uint8Array,
       clientUpdateId: string,
       now: string,
+      source: JournalEntrySource,
       replacementComments: CommentState = state.comments,
     ): Effect.Effect<AcceptedBodyUpdate, AuthorityError> =>
       Effect.gen(function* () {
@@ -345,6 +408,9 @@ export function makeDocumentAuthority(
           metadata,
           replacementComments,
           update,
+          principal,
+          now,
+          source,
           clientUpdateId,
         );
 
@@ -409,7 +475,15 @@ export function makeDocumentAuthority(
             headRevision: nextDocumentRevision(state.metadata.headRevision),
             updatedAt: now,
           };
-          const entry = yield* persist("comment-event", metadata, comments, undefined);
+          const entry = yield* persist(
+            "comment-event",
+            metadata,
+            comments,
+            undefined,
+            principal,
+            now,
+            "command",
+          );
           state = { ...state, comments, dirty: true, metadata, sequence: entry.sequence };
           yield* PubSub.publish(pubsub, {
             comments,
@@ -425,7 +499,9 @@ export function makeDocumentAuthority(
         withLock(
           Effect.suspend(() =>
             authorizeDocument(principal, "edit-body", state.metadata, now).pipe(
-              Effect.flatMap(() => commitBodyUpdateUnlocked(update, clientUpdateId, now)),
+              Effect.flatMap(() =>
+                commitBodyUpdateUnlocked(principal, update, clientUpdateId, now, "collaboration"),
+              ),
             ),
           ),
         ),
@@ -446,7 +522,13 @@ export function makeDocumentAuthority(
               edits,
             );
             const update = yield* updateForReplacement(state.collaborative, replacement);
-            return yield* commitBodyUpdateUnlocked(update, `agent-${expectedRevision}-${now}`, now);
+            return yield* commitBodyUpdateUnlocked(
+              principal,
+              update,
+              `agent-${expectedRevision}-${now}`,
+              now,
+              "command",
+            );
           }),
         ),
       assignRfcNumber: (principal, rfcNumber, now) =>
@@ -455,22 +537,32 @@ export function makeDocumentAuthority(
             yield* authorizeDocument(principal, "edit-metadata", state.metadata, now);
             const metadata = yield* assignRfcNumber(state.metadata, rfcNumber, now);
             if (metadata === state.metadata) return metadata;
-            const entry = yield* persist("metadata-event", metadata, state.comments, undefined);
+            const entry = yield* persist(
+              "metadata-event",
+              metadata,
+              state.comments,
+              undefined,
+              principal,
+              now,
+              "command",
+            );
             state = { ...state, dirty: true, metadata, sequence: entry.sequence };
             yield* PubSub.publish(pubsub, { metadata, type: "metadata-changed" });
             return metadata;
           }),
         ),
       checkpoint: (now) =>
-        checkpointState(
-          options,
-          () => state,
-          (next) => (state = next),
-          mutex,
-          objectStore,
-          journal,
-          digest,
-          now,
+        checkpointMutex.withPermits(1)(
+          checkpointState(
+            options,
+            () => state,
+            (next) => (state = next),
+            mutex,
+            objectStore,
+            journal,
+            digest,
+            now,
+          ).pipe(Effect.uninterruptible),
         ),
       close: destroyCollaborativeDocument(state.collaborative).pipe(
         Effect.zipRight(PubSub.shutdown(pubsub)),
@@ -514,7 +606,15 @@ export function makeDocumentAuthority(
               headRevision: nextDocumentRevision(state.metadata.headRevision),
               updatedAt: now,
             };
-            const entry = yield* persist("comment-event", metadata, comments, undefined);
+            const entry = yield* persist(
+              "comment-event",
+              metadata,
+              comments,
+              undefined,
+              principal,
+              now,
+              "command",
+            );
             state = { ...state, comments, dirty: true, metadata, sequence: entry.sequence };
             yield* PubSub.publish(pubsub, {
               comments,
@@ -530,7 +630,15 @@ export function makeDocumentAuthority(
             yield* authorizeDocument(principal, "delete", state.metadata, now);
             const metadata = yield* markDeleted(state.metadata, expectedRevision, now);
             if (metadata === state.metadata) return metadata;
-            const entry = yield* persist("metadata-event", metadata, state.comments, undefined);
+            const entry = yield* persist(
+              "metadata-event",
+              metadata,
+              state.comments,
+              undefined,
+              principal,
+              now,
+              "command",
+            );
             state = { ...state, dirty: true, metadata, sequence: entry.sequence };
             yield* PubSub.publish(pubsub, { metadata, type: "metadata-changed" });
             return metadata;
@@ -555,7 +663,15 @@ export function makeDocumentAuthority(
               mediaType: "application/json",
             });
             const metadata = yield* markPublished(state.metadata, publishedRevision, now);
-            const entry = yield* persist("publication-event", metadata, state.comments, undefined);
+            const entry = yield* persist(
+              "publication-event",
+              metadata,
+              state.comments,
+              undefined,
+              principal,
+              now,
+              "command",
+            );
             state = { ...state, dirty: true, metadata, sequence: entry.sequence };
             yield* PubSub.publish(pubsub, { metadata, type: "published" });
             return metadata;
@@ -566,7 +682,15 @@ export function makeDocumentAuthority(
           Effect.gen(function* () {
             yield* authorizeDocument(principal, "restore", state.metadata, now);
             const metadata = yield* markRestored(state.metadata, expectedRevision, now);
-            const entry = yield* persist("metadata-event", metadata, state.comments, undefined);
+            const entry = yield* persist(
+              "metadata-event",
+              metadata,
+              state.comments,
+              undefined,
+              principal,
+              now,
+              "command",
+            );
             state = { ...state, dirty: true, metadata, sequence: entry.sequence };
             yield* PubSub.publish(pubsub, { metadata, type: "metadata-changed" });
             return metadata;
@@ -592,9 +716,11 @@ export function makeDocumentAuthority(
               now,
             );
             return yield* commitBodyUpdateUnlocked(
+              principal,
               update,
               `replace-${expectedRevision}-${now}`,
               now,
+              "command",
               comments,
             );
           }),
@@ -622,7 +748,15 @@ export function makeDocumentAuthority(
           Effect.gen(function* () {
             yield* authorizeDocument(principal, "publish", state.metadata, now);
             const metadata = yield* markUnpublished(state.metadata, now);
-            const entry = yield* persist("publication-event", metadata, state.comments, undefined);
+            const entry = yield* persist(
+              "publication-event",
+              metadata,
+              state.comments,
+              undefined,
+              principal,
+              now,
+              "command",
+            );
             state = { ...state, dirty: true, metadata, sequence: entry.sequence };
             yield* PubSub.publish(pubsub, { metadata, type: "published" });
             return metadata;
@@ -638,7 +772,15 @@ export function makeDocumentAuthority(
               expectedRevision,
               now,
             );
-            const entry = yield* persist("metadata-event", metadata, state.comments, undefined);
+            const entry = yield* persist(
+              "metadata-event",
+              metadata,
+              state.comments,
+              undefined,
+              principal,
+              now,
+              "command",
+            );
             state = { ...state, dirty: true, metadata, sequence: entry.sequence };
             yield* PubSub.publish(pubsub, { metadata, type: "metadata-changed" });
             return metadata;
@@ -655,7 +797,15 @@ export function makeDocumentAuthority(
               now,
               expiresAt,
             );
-            const entry = yield* persist("sharing-event", metadata, state.comments, undefined);
+            const entry = yield* persist(
+              "sharing-event",
+              metadata,
+              state.comments,
+              undefined,
+              principal,
+              now,
+              "command",
+            );
             state = { ...state, dirty: true, metadata, sequence: entry.sequence };
             yield* PubSub.publish(pubsub, { metadata, type: "sharing-changed" });
             return metadata;
@@ -708,12 +858,101 @@ export function loadDocumentRevision(
       collaborative,
       comments: checkpoint.comments as CommentState,
       dirty: false,
+      historySnapshotSequence: checkpoint.historySnapshotSequence,
       metadata: normalizeDocumentMetadata(checkpoint.metadata as DocumentMetadata),
       sequence: checkpoint.sequence,
     };
     const snapshot = yield* makeSnapshot(state);
     yield* destroyCollaborativeDocument(collaborative);
     return snapshot;
+  });
+}
+
+export function listDocumentHistoryEvents(
+  options: MakeDocumentAuthorityOptions,
+): Effect.Effect<
+  readonly DocumentHistoryEvent[],
+  RecoveryError | StorageError,
+  typeof ObjectStore.Service | typeof Digest.Service
+> {
+  return Effect.gen(function* () {
+    const objectStore = yield* ObjectStore;
+    const digest = yield* Digest;
+    const events = yield* loadArchivedHistoryEvents(options, objectStore, digest);
+    return events.map((event): DocumentHistoryEvent => ({
+      actor: event.actor,
+      kind: event.kind,
+      occurredAt: event.occurredAt,
+      revision: event.revision as DocumentRevision,
+      sequence: event.sequence,
+      source: event.source,
+    }));
+  });
+}
+
+export function loadDocumentHistoryRevision(
+  options: MakeDocumentAuthorityOptions,
+  revision: DocumentRevision,
+): Effect.Effect<
+  DocumentSnapshot,
+  RecoveryError | StorageError | CollaborationError,
+  typeof ObjectStore.Service | typeof Digest.Service
+> {
+  return Effect.gen(function* () {
+    const objectStore = yield* ObjectStore;
+    const digest = yield* Digest;
+    const [checkpoints, events] = yield* Effect.all([
+      loadHistoryCheckpoints(options, objectStore, digest),
+      loadArchivedHistoryEvents(options, objectStore, digest),
+    ]);
+    const eventSequence = events.find((event) => event.revision === revision)?.sequence;
+    const checkpointSequence = checkpoints.find(
+      (checkpoint) =>
+        normalizeDocumentMetadata(checkpoint.metadata as DocumentMetadata).headRevision ===
+        revision,
+    )?.sequence;
+    const targetSequence = eventSequence ?? checkpointSequence;
+    if (targetSequence === undefined) {
+      return yield* recoveryFailure(
+        "document_missing",
+        `Document revision ${revision} is not retained in history.`,
+      );
+    }
+    const checkpoint = checkpoints
+      .filter((candidate) => candidate.sequence <= targetSequence)
+      .toSorted((left, right) => right.sequence - left.sequence)[0];
+    if (checkpoint === undefined) {
+      return yield* recoveryFailure(
+        "document_missing",
+        `Document revision ${revision} predates the retained history.`,
+      );
+    }
+
+    const state = yield* mutableStateFromCheckpoint(checkpoint);
+    const replay = Effect.gen(function* () {
+      for (const event of events) {
+        if (event.sequence <= checkpoint.sequence || event.sequence > targetSequence) continue;
+        state.metadata = normalizeDocumentMetadata(event.payload.metadata as DocumentMetadata);
+        state.comments = (event.payload.comments ?? state.comments) as CommentState;
+        if (event.payload.bodyUpdate !== undefined) {
+          const update = yield* decodeBase64(event.payload.bodyUpdate).pipe(
+            Effect.mapError(
+              (error) => new RecoveryError({ code: "checkpoint_corrupt", message: error.message }),
+            ),
+          );
+          yield* applyDocumentUpdate(state.collaborative.document, update);
+        }
+        state.sequence = event.sequence;
+      }
+      if (state.metadata.headRevision !== revision || state.sequence !== targetSequence) {
+        return yield* recoveryFailure(
+          "checkpoint_corrupt",
+          `Document revision ${revision} cannot be reconstructed from retained history.`,
+        );
+      }
+      return yield* makeSnapshot(state);
+    });
+    return yield* replay.pipe(Effect.ensuring(destroyCollaborativeDocument(state.collaborative)));
   });
 }
 
@@ -728,6 +967,7 @@ function recoverState(
     const collaborative = yield* createCollaborativeDocument();
     let metadata: DocumentMetadata;
     let comments: CommentState;
+    let historySnapshotSequence: number | undefined;
     let sequence = 0;
 
     if (stored === undefined) {
@@ -764,6 +1004,7 @@ function recoverState(
       }
       metadata = normalizeDocumentMetadata(checkpoint.metadata as DocumentMetadata);
       comments = checkpoint.comments as CommentState;
+      historySnapshotSequence = checkpoint.historySnapshotSequence;
       sequence = checkpoint.sequence;
       const update = yield* decodeBase64(checkpoint.bodyUpdate).pipe(
         Effect.mapError(
@@ -794,7 +1035,8 @@ function recoverState(
       checkpointSequence,
       collaborative,
       comments,
-      dirty: entries.length > 0 || stored === undefined,
+      dirty: entries.length > 0 || stored === undefined || historySnapshotSequence === undefined,
+      historySnapshotSequence,
       metadata,
       sequence,
     };
@@ -812,36 +1054,57 @@ function checkpointState(
   now: string,
 ): Effect.Effect<void, AuthorityError> {
   return Effect.gen(function* () {
-    const capture = yield* mutex.withPermits(1)(
+    const plan = yield* mutex.withPermits(1)(
       Effect.gen(function* () {
         const current = getState();
-        if (!current.dirty) {
-          return undefined;
-        }
-        return yield* captureCheckpoint(options, current, now);
+        if (!current.dirty) return undefined;
+        const writeHistorySnapshot =
+          current.historySnapshotSequence === undefined ||
+          current.sequence - current.historySnapshotSequence >= historySnapshotInterval;
+        const historySnapshotSequence = writeHistorySnapshot
+          ? current.sequence
+          : current.historySnapshotSequence;
+        const capture = yield* captureCheckpoint(options, current, now, historySnapshotSequence);
+        return {
+          capture,
+          previousCheckpointSequence: current.checkpointSequence,
+          writeHistorySnapshot,
+        };
       }),
     );
-    if (capture === undefined) {
-      return;
-    }
-    const bytes = encodeCheckpoint(capture);
+    if (plan === undefined) return;
+
+    yield* archiveCheckpointHistory(
+      options,
+      plan.capture,
+      plan.previousCheckpointSequence,
+      plan.writeHistorySnapshot,
+      objectStore,
+      journal,
+      digest,
+    );
+    const bytes = encodeCheckpoint(plan.capture);
     const objectDigest = yield* digest.sha256(bytes);
     yield* objectStore.put(headKey(options), bytes, {
       digest: objectDigest,
       mediaType: "application/json",
     });
-    yield* journal.truncateThrough(options.documentId, capture.sequence);
+    yield* journal.truncateThrough(options.documentId, plan.capture.sequence);
     yield* mutex.withPermits(1)(
       Effect.sync(() => {
         const current = getState();
         setState({
           ...current,
-          checkpointSequence: Math.max(current.checkpointSequence, capture.sequence),
-          dirty: current.sequence > capture.sequence,
+          checkpointSequence: Math.max(current.checkpointSequence, plan.capture.sequence),
+          dirty: current.sequence > plan.capture.sequence,
+          historySnapshotSequence: Math.max(
+            current.historySnapshotSequence ?? 0,
+            plan.capture.historySnapshotSequence ?? 0,
+          ),
         });
       }),
     );
-    yield* writePortableProjections(options, capture, objectStore, digest).pipe(Effect.ignore);
+    yield* writePortableProjections(options, plan.capture, objectStore, digest).pipe(Effect.ignore);
   });
 }
 
@@ -849,6 +1112,7 @@ function captureCheckpoint(
   options: MakeDocumentAuthorityOptions,
   state: MutableState,
   now: string,
+  historySnapshotSequence: number | undefined = state.historySnapshotSequence,
 ): Effect.Effect<CheckpointWire> {
   return encodeDocumentState(state.collaborative.document).pipe(
     Effect.map((bodyUpdate) => ({
@@ -857,12 +1121,232 @@ function captureCheckpoint(
       capturedAt: now,
       comments: state.comments,
       documentId: options.documentId,
+      ...(historySnapshotSequence === undefined ? {} : { historySnapshotSequence }),
       metadata: state.metadata,
       schemaVersion: 1 as const,
       sequence: state.sequence,
       workspaceId: options.workspaceId,
     })),
   );
+}
+
+function archiveCheckpointHistory(
+  options: MakeDocumentAuthorityOptions,
+  capture: CheckpointWire,
+  previousCheckpointSequence: number,
+  writeHistorySnapshot: boolean,
+  objectStore: typeof ObjectStore.Service,
+  journal: typeof DurableDocumentJournal.Service,
+  digest: typeof Digest.Service,
+): Effect.Effect<void, RecoveryError | StorageError> {
+  return Effect.gen(function* () {
+    const entries = (yield* journal.entriesAfter(options.documentId, previousCheckpointSequence))
+      .filter((entry) => entry.sequence <= capture.sequence)
+      .toSorted((left, right) => left.sequence - right.sequence);
+    const expectedEntries = capture.sequence - previousCheckpointSequence;
+    if (
+      entries.length !== expectedEntries ||
+      (entries.length > 0 &&
+        (entries[0]?.sequence !== previousCheckpointSequence + 1 ||
+          entries.at(-1)?.sequence !== capture.sequence))
+    ) {
+      return yield* Effect.fail(
+        new StorageError({
+          message: "The journal tail is incomplete and cannot be archived safely.",
+          operation: "archive document history",
+          retryable: false,
+        }),
+      );
+    }
+
+    for (let offset = 0; offset < entries.length; offset += historySegmentEntryLimit) {
+      const journalEntries = entries.slice(offset, offset + historySegmentEntryLimit);
+      const first = journalEntries[0];
+      const last = journalEntries.at(-1);
+      if (first === undefined || last === undefined) continue;
+      const historyEntries = yield* Effect.forEach(journalEntries, historyEntryFromJournal);
+      const segment: HistorySegmentWire = {
+        documentId: options.documentId,
+        entries: historyEntries,
+        firstSequence: first.sequence,
+        lastSequence: last.sequence,
+        schemaVersion: 1,
+        workspaceId: options.workspaceId,
+      };
+      const bytes = yield* gzipBytes(textEncoder.encode(JSON.stringify(segment)));
+      const objectDigest = yield* digest.sha256(bytes);
+      yield* objectStore.put(
+        historySegmentKey(options, segment.firstSequence, segment.lastSequence),
+        bytes,
+        { digest: objectDigest, mediaType: "application/gzip" },
+      );
+    }
+
+    if (writeHistorySnapshot) {
+      const bytes = yield* gzipBytes(encodeCheckpoint(capture));
+      const objectDigest = yield* digest.sha256(bytes);
+      yield* objectStore.put(historyCheckpointKey(options, capture.sequence), bytes, {
+        digest: objectDigest,
+        mediaType: "application/gzip",
+      });
+    }
+  });
+}
+
+function historyEntryFromJournal(
+  entry: JournalEntry,
+): Effect.Effect<HistoryEntryWire, RecoveryError> {
+  return decodeJournalWire(entry.payload).pipe(
+    Effect.map((payload) => ({
+      ...(entry.actor === undefined ? {} : { actor: entry.actor }),
+      ...(entry.idempotencyKey === undefined ? {} : { idempotencyKey: entry.idempotencyKey }),
+      kind: entry.kind,
+      ...(entry.occurredAt === undefined ? {} : { occurredAt: entry.occurredAt }),
+      payload,
+      revision: entry.revision,
+      sequence: entry.sequence,
+      ...(entry.source === undefined ? {} : { source: entry.source }),
+    })),
+  );
+}
+
+function loadHistoryCheckpoints(
+  options: MakeDocumentAuthorityOptions,
+  objectStore: typeof ObjectStore.Service,
+  digest: typeof Digest.Service,
+): Effect.Effect<readonly CheckpointWire[], RecoveryError | StorageError> {
+  return objectStore.list(historyCheckpointPrefix(options)).pipe(
+    Effect.flatMap((keys) =>
+      Effect.forEach(
+        keys,
+        (key) =>
+          readCompressedHistoryObject(key, checkpointWireSchema, objectStore, digest).pipe(
+            Effect.flatMap((checkpoint) =>
+              checkpoint.documentId === options.documentId &&
+              checkpoint.workspaceId === options.workspaceId
+                ? Effect.succeed(checkpoint)
+                : recoveryFailure(
+                    "checkpoint_incompatible",
+                    "A history checkpoint belongs to another document.",
+                  ),
+            ),
+          ),
+        { concurrency: 8 },
+      ),
+    ),
+    Effect.map((checkpoints) =>
+      checkpoints.toSorted((left, right) => left.sequence - right.sequence),
+    ),
+  );
+}
+
+function loadArchivedHistoryEvents(
+  options: MakeDocumentAuthorityOptions,
+  objectStore: typeof ObjectStore.Service,
+  digest: typeof Digest.Service,
+): Effect.Effect<readonly HistoryEntryWire[], RecoveryError | StorageError> {
+  return Effect.gen(function* () {
+    const keys = yield* objectStore.list(historySegmentPrefix(options));
+    const segments = yield* Effect.forEach(
+      keys,
+      (key) =>
+        readCompressedHistoryObject(key, historySegmentWireSchema, objectStore, digest).pipe(
+          Effect.flatMap((segment) => validateHistorySegment(options, segment)),
+        ),
+      { concurrency: 8 },
+    );
+    const bySequence = new Map<number, HistoryEntryWire>();
+    for (const segment of segments) {
+      for (const event of segment.entries) {
+        const existing = bySequence.get(event.sequence);
+        if (existing !== undefined && JSON.stringify(existing) !== JSON.stringify(event)) {
+          return yield* recoveryFailure(
+            "checkpoint_corrupt",
+            `History sequence ${event.sequence} has conflicting records.`,
+          );
+        }
+        bySequence.set(event.sequence, event);
+      }
+    }
+    return [...bySequence.values()].toSorted((left, right) => left.sequence - right.sequence);
+  });
+}
+
+function validateHistorySegment(
+  options: MakeDocumentAuthorityOptions,
+  segment: HistorySegmentWire,
+): Effect.Effect<HistorySegmentWire, RecoveryError> {
+  if (segment.documentId !== options.documentId || segment.workspaceId !== options.workspaceId) {
+    return recoveryFailure(
+      "checkpoint_incompatible",
+      "A history segment belongs to another document.",
+    );
+  }
+  const entries = segment.entries.toSorted((left, right) => left.sequence - right.sequence);
+  if (
+    entries.length === 0 ||
+    entries[0]?.sequence !== segment.firstSequence ||
+    entries.at(-1)?.sequence !== segment.lastSequence ||
+    entries.some((entry, index) => index > 0 && entry.sequence !== segment.firstSequence + index)
+  ) {
+    return recoveryFailure("checkpoint_corrupt", "A document history segment has gaps.");
+  }
+  return Effect.succeed({ ...segment, entries });
+}
+
+function readCompressedHistoryObject<A, I>(
+  key: string,
+  schema: Schema.Schema<A, I>,
+  objectStore: typeof ObjectStore.Service,
+  digest: typeof Digest.Service,
+): Effect.Effect<A, RecoveryError | StorageError> {
+  return Effect.gen(function* () {
+    const stored = yield* objectStore.get(key);
+    if (stored === undefined) {
+      return yield* recoveryFailure("document_missing", `History object ${key} is missing.`);
+    }
+    const actualDigest = yield* digest.sha256(stored.bytes);
+    if (actualDigest !== stored.digest) {
+      return yield* recoveryFailure(
+        "checkpoint_corrupt",
+        `History object ${key} failed digest verification.`,
+      );
+    }
+    const bytes = yield* gunzipBytes(stored.bytes);
+    return yield* Schema.decodeUnknown(Schema.parseJson(schema))(textDecoder.decode(bytes)).pipe(
+      Effect.mapError(
+        (cause) =>
+          new RecoveryError({
+            cause,
+            code: "checkpoint_corrupt",
+            message: `History object ${key} is invalid.`,
+          }),
+      ),
+    );
+  });
+}
+
+function mutableStateFromCheckpoint(
+  checkpoint: CheckpointWire,
+): Effect.Effect<MutableState, RecoveryError | CollaborationError> {
+  return Effect.gen(function* () {
+    const collaborative = yield* createCollaborativeDocument();
+    const update = yield* decodeBase64(checkpoint.bodyUpdate).pipe(
+      Effect.mapError(
+        (error) => new RecoveryError({ code: "checkpoint_corrupt", message: error.message }),
+      ),
+    );
+    yield* applyDocumentUpdate(collaborative.document, update);
+    return {
+      checkpointSequence: checkpoint.sequence,
+      collaborative,
+      comments: checkpoint.comments as CommentState,
+      dirty: false,
+      historySnapshotSequence: checkpoint.historySnapshotSequence,
+      metadata: normalizeDocumentMetadata(checkpoint.metadata as DocumentMetadata),
+      sequence: checkpoint.sequence,
+    };
+  });
 }
 
 function writePortableProjections(
@@ -997,6 +1481,86 @@ function decodeJournalWire(
         }),
     ),
   );
+}
+
+function journalActor(principal: Principal): JournalActor {
+  switch (principal.kind) {
+    case "anonymous":
+      return { kind: "anonymous" };
+    case "api-key":
+    case "workspace":
+      return {
+        ...(principal.displayName === undefined ? {} : { displayName: principal.displayName }),
+        id: principal.personId,
+        kind: principal.kind,
+      };
+    case "capability":
+      return {
+        ...(principal.guestId === undefined ? {} : { id: principal.guestId }),
+        kind: "capability",
+      };
+  }
+}
+
+function gzipBytes(bytes: Uint8Array): Effect.Effect<Uint8Array, StorageError> {
+  return transformCompression(bytes, false);
+}
+
+function gunzipBytes(bytes: Uint8Array): Effect.Effect<Uint8Array, StorageError> {
+  return transformCompression(bytes, true);
+}
+
+function transformCompression(
+  bytes: Uint8Array,
+  decompress: boolean,
+): Effect.Effect<Uint8Array, StorageError> {
+  return Effect.tryPromise({
+    catch: (cause) =>
+      new StorageError({
+        cause,
+        message: `The document history could not be ${decompress ? "decompressed" : "compressed"}.`,
+        operation: decompress ? "decompress document history" : "compress document history",
+        retryable: false,
+      }),
+    try: async () => {
+      const transform = decompress
+        ? new DecompressionStream("gzip")
+        : new CompressionStream("gzip");
+      const output = new Response(transform.readable).arrayBuffer();
+      const writer = transform.writable.getWriter();
+      await writer.write(Uint8Array.from(bytes));
+      await writer.close();
+      return new Uint8Array(await output);
+    },
+  });
+}
+
+function historyPrefix(options: MakeDocumentAuthorityOptions): string {
+  return `workspaces/${options.workspaceId}/documents/${options.documentId}/history`;
+}
+
+function historyCheckpointPrefix(options: MakeDocumentAuthorityOptions): string {
+  return `${historyPrefix(options)}/checkpoints/`;
+}
+
+function historyCheckpointKey(options: MakeDocumentAuthorityOptions, sequence: number): string {
+  return `${historyCheckpointPrefix(options)}${historySequence(sequence)}.json.gz`;
+}
+
+function historySegmentPrefix(options: MakeDocumentAuthorityOptions): string {
+  return `${historyPrefix(options)}/segments/`;
+}
+
+function historySegmentKey(
+  options: MakeDocumentAuthorityOptions,
+  firstSequence: number,
+  lastSequence: number,
+): string {
+  return `${historySegmentPrefix(options)}${historySequence(firstSequence)}-${historySequence(lastSequence)}.json.gz`;
+}
+
+function historySequence(sequence: number): string {
+  return String(sequence).padStart(historySequenceWidth, "0");
 }
 
 function headKey(options: MakeDocumentAuthorityOptions): string {

@@ -31,7 +31,14 @@ const objectMetadataSchema = Schema.Struct({
   mediaType: Schema.optional(Schema.String),
 });
 
+const journalActorSchema = Schema.Struct({
+  displayName: Schema.optional(Schema.String),
+  id: Schema.optional(Schema.String),
+  kind: Schema.Literal("anonymous", "api-key", "capability", "workspace"),
+});
+
 const journalRecordSchema = Schema.Struct({
+  actor: Schema.optional(journalActorSchema),
   checksum: Schema.String,
   documentId: Schema.String,
   idempotencyKey: Schema.optional(Schema.String),
@@ -42,9 +49,11 @@ const journalRecordSchema = Schema.Struct({
     "sharing-event",
     "publication-event",
   ),
+  occurredAt: Schema.optional(Schema.String),
   payload: Schema.String,
   revision: Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
   sequence: Schema.Number.pipe(Schema.int(), Schema.positive()),
+  source: Schema.optional(Schema.Literal("collaboration", "command")),
 });
 
 type JournalRecord = typeof journalRecordSchema.Type;
@@ -232,14 +241,17 @@ export function journalLayer(
               }
               const sequence = input.previousSequence + 1;
               const recordWithoutChecksum = {
+                ...(input.actor === undefined ? {} : { actor: input.actor }),
                 documentId: input.documentId,
                 ...(input.idempotencyKey === undefined
                   ? {}
                   : { idempotencyKey: input.idempotencyKey }),
                 kind: input.kind,
+                ...(input.occurredAt === undefined ? {} : { occurredAt: input.occurredAt }),
                 payload: encodeBase64(input.payload),
                 revision: input.revision,
                 sequence,
+                ...(input.source === undefined ? {} : { source: input.source }),
               };
               const checksum = yield* digest.sha256(
                 textEncoder.encode(JSON.stringify(recordWithoutChecksum)),
@@ -292,14 +304,17 @@ export function journalLayer(
               const records: string[] = [];
               for (const entry of retained) {
                 const withoutChecksum = {
+                  ...(entry.actor === undefined ? {} : { actor: entry.actor }),
                   documentId: entry.documentId,
                   ...(entry.idempotencyKey === undefined
                     ? {}
                     : { idempotencyKey: entry.idempotencyKey }),
                   kind: entry.kind,
+                  ...(entry.occurredAt === undefined ? {} : { occurredAt: entry.occurredAt }),
                   payload: encodeBase64(entry.payload),
                   revision: entry.revision,
                   sequence: entry.sequence,
+                  ...(entry.source === undefined ? {} : { source: entry.source }),
                 };
                 records.push(
                   JSON.stringify({
@@ -391,13 +406,16 @@ function decodeJournal(
         Effect.mapError((cause) => storageFailure("decode journal payload", cause)),
       );
       entries.push({
+        actor: record.actor,
         documentId: record.documentId as JournalEntry["documentId"],
         idempotencyKey: record.idempotencyKey,
         kind: record.kind,
+        occurredAt: record.occurredAt,
         payload,
         previousSequence: record.sequence - 1,
         revision: record.revision as JournalEntry["revision"],
         sequence: record.sequence,
+        source: record.source,
       });
     }
     return entries;

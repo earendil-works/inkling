@@ -44,12 +44,23 @@ export type JournalEntryKind =
   | "sharing-event"
   | "publication-event";
 
+export interface JournalActor {
+  readonly displayName?: string | undefined;
+  readonly id?: string | undefined;
+  readonly kind: "anonymous" | "api-key" | "capability" | "workspace";
+}
+
+export type JournalEntrySource = "collaboration" | "command";
+
 export interface JournalEntryInput {
+  readonly actor?: JournalActor | undefined;
   readonly documentId: DocumentId;
   readonly revision: DocumentRevision;
   readonly kind: JournalEntryKind;
+  readonly occurredAt?: string | undefined;
   readonly payload: Uint8Array;
   readonly previousSequence: number;
+  readonly source?: JournalEntrySource | undefined;
   readonly idempotencyKey?: string | undefined;
 }
 
