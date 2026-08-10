@@ -225,6 +225,12 @@ test(
         await first.locator("[data-live-editor] .cm-content").innerText(),
         /History restore marker/u,
       );
+      assert.equal(
+        await first.locator("[data-preview]").evaluate((preview) => {
+          return getComputedStyle(preview).paddingTop;
+        }),
+        "0px",
+      );
       await first.locator("[data-restore-history]").click();
       await first
         .locator("[data-confirmation-dialog]")

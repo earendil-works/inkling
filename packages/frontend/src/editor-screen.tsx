@@ -225,7 +225,7 @@ export function EditorScreen({
         }
         previewRef={previewRef}
         metadata={displayedPreviewMetadata}
-        readOnly={!canEdit || historyPreview !== undefined}
+        readOnly={!canEdit}
       />
       {displayName === undefined ? null : (
         <EditorComments
