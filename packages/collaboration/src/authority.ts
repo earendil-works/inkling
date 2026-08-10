@@ -150,6 +150,17 @@ export interface DocumentHistoryEvent {
   readonly source?: JournalEntrySource | undefined;
 }
 
+export interface DocumentHistorySnapshot {
+  readonly occurredAt: string;
+  readonly revision: DocumentRevision;
+  readonly sequence: number;
+}
+
+export interface DocumentHistory {
+  readonly baseline: DocumentHistorySnapshot;
+  readonly events: readonly DocumentHistoryEvent[];
+}
+
 export interface AcceptedBodyUpdate {
   readonly clientUpdateId: string;
   readonly revision: DocumentRevision;
@@ -868,6 +879,46 @@ export function loadDocumentRevision(
   });
 }
 
+export function readDocumentHistory(
+  options: MakeDocumentAuthorityOptions,
+): Effect.Effect<
+  DocumentHistory,
+  RecoveryError | StorageError,
+  typeof ObjectStore.Service | typeof Digest.Service
+> {
+  return Effect.gen(function* () {
+    const objectStore = yield* ObjectStore;
+    const digest = yield* Digest;
+    const [checkpoints, archivedEvents] = yield* Effect.all([
+      loadHistoryCheckpoints(options, objectStore, digest),
+      loadArchivedHistoryEvents(options, objectStore, digest),
+    ]);
+    const checkpoint = checkpoints[0];
+    if (checkpoint === undefined) {
+      return yield* recoveryFailure("document_missing", "The document has no retained history.");
+    }
+    const metadata = normalizeDocumentMetadata(checkpoint.metadata as DocumentMetadata);
+    const events = archivedEvents
+      .filter((event) => event.sequence > checkpoint.sequence)
+      .map((event): DocumentHistoryEvent => ({
+        actor: event.actor,
+        kind: event.kind,
+        occurredAt: event.occurredAt,
+        revision: event.revision as DocumentRevision,
+        sequence: event.sequence,
+        source: event.source,
+      }));
+    return {
+      baseline: {
+        occurredAt: checkpoint.capturedAt,
+        revision: metadata.headRevision,
+        sequence: checkpoint.sequence,
+      },
+      events,
+    };
+  });
+}
+
 export function listDocumentHistoryEvents(
   options: MakeDocumentAuthorityOptions,
 ): Effect.Effect<
@@ -875,19 +926,7 @@ export function listDocumentHistoryEvents(
   RecoveryError | StorageError,
   typeof ObjectStore.Service | typeof Digest.Service
 > {
-  return Effect.gen(function* () {
-    const objectStore = yield* ObjectStore;
-    const digest = yield* Digest;
-    const events = yield* loadArchivedHistoryEvents(options, objectStore, digest);
-    return events.map((event): DocumentHistoryEvent => ({
-      actor: event.actor,
-      kind: event.kind,
-      occurredAt: event.occurredAt,
-      revision: event.revision as DocumentRevision,
-      sequence: event.sequence,
-      source: event.source,
-    }));
-  });
+  return readDocumentHistory(options).pipe(Effect.map((history) => history.events));
 }
 
 export function loadDocumentHistoryRevision(

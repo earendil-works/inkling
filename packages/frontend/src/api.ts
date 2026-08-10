@@ -7,6 +7,7 @@ import {
   AuthenticationStatusSchema,
   CatalogResponseSchema,
   CommentStateSchema,
+  DocumentHistoryResponseSchema,
   DocumentMetadataSchema,
   DocumentResponseSchema,
   ProtocolErrorSchema,
@@ -23,6 +24,7 @@ import type {
   CommentAnchorDto,
   CommentStateDto,
   CreateDocumentRequest,
+  DocumentHistoryResponse,
   DocumentMetadataDto,
   DocumentResponse,
   PublicDocumentResponse,
@@ -55,6 +57,18 @@ export interface ApiClientService {
   readonly readDocument: (
     documentId: string,
     published?: boolean,
+  ) => Effect.Effect<DocumentResponse, ApiError>;
+  readonly listDocumentHistory: (
+    documentId: string,
+  ) => Effect.Effect<DocumentHistoryResponse, ApiError>;
+  readonly readDocumentHistoryRevision: (
+    documentId: string,
+    revision: number,
+  ) => Effect.Effect<DocumentResponse, ApiError>;
+  readonly restoreDocumentHistoryRevision: (
+    documentId: string,
+    revision: number,
+    expectedRevision: number,
   ) => Effect.Effect<DocumentResponse, ApiError>;
   readonly uploadAttachment: (
     documentId: string,
@@ -294,6 +308,11 @@ export function makeApiClient(capabilityToken?: string): ApiClientService {
       ),
     listApiKeys: request("/api/api-keys", Schema.Array(ApiKeySchema)),
     listDeletedDocuments: request("/api/trash", CatalogResponseSchema),
+    listDocumentHistory: (documentId) =>
+      request(
+        `/api/documents/${encodeURIComponent(documentId)}/history`,
+        DocumentHistoryResponseSchema,
+      ),
     listDocuments: (query = "") =>
       request(`/api/documents?q=${encodeURIComponent(query)}`, CatalogResponseSchema),
     listPublicDocuments: (query = "") =>
@@ -308,6 +327,11 @@ export function makeApiClient(capabilityToken?: string): ApiClientService {
     readDocument: (documentId, published = false) =>
       request(
         `/api/documents/${encodeURIComponent(documentId)}${published ? "?published=true" : ""}`,
+        DocumentResponseSchema,
+      ),
+    readDocumentHistoryRevision: (documentId, revision) =>
+      request(
+        `/api/documents/${encodeURIComponent(documentId)}/history/${revision}`,
         DocumentResponseSchema,
       ),
     readPublicRfc: (number) => request(`/api/public/rfc/${number}`, PublicDocumentResponseSchema),
@@ -336,6 +360,13 @@ export function makeApiClient(capabilityToken?: string): ApiClientService {
         `/api/documents/${encodeURIComponent(documentId)}/restore?expectedRevision=${expectedRevision}`,
         DocumentMetadataSchema,
         "POST",
+      ),
+    restoreDocumentHistoryRevision: (documentId, revision, expectedRevision) =>
+      mutation(
+        `/api/documents/${encodeURIComponent(documentId)}/history/${revision}/restore`,
+        DocumentResponseSchema,
+        "POST",
+        { expectedRevision },
       ),
     unpublish: (documentId) =>
       mutation(

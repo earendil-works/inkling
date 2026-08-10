@@ -1,8 +1,17 @@
-import { useEffect, useRef } from "react";
-import type { EditorView } from "codemirror";
+import { useEffect, useRef, useState } from "react";
+import { markdown } from "@codemirror/lang-markdown";
+import { yamlFrontmatter } from "@codemirror/lang-yaml";
+import { syntaxHighlighting } from "@codemirror/language";
+import { Compartment, EditorState } from "@codemirror/state";
+import { oneDarkTheme } from "@codemirror/theme-one-dark";
+import { basicSetup, EditorView } from "codemirror";
 import { Effect, Fiber } from "effect";
 
 import type { DocumentMetadataDto } from "@earendil-works/inkling-protocol";
+import {
+  findInklingCodeLanguage,
+  inklingSyntaxHighlighter,
+} from "@earendil-works/inkling-renderer";
 import type { RenderHeading } from "@earendil-works/inkling-renderer";
 
 import type { ConnectionState } from "../collaboration.ts";
@@ -22,8 +31,10 @@ export interface EditorWorkbenchProps {
   readonly onClosePreview: () => void;
   readonly onPreviewRendered: () => void;
   readonly onPreviewSelection: (range: PreviewSourceRange | undefined) => void;
+  readonly historyBody?: string | undefined;
   readonly previewHeadings: readonly RenderHeading[];
   readonly previewHtml: string;
+  readonly previewLabel?: string | undefined;
   readonly previewRef: React.RefObject<HTMLElement | null>;
   readonly metadata: DocumentMetadataDto;
   readonly readOnly: boolean;
@@ -36,16 +47,25 @@ export function EditorWorkbench({
   onClosePreview,
   onPreviewRendered,
   onPreviewSelection,
+  historyBody,
   previewHeadings,
   previewHtml,
+  previewLabel,
   previewRef,
   metadata,
   readOnly,
 }: EditorWorkbenchProps): React.JSX.Element {
   const renderedCallbackRef = useRef(onPreviewRendered);
   const previewScrollerRef = useRef<HTMLDivElement>(null);
+  const historyEditorHostRef = useRef<HTMLDivElement>(null);
+  const historyEditor = useHistoricalMarkdownEditor(historyBody, historyEditorHostRef);
   renderedCallbackRef.current = onPreviewRendered;
-  useSynchronizedScrolling(editor, editorHostRef, previewRef, previewScrollerRef);
+  useSynchronizedScrolling(
+    historyEditor ?? editor,
+    historyBody === undefined ? editorHostRef : historyEditorHostRef,
+    previewRef,
+    previewScrollerRef,
+  );
 
   useEffect(() => {
     const preview = previewRef.current;
@@ -76,14 +96,34 @@ export function EditorWorkbench({
     <section className={styles["workbench"]}>
       <div className={styles["sourcePane"]} data-source-pane="">
         <div className={styles["paneLabel"]} data-pane-label="">
-          <span>Markdown</span>
-          <span data-save-state="">{connectionLabel(connectionState)}</span>
+          <span>
+            {historyBody === undefined
+              ? "Markdown"
+              : `${previewLabel ?? "Historical version"} · Markdown`}
+          </span>
+          <span data-save-state="">
+            {historyBody === undefined ? connectionLabel(connectionState) : "Read-only history"}
+          </span>
         </div>
-        <div className={styles["editorHost"]} data-editor="" ref={editorHostRef} />
+        {historyBody === undefined ? null : (
+          <div
+            className={styles["editorHost"]}
+            data-editor=""
+            data-history-editor=""
+            ref={historyEditorHostRef}
+          />
+        )}
+        <div
+          className={styles["editorHost"]}
+          data-editor={historyBody === undefined ? "" : undefined}
+          data-live-editor=""
+          hidden={historyBody !== undefined}
+          ref={editorHostRef}
+        />
       </div>
       <div className={styles["previewPane"]} data-preview-pane="">
         <div className={styles["paneLabel"]} data-pane-label="">
-          <span>Preview</span>
+          <span>{previewLabel ?? "Preview"}</span>
           <Button
             aria-label="Close preview"
             className={styles["closePreview"]}
@@ -112,6 +152,69 @@ export function EditorWorkbench({
       </div>
     </section>
   );
+}
+
+function useHistoricalMarkdownEditor(
+  body: string | undefined,
+  hostRef: React.RefObject<HTMLDivElement | null>,
+): EditorView | undefined {
+  const [editor, setEditor] = useState<EditorView>();
+  const bodyRef = useRef(body);
+  const active = body !== undefined;
+  bodyRef.current = body;
+
+  useEffect(() => {
+    if (!active) {
+      setEditor(undefined);
+      return;
+    }
+    const parent = hostRef.current;
+    if (parent === null) return;
+
+    const theme = new Compartment();
+    const created = new EditorView({
+      parent,
+      state: EditorState.create({
+        doc: bodyRef.current ?? "",
+        extensions: [
+          basicSetup,
+          syntaxHighlighting(inklingSyntaxHighlighter),
+          yamlFrontmatter({
+            content: markdown({ codeLanguages: findInklingCodeLanguage }),
+          }),
+          EditorState.readOnly.of(true),
+          EditorView.editable.of(false),
+          theme.of(document.documentElement.dataset["theme"] === "dark" ? oneDarkTheme : []),
+          EditorView.lineWrapping,
+        ],
+      }),
+    });
+    const themeObserver = new MutationObserver(() => {
+      created.dispatch({
+        effects: theme.reconfigure(
+          document.documentElement.dataset["theme"] === "dark" ? oneDarkTheme : [],
+        ),
+      });
+    });
+    themeObserver.observe(document.documentElement, {
+      attributeFilter: ["data-theme"],
+      attributes: true,
+    });
+    setEditor(created);
+    return () => {
+      themeObserver.disconnect();
+      created.destroy();
+    };
+  }, [active, hostRef]);
+
+  useEffect(() => {
+    if (body === undefined || editor === undefined) return;
+    const current = editor.state.doc.toString();
+    if (current === body) return;
+    editor.dispatch({ changes: { from: 0, insert: body, to: current.length } });
+  }, [body, editor]);
+
+  return active ? editor : undefined;
 }
 
 interface PreviewSourceSegment {

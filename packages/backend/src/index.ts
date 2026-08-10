@@ -15,6 +15,7 @@ import {
   protocolVersion,
   ReplaceBodyRequestSchema,
   ReplyRequestSchema,
+  RestoreHistoryRequestSchema,
   ResolutionRequestSchema,
   ShareLinkCreateRequestSchema,
   ShareUnlockRequestSchema,
@@ -201,6 +202,47 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
         ),
       );
     }),
+  );
+
+  app.get("/api/documents/:documentId/history", (context) =>
+    execute(context, options, (service) =>
+      service.listDocumentHistory(credentials(context), context.req.param("documentId")),
+    ),
+  );
+
+  app.get("/api/documents/:documentId/history/:revision", (context) =>
+    execute(context, options, (service) =>
+      positiveIntegerOrZero(context.req.param("revision"), "revision").pipe(
+        Effect.flatMap((revision) =>
+          service.readDocumentHistoryRevision(
+            credentials(context),
+            context.req.param("documentId"),
+            revision,
+          ),
+        ),
+      ),
+    ),
+  );
+
+  app.post("/api/documents/:documentId/history/:revision/restore", (context) =>
+    execute(context, options, (service) =>
+      mutation(
+        context,
+        Effect.all({
+          request: readJson(context, RestoreHistoryRequestSchema),
+          revision: positiveIntegerOrZero(context.req.param("revision"), "revision"),
+        }),
+      ).pipe(
+        Effect.flatMap(({ request, revision }) =>
+          service.restoreDocumentHistoryRevision(
+            credentials(context),
+            context.req.param("documentId"),
+            revision,
+            request.expectedRevision,
+          ),
+        ),
+      ),
+    ),
   );
 
   app.get("/api/documents/:documentId/attachments", (context) =>

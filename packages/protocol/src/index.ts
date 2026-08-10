@@ -112,6 +112,38 @@ export const DocumentResponseSchema = Schema.Struct({
 });
 export type DocumentResponse = typeof DocumentResponseSchema.Type;
 
+export const DocumentHistoryActorSchema = Schema.Struct({
+  displayName: Schema.optional(Schema.String),
+  id: Schema.optional(Schema.String),
+  kind: Schema.Literal("anonymous", "api-key", "capability", "workspace"),
+});
+export type DocumentHistoryActorDto = typeof DocumentHistoryActorSchema.Type;
+
+export const DocumentHistoryVersionSchema = Schema.Struct({
+  actor: Schema.optional(DocumentHistoryActorSchema),
+  kind: Schema.Literal(
+    "snapshot",
+    "body-update",
+    "metadata-event",
+    "comment-event",
+    "sharing-event",
+    "publication-event",
+  ),
+  occurredAt: Schema.optional(Schema.String),
+  revision: Revision,
+  sequence: Revision,
+  source: Schema.optional(Schema.Literal("collaboration", "command")),
+});
+export type DocumentHistoryVersionDto = typeof DocumentHistoryVersionSchema.Type;
+
+export const DocumentHistoryResponseSchema = Schema.Struct({
+  versions: Schema.Array(DocumentHistoryVersionSchema),
+});
+export type DocumentHistoryResponse = typeof DocumentHistoryResponseSchema.Type;
+
+export const RestoreHistoryRequestSchema = Schema.Struct({ expectedRevision: Revision });
+export type RestoreHistoryRequest = typeof RestoreHistoryRequestSchema.Type;
+
 export const DocumentSummarySchema = Schema.Struct({
   excerpt: Schema.String,
   metadata: DocumentMetadataSchema,

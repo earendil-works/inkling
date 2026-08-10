@@ -448,6 +448,16 @@ test("capability access is link-specific within a shared document", async () => 
     authorizeDocument(viewer, "edit-body", shared, now).pipe(Effect.either),
   );
   assert.equal(Either.isLeft(deniedEdit), true);
+  const deniedHistory = await Effect.runPromise(
+    authorizeDocument(viewer, "read-history", shared, now).pipe(Effect.either),
+  );
+  assert.equal(Either.isLeft(deniedHistory), true);
+  const deniedRestore = await Effect.runPromise(
+    authorizeDocument({ ...viewer, access: "edit" }, "restore-history", shared, now).pipe(
+      Effect.either,
+    ),
+  );
+  assert.equal(Either.isLeft(deniedRestore), true);
 
   const expiredViewer: Principal = { ...viewer, expiresAt: "2025-01-01T00:00:00.000Z" };
   const deniedExpired = await Effect.runPromise(

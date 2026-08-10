@@ -1,6 +1,7 @@
 import type {
   AttachmentMetadataDto,
   DocumentMetadataDto,
+  DocumentResponse,
   ShareLinksResponse,
 } from "@earendil-works/inkling-protocol";
 
@@ -11,12 +12,15 @@ import { AttachmentButton } from "./attachment-button.tsx";
 import { ButtonLink } from "./button-link.tsx";
 import { Button } from "./button.tsx";
 import styles from "./editor.module.css";
+import { HistoryControl } from "./history-control.tsx";
+import type { HistoryControlProps } from "./history-control.tsx";
 import { PublishButton } from "./publish-button.tsx";
 import type { PublishButtonProps } from "./publish-button.tsx";
 import { SharingControl } from "./sharing-control.tsx";
 
 export interface EditorToolbarProps {
   readonly api: ApiClientService;
+  readonly beforeHistory: HistoryControlProps["beforeOpen"];
   readonly beforePublish: PublishButtonProps["beforePublish"];
   readonly canDelete: boolean;
   readonly canEdit: boolean;
@@ -24,6 +28,8 @@ export interface EditorToolbarProps {
   readonly metadata: DocumentMetadataDto;
   readonly onAttachment: (attachment: AttachmentMetadataDto) => void;
   readonly onDelete: () => void;
+  readonly onHistoryPreview: (document: DocumentResponse | undefined) => void;
+  readonly onHistoryRestored: (document: DocumentResponse) => void;
   readonly onMetadataChanged: (metadata: DocumentMetadataDto) => void;
   readonly onOpenComments: () => void;
   readonly onSharingChanged: (response: ShareLinksResponse) => void;
@@ -38,6 +44,7 @@ export interface EditorToolbarProps {
 
 export function EditorToolbar({
   api,
+  beforeHistory,
   beforePublish,
   canDelete,
   canEdit,
@@ -45,6 +52,8 @@ export function EditorToolbar({
   metadata,
   onAttachment,
   onDelete,
+  onHistoryPreview,
+  onHistoryRestored,
   onMetadataChanged,
   onOpenComments,
   onSharingChanged,
@@ -90,6 +99,17 @@ export function EditorToolbar({
             {openCommentCount}
           </span>
         </Button>
+        {shared || trashed ? null : (
+          <HistoryControl
+            api={api}
+            beforeOpen={beforeHistory}
+            canRestore={canEdit}
+            currentRevision={metadata.headRevision}
+            documentId={metadata.id}
+            onPreview={onHistoryPreview}
+            onRestored={onHistoryRestored}
+          />
+        )}
         <AllocateRfcButton
           api={api}
           canAllocate={canEditMetadata}

@@ -32,6 +32,7 @@ export const documentActions = [
   "discover",
   "read-working",
   "read-published",
+  "read-history",
   "comment",
   "edit-body",
   "edit-metadata",
@@ -41,6 +42,7 @@ export const documentActions = [
   "delete",
   "hard-delete",
   "restore",
+  "restore-history",
 ] as const;
 
 export type DocumentAction = (typeof documentActions)[number];
@@ -99,7 +101,9 @@ export function isDocumentActionAllowed(
       case "discover":
       case "edit-body":
       case "edit-metadata":
+      case "read-history":
       case "read-working":
+      case "restore-history":
         return true;
       case "delete":
       case "hard-delete":
@@ -159,7 +163,9 @@ export function isDocumentActionAllowed(
     case "manage-comments":
     case "manage-sharing":
     case "publish":
+    case "read-history":
     case "restore":
+    case "restore-history":
       return false;
   }
 }

@@ -16,6 +16,7 @@ import type {
   CommentStateDto,
   CreateDocumentRequest,
   CreateThreadRequest,
+  DocumentHistoryResponse,
   DocumentMetadataDto,
   DocumentResponse,
   EditBodyRequest,
@@ -230,6 +231,21 @@ export interface InklingApplicationService {
     startLine?: number,
     endLine?: number,
     published?: boolean,
+  ) => Effect.Effect<DocumentResponse, ApplicationError>;
+  readonly listDocumentHistory: (
+    credentials: RequestCredentials,
+    documentId: string,
+  ) => Effect.Effect<DocumentHistoryResponse, ApplicationError>;
+  readonly readDocumentHistoryRevision: (
+    credentials: RequestCredentials,
+    documentId: string,
+    revision: number,
+  ) => Effect.Effect<DocumentResponse, ApplicationError>;
+  readonly restoreDocumentHistoryRevision: (
+    credentials: RequestCredentials,
+    documentId: string,
+    revision: number,
+    expectedRevision: number,
   ) => Effect.Effect<DocumentResponse, ApplicationError>;
   readonly updateMetadata: (
     credentials: RequestCredentials,

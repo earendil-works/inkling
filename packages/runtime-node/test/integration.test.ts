@@ -555,6 +555,117 @@ test(
   },
 );
 
+test("document history is available over HTTP and restores forward", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "inkling-history-"));
+  try {
+    await withServer(directory, async (baseUrl, session) => {
+      const authorization = await setupApiKey(baseUrl, "history operator", session);
+      const createdResponse = await fetch(`${baseUrl}/api/documents`, {
+        body: JSON.stringify({
+          body: "first version",
+          creationKey: "history-document",
+          title: "History document",
+        }),
+        headers: { ...authorization, "Content-Type": "application/json" },
+        method: "POST",
+      });
+      assert.equal(createdResponse.status, 200);
+      const created = (await createdResponse.json()) as DocumentWire;
+      const firstEdit = await fetch(`${baseUrl}/api/documents/${created.metadata.id}/edits`, {
+        body: JSON.stringify({
+          edits: [{ newText: "second version", oldText: "first version" }],
+          expectedRevision: created.metadata.headRevision,
+        }),
+        headers: { ...authorization, "Content-Type": "application/json" },
+        method: "POST",
+      });
+      assert.equal(firstEdit.status, 200);
+      const second = (await firstEdit.json()) as DocumentWire;
+      const secondEdit = await fetch(`${baseUrl}/api/documents/${created.metadata.id}/edits`, {
+        body: JSON.stringify({
+          edits: [{ newText: "third version", oldText: "second version" }],
+          expectedRevision: second.metadata.headRevision,
+        }),
+        headers: { ...authorization, "Content-Type": "application/json" },
+        method: "POST",
+      });
+      assert.equal(secondEdit.status, 200);
+      const third = (await secondEdit.json()) as DocumentWire;
+
+      const historyResponse = await fetch(
+        `${baseUrl}/api/documents/${created.metadata.id}/history`,
+        { headers: authorization },
+      );
+      assert.equal(historyResponse.status, 200);
+      const history = (await historyResponse.json()) as {
+        versions: {
+          actor?: { id?: string; kind: string } | undefined;
+          kind: string;
+          revision: number;
+          sequence: number;
+        }[];
+      };
+      assert.deepEqual(
+        history.versions.map((version) => version.revision),
+        [0, 1, 2],
+      );
+      assert.equal(history.versions[0]?.kind, "snapshot");
+      assert.deepEqual(
+        history.versions.slice(1).map((version) => ({
+          id: version.actor?.id,
+          kind: version.actor?.kind,
+        })),
+        [
+          { id: "admin@example.com", kind: "api-key" },
+          { id: "admin@example.com", kind: "api-key" },
+        ],
+      );
+      assert.equal(
+        (await fetch(`${baseUrl}/api/documents/${created.metadata.id}/history`)).status,
+        403,
+      );
+
+      const firstRevision = await fetch(
+        `${baseUrl}/api/documents/${created.metadata.id}/history/0`,
+        { headers: authorization },
+      );
+      assert.equal(firstRevision.status, 200);
+      assert.match(((await firstRevision.json()) as DocumentWire).body, /first version$/u);
+
+      const restoredResponse = await fetch(
+        `${baseUrl}/api/documents/${created.metadata.id}/history/0/restore`,
+        {
+          body: JSON.stringify({ expectedRevision: third.metadata.headRevision }),
+          headers: { ...authorization, "Content-Type": "application/json" },
+          method: "POST",
+        },
+      );
+      assert.equal(restoredResponse.status, 200);
+      const restored = (await restoredResponse.json()) as DocumentWire;
+      assert.equal(restored.metadata.headRevision, third.metadata.headRevision + 1);
+      assert.match(restored.body, /first version$/u);
+
+      const retainedThird = await fetch(
+        `${baseUrl}/api/documents/${created.metadata.id}/history/2`,
+        { headers: authorization },
+      );
+      assert.equal(retainedThird.status, 200);
+      assert.match(((await retainedThird.json()) as DocumentWire).body, /third version$/u);
+      const staleRestore = await fetch(
+        `${baseUrl}/api/documents/${created.metadata.id}/history/1/restore`,
+        {
+          body: JSON.stringify({ expectedRevision: third.metadata.headRevision }),
+          headers: { ...authorization, "Content-Type": "application/json" },
+          method: "POST",
+        },
+      );
+      assert.equal(staleRestore.status, 409);
+    });
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
+});
+
 test("documents move through Trash, restore, and permanent deletion", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "inkling-trash-"));
   try {

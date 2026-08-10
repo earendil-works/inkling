@@ -191,6 +191,56 @@ test(
         await first.locator(".cm-content").innerText(),
         /---\s+authors:\s+- browser@example\.com\s+state: draft\s+visibility: private\s+labels: \[\]\s+---/u,
       );
+
+      await first.locator(".cm-content").click();
+      await first.keyboard.press("ControlOrMeta+End");
+      await first.keyboard.insertText("\n\nHistory restore marker");
+      await first.waitForFunction(
+        () => document.querySelector("[data-save-state]")?.textContent === "Saved",
+      );
+      await first.locator("[data-history-toggle]").click();
+      await first.waitForSelector("[data-history-dropdown]");
+      await first.locator("[data-history-slider]").fill("0");
+      await first.waitForFunction(
+        () =>
+          document.querySelector("[data-preview-pane] [data-pane-label] span")?.textContent ===
+          "Revision 0",
+      );
+      await first.waitForFunction(
+        () =>
+          !document
+            .querySelector("[data-preview]")
+            ?.textContent?.includes("History restore marker"),
+      );
+      await first.waitForFunction(
+        () =>
+          document.querySelector("[data-source-pane] [data-pane-label] span")?.textContent ===
+          "Revision 0 · Markdown",
+      );
+      assert.doesNotMatch(
+        await first.locator("[data-history-editor] .cm-content").innerText(),
+        /History restore marker/u,
+      );
+      assert.match(
+        await first.locator("[data-live-editor] .cm-content").innerText(),
+        /History restore marker/u,
+      );
+      await first.locator("[data-restore-history]").click();
+      await first
+        .locator("[data-confirmation-dialog]")
+        .getByRole("button", { name: "Restore version" })
+        .click();
+      await first.locator("[data-history-dropdown]").waitFor({ state: "hidden" });
+      await first.waitForFunction(
+        () =>
+          !document
+            .querySelector("[data-editor] .cm-content")
+            ?.textContent?.includes("History restore marker"),
+      );
+      await first.waitForFunction(
+        () => document.querySelector("[data-save-state]")?.textContent === "Saved",
+      );
+
       const draftStateChip = first.locator("[data-preview-scroller] [data-lifecycle-state]");
       await draftStateChip.waitFor();
       assert.equal(await draftStateChip.getAttribute("data-lifecycle-state"), "draft");
@@ -242,7 +292,7 @@ test(
       await first.keyboard.press("Shift+Home");
       await first.keyboard.insertText("labels: [] invalid");
       await first.waitForTimeout(100);
-      assert.equal(await first.locator("[data-toasts] [data-toast]").count(), 0);
+      assert.equal(await first.locator('[data-toasts] [data-toast="error"]').count(), 0);
       assert.equal(
         await first.locator("[data-preview-scroller] [data-document-page] h1").textContent(),
         "Browser collaboration",

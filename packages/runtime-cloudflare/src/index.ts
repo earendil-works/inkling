@@ -1188,15 +1188,20 @@ function isMutation(request: Request): boolean {
 
 function isBodyMutation(method: string, pathname: string, documentId: string): boolean {
   const base = `/api/documents/${encodeURIComponent(documentId)}`;
+  const suffix = pathname.startsWith(base) ? pathname.slice(base.length) : "";
   return (
-    (method === "POST" && pathname === `${base}/edits`) ||
-    (method === "PUT" && pathname === `${base}/body`)
+    (method === "POST" && (suffix === "/edits" || /^\/history\/\d+\/restore$/u.test(suffix))) ||
+    (method === "PUT" && suffix === "/body")
   );
 }
 
 function isBodyReplacement(method: string, pathname: string, documentId: string): boolean {
   const base = `/api/documents/${encodeURIComponent(documentId)}`;
-  return method === "PUT" && pathname === `${base}/body`;
+  const suffix = pathname.startsWith(base) ? pathname.slice(base.length) : "";
+  return (
+    (method === "POST" && /^\/history\/\d+\/restore$/u.test(suffix)) ||
+    (method === "PUT" && suffix === "/body")
+  );
 }
 
 function isPublicationMutation(pathname: string, documentId: string): boolean {

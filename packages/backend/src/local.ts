@@ -18,6 +18,7 @@ import {
   Digest,
   documentActions,
   documentId,
+  documentRevision,
   documentTitleFromMarkdown,
   DomainError,
   DurableDocumentJournal,
@@ -66,7 +67,9 @@ import {
   CollaborationError,
   decodeBase64,
   encodeBase64,
+  loadDocumentHistoryRevision,
   loadDocumentRevision,
+  readDocumentHistory,
   makeDocumentAuthority,
   RecoveryError,
 } from "@earendil-works/inkling-collaboration";
@@ -87,6 +90,7 @@ import type {
   AttachmentMetadataDto,
   CatalogResponse,
   CommentStateDto,
+  DocumentHistoryResponse,
   DocumentMetadataDto,
   DocumentResponse,
   ImportDocumentRequest,
@@ -1912,6 +1916,40 @@ export function makeLocalInklingApplication(
           yield* scheduleCheckpoint(room);
           return metadata as DocumentMetadataDto;
         }),
+      listDocumentHistory: (credentials, rawDocumentId) =>
+        Effect.gen(function* () {
+          const room = yield* getRoom(rawDocumentId);
+          const principal = yield* resolvePrincipal(credentials, rawDocumentId);
+          const now = new Date().toISOString();
+          const current = yield* room
+            .snapshot(principal, now)
+            .pipe(Effect.mapError(toApplicationError));
+          yield* authorizeDocument(principal, "read-history", current.metadata, now).pipe(
+            Effect.mapError(toApplicationError),
+          );
+          yield* room.checkpoint(now).pipe(Effect.mapError(toApplicationError));
+          const history = yield* provideAuthorityDependencies(
+            readDocumentHistory({ documentId: room.documentId, workspaceId: state.workspaceId }),
+          ).pipe(Effect.mapError(toApplicationError));
+          return {
+            versions: [
+              {
+                kind: "snapshot" as const,
+                occurredAt: history.baseline.occurredAt,
+                revision: history.baseline.revision,
+                sequence: history.baseline.sequence,
+              },
+              ...history.events.map((event) => ({
+                actor: event.actor,
+                kind: event.kind,
+                occurredAt: event.occurredAt,
+                revision: event.revision,
+                sequence: event.sequence,
+                source: event.source,
+              })),
+            ],
+          } satisfies DocumentHistoryResponse;
+        }),
       readDocument: (credentials, rawDocumentId, startLine, endLine, published = false) =>
         Effect.gen(function* () {
           const room = yield* getRoom(rawDocumentId);
@@ -1920,6 +1958,29 @@ export function makeLocalInklingApplication(
             ? publishedSnapshotFor(room, principal, startLine, endLine)
             : snapshotFor(room, principal, startLine, endLine);
           return yield* read;
+        }),
+      readDocumentHistoryRevision: (credentials, rawDocumentId, rawRevision) =>
+        Effect.gen(function* () {
+          const room = yield* getRoom(rawDocumentId);
+          const principal = yield* resolvePrincipal(credentials, rawDocumentId);
+          const revision = yield* documentRevision(rawRevision).pipe(
+            Effect.mapError(toApplicationError),
+          );
+          const now = new Date().toISOString();
+          const current = yield* room
+            .snapshot(principal, now)
+            .pipe(Effect.mapError(toApplicationError));
+          yield* authorizeDocument(principal, "read-history", current.metadata, now).pipe(
+            Effect.mapError(toApplicationError),
+          );
+          yield* room.checkpoint(now).pipe(Effect.mapError(toApplicationError));
+          const historical = yield* provideAuthorityDependencies(
+            loadDocumentHistoryRevision(
+              { documentId: room.documentId, workspaceId: state.workspaceId },
+              revision,
+            ),
+          ).pipe(Effect.mapError(toApplicationError));
+          return toDocumentResponse(historical);
         }),
       readPublicDocument: (rawDocumentId) =>
         readPublished(rawDocumentId, `/public/documents/${encodeURIComponent(rawDocumentId)}`),
@@ -2001,6 +2062,35 @@ export function makeLocalInklingApplication(
           yield* projectDocument(room);
           yield* scheduleCheckpoint(room);
           return comments as CommentStateDto;
+        }),
+      restoreDocumentHistoryRevision: (credentials, rawDocumentId, rawRevision, expectedRevision) =>
+        Effect.gen(function* () {
+          const room = yield* getRoom(rawDocumentId);
+          const principal = yield* resolvePrincipal(credentials, rawDocumentId);
+          const revision = yield* documentRevision(rawRevision).pipe(
+            Effect.mapError(toApplicationError),
+          );
+          const now = new Date().toISOString();
+          const current = yield* room
+            .snapshot(principal, now)
+            .pipe(Effect.mapError(toApplicationError));
+          yield* authorizeDocument(principal, "restore-history", current.metadata, now).pipe(
+            Effect.mapError(toApplicationError),
+          );
+          yield* requireRevision(current.metadata, expectedRevision).pipe(
+            Effect.mapError(toApplicationError),
+          );
+          yield* room.checkpoint(now).pipe(Effect.mapError(toApplicationError));
+          const historical = yield* provideAuthorityDependencies(
+            loadDocumentHistoryRevision(
+              { documentId: room.documentId, workspaceId: state.workspaceId },
+              revision,
+            ),
+          ).pipe(Effect.mapError(toApplicationError));
+          yield* room
+            .replaceBody(principal, historical.body, expectedRevision, now)
+            .pipe(Effect.mapError(toApplicationError));
+          return yield* afterMutation(room);
         }),
       revokeApiKey: (credentials, keyId) =>
         Effect.gen(function* () {

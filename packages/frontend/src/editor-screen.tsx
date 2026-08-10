@@ -43,6 +43,7 @@ export function EditorScreen({
   const editorCommentsRef = useRef<EditorCommentsHandle>(null);
   const [metadata, setMetadata] = useState(initial.metadata);
   const [comments, setComments] = useState(initial.comments);
+  const [historyPreview, setHistoryPreview] = useState<DocumentResponse>();
   const [displayName, setDisplayName] = useState<string | undefined>(() =>
     shared ? storedGuestName() : (account?.displayName ?? "Workspace member"),
   );
@@ -93,6 +94,7 @@ export function EditorScreen({
   const canDelete = permissions?.includes("delete") ?? false;
   const canEditMetadata = permissions?.includes("edit-metadata") ?? !shared;
   const rendered = useRenderedMarkdown(body, true);
+  const historyRendered = useRenderedMarkdown(historyPreview?.body ?? "", true);
   const publishDisabledLabel =
     connectionState === "connecting"
       ? "Connecting…"
@@ -116,6 +118,16 @@ export function EditorScreen({
     rendered.title,
     frontmatterVocabulary.people,
   );
+  const displayedPreview = historyPreview === undefined ? rendered : historyRendered;
+  const displayedPreviewMetadata =
+    historyPreview === undefined
+      ? previewMetadata
+      : metadataWithFrontmatter(
+          historyPreview.metadata,
+          historyRendered.frontmatter,
+          historyRendered.title,
+          frontmatterVocabulary.people,
+        );
 
   useEffect(() => {
     document.title = previewMetadata.title;
@@ -146,6 +158,7 @@ export function EditorScreen({
     >
       <EditorToolbar
         api={api}
+        beforeHistory={saveBeforePublish}
         beforePublish={saveBeforePublish}
         canDelete={canDelete}
         canEdit={canEdit}
@@ -165,6 +178,15 @@ export function EditorScreen({
           });
         }}
         onDelete={() => setDeleteOpen(true)}
+        onHistoryPreview={(document) => {
+          setHistoryPreview(document);
+          if (document !== undefined) setPreviewOpen(true);
+        }}
+        onHistoryRestored={(document) => {
+          setHistoryPreview(undefined);
+          setMetadata(document.metadata);
+          setComments(document.comments);
+        }}
         onMetadataChanged={setMetadata}
         onOpenComments={() => editorCommentsRef.current?.openControls()}
         onSharingChanged={(response) =>
@@ -187,13 +209,23 @@ export function EditorScreen({
         editor={sessionRef.current?.editor}
         editorHostRef={editorHostRef}
         onClosePreview={() => setPreviewOpen(false)}
-        onPreviewRendered={() => setPreviewRevision((revision) => revision + 1)}
-        onPreviewSelection={(range) => editorCommentsRef.current?.setPreviewSelection(range)}
-        previewHeadings={rendered.headings}
-        previewHtml={rendered.html}
+        onPreviewRendered={() => {
+          if (historyPreview === undefined) setPreviewRevision((revision) => revision + 1);
+        }}
+        onPreviewSelection={(range) => {
+          if (historyPreview === undefined) editorCommentsRef.current?.setPreviewSelection(range);
+        }}
+        historyBody={historyPreview?.body}
+        previewHeadings={displayedPreview.headings}
+        previewHtml={displayedPreview.html}
+        previewLabel={
+          historyPreview === undefined
+            ? undefined
+            : `Revision ${historyPreview.metadata.headRevision}`
+        }
         previewRef={previewRef}
-        metadata={previewMetadata}
-        readOnly={!canEdit}
+        metadata={displayedPreviewMetadata}
+        readOnly={!canEdit || historyPreview !== undefined}
       />
       {displayName === undefined ? null : (
         <EditorComments
