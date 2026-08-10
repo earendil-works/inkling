@@ -1,13 +1,15 @@
 {
   "name": "@earendil-works/inkling-runtime-node",
   "version": "0.0.0",
-  "private": true,
+  "description": "Node.js runtime adapters and local server for Inkling.",
   "type": "module",
   "exports": {
     ".": "./src/server.ts"
   },
   "scripts": {
+    "build:package": "rm -rf dist && tsc -p tsconfig.build.json && node ../../scripts/fix-declaration-imports.mjs dist",
     "dev": "node --watch src/main.ts",
+    "prepublishOnly": "echo 'Publish from the repository root with pnpm release' >&2 && exit 1",
     "start": "node src/main.ts",
     "test": "node --test test/*.test.ts",
     "typecheck": "tsc -p tsconfig.json"
@@ -16,6 +18,7 @@
     "@earendil-works/inkling-backend": "workspace:*",
     "@earendil-works/inkling-collaboration": "workspace:*",
     "@earendil-works/inkling-core": "workspace:*",
+    "@earendil-works/inkling-frontend": "workspace:*",
     "@earendil-works/inkling-protocol": "workspace:*",
     "@earendil-works/inkling-renderer": "workspace:*",
     "@effect/platform": "0.97.1",

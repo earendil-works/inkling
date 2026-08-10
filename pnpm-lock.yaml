@@ -244,6 +244,9 @@ importers:
       '@earendil-works/inkling-core':
         specifier: workspace:*
         version: link:../core
+      '@earendil-works/inkling-frontend':
+        specifier: workspace:*
+        version: link:../frontend
       '@earendil-works/inkling-protocol':
         specifier: workspace:*
         version: link:../protocol

@@ -1,0 +1,75 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Stable package version to publish (for example, 0.1.0)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: npm-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: npm
+    steps:
+      - name: Require the main branch
+        if: github.ref != 'refs/heads/main'
+        run: exit 1
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - run: npm install --global npm@11.15.0
+      - run: pnpm install --frozen-lockfile
+      - run: make check
+      - name: Set the release version
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: pnpm release:version "$RELEASE_VERSION"
+      - name: Commit the release version
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          git add packages/*/package.json
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "chore: release $RELEASE_VERSION"
+            git push origin HEAD:main
+          fi
+      - name: Publish packages
+        run: pnpm release
+      - name: Tag the release
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          tag="v$RELEASE_VERSION"
+          if git rev-parse --verify --quiet "refs/tags/$tag"; then
+            test "$(git rev-list -n 1 "$tag")" = "$(git rev-parse HEAD)"
+          else
+            git tag --annotate "$tag" --message "Inkling $RELEASE_VERSION"
+            git push origin "$tag"
+          fi
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          tag="v$RELEASE_VERSION"
+          gh release view "$tag" >/dev/null 2>&1 || \
+            gh release create "$tag" --verify-tag --generate-notes --title "Inkling $RELEASE_VERSION"

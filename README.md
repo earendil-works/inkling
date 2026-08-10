@@ -105,4 +105,5 @@ to set the guest comment name.
 Inkling can run as a self-contained Node.js service backed by the filesystem or
 on Cloudflare using Durable Objects and R2. See [`DEPLOYMENT.md`](DEPLOYMENT.md)
 for local setup, Google OAuth configuration, Docker, and production deployment
-instructions.
+instructions. Maintainers can find the npm package process in
+[`RELEASING.md`](RELEASING.md).

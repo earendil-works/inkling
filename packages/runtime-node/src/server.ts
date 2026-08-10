@@ -86,9 +86,11 @@ export function startServer(
       runtime,
       version: options.version,
     });
-    const frontendRoot = path.resolve(
-      path.dirname(fileURLToPath(import.meta.url)),
-      "../../frontend/dist",
+    const frontendRoot = path.join(
+      path.dirname(
+        fileURLToPath(import.meta.resolve("@earendil-works/inkling-frontend/package.json")),
+      ),
+      "dist",
     );
     app.get("/trash", serveStatic({ path: "index.html", root: frontendRoot }));
     app.get("/documents/*", serveStatic({ path: "index.html", root: frontendRoot }));

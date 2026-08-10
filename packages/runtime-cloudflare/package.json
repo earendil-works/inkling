@@ -1,15 +1,17 @@
 {
   "name": "@earendil-works/inkling-runtime-cloudflare",
   "version": "0.0.0",
-  "private": true,
+  "description": "Cloudflare Worker, Durable Object, alarm, and R2 adapters for Inkling.",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
     "build": "wrangler deploy --dry-run --outdir dist",
+    "build:package": "rm -rf dist && tsc -p tsconfig.build.json && node ../../scripts/fix-declaration-imports.mjs dist",
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
+    "prepublishOnly": "echo 'Publish from the repository root with pnpm release' >&2 && exit 1",
     "test": "node --test test/*.test.ts",
     "typecheck": "tsc -p tsconfig.json"
   },

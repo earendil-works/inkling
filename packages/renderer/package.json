@@ -1,12 +1,14 @@
 {
   "name": "@earendil-works/inkling-renderer",
   "version": "0.0.0",
-  "private": true,
+  "description": "Deterministic safe Markdown rendering for Inkling.",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
+    "build:package": "rm -rf dist && tsc -p tsconfig.build.json && node ../../scripts/fix-declaration-imports.mjs dist",
+    "prepublishOnly": "echo 'Publish from the repository root with pnpm release' >&2 && exit 1",
     "test": "node --test test/*.test.ts",
     "typecheck": "tsc -p tsconfig.json"
   },

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "pnpm --parallel --filter @earendil-works/inkling-runtime-cloudflare --filter @earendil-works/inkling-frontend run dev",
     "build": "pnpm --filter @earendil-works/inkling-frontend run build && pnpm --filter @earendil-works/inkling-runtime-cloudflare run build",
+    "build:packages": "pnpm --recursive --if-present run build:package",
     "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
@@ -13,7 +14,13 @@
     "test": "pnpm --recursive --if-present run test",
     "typecheck": "tsc -p scripts/tsconfig.json && pnpm --recursive --if-present run typecheck",
     "import-rfcs": "node scripts/import-rfcs.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "release": "pnpm run release:prepare && node scripts/publish-release-packages.mjs",
+    "release:pack": "pnpm run release:prepare && node scripts/pack-release-packages.mjs",
+    "release:prepare": "pnpm run build:packages && node scripts/prepare-release-packages.mjs",
+    "release:prime": "node scripts/prime-npm-packages.mjs",
+    "release:trust": "node scripts/configure-npm-trust.mjs",
+    "release:version": "node scripts/version-release-packages.mjs"
   },
   "devDependencies": {
     "@types/node": "25.0.3",

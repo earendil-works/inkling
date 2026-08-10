@@ -1,12 +1,14 @@
 {
   "name": "@earendil-works/inkling-cli",
   "version": "0.0.0",
-  "private": true,
+  "description": "Command-line client and local server launcher for Inkling.",
   "bin": {
     "inkling": "./src/main.ts"
   },
   "type": "module",
   "scripts": {
+    "build:package": "rm -rf dist && tsc -p tsconfig.build.json && node ../../scripts/fix-declaration-imports.mjs dist",
+    "prepublishOnly": "echo 'Publish from the repository root with pnpm release' >&2 && exit 1",
     "test": "node --test test/*.test.ts",
     "typecheck": "tsc -p tsconfig.json"
   },

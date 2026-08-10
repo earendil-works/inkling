@@ -1,12 +1,17 @@
 {
   "name": "@earendil-works/inkling-frontend",
   "version": "0.0.0",
-  "private": true,
+  "description": "Browser application assets for Inkling.",
   "type": "module",
+  "exports": {
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "build": "vite build",
+    "build:package": "vite build",
     "dev": "vite",
     "preview": "vite preview",
+    "prepublishOnly": "echo 'Publish from the repository root with pnpm release' >&2 && exit 1",
     "test": "vite build && node --test test/*.test.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
