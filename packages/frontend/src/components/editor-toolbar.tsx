@@ -28,7 +28,7 @@ export interface EditorToolbarProps {
   readonly metadata: DocumentMetadataDto;
   readonly onAttachment: (attachment: AttachmentMetadataDto) => void;
   readonly onDelete: () => void;
-  readonly onHistoryPreview: (document: DocumentResponse | undefined) => void;
+  readonly onHistoryPreview: HistoryControlProps["onPreview"];
   readonly onHistoryRestored: (document: DocumentResponse) => void;
   readonly onMetadataChanged: (metadata: DocumentMetadataDto) => void;
   readonly onOpenComments: () => void;

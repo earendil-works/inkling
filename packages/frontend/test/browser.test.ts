@@ -194,17 +194,35 @@ test(
 
       await first.locator(".cm-content").click();
       await first.keyboard.press("ControlOrMeta+End");
-      await first.keyboard.insertText("\n\nHistory restore marker");
+      await first.keyboard.insertText("\n\nHistory highlight target");
+      await first.waitForFunction(
+        () => document.querySelector("[data-save-state]")?.textContent === "Saved",
+      );
+      const historyTargetLine = first.locator(".cm-line", {
+        hasText: "History highlight target",
+      });
+      await historyTargetLine.click();
+      await first.keyboard.press("End");
+      await first.keyboard.press("Shift+Home");
+      await first.keyboard.insertText("History restore marker");
       await first.waitForFunction(
         () => document.querySelector("[data-save-state]")?.textContent === "Saved",
       );
       await first.locator("[data-history-toggle]").click();
       await first.waitForSelector("[data-history-dropdown]");
-      await first.locator("[data-history-slider]").fill("0");
+      const historySlider = first.locator("[data-history-slider]");
+      const previousHistoryIndex = Number(await historySlider.getAttribute("max")) - 1;
+      assert.ok(previousHistoryIndex > 0);
+      await historySlider.fill(String(previousHistoryIndex));
+      const selectedHistoryRevision = await first
+        .locator("[data-history-revision]")
+        .getAttribute("data-history-revision");
+      assert.ok(selectedHistoryRevision !== null);
       await first.waitForFunction(
-        () =>
+        (revision) =>
           document.querySelector("[data-preview-pane] [data-pane-label] span")?.textContent ===
-          "Revision 0",
+          `Revision ${revision}`,
+        selectedHistoryRevision,
       );
       await first.waitForFunction(
         () =>
@@ -213,9 +231,18 @@ test(
             ?.textContent?.includes("History restore marker"),
       );
       await first.waitForFunction(
-        () =>
+        (revision) =>
           document.querySelector("[data-source-pane] [data-pane-label] span")?.textContent ===
-          "Revision 0 · Markdown",
+          `Revision ${revision} · Markdown`,
+        selectedHistoryRevision,
+      );
+      await Promise.all([
+        first.locator("[data-history-editor] [data-history-change]").first().waitFor(),
+        first.locator("[data-preview] [data-history-change]").first().waitFor(),
+      ]);
+      assert.match(await first.locator("[data-preview]").innerText(), /History highlight target/u);
+      await first.waitForFunction(
+        () => document.querySelectorAll("[data-history-change]").length === 0,
       );
       assert.doesNotMatch(
         await first.locator("[data-history-editor] .cm-content").innerText(),
@@ -242,6 +269,22 @@ test(
           !document
             .querySelector("[data-editor] .cm-content")
             ?.textContent?.includes("History restore marker"),
+      );
+      await first.waitForFunction(
+        () => document.querySelector("[data-save-state]")?.textContent === "Saved",
+      );
+      const restoredHistoryTarget = first.locator(".cm-line", {
+        hasText: "History highlight target",
+      });
+      await restoredHistoryTarget.click();
+      await first.keyboard.press("End");
+      await first.keyboard.press("Shift+Home");
+      await first.keyboard.press("Backspace");
+      await first.waitForFunction(
+        () =>
+          !document
+            .querySelector("[data-preview]")
+            ?.textContent?.includes("History highlight target"),
       );
       await first.waitForFunction(
         () => document.querySelector("[data-save-state]")?.textContent === "Saved",

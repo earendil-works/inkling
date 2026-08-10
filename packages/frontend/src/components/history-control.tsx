@@ -7,10 +7,17 @@ import type { ApiClientService, ApiError } from "../api.ts";
 import { useAppContext } from "../app-context.tsx";
 import type { CollaborationClientError } from "../collaboration.ts";
 import { useEffectAction, useEffectQuery } from "../effect-hooks.ts";
+import { historyChangeRanges } from "../history-diff.ts";
+import type { HistoryChangeRange } from "../history-diff.ts";
 import { Button } from "./button.tsx";
 import { ConfirmationDialog } from "./confirmation-dialog.tsx";
 import { FormError } from "./form-error.tsx";
 import styles from "./history-control.module.css";
+
+export interface HistoryPreview {
+  readonly changes: readonly HistoryChangeRange[];
+  readonly document: DocumentResponse;
+}
 
 export interface HistoryControlProps {
   readonly api: ApiClientService;
@@ -18,7 +25,7 @@ export interface HistoryControlProps {
   readonly canRestore: boolean;
   readonly currentRevision: number;
   readonly documentId: string;
-  readonly onPreview: (document: DocumentResponse | undefined) => void;
+  readonly onPreview: (preview: HistoryPreview | undefined) => void;
   readonly onRestored: (document: DocumentResponse) => void;
 }
 
@@ -33,6 +40,7 @@ export function HistoryControl({
 }: HistoryControlProps): React.JSX.Element {
   const { showToast } = useAppContext();
   const detailsRef = useRef<HTMLDetailsElement>(null);
+  const revisionCacheRef = useRef(new Map<number, DocumentResponse>());
   const [open, setOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [restoreCandidate, setRestoreCandidate] = useState<DocumentHistoryVersionDto>();
@@ -42,8 +50,22 @@ export function HistoryControl({
       : Effect.succeed(undefined),
     `document-history:${documentId}:${open ? "open" : "closed"}`,
   );
-  const previewAction = useEffectAction<number, DocumentResponse, ApiError>((revision) =>
-    api.readDocumentHistoryRevision(documentId, revision),
+  const previewAction = useEffectAction<
+    { readonly previousRevision: number | undefined; readonly revision: number },
+    HistoryPreview,
+    ApiError
+  >(({ previousRevision, revision }) =>
+    Effect.gen(function* () {
+      const document = yield* loadRevision(api, documentId, revision, revisionCacheRef.current);
+      if (previousRevision === undefined) return { changes: [], document };
+      const previous = yield* loadRevision(
+        api,
+        documentId,
+        previousRevision,
+        revisionCacheRef.current,
+      );
+      return { changes: historyChangeRanges(previous.body, document.body), document };
+    }),
   );
   const restoreAction = useEffectAction<
     { readonly expectedRevision: number; readonly revision: number },
@@ -97,10 +119,13 @@ export function HistoryControl({
       onPreview(undefined);
       return;
     }
-    previewAction.execute(version.revision, {
-      onFailure: () => onPreview(undefined),
-      onSuccess: onPreview,
-    });
+    previewAction.execute(
+      { previousRevision: versions[index - 1]?.revision, revision: version.revision },
+      {
+        onFailure: () => onPreview(undefined),
+        onSuccess: onPreview,
+      },
+    );
   };
 
   return (
@@ -162,9 +187,9 @@ export function HistoryControl({
                   {selected.revision === currentRevision ? (
                     <small>The editor and preview show this version.</small>
                   ) : previewAction.state.pending ? (
-                    <small>Loading this revision into the preview…</small>
+                    <small>Loading this revision into the editor and preview…</small>
                   ) : (
-                    <small>The preview pane shows this retained revision.</small>
+                    <small>Changed lines briefly pulse in the editor and preview.</small>
                   )}
                 </article>
               )}
@@ -222,6 +247,19 @@ export function HistoryControl({
       />
     </>
   );
+}
+
+function loadRevision(
+  api: ApiClientService,
+  documentId: string,
+  revision: number,
+  cache: Map<number, DocumentResponse>,
+): Effect.Effect<DocumentResponse, ApiError> {
+  const cached = cache.get(revision);
+  if (cached !== undefined) return Effect.succeed(cached);
+  return api
+    .readDocumentHistoryRevision(documentId, revision)
+    .pipe(Effect.tap((document) => Effect.sync(() => cache.set(revision, document))));
 }
 
 function versionLabel(version: DocumentHistoryVersionDto): string {

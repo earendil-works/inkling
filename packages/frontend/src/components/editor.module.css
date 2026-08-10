@@ -214,6 +214,55 @@
   background: var(--editor-active-line-background);
 }
 
+.historyChangedLine {
+  animation: history-source-pulse 1.3s ease-out both;
+}
+
+.historyChangedPreview {
+  animation: history-preview-pulse 1.3s ease-out both;
+  border-radius: 2px;
+}
+
+@keyframes history-source-pulse {
+  0%,
+  24% {
+    background: color-mix(in oklab, var(--accent) 28%, transparent);
+    box-shadow: inset 3px 0 var(--accent);
+  }
+
+  100% {
+    background: transparent;
+    box-shadow: inset 3px 0 transparent;
+  }
+}
+
+@keyframes history-preview-pulse {
+  0%,
+  24% {
+    background-color: color-mix(in oklab, var(--accent) 20%, transparent);
+    box-shadow: -4px 0 var(--accent);
+  }
+
+  100% {
+    background-color: transparent;
+    box-shadow: -4px 0 transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .historyChangedLine {
+    animation: none;
+    background: color-mix(in oklab, var(--accent) 22%, transparent);
+    box-shadow: inset 3px 0 var(--accent);
+  }
+
+  .historyChangedPreview {
+    animation: none;
+    background-color: color-mix(in oklab, var(--accent) 16%, transparent);
+    box-shadow: -4px 0 var(--accent);
+  }
+}
+
 .editorHost :global(.cm-editor.cm-focused) {
   outline: 0;
 }

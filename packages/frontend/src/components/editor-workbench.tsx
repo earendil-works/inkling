@@ -2,8 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { markdown } from "@codemirror/lang-markdown";
 import { yamlFrontmatter } from "@codemirror/lang-yaml";
 import { syntaxHighlighting } from "@codemirror/language";
-import { Compartment, EditorState } from "@codemirror/state";
+import { Compartment, EditorState, StateEffect, StateField } from "@codemirror/state";
+import type { Range, Text } from "@codemirror/state";
 import { oneDarkTheme } from "@codemirror/theme-one-dark";
+import { Decoration } from "@codemirror/view";
+import type { DecorationSet } from "@codemirror/view";
 import { basicSetup, EditorView } from "codemirror";
 import { Effect, Fiber } from "effect";
 
@@ -18,6 +21,7 @@ import type { ConnectionState } from "../collaboration.ts";
 import { selectedPreviewSourceRange } from "../comments.ts";
 import type { PreviewSourceRange } from "../comments.ts";
 import { browserRuntime } from "../effect-runtime.ts";
+import type { HistoryChangeRange } from "../history-diff.ts";
 import { renderMermaid } from "../markdown.tsx";
 import { Button } from "./button.tsx";
 import { DocumentPage } from "./document-page.tsx";
@@ -32,6 +36,7 @@ export interface EditorWorkbenchProps {
   readonly onPreviewRendered: () => void;
   readonly onPreviewSelection: (range: PreviewSourceRange | undefined) => void;
   readonly historyBody?: string | undefined;
+  readonly historyChanges?: readonly HistoryChangeRange[] | undefined;
   readonly previewHeadings: readonly RenderHeading[];
   readonly previewHtml: string;
   readonly previewLabel?: string | undefined;
@@ -48,6 +53,7 @@ export function EditorWorkbench({
   onPreviewRendered,
   onPreviewSelection,
   historyBody,
+  historyChanges = emptyHistoryChanges,
   previewHeadings,
   previewHtml,
   previewLabel,
@@ -58,7 +64,11 @@ export function EditorWorkbench({
   const renderedCallbackRef = useRef(onPreviewRendered);
   const previewScrollerRef = useRef<HTMLDivElement>(null);
   const historyEditorHostRef = useRef<HTMLDivElement>(null);
-  const historyEditor = useHistoricalMarkdownEditor(historyBody, historyEditorHostRef);
+  const historyEditor = useHistoricalMarkdownEditor(
+    historyBody,
+    historyChanges,
+    historyEditorHostRef,
+  );
   renderedCallbackRef.current = onPreviewRendered;
   useSynchronizedScrolling(
     historyEditor ?? editor,
@@ -75,15 +85,22 @@ export function EditorWorkbench({
       renderedCallbackRef.current();
       return;
     }
+    const changedElements = markChangedPreviewBlocks(preview, historyChanges);
+    const highlightTimer =
+      changedElements.length === 0
+        ? undefined
+        : window.setTimeout(() => clearPreviewHighlights(changedElements), highlightDuration);
     const fiber = browserRuntime.runFork(
       renderMermaid(preview).pipe(
         Effect.ensuring(Effect.sync(() => renderedCallbackRef.current())),
       ),
     );
     return () => {
+      if (highlightTimer !== undefined) window.clearTimeout(highlightTimer);
+      clearPreviewHighlights(changedElements);
       browserRuntime.runFork(Fiber.interrupt(fiber));
     };
-  }, [previewHtml, previewRef]);
+  }, [historyChanges, previewHtml, previewRef]);
 
   const capturePreviewSelection = (): void => {
     window.setTimeout(() => {
@@ -154,8 +171,26 @@ export function EditorWorkbench({
   );
 }
 
+const emptyHistoryChanges: readonly HistoryChangeRange[] = [];
+const highlightDuration = 1_300;
+const replaceHistoryHighlights = StateEffect.define<readonly HistoryChangeRange[]>();
+const historyHighlightField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  provide: (field) => EditorView.decorations.from(field),
+  update: (decorations, transaction) => {
+    let next = decorations.map(transaction.changes);
+    for (const effect of transaction.effects) {
+      if (effect.is(replaceHistoryHighlights)) {
+        next = historyLineDecorations(transaction.state.doc, effect.value);
+      }
+    }
+    return next;
+  },
+});
+
 function useHistoricalMarkdownEditor(
   body: string | undefined,
+  changes: readonly HistoryChangeRange[],
   hostRef: React.RefObject<HTMLDivElement | null>,
 ): EditorView | undefined {
   const [editor, setEditor] = useState<EditorView>();
@@ -184,6 +219,7 @@ function useHistoricalMarkdownEditor(
           }),
           EditorState.readOnly.of(true),
           EditorView.editable.of(false),
+          historyHighlightField,
           theme.of(document.documentElement.dataset["theme"] === "dark" ? oneDarkTheme : []),
           EditorView.lineWrapping,
         ],
@@ -210,11 +246,100 @@ function useHistoricalMarkdownEditor(
   useEffect(() => {
     if (body === undefined || editor === undefined) return;
     const current = editor.state.doc.toString();
-    if (current === body) return;
-    editor.dispatch({ changes: { from: 0, insert: body, to: current.length } });
-  }, [body, editor]);
+    const effects: StateEffect<unknown>[] = [replaceHistoryHighlights.of(changes)];
+    const firstChange = changes[0];
+    if (firstChange !== undefined) {
+      effects.push(
+        EditorView.scrollIntoView(Math.min(firstChange.from, body.length), { y: "center" }),
+      );
+    }
+    editor.dispatch(
+      current === body
+        ? { effects }
+        : { changes: { from: 0, insert: body, to: current.length }, effects },
+    );
+    if (changes.length === 0) return;
+    const timer = window.setTimeout(() => {
+      editor.dispatch({ effects: replaceHistoryHighlights.of(emptyHistoryChanges) });
+    }, highlightDuration);
+    return () => window.clearTimeout(timer);
+  }, [body, changes, editor]);
 
   return active ? editor : undefined;
+}
+
+function historyLineDecorations(
+  document: Text,
+  changes: readonly HistoryChangeRange[],
+): DecorationSet {
+  const decorations: Range<Decoration>[] = [];
+  const decoratedLines = new Set<number>();
+  for (const change of changes) {
+    const from = Math.max(0, Math.min(change.from, document.length));
+    const target = Math.max(from, Math.min(Math.max(change.from, change.to - 1), document.length));
+    let line = document.lineAt(from);
+    while (true) {
+      if (!decoratedLines.has(line.from)) {
+        decoratedLines.add(line.from);
+        decorations.push(
+          Decoration.line({
+            attributes: { "data-history-change": "" },
+            class: styles["historyChangedLine"] ?? "",
+          }).range(line.from),
+        );
+      }
+      if (line.to >= target || line.number === document.lines) break;
+      line = document.line(line.number + 1);
+    }
+  }
+  return Decoration.set(decorations, true);
+}
+
+function markChangedPreviewBlocks(
+  preview: HTMLElement,
+  changes: readonly HistoryChangeRange[],
+): readonly HTMLElement[] {
+  if (changes.length === 0) return [];
+  const overlapping = [
+    ...preview.querySelectorAll<HTMLElement>("[data-inkling-source-start]"),
+  ].filter((element) => elementOverlapsChanges(element, changes));
+  const selected = new Set(overlapping);
+  for (const element of overlapping) {
+    let parent = element.parentElement;
+    while (parent !== null && parent !== preview) {
+      selected.delete(parent);
+      parent = parent.parentElement;
+    }
+  }
+  const elements = [...selected];
+  const className = styles["historyChangedPreview"];
+  for (const element of elements) {
+    if (className !== undefined) element.classList.add(className);
+    element.dataset["historyChange"] = "";
+  }
+  return elements;
+}
+
+function elementOverlapsChanges(
+  element: HTMLElement,
+  changes: readonly HistoryChangeRange[],
+): boolean {
+  const start = Number(element.dataset["inklingSourceStart"]);
+  const end = Number(element.dataset["inklingSourceEnd"]);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return false;
+  return changes.some((change) =>
+    change.from === change.to
+      ? start <= change.from && change.from <= end
+      : start < change.to && change.from < end,
+  );
+}
+
+function clearPreviewHighlights(elements: readonly HTMLElement[]): void {
+  const className = styles["historyChangedPreview"];
+  for (const element of elements) {
+    if (className !== undefined) element.classList.remove(className);
+    delete element.dataset["historyChange"];
+  }
 }
 
 interface PreviewSourceSegment {

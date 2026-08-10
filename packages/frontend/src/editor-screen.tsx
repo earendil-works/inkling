@@ -13,6 +13,7 @@ import { EditorComments } from "./components/editor-comments.tsx";
 import type { EditorCommentsHandle } from "./components/editor-comments.tsx";
 import { EditorToolbar } from "./components/editor-toolbar.tsx";
 import { connectionLabel, EditorWorkbench } from "./components/editor-workbench.tsx";
+import type { HistoryPreview } from "./components/history-control.tsx";
 import { GuestIdentityDialog } from "./components/guest-identity-dialog.tsx";
 import { useEffectAction } from "./effect-hooks.ts";
 import { useRenderedMarkdown } from "./markdown.tsx";
@@ -43,7 +44,7 @@ export function EditorScreen({
   const editorCommentsRef = useRef<EditorCommentsHandle>(null);
   const [metadata, setMetadata] = useState(initial.metadata);
   const [comments, setComments] = useState(initial.comments);
-  const [historyPreview, setHistoryPreview] = useState<DocumentResponse>();
+  const [historyPreview, setHistoryPreview] = useState<HistoryPreview>();
   const [displayName, setDisplayName] = useState<string | undefined>(() =>
     shared ? storedGuestName() : (account?.displayName ?? "Workspace member"),
   );
@@ -94,7 +95,7 @@ export function EditorScreen({
   const canDelete = permissions?.includes("delete") ?? false;
   const canEditMetadata = permissions?.includes("edit-metadata") ?? !shared;
   const rendered = useRenderedMarkdown(body, true);
-  const historyRendered = useRenderedMarkdown(historyPreview?.body ?? "", true);
+  const historyRendered = useRenderedMarkdown(historyPreview?.document.body ?? "", true);
   const publishDisabledLabel =
     connectionState === "connecting"
       ? "Connecting…"
@@ -123,7 +124,7 @@ export function EditorScreen({
     historyPreview === undefined
       ? previewMetadata
       : metadataWithFrontmatter(
-          historyPreview.metadata,
+          historyPreview.document.metadata,
           historyRendered.frontmatter,
           historyRendered.title,
           frontmatterVocabulary.people,
@@ -178,9 +179,9 @@ export function EditorScreen({
           });
         }}
         onDelete={() => setDeleteOpen(true)}
-        onHistoryPreview={(document) => {
-          setHistoryPreview(document);
-          if (document !== undefined) setPreviewOpen(true);
+        onHistoryPreview={(preview) => {
+          setHistoryPreview(preview);
+          if (preview !== undefined) setPreviewOpen(true);
         }}
         onHistoryRestored={(document) => {
           setHistoryPreview(undefined);
@@ -215,13 +216,14 @@ export function EditorScreen({
         onPreviewSelection={(range) => {
           if (historyPreview === undefined) editorCommentsRef.current?.setPreviewSelection(range);
         }}
-        historyBody={historyPreview?.body}
+        historyBody={historyPreview?.document.body}
+        historyChanges={historyPreview?.changes}
         previewHeadings={displayedPreview.headings}
         previewHtml={displayedPreview.html}
         previewLabel={
           historyPreview === undefined
             ? undefined
-            : `Revision ${historyPreview.metadata.headRevision}`
+            : `Revision ${historyPreview.document.metadata.headRevision}`
         }
         previewRef={previewRef}
         metadata={displayedPreviewMetadata}
