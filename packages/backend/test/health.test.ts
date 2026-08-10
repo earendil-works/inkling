@@ -38,6 +38,10 @@ test("unavailable resources put the agent handoff at the start of default HTML",
   assert.match(response.headers.get("link") ?? "", /<https:\/\/rfcs\.example\.com\/AGENTS\.md>/u);
   assert.ok(body.indexOf("INKLING AGENT HANDOFF") < 128);
   assert.ok(body.indexOf("/AGENTS.md") < 256);
+  const visibleBody = body.slice(body.indexOf("<body>"));
+  assert.match(visibleBody, /INKLING AGENT HANDOFF/u);
+  assert.match(visibleBody, /do not summarize this application response/u);
+  assert.match(visibleBody, /inkling read/u);
   assert.doesNotMatch(body, /0057/u);
 });
 

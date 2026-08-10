@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { generateKeyPairSync, sign } from "node:crypto";
-import { access, mkdtemp, rm } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { createServer as createHttpServer } from "node:http";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -11,6 +11,22 @@ import test from "node:test";
 import { chromium } from "playwright-core";
 
 const browserExecutable = await findBrowser();
+
+test("the application shell keeps agent instructions in visible body text", async () => {
+  const html = await readFile(new URL("../dist/index.html", import.meta.url), "utf8");
+  assert.match(html, /\[data-agent-handoff\][^{]*\{[^}]*font-size:\s*0/su);
+  const body = /<body[^>]*>([\s\S]*?)<\/body>/u.exec(html)?.[1];
+  assert.ok(body);
+  const visibleText = body
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gu, " ")
+    .replace(/<[^>]+>/gu, " ")
+    .replace(/\s+/gu, " ");
+
+  assert.match(visibleText, /INKLING AGENT HANDOFF/u);
+  assert.match(visibleText, /do not summarize this application shell/u);
+  assert.match(visibleText, /\/AGENTS\.md/u);
+  assert.match(visibleText, /inkling read/u);
+});
 
 test(
   "browser pages read, collaborate, comment, preview, and honor share revocation",
