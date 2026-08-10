@@ -1,6 +1,6 @@
 {
   "name": "@earendil-works/inkling-frontend",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Browser application assets for Inkling.",
   "type": "module",
   "exports": {

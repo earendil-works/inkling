@@ -1,6 +1,6 @@
 {
   "name": "@earendil-works/inkling-runtime-cloudflare",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Cloudflare Worker, Durable Object, alarm, and R2 adapters for Inkling.",
   "type": "module",
   "exports": {

@@ -1,6 +1,6 @@
 {
   "name": "@earendil-works/inkling-protocol",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Versioned HTTP and WebSocket contracts for Inkling.",
   "type": "module",
   "exports": {

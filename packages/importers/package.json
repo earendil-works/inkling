@@ -1,6 +1,6 @@
 {
   "name": "@earendil-works/inkling-importers",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Legacy Jot and Earendil RFC importers for Inkling.",
   "type": "module",
   "exports": {

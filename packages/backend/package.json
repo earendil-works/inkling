@@ -1,6 +1,6 @@
 {
   "name": "@earendil-works/inkling-backend",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Runtime-neutral Fetch API composition for Inkling.",
   "type": "module",
   "exports": {

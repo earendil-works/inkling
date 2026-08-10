@@ -1,6 +1,6 @@
 {
   "name": "@earendil-works/inkling-core",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Runtime-independent Inkling domain models and application contracts.",
   "type": "module",
   "exports": {

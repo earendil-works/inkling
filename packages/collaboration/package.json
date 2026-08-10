@@ -1,6 +1,6 @@
 {
   "name": "@earendil-works/inkling-collaboration",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Shared Yjs collaboration behavior for Inkling clients and authorities.",
   "type": "module",
   "exports": {

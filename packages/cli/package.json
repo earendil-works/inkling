@@ -1,6 +1,6 @@
 {
   "name": "@earendil-works/inkling-cli",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Command-line client and local server launcher for Inkling.",
   "bin": {
     "inkling": "./src/main.ts"

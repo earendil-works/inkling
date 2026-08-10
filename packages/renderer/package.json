@@ -1,6 +1,6 @@
 {
   "name": "@earendil-works/inkling-renderer",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Deterministic safe Markdown rendering for Inkling.",
   "type": "module",
   "exports": {
