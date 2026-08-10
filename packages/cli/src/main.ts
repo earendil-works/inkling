@@ -14,7 +14,7 @@ import type { DocumentResponse } from "@earendil-works/inkling-protocol";
 import { makeCliClient } from "./client.ts";
 import type { CliClient } from "./client.ts";
 import { loadConfig, saveConfig, selectedInstance, upsertInstance } from "./config.ts";
-import type { Instance } from "./config.ts";
+import type { Config, Instance } from "./config.ts";
 import { renderHelp, requestedHelp } from "./help.ts";
 
 if (import.meta.main) {
@@ -59,7 +59,7 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
 
   return Effect.gen(function* () {
     const config = yield* loadConfig();
-    const instance = yield* selectedInstance(config);
+    const instance = yield* commandInstance(config, command, arguments_);
     const client = makeCliClient(instance);
 
     switch (command) {
@@ -145,9 +145,9 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
         return;
       }
       case "read": {
-        const id = yield* documentArgument(instance, arguments_, 1);
+        const target = yield* readTarget(client, instance, arguments_, 1);
         const range = yield* parseRange(option(arguments_, "--lines"));
-        printDocument(yield* client.read(id, range));
+        printDocument(yield* client.read(target.documentId, range, target.published));
         return;
       }
       case "create": {
@@ -529,6 +529,95 @@ function parseRange(
     end: positiveInteger(match[2], "end line"),
     start: positiveInteger(match[1], "start line"),
   });
+}
+
+function commandInstance(
+  config: Config,
+  command: string,
+  arguments_: readonly string[],
+): Effect.Effect<Instance, Error> {
+  const url = command === "read" ? optionalHttpUrl(arguments_[1]) : undefined;
+  if (url === undefined) return selectedInstance(config);
+  const matching = config.instances.filter((instance) => {
+    try {
+      return new URL(instance.baseUrl).origin === url.origin;
+    } catch {
+      return false;
+    }
+  });
+  const apiKeyMatches = matching.filter((candidate) => candidate.apiKey !== undefined);
+  const eligible = url.pathname.startsWith("/share/")
+    ? matching
+    : apiKeyMatches.length > 0
+      ? apiKeyMatches
+      : url.pathname.startsWith("/rfcs/")
+        ? []
+        : matching;
+  const requestedName = process.env["INKLING_INSTANCE"] ?? config.active;
+  const instance = eligible.find((candidate) => candidate.name === requestedName) ?? eligible[0];
+  return instance === undefined
+    ? usageFailure(
+        `No Inkling instance is configured for ${url.origin}. Read ${url.origin}/AGENTS.md and ask the user to connect it.`,
+      )
+    : Effect.succeed(instance);
+}
+
+function readTarget(
+  client: CliClient,
+  instance: Instance,
+  arguments_: readonly string[],
+  index: number,
+): Effect.Effect<{ readonly documentId: string; readonly published: boolean }, Error> {
+  if (instance.documentId !== undefined && arguments_[index] === undefined) {
+    return Effect.succeed({ documentId: instance.documentId, published: false });
+  }
+  return argument(arguments_, index, "document id or URL").pipe(
+    Effect.flatMap((value) => {
+      const url = optionalHttpUrl(value);
+      if (url === undefined) return Effect.succeed({ documentId: value, published: false });
+      const document = /^\/(?:public\/)?documents\/([^/]+)(?:\/(edit))?\/?$/u.exec(url.pathname);
+      const shared = /^\/share\/([^/]+)(?:\/(edit))?\/?$/u.exec(url.pathname);
+      const direct = document ?? shared;
+      if (direct?.[1] !== undefined) {
+        try {
+          return Effect.succeed({
+            documentId: decodeURIComponent(direct[1]),
+            published: direct[2] !== "edit",
+          });
+        } catch {
+          return usageFailure("The Inkling document URL is invalid.");
+        }
+      }
+      const rfc = /^\/rfcs\/(\d+)(?:\/(edit))?\/?$/u.exec(url.pathname);
+      const number = Number(rfc?.[1]);
+      if (rfc?.[1] === undefined || !Number.isSafeInteger(number) || number < 1) {
+        return usageFailure("The URL is not a supported Inkling document URL.");
+      }
+      return client.list(`rfc:${number}`).pipe(
+        Effect.flatMap((catalog) => {
+          const match = catalog.documents.find(
+            (candidate) => candidate.metadata.rfcNumber === number,
+          );
+          return match === undefined
+            ? usageFailure(`RFC ${String(number).padStart(4, "0")} is not available.`)
+            : Effect.succeed({
+                documentId: match.metadata.id,
+                published: rfc[2] !== "edit",
+              });
+        }),
+      );
+    }),
+  );
+}
+
+function optionalHttpUrl(value: string | undefined): URL | undefined {
+  if (value === undefined) return undefined;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? url : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function documentTarget(

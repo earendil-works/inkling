@@ -82,18 +82,23 @@ test(
       assert.equal(await first.locator("[data-settings-dialog] h2").textContent(), "API keys");
       assert.match(
         (await first.locator("[data-settings-note]").textContent()) ?? "",
-        /belong to your account/u,
+        /Reuse an active key/u,
       );
       await first.getByLabel("Key name").fill("Browser agent");
       await first.getByRole("button", { name: "Create API key" }).click();
       const revealedKey = (await first.locator("[data-api-key-secret]").textContent()) ?? "";
       assert.match(revealedKey, /^key_[0-9A-Za-z]+\./u);
-      assert.doesNotMatch(
-        (await first.locator("[data-api-key-reveal]").textContent()) ?? "",
-        /inkling instance add/u,
-      );
       assert.equal(await first.locator("[data-copy-api-key]").textContent(), "Copy API key");
+      assert.equal(await first.getByRole("button", { name: "Create another key" }).count(), 1);
       await first.getByLabel("Close API keys").click();
+
+      await first.locator("[data-account-trigger]").click();
+      await first.locator("[data-open-api-keys]").click();
+      assert.equal(await first.locator("[data-api-key-secret]").count(), 0);
+      await first.locator("[data-show-api-key]").click();
+      assert.equal((await first.locator("[data-api-key-secret]").textContent()) ?? "", revealedKey);
+      await first.getByLabel("Close API keys").click();
+
       const initialTheme = await first.locator("html").getAttribute("data-theme");
       await first.locator("[data-theme-toggle]").dblclick();
       assert.notEqual(await first.locator("html").getAttribute("data-theme"), initialTheme);

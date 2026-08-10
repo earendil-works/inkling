@@ -21,6 +21,8 @@ export interface ApiKeyRecord {
   readonly id: string;
   readonly label: string;
   readonly tokenHash: string;
+  /** Retained so the signed-in owner can reveal and reuse the key. */
+  readonly retainedSecret?: string | undefined;
   readonly createdAt: string;
   /** Optional only while decoding legacy keys, which are invalid until recreated by a user. */
   readonly personId?: PersonId | undefined;
@@ -188,6 +190,7 @@ export function createApiKey(
       id,
       label: normalizedLabel,
       personId: identity.personId,
+      retainedSecret: secret,
       role: identity.role,
       tokenHash: yield* hasher.hash(secret),
     };

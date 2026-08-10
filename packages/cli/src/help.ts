@@ -136,10 +136,19 @@ const helpTopics: Readonly<Record<string, HelpTopic>> = {
     usage: ["inkling repair"],
   },
   read: {
-    arguments: [["DOCUMENT", "Document ID. Omit it when using a shared-document instance."]],
-    description: "Read a document working head, metadata, and comment identifiers.",
+    arguments: [
+      [
+        "DOCUMENT",
+        "Document ID or complete Inkling URL. Omit it when using a shared-document instance.",
+      ],
+    ],
+    description: "Read a document, its metadata, and comment identifiers.",
+    notes: [
+      "A reader URL returns its published revision; an /edit URL returns the working head.",
+      "URL origins select a matching configured instance automatically.",
+    ],
     options: [["--lines START:END", "Print only the inclusive one-based line range."]],
-    usage: ["inkling read [DOCUMENT] [--lines START:END]"],
+    usage: ["inkling read [DOCUMENT|URL] [--lines START:END]"],
   },
   create: {
     arguments: [["TITLE", "Title used for the document's initial top-level heading."]],

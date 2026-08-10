@@ -1,5 +1,5 @@
 .dialog {
-  width: min(36rem, calc(100vw - 2rem));
+  width: min(40rem, calc(100vw - 2rem));
   max-height: min(48rem, calc(100dvh - 2rem));
   padding: 1.5rem;
   overflow: auto;
@@ -10,37 +10,119 @@
   gap: 1rem;
 }
 
-.note {
+.note,
+.safety {
   margin: 0;
   color: var(--muted);
   font-size: var(--font-ui);
   line-height: 1.5;
 }
 
-.create,
-.list {
+.list,
+.create {
   display: grid;
   gap: 1rem;
   padding-top: 1rem;
   border-top: 1px solid var(--border);
 }
 
-.create h3,
 .list h3,
-.reveal h3 {
+.create h3 {
   margin: 0;
   font-size: 1.05rem;
   font-weight: 650;
 }
 
+.list p,
 .create p,
-.listEmpty,
-.reveal p,
-.reveal small {
+.listEmpty {
   margin: 0;
   color: var(--muted);
   font-size: var(--font-small);
   line-height: 1.45;
+}
+
+.listHeading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.listHeading > div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.listHeading > span {
+  display: inline-grid;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--muted);
+  font: var(--font-caption) / 1 var(--mono);
+  place-items: center;
+}
+
+.keyRow {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  background: color-mix(in oklab, var(--surface) 92%, var(--accent-soft));
+}
+
+.keySummary {
+  display: grid;
+  min-width: 0;
+  gap: 0.65rem;
+}
+
+.keySummary > span {
+  display: grid;
+  min-width: 0;
+  gap: 0.25rem;
+}
+
+.keySummary b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.keySummary small {
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+.maskedKey,
+.keySummary pre {
+  margin: 0;
+  overflow: auto;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  color: var(--text);
+  font: var(--font-caption) / 1.5 var(--mono);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.maskedKey {
+  color: var(--muted);
+}
+
+.legacyKey {
+  line-height: 1.45;
+}
+
+.keyActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
 }
 
 .createControls {
@@ -54,90 +136,33 @@
   min-height: 2.55rem;
 }
 
-.listHeading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.listHeading span {
-  display: inline-grid;
-  min-width: 1.5rem;
-  height: 1.5rem;
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  color: var(--muted);
-  font: var(--font-caption) / 1 var(--mono);
-  place-items: center;
-}
-
-.keyRow {
+.createPrompt {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.75rem 0;
-  border-bottom: 1px solid var(--border);
+  padding-top: 0.25rem;
 }
 
-.keyRow span {
-  display: grid;
-  min-width: 0;
-  gap: 0.25rem;
-}
-
-.keyRow b {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.keyRow small {
-  color: var(--muted);
-  font-family: var(--mono);
-}
-
-.reveal {
-  display: grid;
-  gap: 0.65rem;
-  padding: 1rem;
-  border: 1px solid var(--accent);
-  background: var(--accent-soft);
-}
-
-.revealEyebrow {
+.createPrompt p {
   margin: 0;
-  color: var(--text);
-  font: var(--font-caption) / 1.3 var(--mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.reveal pre {
-  margin: 0;
-  overflow: auto;
-  padding: 0.75rem;
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
-  font: var(--font-caption) / 1.5 var(--mono);
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
-.revealAction {
-  display: flex;
-  min-height: 1.75rem;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.revealAction span {
   color: var(--muted);
-  font: var(--font-caption) / 1 var(--mono);
+  font-size: var(--font-small);
+}
+
+.safety {
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  font-size: var(--font-small);
 }
 
 @media (width <= 34rem) {
   .createControls {
     grid-template-columns: 1fr;
+  }
+
+  .createPrompt {
+    align-items: start;
+    flex-direction: column;
   }
 }

@@ -6,7 +6,11 @@ import { Effect } from "effect";
 import { IdGenerator, identifierTag } from "@earendil-works/inkling-core";
 import type { HealthResponse } from "@earendil-works/inkling-protocol";
 
-import { createBackendApp, IdGeneratorLive } from "../src/index.ts";
+import {
+  agentResourceUnavailableResponse,
+  createBackendApp,
+  IdGeneratorLive,
+} from "../src/index.ts";
 
 test("served agent instructions explain personal API keys and safe CLI use", async () => {
   const response = await createBackendApp({ version: "test" }).request(
@@ -18,9 +22,23 @@ test("served agent instructions explain personal API keys and safe CLI use", asy
   assert.match(response.headers.get("content-type") ?? "", /^text\/markdown/u);
   assert.match(body, /base URL is https:\/\/rfcs\.example\.com/u);
   assert.match(body, /account menu.*API keys/su);
+  assert.match(body, /Reuse an active key.*click \*\*Show\*\*/su);
+  assert.match(body, /inkling read https:\/\/rfcs\.example\.com\/rfcs\/0057/u);
   assert.match(body, /API keys belong to the user who created them/u);
   assert.match(body, /\.agents\/skills\/inkling\/SKILL\.md/u);
   assert.match(body, /never contain an API key/u);
+});
+
+test("unavailable resources put the agent handoff at the start of default HTML", async () => {
+  const response = agentResourceUnavailableResponse("https://rfcs.example.com/rfcs/0057");
+  const body = await response.text();
+
+  assert.equal(response.status, 404);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/html/u);
+  assert.match(response.headers.get("link") ?? "", /<https:\/\/rfcs\.example\.com\/AGENTS\.md>/u);
+  assert.ok(body.indexOf("INKLING AGENT HANDOFF") < 128);
+  assert.ok(body.indexOf("/AGENTS.md") < 256);
+  assert.doesNotMatch(body, /0057/u);
 });
 
 test("health identifies the service and protocol", async () => {

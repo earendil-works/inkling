@@ -343,6 +343,10 @@ export interface InklingApplicationService {
   readonly listApiKeys: (
     credentials: RequestCredentials,
   ) => Effect.Effect<readonly ApiKeyDto[], ApplicationError>;
+  readonly revealApiKey: (
+    credentials: RequestCredentials,
+    keyId: string,
+  ) => Effect.Effect<ApiKeyCreated, ApplicationError>;
   readonly revokeApiKey: (
     credentials: RequestCredentials,
     keyId: string,

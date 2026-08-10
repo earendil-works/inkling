@@ -340,6 +340,7 @@ export const ApiKeySchema = Schema.Struct({
   label: Schema.String,
   lastUsedAt: Schema.optional(Schema.String),
   personId: Schema.String,
+  revealable: Schema.Boolean,
   revokedAt: Schema.optional(Schema.String),
 });
 export type ApiKeyDto = typeof ApiKeySchema.Type;

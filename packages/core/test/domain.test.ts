@@ -262,6 +262,7 @@ test("API keys belong to their creator and retain that user's role", async () =>
   );
 
   assert.equal(created.token, "key_12345678.key-secret");
+  assert.equal(created.record.retainedSecret, "key-secret");
   assert.equal(apiKeyBelongsTo(created.record, accountId), true);
   assert.equal(apiKeyBelongsTo(created.record, otherId), false);
   const authenticated = await Effect.runPromise(

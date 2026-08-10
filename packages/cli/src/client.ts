@@ -60,6 +60,7 @@ export interface CliClient {
   readonly read: (
     documentId: string,
     range?: { readonly start: number; readonly end: number },
+    published?: boolean,
   ) => Effect.Effect<DocumentResponse, ClientError>;
   readonly create: (
     title: string,
@@ -412,15 +413,23 @@ export function makeCliClient(instance: Instance): CliClient {
         DocumentMetadataSchema,
         "POST",
       ),
-    read: (documentId, range) =>
-      assertDocument(documentId).pipe(
+    read: (documentId, range, published = false) => {
+      const query = new URLSearchParams();
+      if (range !== undefined) {
+        query.set("startLine", String(range.start));
+        query.set("endLine", String(range.end));
+      }
+      if (published) query.set("published", "true");
+      const suffix = query.size === 0 ? "" : `?${query.toString()}`;
+      return assertDocument(documentId).pipe(
         Effect.zipRight(
           request(
-            `/api/documents/${encodeURIComponent(documentId)}${range === undefined ? "" : `?startLine=${range.start}&endLine=${range.end}`}`,
+            `/api/documents/${encodeURIComponent(documentId)}${suffix}`,
             DocumentResponseSchema,
           ),
         ),
-      ),
+      );
+    },
     remove: (documentId, expectedRevision) =>
       mutate(
         `/api/documents/${encodeURIComponent(documentId)}?expectedRevision=${expectedRevision}`,

@@ -210,7 +210,7 @@ The command-line executable is named `inkling`. Run it directly from a checkout 
 node packages/cli/src/main.ts --help
 ```
 
-Open the account menu and choose **API keys**. Create and copy a personal key; it is revealed only once. Then register the workspace without putting the key in project files:
+Open the account menu and choose **API keys**. Reuse an active key when possible by choosing **Show**, or create one when separate rotation or revocation is required. Then register the workspace without putting the key in project files:
 
 ```sh
 inkling instance add workspace https://rfcs.example.com API_KEY

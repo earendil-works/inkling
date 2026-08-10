@@ -42,6 +42,7 @@ export interface ApiClientService {
   readonly authenticationStatus: Effect.Effect<AuthenticationStatus, ApiError>;
   readonly createApiKey: (label: string) => Effect.Effect<ApiKeyCreated, ApiError>;
   readonly listApiKeys: Effect.Effect<readonly ApiKeyDto[], ApiError>;
+  readonly revealApiKey: (keyId: string) => Effect.Effect<ApiKeyCreated, ApiError>;
   readonly revokeApiKey: (keyId: string) => Effect.Effect<void, ApiError>;
   readonly logout: Effect.Effect<void, ApiError>;
   readonly listDocuments: (query?: string) => Effect.Effect<CatalogResponse, ApiError>;
@@ -310,6 +311,8 @@ export function makeApiClient(capabilityToken?: string): ApiClientService {
         DocumentResponseSchema,
       ),
     readPublicRfc: (number) => request(`/api/public/rfc/${number}`, PublicDocumentResponseSchema),
+    revealApiKey: (keyId) =>
+      request(`/api/api-keys/${encodeURIComponent(keyId)}`, ApiKeyCreatedSchema),
     reply: (documentId, threadId, parentId, body, authorDisplayName) =>
       mutation(
         `/api/documents/${encodeURIComponent(documentId)}/comments/${encodeURIComponent(threadId)}/replies`,

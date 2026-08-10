@@ -15,6 +15,7 @@ import type {
   WorkspaceIdentity,
 } from "@earendil-works/inkling-core";
 import {
+  agentResourceUnavailableResponse,
   ApplicationError,
   createBackendApp,
   DigestLive,
@@ -816,7 +817,11 @@ const worker: ExportedHandler<CloudflareEnvironment> = {
     const rfcNumber = rfcNumberFromPath(url.pathname);
     if (rfcNumber !== undefined) {
       const resolution = await workspaceStub(environment).resolvePublicRfc(rfcNumber);
-      if (!resolution.ok) return protocolErrorResponse(resolution.error);
+      if (!resolution.ok) {
+        return resolution.error.status === 404 && /^\/rfcs\/\d+/u.test(url.pathname)
+          ? agentResourceUnavailableResponse(request.url)
+          : protocolErrorResponse(resolution.error);
+      }
       return dispatchDocument(request, environment, resolution.value.documentId, resolution.value);
     }
     if (isApplicationPath(url.pathname)) {

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -45,6 +46,17 @@ test(
         };
         assert.equal(createdKey.metadata.personId, "admin@example.com");
         const apiKey = createdKey.key;
+        const keyListResponse = await fetch(`${baseUrl}/api/api-keys`, {
+          headers: { Cookie: cookieHeader },
+        });
+        assert.equal(keyListResponse.status, 200);
+        const keyList = (await keyListResponse.json()) as { id: string; revealable: boolean }[];
+        assert.equal(keyList[0]?.revealable, true);
+        const revealedKeyResponse = await fetch(`${baseUrl}/api/api-keys/${keyList[0]?.id}`, {
+          headers: { Cookie: cookieHeader },
+        });
+        assert.equal(revealedKeyResponse.status, 200);
+        assert.equal(((await revealedKeyResponse.json()) as { key: string }).key, apiKey);
         const authorization = { Authorization: `Bearer ${apiKey}` };
 
         const create = await fetch(`${baseUrl}/api/documents`, {
@@ -325,7 +337,12 @@ test(
           "architecture",
           "platform",
         ]);
-        assert.equal((await fetch(`${baseUrl}/rfcs/0001`)).status, 404);
+        const unavailableRfc = await fetch(`${baseUrl}/rfcs/0001`);
+        assert.equal(unavailableRfc.status, 404);
+        assert.match(unavailableRfc.headers.get("content-type") ?? "", /^text\/html/u);
+        const unavailableHtml = await unavailableRfc.text();
+        assert.ok(unavailableHtml.indexOf("INKLING AGENT HANDOFF") < 128);
+        assert.ok(unavailableHtml.indexOf("/AGENTS.md") < 256);
         const publish = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/publish`, {
           headers: authorization,
           method: "POST",
@@ -350,6 +367,8 @@ test(
         assert.match(publishedCsp, /font-src 'self' https:\/\/fonts\.gstatic\.com/u);
         assert.doesNotMatch(publishedCsp, /style-src 'unsafe-inline'/u);
         const publishedHtml = await published.text();
+        assert.ok(publishedHtml.indexOf("INKLING AGENT HANDOFF") < 128);
+        assert.ok(publishedHtml.indexOf("/AGENTS.md") < 256);
         assert.match(publishedHtml, /Integrated RFC/u);
         assert.match(publishedHtml, /<title>Integrated RFC<\/title>/u);
         assert.match(publishedHtml, /class="public-hero"/u);
@@ -373,6 +392,30 @@ test(
         assert.match(publishedHtml, /<link rel="stylesheet" href="\/fonts\.css">/u);
         assert.match(publishedHtml, /<link rel="stylesheet" href="\/public\.css">/u);
         assert.doesNotMatch(publishedHtml, /<style>/u);
+
+        const cliConfig = path.join(directory, "agent-cli-config.json");
+        await writeFile(
+          cliConfig,
+          `${JSON.stringify({
+            active: "linked",
+            instances: [{ apiKey, baseUrl, name: "linked" }],
+            version: 1,
+          })}\n`,
+          { mode: 0o600 },
+        );
+        const linkedRead = await runCommand(
+          process.execPath,
+          [
+            path.resolve(import.meta.dirname, "../../cli/src/main.ts"),
+            "read",
+            `${baseUrl}/rfcs/0001`,
+          ],
+          { ...process.env, INKLING_CONFIG: cliConfig },
+        );
+        assert.equal(linkedRead.status, 0, linkedRead.stderr);
+        assert.match(linkedRead.stdout, /RFC 0001: Integrated RFC/u);
+        assert.match(linkedRead.stdout, /Durable body from collaboration/u);
+
         const statePage = await fetch(`${baseUrl}/state/draft`);
         assert.equal(statePage.status, 200);
         assert.match(await statePage.text(), /<title>Inkling<\/title>/u);
@@ -491,6 +534,13 @@ test(
 
       await withServer(directory, async (baseUrl) => {
         const authorization = { Authorization: `Bearer ${first.apiKey}` };
+        const keyId = first.apiKey.split(".")[0];
+        assert.ok(keyId);
+        const revealedAfterRestart = await fetch(`${baseUrl}/api/api-keys/${keyId}`, {
+          headers: authorization,
+        });
+        assert.equal(revealedAfterRestart.status, 200);
+        assert.equal(((await revealedAfterRestart.json()) as { key: string }).key, first.apiKey);
         const recovered = await readDocument(baseUrl, first.documentId, authorization);
         assert.match(
           recovered.body,
@@ -843,6 +893,22 @@ async function withServer<A>(
       }),
     ),
   );
+}
+
+async function runCommand(
+  command: string,
+  arguments_: readonly string[],
+  environment: NodeJS.ProcessEnv,
+): Promise<{ readonly status: number | null; readonly stderr: string; readonly stdout: string }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, arguments_, { env: environment });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
+    child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString()));
+    child.once("error", reject);
+    child.once("close", (status) => resolve({ status, stderr, stdout }));
+  });
 }
 
 async function setupApiKey(

@@ -1679,6 +1679,31 @@ export function makeLocalInklingApplication(
             .filter((record) => apiKeyBelongsTo(record, account.personId))
             .map((record) => apiKeyDto(record, account.personId));
         }),
+      revealApiKey: (credentials, keyId) =>
+        Effect.gen(function* () {
+          const principal = yield* resolvePrincipal(credentials);
+          const account = yield* requireAccount(principal);
+          const record = state.authentication.apiKeys.find(
+            (candidate) =>
+              candidate.id === keyId &&
+              candidate.revokedAt === undefined &&
+              apiKeyBelongsTo(candidate, account.personId),
+          );
+          if (record === undefined) {
+            return yield* applicationFailure("not_found", "The API key does not exist.", 404);
+          }
+          if (record.retainedSecret === undefined) {
+            return yield* applicationFailure(
+              "api_key_not_revealable",
+              "This older API key cannot be revealed. Create a replacement key to reuse access.",
+              409,
+            );
+          }
+          return {
+            key: `${record.id}.${record.retainedSecret}`,
+            metadata: apiKeyDto(record, account.personId),
+          } satisfies ApiKeyCreated;
+        }),
       listPublicDocuments: (query, lifecycleState, label) =>
         Effect.gen(function* () {
           const normalizedQuery = normalizeSearchText(query);
@@ -2789,6 +2814,7 @@ function apiKeyDto(record: ApiKeyRecord, fallbackPersonId: PersonReference["id"]
     label: record.label,
     lastUsedAt: record.lastUsedAt,
     personId: record.personId ?? fallbackPersonId,
+    revealable: record.retainedSecret !== undefined,
     revokedAt: record.revokedAt,
   };
 }
