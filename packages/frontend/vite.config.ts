@@ -18,6 +18,14 @@ export default defineConfig({
         target: "http://localhost:8787",
         ws: true,
       },
+      "/theme.css": {
+        changeOrigin: false,
+        target: "http://localhost:8787",
+      },
+      "/theme.json": {
+        changeOrigin: false,
+        target: "http://localhost:8787",
+      },
     },
   },
 });

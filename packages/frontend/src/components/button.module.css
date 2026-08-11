@@ -1,7 +1,7 @@
 .base {
   color: inherit;
   font: inherit;
-  -webkit-tap-highlight-color: transparent;
+  -webkit-tap-highlight-color: var(--transparent);
 }
 
 button.base {
@@ -28,14 +28,14 @@ button.base:disabled {
   height: 2rem;
   padding: 0;
   place-items: center;
-  background: transparent;
+  background: var(--transparent);
   font-size: 1rem;
 }
 
 .text {
   width: max-content;
   padding: 0.45rem 0;
-  background: transparent;
+  background: var(--transparent);
   color: var(--muted);
   font-size: var(--font-caption);
   letter-spacing: 0.04em;

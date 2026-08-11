@@ -18,7 +18,9 @@ import {
   agentResourceUnavailableResponse,
   ApplicationError,
   createBackendApp,
+  decodeThemeJson,
   DigestLive,
+  findBundledTheme,
   finishGoogleAuthentication,
   IdGeneratorLive,
   InklingApplication,
@@ -27,6 +29,7 @@ import {
   SecureTokenLive,
   shareProofCookieNameFromToken,
   startGoogleAuthentication,
+  themeCssResponse,
 } from "@earendil-works/inkling-backend";
 import type {
   DocumentRuntimeConfiguration,
@@ -34,6 +37,8 @@ import type {
   LocalApplicationOptions,
   RequestCredentials,
   SessionResult,
+  ThemeConfiguration,
+  ThemeError,
 } from "@earendil-works/inkling-backend";
 import { decodeBase64 } from "@earendil-works/inkling-collaboration";
 import {
@@ -70,6 +75,7 @@ export interface CloudflareEnvironment {
   readonly INKLING_GOOGLE_DIRECTORY_ENDPOINT?: string | undefined;
   readonly INKLING_GOOGLE_TOKEN_ENDPOINT?: string | undefined;
   readonly INKLING_OAUTH_STATE_SECRET?: string | undefined;
+  readonly INKLING_THEME?: string | undefined;
   readonly INKLING_DOCUMENTS: DurableObjectNamespace<DocumentDurableObject>;
   readonly INKLING_OBJECTS: R2Bucket;
   readonly INKLING_WORKSPACE: DurableObjectNamespace<WorkspaceDurableObject>;
@@ -834,6 +840,30 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
 const worker: ExportedHandler<CloudflareEnvironment> = {
   async fetch(request, environment) {
     const url = new URL(request.url);
+    if (url.pathname === "/theme.css" || url.pathname === "/theme.json") {
+      try {
+        const theme = await Effect.runPromise(themeFromEnvironment(environment.INKLING_THEME));
+        return url.pathname === "/theme.css"
+          ? themeCssResponse(theme)
+          : Response.json(theme, { headers: { "Cache-Control": "public, max-age=300" } });
+      } catch {
+        return new Response(
+          url.pathname === "/theme.css"
+            ? "/* INKLING_THEME is invalid. */\n"
+            : JSON.stringify({ error: "INKLING_THEME is invalid." }),
+          {
+            headers: {
+              "Cache-Control": "no-store",
+              "Content-Type":
+                url.pathname === "/theme.css"
+                  ? "text/css; charset=UTF-8"
+                  : "application/json; charset=UTF-8",
+            },
+            status: 500,
+          },
+        );
+      }
+    }
     if (url.pathname === "/api/auth/google/start") {
       return startGoogleAuthentication(request, environment);
     }
@@ -890,6 +920,14 @@ const worker: ExportedHandler<CloudflareEnvironment> = {
 };
 
 export default worker;
+
+function themeFromEnvironment(
+  value: string | undefined,
+): Effect.Effect<ThemeConfiguration, ThemeError> {
+  const selected = value?.trim();
+  const bundled = findBundledTheme(selected);
+  return bundled === undefined ? decodeThemeJson(selected ?? "") : Effect.succeed(bundled);
+}
 
 async function flushDocumentsForBackup(
   environment: CloudflareEnvironment,

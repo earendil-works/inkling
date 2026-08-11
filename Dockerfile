@@ -7,7 +7,8 @@ ENV NODE_ENV=production \
 RUN corepack enable && useradd --create-home --uid 10001 inkling
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json .npmrc ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json theme.schema.json .npmrc ./
+COPY themes ./themes
 COPY packages ./packages
 RUN pnpm install --frozen-lockfile \
       --filter @earendil-works/inkling-cli... \

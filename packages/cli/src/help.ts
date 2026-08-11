@@ -54,6 +54,7 @@ const helpTopics: Readonly<Record<string, HelpTopic>> = {
   },
   serve: {
     description: "Start a local Inkling HTTP and WebSocket server.",
+    notes: ["INKLING_THEME selects inkling, paper, or a theme JSON file."],
     options: [
       ["--port PORT", "Listen on PORT (default: PORT or 8787)."],
       ["--data-dir PATH", "Store durable data at PATH (default: INKLING_DATA_DIR or .inkling)."],

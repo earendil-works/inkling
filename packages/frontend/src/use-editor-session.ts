@@ -4,7 +4,6 @@ import { markdown } from "@codemirror/lang-markdown";
 import { yamlFrontmatter, yamlLanguage } from "@codemirror/lang-yaml";
 import { syntaxHighlighting } from "@codemirror/language";
 import { Compartment, EditorState } from "@codemirror/state";
-import { oneDarkTheme } from "@codemirror/theme-one-dark";
 import { EditorView, basicSetup } from "codemirror";
 import { Effect, Fiber } from "effect";
 import { Awareness } from "y-protocols/awareness";
@@ -109,7 +108,6 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
     const yBody = yDocument.getText("body");
     const awareness = new Awareness(yDocument);
     const editable = new Compartment();
-    const theme = new Compartment();
     const participantId = randomId(identifierTag.participant);
     const participantColor = colorFor(identityId ?? participantId);
     const participantMap = new Map<string, PresenceDto>();
@@ -134,7 +132,6 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
           commentDecorationsExtension,
           selectionIndentationExtension,
           editable.of(EditorView.editable.of(initiallyEditable)),
-          theme.of(document.documentElement.dataset["theme"] === "dark" ? oneDarkTheme : []),
           EditorView.lineWrapping,
           EditorView.updateListener.of((update) => {
             if ((!update.selectionSet && !update.focusChanged) || client === undefined) return;
@@ -151,17 +148,6 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
           }),
         ],
       }),
-    });
-    const themeObserver = new MutationObserver(() => {
-      editor.dispatch({
-        effects: theme.reconfigure(
-          document.documentElement.dataset["theme"] === "dark" ? oneDarkTheme : [],
-        ),
-      });
-    });
-    themeObserver.observe(document.documentElement, {
-      attributeFilter: ["data-theme"],
-      attributes: true,
     });
     const updateBody = (): void => {
       setBody(yBody.toString());
@@ -235,7 +221,6 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
       browserRuntime.runFork(Fiber.interrupt(collaborationFiber));
       if (client !== undefined) browserRuntime.runFork(client.close);
       yBody.unobserve(updateBody);
-      themeObserver.disconnect();
       editor.destroy();
       awareness.destroy();
       yDocument.destroy();

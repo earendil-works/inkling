@@ -176,7 +176,7 @@
   padding: 1.25rem;
   border: 1px solid var(--border);
   background: var(--surface);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 7%);
+  box-shadow: 0 8px 24px var(--shadow-soft);
 }
 
 .editorHost,
@@ -187,6 +187,7 @@
 
 .editorHost :global(.cm-editor) {
   background: var(--editor-background);
+  color: var(--text);
   font-size: 0.95rem;
 }
 
@@ -206,12 +207,81 @@
 .editorHost :global(.cm-gutters) {
   display: none;
   border: 0;
-  background: transparent;
+  background: var(--transparent);
   color: var(--muted);
 }
 
-.editorHost :global(.cm-activeLine) {
+.editorHost :global(.cm-activeLine),
+.editorHost :global(.cm-activeLineGutter) {
   background: var(--editor-active-line-background);
+}
+
+.editorHost :global(.cm-cursor),
+.editorHost :global(.cm-dropCursor) {
+  border-left-color: var(--text);
+}
+
+.editorHost :global(.cm-selectionBackground),
+.editorHost :global(.cm-content ::selection) {
+  background: color-mix(in oklch, var(--accent) 24%, var(--transparent)) !important;
+}
+
+.editorHost :global(.cm-panels),
+.editorHost :global(.cm-tooltip) {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.editorHost :global(.cm-tooltip-autocomplete > ul > li[aria-selected]) {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.editorHost :global(.cm-completionDetail),
+.editorHost :global(.cm-completionInfo),
+.editorHost :global(.cm-placeholder) {
+  color: var(--muted);
+}
+
+.editorHost :global(.cm-completionIcon) {
+  color: var(--code-attribute);
+}
+
+.editorHost :global(.cm-completionIcon-keyword),
+.editorHost :global(.cm-completionIcon-constant) {
+  color: var(--code-keyword);
+}
+
+.editorHost :global(.cm-completionIcon-class),
+.editorHost :global(.cm-completionIcon-interface),
+.editorHost :global(.cm-completionIcon-type) {
+  color: var(--code-title);
+}
+
+.editorHost :global(.cm-completionIcon-text),
+.editorHost :global(.cm-completionIcon-variable) {
+  color: var(--code-string);
+}
+
+.editorHost :global(.cm-button),
+.editorHost :global(.cm-textfield),
+.editorHost :global(.cm-foldPlaceholder) {
+  border-color: var(--border);
+  background: var(--surface-muted);
+  background-image: none;
+  color: var(--text);
+}
+
+.editorHost :global(.cm-matchingBracket),
+.editorHost :global(.cm-searchMatch),
+.editorHost :global(.cm-selectionMatch) {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.editorHost :global(.cm-searchMatch.cm-searchMatch-selected) {
+  outline-color: var(--focus-ring);
 }
 
 .historyChangedLine {
@@ -226,39 +296,39 @@
 @keyframes history-source-pulse {
   0%,
   24% {
-    background: color-mix(in oklab, var(--accent) 28%, transparent);
+    background: color-mix(in oklch, var(--accent) 28%, var(--transparent));
     box-shadow: inset 3px 0 var(--accent);
   }
 
   100% {
-    background: transparent;
-    box-shadow: inset 3px 0 transparent;
+    background: var(--transparent);
+    box-shadow: inset 3px 0 var(--transparent);
   }
 }
 
 @keyframes history-preview-pulse {
   0%,
   24% {
-    background-color: color-mix(in oklab, var(--accent) 20%, transparent);
+    background-color: color-mix(in oklch, var(--accent) 20%, var(--transparent));
     box-shadow: -4px 0 var(--accent);
   }
 
   100% {
-    background-color: transparent;
-    box-shadow: -4px 0 transparent;
+    background-color: var(--transparent);
+    box-shadow: -4px 0 var(--transparent);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .historyChangedLine {
     animation: none;
-    background: color-mix(in oklab, var(--accent) 22%, transparent);
+    background: color-mix(in oklch, var(--accent) 22%, var(--transparent));
     box-shadow: inset 3px 0 var(--accent);
   }
 
   .historyChangedPreview {
     animation: none;
-    background-color: color-mix(in oklab, var(--accent) 16%, transparent);
+    background-color: color-mix(in oklch, var(--accent) 16%, var(--transparent));
     box-shadow: -4px 0 var(--accent);
   }
 }
@@ -269,8 +339,8 @@
 
 .remoteSelection {
   border-radius: 2px;
-  background: color-mix(in oklab, var(--remote-color) 28%, transparent);
-  box-shadow: inset 0 -1px color-mix(in oklab, var(--remote-color) 72%, transparent);
+  background: color-mix(in oklch, var(--remote-color) 28%, var(--transparent));
+  box-shadow: inset 0 -1px color-mix(in oklch, var(--remote-color) 72%, var(--transparent));
 }
 
 .remoteCursor {
@@ -289,8 +359,8 @@
   padding: 0.2rem 0.35rem;
   border-radius: 2px 2px 2px 0;
   background: var(--remote-color);
-  box-shadow: 0 2px 8px rgb(0 0 0 / 18%);
-  color: oklch(18% 0.02 260);
+  box-shadow: 0 2px 8px var(--shadow-strong);
+  color: var(--participant-text);
   font: 650 var(--font-caption) / 1.15 var(--mono);
   white-space: nowrap;
 }

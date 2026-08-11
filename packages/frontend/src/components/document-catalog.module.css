@@ -9,7 +9,7 @@
   align-items: center;
   padding: 0.85rem 0.8rem;
   border-bottom: 1px solid var(--border);
-  border-left: 2px solid transparent;
+  border-left: 2px solid var(--transparent);
   text-decoration: none;
 }
 

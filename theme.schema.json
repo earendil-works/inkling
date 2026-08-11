@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "theme.schema.json",
+  "title": "Inkling theme",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "name", "fonts", "light", "dark"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "fonts": { "$ref": "#/$defs/fonts" },
+    "light": { "$ref": "#/$defs/mode" },
+    "dark": { "$ref": "#/$defs/mode" }
+  },
+  "$defs": {
+    "color": {
+      "type": "string",
+      "description": "An OKLCH CSS color, optionally with alpha.",
+      "pattern": "^oklch\\(\\s*(?:(?:\\d+(?:\\.\\d+)?|\\.\\d+)%|(?:\\d+(?:\\.\\d+)?|\\.\\d+))\\s+(?:\\d+(?:\\.\\d+)?|\\.\\d+)\\s+-?(?:\\d+(?:\\.\\d+)?|\\.\\d+)(?:deg)?(?:\\s*\\/\\s*(?:(?:\\d+(?:\\.\\d+)?|\\.\\d+)%|(?:\\d+(?:\\.\\d+)?|\\.\\d+)))?\\s*\\)$"
+    },
+    "fonts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["imports", "prose", "heading", "ui", "code"],
+      "properties": {
+        "imports": {
+          "type": "array",
+          "maxItems": 8,
+          "items": { "type": "string", "pattern": "^https://" }
+        },
+        "prose": { "type": "string", "minLength": 1 },
+        "heading": { "type": "string", "minLength": 1 },
+        "ui": { "type": "string", "minLength": 1 },
+        "code": { "type": "string", "minLength": 1 }
+      }
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["background", "border", "text"],
+      "properties": {
+        "background": { "$ref": "#/$defs/color" },
+        "border": { "$ref": "#/$defs/color" },
+        "text": { "$ref": "#/$defs/color" }
+      }
+    },
+    "visibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["background", "hover", "border", "text"],
+      "properties": {
+        "background": { "$ref": "#/$defs/color" },
+        "hover": { "$ref": "#/$defs/color" },
+        "border": { "$ref": "#/$defs/color" },
+        "text": { "$ref": "#/$defs/color" }
+      }
+    },
+    "syntax": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "background",
+        "text",
+        "comment",
+        "keyword",
+        "title",
+        "attribute",
+        "string",
+        "symbol",
+        "addition",
+        "deletion",
+        "invalid"
+      ],
+      "properties": {
+        "background": { "$ref": "#/$defs/color" },
+        "text": { "$ref": "#/$defs/color" },
+        "comment": { "$ref": "#/$defs/color" },
+        "keyword": { "$ref": "#/$defs/color" },
+        "title": { "$ref": "#/$defs/color" },
+        "attribute": { "$ref": "#/$defs/color" },
+        "string": { "$ref": "#/$defs/color" },
+        "symbol": { "$ref": "#/$defs/color" },
+        "addition": { "$ref": "#/$defs/color" },
+        "deletion": { "$ref": "#/$defs/color" },
+        "invalid": { "$ref": "#/$defs/color" }
+      }
+    },
+    "mermaid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "background",
+        "primary",
+        "primaryText",
+        "primaryBorder",
+        "line",
+        "secondary",
+        "tertiary",
+        "note",
+        "noteText"
+      ],
+      "properties": {
+        "background": { "$ref": "#/$defs/color" },
+        "primary": { "$ref": "#/$defs/color" },
+        "primaryText": { "$ref": "#/$defs/color" },
+        "primaryBorder": { "$ref": "#/$defs/color" },
+        "line": { "$ref": "#/$defs/color" },
+        "secondary": { "$ref": "#/$defs/color" },
+        "tertiary": { "$ref": "#/$defs/color" },
+        "note": { "$ref": "#/$defs/color" },
+        "noteText": { "$ref": "#/$defs/color" }
+      }
+    },
+    "mode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "page",
+        "publicPage",
+        "surface",
+        "surfaceMuted",
+        "editorBackground",
+        "editorActiveLine",
+        "text",
+        "transparent",
+        "muted",
+        "border",
+        "borderStrong",
+        "accent",
+        "accentContrast",
+        "accentSoft",
+        "focusRing",
+        "danger",
+        "shadow",
+        "shadowSoft",
+        "shadowStrong",
+        "scrim",
+        "scrimSoft",
+        "participantText",
+        "presence",
+        "states",
+        "visibility",
+        "syntax",
+        "mermaid"
+      ],
+      "properties": {
+        "page": { "$ref": "#/$defs/color" },
+        "publicPage": { "$ref": "#/$defs/color" },
+        "surface": { "$ref": "#/$defs/color" },
+        "surfaceMuted": { "$ref": "#/$defs/color" },
+        "editorBackground": { "$ref": "#/$defs/color" },
+        "editorActiveLine": { "$ref": "#/$defs/color" },
+        "text": { "$ref": "#/$defs/color" },
+        "transparent": { "$ref": "#/$defs/color" },
+        "muted": { "$ref": "#/$defs/color" },
+        "border": { "$ref": "#/$defs/color" },
+        "borderStrong": { "$ref": "#/$defs/color" },
+        "accent": { "$ref": "#/$defs/color" },
+        "accentContrast": { "$ref": "#/$defs/color" },
+        "accentSoft": { "$ref": "#/$defs/color" },
+        "focusRing": { "$ref": "#/$defs/color" },
+        "danger": { "$ref": "#/$defs/color" },
+        "shadow": { "$ref": "#/$defs/color" },
+        "shadowSoft": { "$ref": "#/$defs/color" },
+        "shadowStrong": { "$ref": "#/$defs/color" },
+        "scrim": { "$ref": "#/$defs/color" },
+        "scrimSoft": { "$ref": "#/$defs/color" },
+        "participantText": { "$ref": "#/$defs/color" },
+        "presence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lightness", "chroma", "hueOffset"],
+          "properties": {
+            "lightness": { "type": "number", "minimum": 0 },
+            "chroma": { "type": "number", "minimum": 0 },
+            "hueOffset": { "type": "number" }
+          }
+        },
+        "states": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["draft", "discussion", "published", "accepted", "implemented", "abandoned"],
+          "properties": {
+            "draft": { "$ref": "#/$defs/state" },
+            "discussion": { "$ref": "#/$defs/state" },
+            "published": { "$ref": "#/$defs/state" },
+            "accepted": { "$ref": "#/$defs/state" },
+            "implemented": { "$ref": "#/$defs/state" },
+            "abandoned": { "$ref": "#/$defs/state" }
+          }
+        },
+        "visibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["public", "private", "confidential"],
+          "properties": {
+            "public": { "$ref": "#/$defs/visibility" },
+            "private": { "$ref": "#/$defs/visibility" },
+            "confidential": { "$ref": "#/$defs/visibility" }
+          }
+        },
+        "syntax": { "$ref": "#/$defs/syntax" },
+        "mermaid": { "$ref": "#/$defs/mermaid" }
+      }
+    }
+  }
+}

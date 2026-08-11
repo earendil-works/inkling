@@ -10,7 +10,7 @@
   padding: 1.5rem 0 2rem;
   border: 1px solid var(--border);
   background: var(--surface);
-  box-shadow: 0 10px 30px rgb(0 0 0 / 8%);
+  box-shadow: 0 10px 30px var(--shadow-soft);
 }
 
 .toolbar {
@@ -24,7 +24,7 @@
   margin: 0 auto 1.35rem;
   padding: 0 1.5rem;
   border: 0;
-  background: transparent;
+  background: var(--transparent);
 }
 
 .modeLink {
@@ -321,7 +321,7 @@
 
 .preview .toc a[aria-current="location"] {
   border-color: var(--border-strong);
-  background: color-mix(in oklab, var(--surface-muted) 94%, var(--text));
+  background: color-mix(in oklch, var(--surface-muted) 94%, var(--text));
   box-shadow: inset 0 -2px var(--text);
 }
 
@@ -330,7 +330,7 @@
     margin: -0.18rem -0.4rem;
     padding: 0.18rem 0.4rem;
     border-radius: 2px;
-    background: color-mix(in oklab, var(--surface-muted) 94%, var(--text));
+    background: color-mix(in oklch, var(--surface-muted) 94%, var(--text));
   }
 }
 
@@ -388,7 +388,7 @@
 
   .toc a[aria-current="location"] {
     border-color: var(--border-strong);
-    background: color-mix(in oklab, var(--surface-muted) 94%, var(--text));
+    background: color-mix(in oklch, var(--surface-muted) 94%, var(--text));
     box-shadow: inset 0 -2px var(--text);
   }
 }

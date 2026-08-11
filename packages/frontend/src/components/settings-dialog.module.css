@@ -71,7 +71,7 @@
   gap: 0.75rem;
   padding: 1rem;
   border: 1px solid var(--border);
-  background: color-mix(in oklab, var(--surface) 92%, var(--accent-soft));
+  background: color-mix(in oklch, var(--surface) 92%, var(--accent-soft));
 }
 
 .keySummary {

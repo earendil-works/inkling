@@ -24,7 +24,7 @@
 .menu::backdrop,
 .card::backdrop,
 .composerPopover::backdrop {
-  background: transparent;
+  background: var(--transparent);
 }
 
 .composerPopover {
@@ -43,7 +43,7 @@
 }
 
 .composerDialog::backdrop {
-  background: rgb(10 15 12 / 32%);
+  background: var(--scrim);
   backdrop-filter: blur(2px);
 }
 
@@ -271,7 +271,7 @@
 .actions button {
   padding: 0;
   border: 0;
-  background: transparent;
+  background: var(--transparent);
   color: var(--accent);
 }
 
@@ -330,7 +330,7 @@
   border: 1px solid var(--border-strong);
   border-radius: 1rem;
   background: var(--surface);
-  box-shadow: 0 3px 10px rgb(24 32 28 / 10%);
+  box-shadow: 0 3px 10px var(--shadow-soft);
   color: var(--muted);
   font: var(--font-caption) / 1 var(--mono);
   vertical-align: middle;
@@ -392,7 +392,7 @@
 
 .composerBubble .bubbleAvatar {
   border: 1px solid var(--accent);
-  background: transparent;
+  background: var(--transparent);
   color: var(--accent);
 }
 
@@ -440,7 +440,7 @@
   }
 
   .card::backdrop {
-    background: rgb(12 18 15 / 18%);
+    background: var(--scrim-soft);
   }
 
   .composerFooter {

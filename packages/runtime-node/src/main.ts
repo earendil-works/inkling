@@ -13,6 +13,7 @@ const program = Effect.scoped(
       console.log(`Data directory: ${dataDirectory}`);
     },
     port,
+    theme: process.env["INKLING_THEME"],
     version: process.env["INKLING_VERSION"],
   }).pipe(Effect.zipRight(Effect.never)),
 );

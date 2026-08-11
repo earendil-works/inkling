@@ -155,7 +155,7 @@ a.breadcrumbLabel:hover {
   border: 2px solid var(--surface);
   border-radius: 50%;
   background: var(--participant);
-  color: oklch(18% 0.02 260);
+  color: var(--participant-text);
   font: var(--font-caption) var(--mono);
 }
 

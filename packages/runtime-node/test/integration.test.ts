@@ -389,7 +389,7 @@ test(
         assert.match(publishedHtml, /Target decision/u);
         assert.doesNotMatch(publishedHtml, /visibility: public/u);
         assert.match(publishedHtml, /class="tok-keyword">const<\/span>/u);
-        assert.match(publishedHtml, /<link rel="stylesheet" href="\/fonts\.css">/u);
+        assert.match(publishedHtml, /<link rel="stylesheet" href="\/theme\.css">/u);
         assert.match(publishedHtml, /<link rel="stylesheet" href="\/public\.css">/u);
         assert.doesNotMatch(publishedHtml, /<style>/u);
 
@@ -419,11 +419,13 @@ test(
         const statePage = await fetch(`${baseUrl}/state/draft`);
         assert.equal(statePage.status, 200);
         assert.match(await statePage.text(), /<title>Inkling<\/title>/u);
-        const fontStylesheet = await fetch(`${baseUrl}/fonts.css`);
-        assert.equal(fontStylesheet.status, 200);
-        const fontStyles = await fontStylesheet.text();
-        assert.match(fontStyles, /family=JetBrains\+Mono/u);
-        assert.match(fontStyles, /family=Newsreader/u);
+        const themeStylesheet = await fetch(`${baseUrl}/theme.css`);
+        assert.equal(themeStylesheet.status, 200);
+        const themeStyles = await themeStylesheet.text();
+        assert.match(themeStyles, /family=JetBrains\+Mono/u);
+        assert.match(themeStyles, /family=Newsreader/u);
+        assert.match(themeStyles, /--code-keyword: oklch\(/u);
+        assert.match(themeStyles, /:root\[data-theme="dark"\]/u);
         const publicStylesheet = await fetch(`${baseUrl}/public.css`);
         assert.equal(publicStylesheet.status, 200);
         const publicStyles = await publicStylesheet.text();

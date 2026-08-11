@@ -15,6 +15,8 @@ const browserExecutable = await findBrowser();
 test("the application shell keeps agent instructions in visible body text", async () => {
   const html = await readFile(new URL("../dist/index.html", import.meta.url), "utf8");
   assert.match(html, /\[data-agent-handoff\][^{]*\{[^}]*font-size:\s*0/su);
+  assert.match(html, /href="\/theme\.css"/u);
+  assert.doesNotMatch(html, /href="\/fonts\.css"/u);
   const body = /<body[^>]*>([\s\S]*?)<\/body>/u.exec(html)?.[1];
   assert.ok(body);
   const visibleText = body
@@ -743,7 +745,14 @@ test(
         const content = document.querySelector<HTMLElement>(".cm-content");
         const gutter = document.querySelector<HTMLElement>(".cm-gutters");
         const activeLine = document.querySelector<HTMLElement>(".cm-activeLine");
-        if (editor === null || content === null || gutter === null || activeLine === null) {
+        const keyword = document.querySelector<HTMLElement>(".cm-content .tok-keyword");
+        if (
+          editor === null ||
+          content === null ||
+          gutter === null ||
+          activeLine === null ||
+          keyword === null
+        ) {
           throw new Error("Editor appearance elements are missing.");
         }
         const originalTheme = document.documentElement.dataset["theme"];
@@ -761,6 +770,7 @@ test(
             activeLine: brightness(getComputedStyle(activeLine).backgroundColor),
             editor: brightness(getComputedStyle(editor).backgroundColor),
             page: brightness(getComputedStyle(document.documentElement).backgroundColor),
+            syntax: brightness(getComputedStyle(keyword).color),
           };
         };
         const light = sampleTheme("light");
@@ -772,6 +782,9 @@ test(
         });
         const contentStyle = getComputedStyle(content);
         return {
+          codeKeyword: getComputedStyle(document.documentElement)
+            .getPropertyValue("--code-keyword")
+            .trim(),
           dark,
           light,
           gutter: getComputedStyle(gutter).display,
@@ -786,6 +799,8 @@ test(
       assert.ok(editorAppearance.light.activeLine < editorAppearance.light.editor);
       assert.ok(editorAppearance.dark.editor > editorAppearance.dark.page);
       assert.ok(editorAppearance.dark.activeLine > editorAppearance.dark.editor);
+      assert.notEqual(editorAppearance.light.syntax, editorAppearance.dark.syntax);
+      assert.match(editorAppearance.codeKeyword, /^oklch\(/u);
       const compactToc = await first
         .locator("[data-preview-scroller] [data-reader-toc]")
         .evaluate((toc) => {

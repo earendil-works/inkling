@@ -1,0 +1,224 @@
+{
+  "$schema": "../theme.schema.json",
+  "schemaVersion": 1,
+  "name": "paper",
+  "fonts": {
+    "imports": [
+      "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,600;1,400&family=Literata:ital,opsz,wght@0,7..72,400..700;1,7..72,400..700&display=swap"
+    ],
+    "prose": "\"Literata\", Georgia, \"Times New Roman\", serif",
+    "heading": "\"Literata\", Georgia, \"Times New Roman\", serif",
+    "ui": "\"IBM Plex Mono\", \"SFMono-Regular\", Consolas, monospace",
+    "code": "\"IBM Plex Mono\", \"SFMono-Regular\", Consolas, monospace"
+  },
+  "light": {
+    "page": "oklch(94.80% 0.028 84)",
+    "publicPage": "oklch(92.80% 0.033 78)",
+    "surface": "oklch(97.10% 0.022 88)",
+    "surfaceMuted": "oklch(91.80% 0.031 82)",
+    "editorBackground": "oklch(95.60% 0.021 87)",
+    "editorActiveLine": "oklch(92.70% 0.029 84)",
+    "text": "oklch(30% 0.035 54)",
+    "transparent": "oklch(0% 0 0 / 0%)",
+    "muted": "oklch(51% 0.033 62)",
+    "border": "oklch(81% 0.045 76)",
+    "borderStrong": "oklch(70% 0.055 68)",
+    "accent": "oklch(48% 0.125 45)",
+    "accentContrast": "oklch(97% 0.018 87)",
+    "accentSoft": "oklch(88% 0.055 60)",
+    "focusRing": "oklch(60% 0.145 48)",
+    "danger": "oklch(50% 0.15 28)",
+    "shadow": "oklch(25% 0.035 50 / 18%)",
+    "shadowSoft": "oklch(20% 0.025 50 / 10%)",
+    "shadowStrong": "oklch(20% 0.025 50 / 24%)",
+    "scrim": "oklch(17% 0.03 50 / 48%)",
+    "scrimSoft": "oklch(17% 0.03 50 / 22%)",
+    "participantText": "oklch(20% 0.03 55)",
+    "presence": {
+      "chroma": 0.13,
+      "hueOffset": 24,
+      "lightness": 66
+    },
+    "states": {
+      "draft": {
+        "background": "oklch(91% 0.035 82)",
+        "border": "oklch(80% 0.05 76)",
+        "text": "oklch(49% 0.055 68)"
+      },
+      "discussion": {
+        "background": "oklch(90% 0.045 112)",
+        "border": "oklch(78% 0.065 112)",
+        "text": "oklch(45% 0.075 122)"
+      },
+      "published": {
+        "background": "oklch(90% 0.035 242)",
+        "border": "oklch(78% 0.055 242)",
+        "text": "oklch(43% 0.075 245)"
+      },
+      "accepted": {
+        "background": "oklch(89% 0.04 151)",
+        "border": "oklch(77% 0.065 151)",
+        "text": "oklch(43% 0.075 151)"
+      },
+      "implemented": {
+        "background": "oklch(47% 0.07 145)",
+        "border": "oklch(40% 0.065 145)",
+        "text": "oklch(95% 0.025 90)"
+      },
+      "abandoned": {
+        "background": "oklch(88% 0.045 35)",
+        "border": "oklch(75% 0.075 35)",
+        "text": "oklch(45% 0.11 30)"
+      }
+    },
+    "visibility": {
+      "public": {
+        "background": "oklch(93% 0.03 145)",
+        "hover": "oklch(90% 0.04 145)",
+        "border": "oklch(78% 0.06 145)",
+        "text": "oklch(43% 0.07 145)"
+      },
+      "private": {
+        "background": "oklch(92% 0.045 85)",
+        "hover": "oklch(89% 0.055 82)",
+        "border": "oklch(78% 0.075 80)",
+        "text": "oklch(46% 0.07 70)"
+      },
+      "confidential": {
+        "background": "oklch(91% 0.035 30)",
+        "hover": "oklch(88% 0.05 30)",
+        "border": "oklch(75% 0.075 30)",
+        "text": "oklch(44% 0.095 28)"
+      }
+    },
+    "syntax": {
+      "background": "oklch(92.80% 0.028 84)",
+      "text": "oklch(30% 0.035 54)",
+      "comment": "oklch(54% 0.04 67)",
+      "keyword": "oklch(47% 0.14 27)",
+      "title": "oklch(45% 0.10 300)",
+      "attribute": "oklch(45% 0.09 235)",
+      "string": "oklch(43% 0.10 145)",
+      "symbol": "oklch(50% 0.12 70)",
+      "addition": "oklch(88% 0.055 145)",
+      "deletion": "oklch(87% 0.055 28)",
+      "invalid": "oklch(50% 0.15 28)"
+    },
+    "mermaid": {
+      "background": "oklch(97.10% 0.022 88)",
+      "primary": "oklch(91.80% 0.031 82)",
+      "primaryText": "oklch(30% 0.035 54)",
+      "primaryBorder": "oklch(70% 0.055 68)",
+      "line": "oklch(51% 0.033 62)",
+      "secondary": "oklch(88% 0.055 60)",
+      "tertiary": "oklch(90% 0.045 112)",
+      "note": "oklch(92% 0.045 85)",
+      "noteText": "oklch(30% 0.035 54)"
+    }
+  },
+  "dark": {
+    "page": "oklch(22.50% 0.025 52)",
+    "publicPage": "oklch(21% 0.026 52)",
+    "surface": "oklch(26% 0.028 56)",
+    "surfaceMuted": "oklch(30% 0.03 58)",
+    "editorBackground": "oklch(24.80% 0.026 54)",
+    "editorActiveLine": "oklch(29% 0.031 58)",
+    "text": "oklch(91% 0.025 82)",
+    "transparent": "oklch(0% 0 0 / 0%)",
+    "muted": "oklch(70% 0.035 72)",
+    "border": "oklch(38% 0.04 61)",
+    "borderStrong": "oklch(48% 0.05 64)",
+    "accent": "oklch(73% 0.13 55)",
+    "accentContrast": "oklch(23% 0.026 52)",
+    "accentSoft": "oklch(34% 0.065 49)",
+    "focusRing": "oklch(78% 0.12 70)",
+    "danger": "oklch(72% 0.15 28)",
+    "shadow": "oklch(10% 0.02 48 / 42%)",
+    "shadowSoft": "oklch(10% 0.02 48 / 24%)",
+    "shadowStrong": "oklch(8% 0.02 48 / 50%)",
+    "scrim": "oklch(8% 0.02 48 / 62%)",
+    "scrimSoft": "oklch(8% 0.02 48 / 34%)",
+    "participantText": "oklch(18% 0.03 55)",
+    "presence": {
+      "chroma": 0.12,
+      "hueOffset": 24,
+      "lightness": 74
+    },
+    "states": {
+      "draft": {
+        "background": "oklch(26.56% 0.0117 84.58)",
+        "border": "oklch(37.33% 0.0179 84.57)",
+        "text": "oklch(80.30% 0.0253 77.42)"
+      },
+      "discussion": {
+        "background": "oklch(28.91% 0.0352 147.60)",
+        "border": "oklch(43.64% 0.0588 142.90)",
+        "text": "oklch(84.27% 0.0697 134.06)"
+      },
+      "published": {
+        "background": "oklch(27.80% 0.0293 245.00)",
+        "border": "oklch(42.31% 0.0526 251.08)",
+        "text": "oklch(85.84% 0.0464 247.36)"
+      },
+      "accepted": {
+        "background": "oklch(28.86% 0.0332 155.96)",
+        "border": "oklch(45.40% 0.0584 153.28)",
+        "text": "oklch(86.32% 0.0547 152.51)"
+      },
+      "implemented": {
+        "background": "oklch(42.94% 0.0746 149.70)",
+        "border": "oklch(55.56% 0.0905 149.58)",
+        "text": "oklch(96.94% 0.0173 140.02)"
+      },
+      "abandoned": {
+        "background": "oklch(26.67% 0.0329 16.39)",
+        "border": "oklch(41.48% 0.0563 19.74)",
+        "text": "oklch(83.33% 0.0631 23.39)"
+      }
+    },
+    "visibility": {
+      "public": {
+        "background": "oklch(30% 0.035 145)",
+        "hover": "oklch(34% 0.045 145)",
+        "border": "oklch(47% 0.065 145)",
+        "text": "oklch(82% 0.06 145)"
+      },
+      "private": {
+        "background": "oklch(31% 0.04 78)",
+        "hover": "oklch(35% 0.05 76)",
+        "border": "oklch(49% 0.07 74)",
+        "text": "oklch(84% 0.07 82)"
+      },
+      "confidential": {
+        "background": "oklch(29% 0.04 28)",
+        "hover": "oklch(33% 0.05 28)",
+        "border": "oklch(47% 0.07 28)",
+        "text": "oklch(82% 0.07 30)"
+      }
+    },
+    "syntax": {
+      "background": "oklch(23.50% 0.025 52)",
+      "text": "oklch(90% 0.025 82)",
+      "comment": "oklch(65% 0.04 70)",
+      "keyword": "oklch(79% 0.14 35)",
+      "title": "oklch(82% 0.10 305)",
+      "attribute": "oklch(79% 0.09 235)",
+      "string": "oklch(79% 0.10 145)",
+      "symbol": "oklch(83% 0.13 75)",
+      "addition": "oklch(30% 0.065 145)",
+      "deletion": "oklch(30% 0.075 28)",
+      "invalid": "oklch(72% 0.15 28)"
+    },
+    "mermaid": {
+      "background": "oklch(23.50% 0.025 52)",
+      "primary": "oklch(30% 0.03 58)",
+      "primaryText": "oklch(91% 0.025 82)",
+      "primaryBorder": "oklch(48% 0.05 64)",
+      "line": "oklch(70% 0.035 72)",
+      "secondary": "oklch(34% 0.065 49)",
+      "tertiary": "oklch(30% 0.05 112)",
+      "note": "oklch(31% 0.04 78)",
+      "noteText": "oklch(91% 0.025 82)"
+    }
+  }
+}

@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -7,10 +8,17 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { NodeFileSystem } from "@effect/platform-node";
 import { Effect, Layer, ManagedRuntime, type Scope } from "effect";
 
-import { createBackendApp, InklingApplication } from "@earendil-works/inkling-backend";
+import {
+  createBackendApp,
+  decodeThemeJson,
+  findBundledTheme,
+  InklingApplication,
+  ThemeError,
+} from "@earendil-works/inkling-backend";
 import type {
   GoogleAuthenticationEnvironment,
   InklingApplicationService,
+  ThemeConfiguration,
 } from "@earendil-works/inkling-backend";
 import { MarkdownRendererLive } from "@earendil-works/inkling-renderer";
 
@@ -26,6 +34,7 @@ export interface StartServerOptions {
   readonly version?: string | undefined;
   readonly googleAuthentication?: GoogleAuthenticationEnvironment | undefined;
   readonly onListen?: ((port: number) => void) | undefined;
+  readonly theme?: string | undefined;
 }
 
 export interface RunningServer {
@@ -50,8 +59,9 @@ export function resolveDataDirectory(rawValue: string | undefined): string {
 
 export function startServer(
   options: StartServerOptions,
-): Effect.Effect<RunningServer, DataDirectoryLockError, Scope.Scope> {
+): Effect.Effect<RunningServer, DataDirectoryLockError | ThemeError, Scope.Scope> {
   return Effect.gen(function* () {
+    const theme = yield* loadTheme(options.theme);
     yield* acquireDataDirectoryLock(options.dataDirectory);
     const runtime = createRuntime(options.dataDirectory);
     yield* Effect.tryPromise({
@@ -84,6 +94,7 @@ export function startServer(
     const app = createBackendApp({
       googleAuthentication: options.googleAuthentication ?? googleAuthenticationFromEnvironment(),
       runtime,
+      theme,
       version: options.version,
     });
     const frontendRoot = path.join(
@@ -117,6 +128,22 @@ export function startServer(
     yield* Effect.addFinalizer(() => Effect.sync(removeWebSockets));
     return { runtime, server };
   }).pipe(Effect.provide(NodeFileSystem.layer));
+}
+
+export function loadTheme(
+  selection: string | undefined,
+  workingDirectory = process.cwd(),
+): Effect.Effect<ThemeConfiguration, ThemeError> {
+  const value = selection?.trim() ?? "";
+  const bundled = findBundledTheme(value);
+  if (bundled !== undefined) return Effect.succeed(bundled);
+  if (value?.startsWith("{")) return decodeThemeJson(value);
+  const filename = path.resolve(workingDirectory, value);
+  return Effect.tryPromise({
+    catch: (cause) =>
+      new ThemeError({ cause, message: `Theme file could not be read: ${filename}` }),
+    try: () => readFile(filename, "utf8"),
+  }).pipe(Effect.flatMap(decodeThemeJson));
 }
 
 export function googleAuthenticationFromEnvironment(

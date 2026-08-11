@@ -8,5 +8,5 @@
 }
 
 .dialog::backdrop {
-  background: rgb(8 12 10 / 42%);
+  background: var(--scrim);
 }

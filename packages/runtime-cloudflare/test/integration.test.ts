@@ -11,6 +11,8 @@ import test from "node:test";
 import { WebSocket } from "ws";
 import * as Y from "yjs";
 
+import { paperTheme } from "@earendil-works/inkling-backend";
+
 interface RunningWrangler {
   readonly baseUrl: string;
   readonly stop: () => Promise<void>;
@@ -35,6 +37,14 @@ test(
       assert.equal(agentInstructions.status, 200);
       assert.match(agentInstructions.headers.get("content-type") ?? "", /^text\/markdown/u);
       assert.ok((await agentInstructions.text()).includes(`base URL is ${running.baseUrl}`));
+      const themeStylesheet = await fetch(`${running.baseUrl}/theme.css`);
+      assert.equal(themeStylesheet.status, 200);
+      const themeCss = await themeStylesheet.text();
+      assert.ok(themeCss.includes(`--accent: ${paperTheme.light.accent};`));
+      assert.match(themeCss, /--serif: "Literata"/u);
+      const themeConfiguration = await fetch(`${running.baseUrl}/theme.json`);
+      assert.equal(themeConfiguration.status, 200);
+      assert.equal(((await themeConfiguration.json()) as { name: string }).name, "paper");
 
       const cookie = await loginWithGoogle(running.baseUrl);
       const csrf = cookieValue(cookie, "inkling_csrf");
@@ -694,6 +704,7 @@ async function startWrangler(directory: string, googleOrigin: string): Promise<R
       `INKLING_GOOGLE_DIRECTORY_ENDPOINT=${googleOrigin}/directory/users`,
       `INKLING_GOOGLE_TOKEN_ENDPOINT=${googleOrigin}/token`,
       "INKLING_OAUTH_STATE_SECRET=inkling-test-state-secret",
+      "INKLING_THEME=paper",
       "",
     ].join("\n"),
   );

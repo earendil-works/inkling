@@ -7,3 +7,5 @@ GOOGLE_ADMIN_EMAILS=admin@example.com
 GOOGLE_REDIRECT_URI=http://localhost:5173/api/auth/google/callback
 # Optional dedicated HMAC secret; defaults to GOOGLE_CLIENT_SECRET.
 INKLING_OAUTH_STATE_SECRET=
+# Optional: inkling (default), paper, or inline custom theme JSON.
+# INKLING_THEME=paper

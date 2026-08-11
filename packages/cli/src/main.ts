@@ -53,6 +53,7 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
             onListen: (listeningPort) =>
               console.log(`Inkling is running at http://localhost:${listeningPort}`),
             port,
+            theme: process.env["INKLING_THEME"],
           }).pipe(Effect.zipRight(Effect.never)),
         )
       : usageFailure("--port must be an integer between 1 and 65535.");

@@ -79,6 +79,42 @@ Google's current setup is under **Google Auth Platform** in the [Google Cloud Co
 
 Inkling uses a server-side authorization-code flow with PKCE, so no Authorized JavaScript Origin is required for authentication. Redirect URI matching is exact, including scheme, host, port, path, and trailing slash.
 
+### Theme configuration
+
+Inkling ships with two complete themes: [`inkling`](themes/inkling.json), the default editorial palette, and [`paper`](themes/paper.json), a warmer paper-colored palette with its own fonts. Every color—including editor syntax, status chips, presence colors, overlays, and Mermaid diagrams—is expressed in OKLCH. [`theme.schema.json`](theme.schema.json) documents the format.
+
+Select a theme with `INKLING_THEME`:
+
+- Leave it unset or set it to `default` or `inkling` to use the default theme.
+- Set it to `paper` to use the bundled paper theme.
+- In the Node.js runtime, a value other than a bundled name can be a JSON file path. Relative paths are resolved from the process working directory. Inline JSON is also accepted.
+- In the Cloudflare runtime, custom themes must be supplied as complete inline JSON because Workers cannot read deployment-local files.
+
+For the normal Cloudflare and Vite development servers:
+
+```sh
+INKLING_THEME=paper make dev
+```
+
+For local Node development:
+
+```sh
+INKLING_THEME=paper pnpm --filter @earendil-works/inkling-runtime-node start
+
+# Or customize a bundled theme.
+cp themes/inkling.json my-theme.json
+INKLING_THEME=./my-theme.json pnpm --filter @earendil-works/inkling-runtime-node start
+```
+
+For Cloudflare, set `INKLING_THEME=paper` as a text variable for the bundled theme, or upload custom JSON as a secret:
+
+```sh
+cd packages/runtime-cloudflare
+pnpm exec wrangler secret put INKLING_THEME < ../../my-theme.json
+```
+
+Themes must include both `light` and `dark`. Font imports must be HTTPS URLs, and all color values must use `oklch(...)`; invalid themes fail instead of injecting partial CSS.
+
 Official references:
 
 - [Using OAuth 2.0 for Web Server Applications](https://developers.google.com/identity/protocols/oauth2/web-server)

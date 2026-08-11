@@ -38,8 +38,19 @@ export function colorFor(value: string): string {
     hash ^= character.codePointAt(0) ?? 0;
     hash = Math.imul(hash, 16_777_619) >>> 0;
   }
-  const hue = ((hash / 0xffff_ffff) * 360).toFixed(2);
-  return `oklch(68% 0.16 ${hue})`;
+  const lightness = themeNumber("--presence-lightness", 68);
+  const chroma = themeNumber("--presence-chroma", 0.16);
+  const hueOffset = themeNumber("--presence-hue-offset", 0);
+  const hue = (((hash / 0xffff_ffff) * 360 + hueOffset) % 360).toFixed(2);
+  return `oklch(${lightness}% ${chroma} ${hue})`;
+}
+
+function themeNumber(name: string, fallback: number): number {
+  if (typeof document === "undefined") return fallback;
+  const value = Number.parseFloat(
+    getComputedStyle(document.documentElement).getPropertyValue(name),
+  );
+  return Number.isFinite(value) ? value : fallback;
 }
 
 export function storedGuestName(): string | undefined {

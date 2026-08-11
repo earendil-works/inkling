@@ -2,9 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { markdown } from "@codemirror/lang-markdown";
 import { yamlFrontmatter } from "@codemirror/lang-yaml";
 import { syntaxHighlighting } from "@codemirror/language";
-import { Compartment, EditorState, StateEffect, StateField } from "@codemirror/state";
+import { EditorState, StateEffect, StateField } from "@codemirror/state";
 import type { Range, Text } from "@codemirror/state";
-import { oneDarkTheme } from "@codemirror/theme-one-dark";
 import { Decoration } from "@codemirror/view";
 import type { DecorationSet } from "@codemirror/view";
 import { basicSetup, EditorView } from "codemirror";
@@ -22,7 +21,7 @@ import { selectedPreviewSourceRange } from "../comments.ts";
 import type { PreviewSourceRange } from "../comments.ts";
 import { browserRuntime } from "../effect-runtime.ts";
 import type { HistoryChangeRange } from "../history-diff.ts";
-import { renderMermaid } from "../markdown.tsx";
+import { renderMermaid, useThemeRevision } from "../markdown.tsx";
 import { Button } from "./button.tsx";
 import { DocumentPage } from "./document-page.tsx";
 import styles from "./editor.module.css";
@@ -63,6 +62,7 @@ export function EditorWorkbench({
 }: EditorWorkbenchProps): React.JSX.Element {
   const renderedCallbackRef = useRef(onPreviewRendered);
   const previewScrollerRef = useRef<HTMLDivElement>(null);
+  const themeRevision = useThemeRevision();
   const historyEditorHostRef = useRef<HTMLDivElement>(null);
   const historyEditor = useHistoricalMarkdownEditor(
     historyBody,
@@ -100,7 +100,7 @@ export function EditorWorkbench({
       clearPreviewHighlights(changedElements);
       browserRuntime.runFork(Fiber.interrupt(fiber));
     };
-  }, [historyChanges, previewHtml, previewRef]);
+  }, [historyChanges, previewHtml, previewRef, themeRevision]);
 
   const capturePreviewSelection = (): void => {
     window.setTimeout(() => {
@@ -206,7 +206,6 @@ function useHistoricalMarkdownEditor(
     const parent = hostRef.current;
     if (parent === null) return;
 
-    const theme = new Compartment();
     const created = new EditorView({
       parent,
       state: EditorState.create({
@@ -220,27 +219,12 @@ function useHistoricalMarkdownEditor(
           EditorState.readOnly.of(true),
           EditorView.editable.of(false),
           historyHighlightField,
-          theme.of(document.documentElement.dataset["theme"] === "dark" ? oneDarkTheme : []),
           EditorView.lineWrapping,
         ],
       }),
     });
-    const themeObserver = new MutationObserver(() => {
-      created.dispatch({
-        effects: theme.reconfigure(
-          document.documentElement.dataset["theme"] === "dark" ? oneDarkTheme : [],
-        ),
-      });
-    });
-    themeObserver.observe(document.documentElement, {
-      attributeFilter: ["data-theme"],
-      attributes: true,
-    });
     setEditor(created);
-    return () => {
-      themeObserver.disconnect();
-      created.destroy();
-    };
+    return () => created.destroy();
   }, [active, hostRef]);
 
   useEffect(() => {

@@ -44,6 +44,8 @@
       "/public/*",
       "/state/*",
       "/keyword/*",
+      "/theme.css",
+      "/theme.json",
     ],
   },
 }

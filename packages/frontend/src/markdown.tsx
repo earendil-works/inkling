@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Mermaid } from "mermaid";
 import { Effect } from "effect";
 
@@ -48,6 +48,13 @@ export function renderMermaid(root: ParentNode): Effect.Effect<void> {
     catch: () => undefined,
     try: async () => {
       const mermaid = await loadMermaid();
+      mermaid.initialize({
+        securityLevel: "strict",
+        startOnLoad: false,
+        suppressErrorRendering: true,
+        theme: "base",
+        themeVariables: mermaidThemeVariables(),
+      });
       await Promise.all(diagrams.map((diagram) => renderMermaidDiagram(mermaid, diagram)));
     },
   }).pipe(Effect.ignore);
@@ -68,15 +75,74 @@ async function renderMermaidDiagram(mermaid: Mermaid, diagram: HTMLElement): Pro
   }
 }
 
-function loadMermaid(): Promise<Mermaid> {
-  mermaidPromise ??= import("mermaid").then(({ default: mermaid }) => {
-    mermaid.initialize({
-      securityLevel: "strict",
-      startOnLoad: false,
-      suppressErrorRendering: true,
-      theme: document.documentElement.dataset["theme"] === "dark" ? "dark" : "neutral",
+export function useThemeRevision(): number {
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    const observer = new MutationObserver(() => setRevision((current) => current + 1));
+    observer.observe(document.documentElement, {
+      attributeFilter: ["data-theme"],
+      attributes: true,
     });
-    return mermaid;
-  });
+    return () => observer.disconnect();
+  }, []);
+  return revision;
+}
+
+function loadMermaid(): Promise<Mermaid> {
+  mermaidPromise ??= import("mermaid").then(({ default: mermaid }) => mermaid);
   return mermaidPromise;
+}
+
+function mermaidThemeVariables(): Record<string, string> {
+  const style = getComputedStyle(document.documentElement);
+  const value = (name: string): string => themeColorForMermaid(style.getPropertyValue(name).trim());
+  const background = value("--mermaid-background");
+  const text = value("--mermaid-primary-text");
+  const border = value("--mermaid-primary-border");
+  const line = value("--mermaid-line");
+  return {
+    activationBkgColor: value("--mermaid-secondary"),
+    activationBorderColor: border,
+    actorBkg: value("--mermaid-primary"),
+    actorBorder: border,
+    actorTextColor: text,
+    background,
+    clusterBkg: value("--mermaid-tertiary"),
+    clusterBorder: border,
+    edgeLabelBackground: background,
+    fontFamily: style.getPropertyValue("--sans").trim(),
+    labelBackground: background,
+    labelBoxBkgColor: value("--mermaid-primary"),
+    labelBoxBorderColor: border,
+    labelTextColor: text,
+    lineColor: line,
+    loopTextColor: text,
+    mainBkg: value("--mermaid-primary"),
+    nodeBorder: border,
+    noteBkgColor: value("--mermaid-note"),
+    noteBorderColor: border,
+    noteTextColor: value("--mermaid-note-text"),
+    primaryBorderColor: border,
+    primaryColor: value("--mermaid-primary"),
+    primaryTextColor: text,
+    secondaryColor: value("--mermaid-secondary"),
+    signalColor: line,
+    signalTextColor: text,
+    tertiaryColor: value("--mermaid-tertiary"),
+    textColor: text,
+    titleColor: text,
+  };
+}
+
+/** Mermaid's color arithmetic does not yet parse OKLCH, so resolve the themed color first. */
+function themeColorForMermaid(color: string): string {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1;
+  canvas.height = 1;
+  const context = canvas.getContext("2d");
+  if (context === null) return color;
+  context.fillStyle = color;
+  context.fillRect(0, 0, 1, 1);
+  const [red = 0, green = 0, blue = 0] = context.getImageData(0, 0, 1, 1).data;
+  return `rgb(${red}, ${green}, ${blue})`;
 }

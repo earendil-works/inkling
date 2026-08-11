@@ -109,7 +109,7 @@
   overflow: hidden;
   padding: 1rem;
   border: 1px solid var(--border);
-  background: white;
+  background: var(--mermaid-background);
 }
 
 .body :global(.inkling-mermaid[data-mermaid-error]) {
@@ -117,7 +117,7 @@
   padding: 0;
   overflow: visible;
   border: 0;
-  background: transparent;
+  background: var(--transparent);
 }
 
 .body :global(.inkling-mermaid > .inkling-mermaid__error) {
@@ -152,9 +152,9 @@
 
 .body :global(.inkling-mermaid__controls button) {
   padding: 0.35rem 0.55rem;
-  border: 1px solid #777;
-  background: #fff;
-  color: #111;
+  border: 1px solid var(--mermaid-primary-border);
+  background: var(--mermaid-primary);
+  color: var(--mermaid-primary-text);
 }
 
 @media (width <= 52rem) {

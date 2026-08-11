@@ -53,10 +53,14 @@
   padding: 1.1rem;
   border: 1px solid var(--border-strong);
   background:
-    linear-gradient(90deg, color-mix(in oklab, var(--accent) 7%, transparent) 1px, transparent 1px)
+    linear-gradient(
+        90deg,
+        color-mix(in oklch, var(--accent) 7%, var(--transparent)) 1px,
+        var(--transparent) 1px
+      )
       0 0 / 2.5rem 100%,
     var(--surface);
-  box-shadow: 0 18px 50px rgb(0 0 0 / 18%);
+  box-shadow: 0 18px 50px var(--shadow-strong);
   color: var(--text);
 }
 
@@ -132,7 +136,7 @@
   padding: 0.9rem;
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
-  background: color-mix(in oklab, var(--surface) 92%, var(--accent));
+  background: color-mix(in oklch, var(--surface) 92%, var(--accent));
 }
 
 .revisionLine output {

@@ -1,0 +1,224 @@
+{
+  "$schema": "../theme.schema.json",
+  "schemaVersion": 1,
+  "name": "inkling",
+  "fonts": {
+    "imports": [
+      "https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400..800;1,400..800&family=Newsreader:ital,opsz,wght@0,6..72,400..800;1,6..72,400..800&display=swap"
+    ],
+    "prose": "\"Newsreader\", Georgia, \"Times New Roman\", serif",
+    "heading": "\"Newsreader\", Georgia, \"Times New Roman\", serif",
+    "ui": "\"JetBrains Mono\", \"SFMono-Regular\", Consolas, monospace",
+    "code": "\"JetBrains Mono\", \"SFMono-Regular\", Consolas, monospace"
+  },
+  "light": {
+    "page": "oklch(98.20% 0.0041 91.45)",
+    "publicPage": "oklch(96.13% 0.0070 88.64)",
+    "surface": "oklch(99.67% 0.0054 95.10)",
+    "surfaceMuted": "oklch(95.48% 0.0054 95.10)",
+    "editorBackground": "oklch(96.95% 0.0045 91.50)",
+    "editorActiveLine": "oklch(94.70% 0.0055 91.50)",
+    "text": "oklch(32.50% 0.0054 91.55)",
+    "transparent": "oklch(0% 0 0 / 0%)",
+    "muted": "oklch(54.97% 0.0085 80.71)",
+    "border": "oklch(87.37% 0.0088 84.58)",
+    "borderStrong": "oklch(78.38% 0.0108 81.79)",
+    "accent": "oklch(32.50% 0.0054 91.55)",
+    "accentContrast": "oklch(98.20% 0.0041 91.45)",
+    "accentSoft": "oklch(92.48% 0.0083 91.49)",
+    "focusRing": "oklch(57.01% 0.0774 55.02)",
+    "danger": "oklch(51.04% 0.1316 30.47)",
+    "shadow": "oklch(32.50% 0.0054 91.55 / 14%)",
+    "shadowSoft": "oklch(0% 0 0 / 8%)",
+    "shadowStrong": "oklch(0% 0 0 / 18%)",
+    "scrim": "oklch(14.89% 0.0080 164.48 / 42%)",
+    "scrimSoft": "oklch(17.46% 0.0112 163.33 / 18%)",
+    "participantText": "oklch(18% 0.02 260)",
+    "presence": {
+      "chroma": 0.16,
+      "hueOffset": 0,
+      "lightness": 68
+    },
+    "states": {
+      "draft": {
+        "background": "oklch(92.94% 0.0132 82.40)",
+        "border": "oklch(85.85% 0.0232 78.20)",
+        "text": "oklch(51.53% 0.0204 72.87)"
+      },
+      "discussion": {
+        "background": "oklch(92.28% 0.0267 125.63)",
+        "border": "oklch(85.48% 0.0442 125.88)",
+        "text": "oklch(47.85% 0.0628 133.30)"
+      },
+      "published": {
+        "background": "oklch(92.26% 0.0180 245.40)",
+        "border": "oklch(85.93% 0.0300 248.18)",
+        "text": "oklch(46.98% 0.0585 246.66)"
+      },
+      "accepted": {
+        "background": "oklch(91.93% 0.0216 158.57)",
+        "border": "oklch(84.13% 0.0339 156.42)",
+        "text": "oklch(47.05% 0.0595 154.64)"
+      },
+      "implemented": {
+        "background": "oklch(53.83% 0.0467 148.02)",
+        "border": "oklch(47.95% 0.0456 150.22)",
+        "text": "oklch(95.99% 0.0147 132.47)"
+      },
+      "abandoned": {
+        "background": "oklch(90.79% 0.0231 41.40)",
+        "border": "oklch(83.69% 0.0370 39.30)",
+        "text": "oklch(48.46% 0.0884 28.22)"
+      }
+    },
+    "visibility": {
+      "public": {
+        "background": "oklch(97.53% 0.0058 153.78)",
+        "hover": "oklch(96.05% 0.0099 155.10)",
+        "border": "oklch(85.98% 0.0246 155.08)",
+        "text": "oklch(49.74% 0.0363 156.26)"
+      },
+      "private": {
+        "background": "oklch(97.57% 0.0136 92.98)",
+        "hover": "oklch(95.80% 0.0205 91.58)",
+        "border": "oklch(86.32% 0.0506 93.42)",
+        "text": "oklch(52.58% 0.0445 91.28)"
+      },
+      "confidential": {
+        "background": "oklch(96.71% 0.0087 26.02)",
+        "hover": "oklch(94.67% 0.0144 28.02)",
+        "border": "oklch(83.95% 0.0327 29.79)",
+        "text": "oklch(49.30% 0.0415 33.46)"
+      }
+    },
+    "syntax": {
+      "background": "oklch(95.48% 0.0054 95.10)",
+      "text": "oklch(32.50% 0.0054 91.55)",
+      "comment": "oklch(55.75% 0.0091 73.68)",
+      "keyword": "oklch(50.81% 0.1317 6.62)",
+      "title": "oklch(51.09% 0.1208 292.20)",
+      "attribute": "oklch(50.01% 0.0887 226.40)",
+      "string": "oklch(48.76% 0.1012 153.62)",
+      "symbol": "oklch(54.04% 0.1165 50.79)",
+      "addition": "oklch(94.55% 0.0281 155.29)",
+      "deletion": "oklch(92.10% 0.0291 25.56)",
+      "invalid": "oklch(54.78% 0.1502 31.38)"
+    },
+    "mermaid": {
+      "background": "oklch(100% 0 0)",
+      "primary": "oklch(95.48% 0.0054 95.10)",
+      "primaryText": "oklch(32.50% 0.0054 91.55)",
+      "primaryBorder": "oklch(78.38% 0.0108 81.79)",
+      "line": "oklch(54.97% 0.0085 80.71)",
+      "secondary": "oklch(92.26% 0.0180 245.40)",
+      "tertiary": "oklch(92.28% 0.0267 125.63)",
+      "note": "oklch(97.57% 0.0136 92.98)",
+      "noteText": "oklch(32.50% 0.0054 91.55)"
+    }
+  },
+  "dark": {
+    "page": "oklch(29.75% 0.0038 84.58)",
+    "publicPage": "oklch(29.75% 0.0038 84.58)",
+    "surface": "oklch(32.10% 0.0054 91.55)",
+    "surfaceMuted": "oklch(34.45% 0.0053 91.54)",
+    "editorBackground": "oklch(32.45% 0.0050 90)",
+    "editorActiveLine": "oklch(35.20% 0.0055 90)",
+    "text": "oklch(97.61% 0.0041 91.45)",
+    "transparent": "oklch(0% 0 0 / 0%)",
+    "muted": "oklch(72.91% 0.0092 84.58)",
+    "border": "oklch(40.22% 0.0071 84.59)",
+    "borderStrong": "oklch(50.05% 0.0101 84.59)",
+    "accent": "oklch(97.61% 0.0041 91.45)",
+    "accentContrast": "oklch(29.75% 0.0038 84.58)",
+    "accentSoft": "oklch(37.97% 0.0072 84.59)",
+    "focusRing": "oklch(75.08% 0.0796 57.86)",
+    "danger": "oklch(71.93% 0.1404 31.44)",
+    "shadow": "oklch(0% 0 0 / 32%)",
+    "shadowSoft": "oklch(0% 0 0 / 18%)",
+    "shadowStrong": "oklch(0% 0 0 / 36%)",
+    "scrim": "oklch(0% 0 0 / 55%)",
+    "scrimSoft": "oklch(0% 0 0 / 28%)",
+    "participantText": "oklch(18% 0.02 260)",
+    "presence": {
+      "chroma": 0.14,
+      "hueOffset": 0,
+      "lightness": 76
+    },
+    "states": {
+      "draft": {
+        "background": "oklch(26.56% 0.0117 84.58)",
+        "border": "oklch(37.33% 0.0179 84.57)",
+        "text": "oklch(80.30% 0.0253 77.42)"
+      },
+      "discussion": {
+        "background": "oklch(28.91% 0.0352 147.60)",
+        "border": "oklch(43.64% 0.0588 142.90)",
+        "text": "oklch(84.27% 0.0697 134.06)"
+      },
+      "published": {
+        "background": "oklch(27.80% 0.0293 245.00)",
+        "border": "oklch(42.31% 0.0526 251.08)",
+        "text": "oklch(85.84% 0.0464 247.36)"
+      },
+      "accepted": {
+        "background": "oklch(28.86% 0.0332 155.96)",
+        "border": "oklch(45.40% 0.0584 153.28)",
+        "text": "oklch(86.32% 0.0547 152.51)"
+      },
+      "implemented": {
+        "background": "oklch(42.94% 0.0746 149.70)",
+        "border": "oklch(55.56% 0.0905 149.58)",
+        "text": "oklch(96.94% 0.0173 140.02)"
+      },
+      "abandoned": {
+        "background": "oklch(26.67% 0.0329 16.39)",
+        "border": "oklch(41.48% 0.0563 19.74)",
+        "text": "oklch(83.33% 0.0631 23.39)"
+      }
+    },
+    "visibility": {
+      "public": {
+        "background": "oklch(34.65% 0.0085 159.66)",
+        "hover": "oklch(37.00% 0.0135 158.26)",
+        "border": "oklch(50.15% 0.0241 156.25)",
+        "text": "oklch(86.06% 0.0238 153.40)"
+      },
+      "private": {
+        "background": "oklch(34.07% 0.0106 91.65)",
+        "hover": "oklch(36.04% 0.0140 89.87)",
+        "border": "oklch(51.35% 0.0370 93.74)",
+        "text": "oklch(86.99% 0.0428 92.23)"
+      },
+      "confidential": {
+        "background": "oklch(33.10% 0.0087 28.94)",
+        "hover": "oklch(35.37% 0.0128 25.33)",
+        "border": "oklch(49.80% 0.0283 30.66)",
+        "text": "oklch(84.77% 0.0266 29.44)"
+      }
+    },
+    "syntax": {
+      "background": "oklch(25.65% 0.0040 84.58)",
+      "text": "oklch(95.53% 0.0070 88.64)",
+      "comment": "oklch(68.04% 0.0094 84.58)",
+      "keyword": "oklch(76.95% 0.1398 10.38)",
+      "title": "oklch(81.47% 0.1026 293.42)",
+      "attribute": "oklch(81.71% 0.0865 230.56)",
+      "string": "oklch(82.48% 0.0826 154.59)",
+      "symbol": "oklch(79.74% 0.1082 62.09)",
+      "addition": "oklch(32.32% 0.0557 155.24)",
+      "deletion": "oklch(31.48% 0.0609 24.10)",
+      "invalid": "oklch(71.93% 0.1404 31.44)"
+    },
+    "mermaid": {
+      "background": "oklch(25.65% 0.0040 84.58)",
+      "primary": "oklch(34.45% 0.0053 91.54)",
+      "primaryText": "oklch(97.61% 0.0041 91.45)",
+      "primaryBorder": "oklch(50.05% 0.0101 84.59)",
+      "line": "oklch(72.91% 0.0092 84.58)",
+      "secondary": "oklch(27.80% 0.0293 245.00)",
+      "tertiary": "oklch(28.91% 0.0352 147.60)",
+      "note": "oklch(34.07% 0.0106 91.65)",
+      "noteText": "oklch(97.61% 0.0041 91.45)"
+    }
+  }
+}

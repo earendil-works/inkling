@@ -40,7 +40,10 @@ export function AppHeader({
     document.documentElement.dataset["theme"] = theme;
     document
       .querySelector<HTMLMetaElement>('meta[name="theme-color"]')
-      ?.setAttribute("content", theme === "dark" ? "#2e2d2b" : "#faf9f6");
+      ?.setAttribute(
+        "content",
+        getComputedStyle(document.documentElement).getPropertyValue("--page").trim(),
+      );
   }, [theme]);
 
   const toggleTheme = (): void => {

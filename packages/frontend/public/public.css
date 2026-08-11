@@ -1,49 +1,11 @@
 @import url("/syntax-theme.css");
 
 :root {
-  color-scheme: light dark;
-  --public-page: #f4f2ed;
-  --public-paper: #fffefa;
-  --public-muted-surface: #f1f0ec;
-  --public-text: #353431;
-  --public-muted: #74716c;
-  --public-border: #d8d5cf;
-  --public-border-strong: #bcb8b1;
-  --state-draft-bg: light-dark(#ece7de, #28251f);
-  --state-draft-border: light-dark(#d9cfc0, #454036);
-  --state-draft-text: light-dark(#6f665b, #c8bdad);
-  --state-discussion-bg: light-dark(#e1e9d6, #1f3021);
-  --state-discussion-border: light-dark(#c8d5b6, #3e5a3c);
-  --state-discussion-text: light-dark(#4f6540, #b9d6a8);
-  --state-published-bg: light-dark(#dce7f1, #1c2a36);
-  --state-published-border: light-dark(#c2d3e4, #38506a);
-  --state-published-text: light-dark(#3f5e7a, #b9d4ee);
-  --state-accepted-bg: light-dark(#d9e9df, #1d3024);
-  --state-accepted-border: light-dark(#bad2c2, #3c6047);
-  --state-accepted-text: light-dark(#3f654c, #b8ddc1);
-  --state-implemented-bg: light-dark(#5c765f, #2f5b39);
-  --state-implemented-border: light-dark(#4b6550, #4a8256);
-  --state-implemented-text: light-dark(#eef4ea, #eff8ed);
-  --state-abandoned-bg: light-dark(#efdcd5, #341f20);
-  --state-abandoned-border: light-dark(#e0c2b8, #673f3f);
-  --state-abandoned-text: light-dark(#8a4a42, #efb9b5);
-  --visibility-public-bg: light-dark(#f4f8f5, #363b38);
-  --visibility-public-border: light-dark(#c5d6ca, #59685e);
-  --visibility-public-text: light-dark(#52695a, #c6d6ca);
+  --font-caption: 0.75rem;
+  --font-small: 0.825rem;
+  --font-ui: 0.875rem;
   font-family: var(--serif);
   line-height: 1.65;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --public-page: #2e2d2b;
-    --public-paper: #343330;
-    --public-muted-surface: #3a3936;
-    --public-text: #f8f7f4;
-    --public-muted: #aaa7a1;
-    --public-border: #4a4844;
-    --public-border-strong: #66635d;
-  }
 }
 
 * {
@@ -62,6 +24,13 @@ body {
   margin: 0;
   background: var(--public-page);
   color: var(--public-text);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--heading);
 }
 
 .public-masthead {
@@ -92,7 +61,7 @@ body {
   padding: 1.5rem 1.5rem 2.5rem;
   border: 1px solid var(--public-border);
   background: var(--public-paper);
-  box-shadow: 0 10px 30px rgb(0 0 0 / 8%);
+  box-shadow: 0 10px 30px var(--shadow-soft);
 }
 
 .public-hero,
