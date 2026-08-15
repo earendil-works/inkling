@@ -59,7 +59,7 @@ See [the prior decision](../rfcs/0012-prior.md#outcome).
   assert.deepEqual(imported.relatedRfcNumbers, [12, 13]);
   assert.equal(imported.metadata.title, "Durable collaboration");
   assert.equal(imported.body.startsWith("# Durable collaboration"), true);
-  assert.match(imported.body, /\/rfcs\/0012#outcome/u);
+  assert.match(imported.body, /\/rfc\/0012#outcome/u);
 });
 
 test("legacy confidentiality imports as confidential visibility", async () => {
@@ -141,7 +141,7 @@ test("legacy RFC link rewriting leaves external links unchanged", () => {
     rewriteLegacyRfcLinks(
       "[relative](rfc-7-title.md) [old site](http://rfcs/0012.md) [external](https://example.com/7.md)",
     ),
-    "[relative](/rfcs/0007) [old site](/rfcs/0012) [external](https://example.com/7.md)",
+    "[relative](/rfc/0007) [old site](/rfc/0012) [external](https://example.com/7.md)",
   );
 });
 
@@ -152,6 +152,6 @@ test("known legacy source links become canonical RFC links", () => {
       `[prior](${source}?tab=t.0#heading=h.old) [external](https://example.com/)`,
       [{ legacySourceUrl: source, rfcNumber: 7 }],
     ),
-    "[prior](/rfcs/0007) [external](https://example.com/)",
+    "[prior](/rfc/0007) [external](https://example.com/)",
   );
 });

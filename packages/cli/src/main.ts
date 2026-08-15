@@ -599,9 +599,11 @@ function documentTarget(
         );
       }
 
-      const rfc = /^\/rfcs\/(\d+)(?:\/(edit))?\/?$/u.exec(url.pathname);
-      const number = Number(rfc?.[1]);
-      if (rfc?.[1] === undefined || !Number.isSafeInteger(number) || number < 1) {
+      const routedRfc = /^\/(?:rfc|rfcs)\/(\d+)(?:\/(edit))?\/?$/u.exec(url.pathname);
+      const numericRfc = /^\/(\d{4})\/?$/u.exec(url.pathname);
+      const digits = routedRfc?.[1] ?? numericRfc?.[1];
+      const number = Number(digits);
+      if (digits === undefined || !Number.isSafeInteger(number) || number < 1) {
         return usageFailure("The URL is not a supported Inkling document URL.");
       }
       return client.list(`rfc:${number}`).pipe(
@@ -614,7 +616,7 @@ function documentTarget(
             : Effect.succeed({
                 documentId: match.metadata.id,
                 nextIndex: index + 1,
-                published: rfc[2] !== "edit",
+                published: routedRfc?.[2] !== "edit",
               });
         }),
       );

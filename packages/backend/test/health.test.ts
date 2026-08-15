@@ -26,7 +26,7 @@ test("served agent instructions explain personal API keys and safe CLI use", asy
   assert.match(body, /account menu.*API keys/su);
   assert.match(body, /Reuse an active key.*click \*\*Show\*\*/su);
   assert.match(body, /inkling workspace add https:\/\/rfcs\.example\.com API_KEY/u);
-  assert.match(body, /inkling read https:\/\/rfcs\.example\.com\/rfcs\/0057/u);
+  assert.match(body, /inkling read https:\/\/rfcs\.example\.com\/rfc\/0057/u);
   assert.match(body, /inkling read rfcs\.example\.com DOCUMENT_ID/u);
   assert.match(body, /Capability .* URLs.*without configuring a workspace/u);
   assert.match(body, /API keys belong to the user who created them/u);
@@ -35,7 +35,7 @@ test("served agent instructions explain personal API keys and safe CLI use", asy
 });
 
 test("unavailable resources put the agent handoff at the start of default HTML", async () => {
-  const response = agentResourceUnavailableResponse("https://rfcs.example.com/rfcs/0057");
+  const response = agentResourceUnavailableResponse("https://rfcs.example.com/rfc/0057");
   const body = await response.text();
 
   assert.equal(response.status, 404);

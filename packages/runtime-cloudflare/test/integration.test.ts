@@ -206,12 +206,18 @@ test(
           id: "alphatest0@earendil.com",
         },
       ]);
-      const publicRfc = await fetch(`${running.baseUrl}/rfcs/0001`);
+      const publicRfc = await fetch(`${running.baseUrl}/rfc/0001`);
       assert.equal(publicRfc.status, 200);
       const publicHtml = await publicRfc.text();
       assert.match(publicHtml, />Armin Ronacher<\/a>/u);
       assert.match(publicHtml, />Colin Hanna<\/a>/u);
       assert.match(publicHtml, /mailto:alphatest0@earendil\.com/u);
+      const numericRfc = await fetch(`${running.baseUrl}/0001/`, { redirect: "manual" });
+      assert.equal(numericRfc.status, 308);
+      assert.equal(numericRfc.headers.get("location"), "/rfc/0001");
+      const pluralRfc = await fetch(`${running.baseUrl}/rfcs/0001`, { redirect: "manual" });
+      assert.equal(pluralRfc.status, 308);
+      assert.equal(pluralRfc.headers.get("location"), "/rfc/0001");
 
       const lateNumbered = await readDocument(running.baseUrl, second.metadata.id, authorization);
       const publicSecond = await fetch(
@@ -236,7 +242,7 @@ test(
       assert.equal(lateAllocatedRfc.status, 200);
       assert.equal(
         ((await lateAllocatedRfc.json()) as { canonicalPath: string }).canonicalPath,
-        "/rfcs/0002",
+        "/rfc/0002",
       );
       const anonymousSecond = await fetch(
         `${running.baseUrl}/api/documents/${publicSecondDocument.metadata.id}?published=true`,

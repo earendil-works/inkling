@@ -27,7 +27,7 @@ It's built to easily deploy to Cloudflare but can also be run locally.
 ## Authoring
 
 RFCs and notes use markdown as syntax. RFC numbers are allocated monotonically
-and have canonical routes such as `/rfcs/0042`. Notes are more informal and
+and have canonical routes such as `/rfc/0042`. Notes are more informal and
 always have their own internal document IDs as URL. They are for meeting notes
 and other throwaway documents that do not need to live forever.
 
@@ -81,7 +81,7 @@ The command-line executable is named `inkling`. Open the account menu and choose
 inkling workspace add https://rfcs.example.com API_KEY
 inkling list rfcs.example.com
 inkling search rfcs.example.com 'state:discussion label:platform'
-inkling read https://rfcs.example.com/rfcs/0057/edit
+inkling read https://rfcs.example.com/rfc/0057/edit
 inkling read rfcs.example.com DOCUMENT_ID
 inkling create rfcs.example.com 'New proposal' --rfc
 ```

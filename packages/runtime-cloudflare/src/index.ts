@@ -25,6 +25,7 @@ import {
   IdGeneratorLive,
   InklingApplication,
   localApplicationLayer,
+  rfcRedirectLocation,
   SecretHasherLive,
   SecureTokenLive,
   shareProofCookieNameFromToken,
@@ -840,6 +841,12 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
 const worker: ExportedHandler<CloudflareEnvironment> = {
   async fetch(request, environment) {
     const url = new URL(request.url);
+    if (request.method === "GET" || request.method === "HEAD") {
+      const location = rfcRedirectLocation(request.url);
+      if (location !== undefined) {
+        return new Response(null, { headers: { Location: location }, status: 308 });
+      }
+    }
     if (url.pathname === "/theme.css" || url.pathname === "/theme.json") {
       try {
         const theme = await Effect.runPromise(themeFromEnvironment(environment.INKLING_THEME));
@@ -882,14 +889,14 @@ const worker: ExportedHandler<CloudflareEnvironment> = {
     if (documentId !== undefined) {
       return dispatchDocument(request, environment, documentId);
     }
-    if (/^\/rfcs\/\d+\/?$/u.test(url.pathname) && credentials(request).sessionToken !== undefined) {
+    if (/^\/rfc\/\d+$/u.test(url.pathname) && credentials(request).sessionToken !== undefined) {
       return environment.ASSETS.fetch(request);
     }
     const rfcNumber = rfcNumberFromPath(url.pathname);
     if (rfcNumber !== undefined) {
       const resolution = await workspaceStub(environment).resolvePublicRfc(rfcNumber);
       if (!resolution.ok) {
-        return resolution.error.status === 404 && /^\/rfcs\/\d+/u.test(url.pathname)
+        return resolution.error.status === 404 && /^\/rfc\/\d+/u.test(url.pathname)
           ? agentResourceUnavailableResponse(request.url)
           : protocolErrorResponse(resolution.error);
       }
@@ -1200,9 +1207,8 @@ function documentIdFromRfcAllocation(pathname: string): string | undefined {
 
 function rfcNumberFromPath(pathname: string): number | undefined {
   const api = /^\/api\/public\/rfc\/(\d+)\/?$/u.exec(pathname);
-  const canonical = /^\/rfcs\/(\d+)(?:\/(?!edit\/?$)[^/]+)?\/?$/u.exec(pathname);
-  const legacy = /^\/rfc\/(\d+)(?:\/[^/]+)?\/?$/u.exec(pathname);
-  const value = Number(api?.[1] ?? canonical?.[1] ?? legacy?.[1]);
+  const canonical = /^\/rfc\/(\d+)$/u.exec(pathname);
+  const value = Number(api?.[1] ?? canonical?.[1]);
   return Number.isSafeInteger(value) && value > 0 ? value : undefined;
 }
 

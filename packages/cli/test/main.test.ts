@@ -114,6 +114,14 @@ test("URL-derived workspaces route document IDs and complete URLs", async () => 
       Effect.runPromise(main(["read", "http://localhost:8787/share/doc_456?cap=secret"])),
       /unexpected response/u,
     );
+    await assert.rejects(
+      Effect.runPromise(main(["read", "https://one.example/rfc/0042"])),
+      /unexpected response/u,
+    );
+    await assert.rejects(
+      Effect.runPromise(main(["read", "https://one.example/0042/"])),
+      /unexpected response/u,
+    );
 
     assert.deepEqual(requests, [
       {
@@ -127,6 +135,14 @@ test("URL-derived workspaces route document IDs and complete URLs", async () => 
       {
         authorization: null,
         url: "http://localhost:8787/api/documents/doc_456?published=true&cap=secret",
+      },
+      {
+        authorization: "Bearer key-one",
+        url: "https://one.example/api/documents?q=rfc%3A42",
+      },
+      {
+        authorization: "Bearer key-one",
+        url: "https://one.example/api/documents?q=rfc%3A42",
       },
     ]);
     await assert.rejects(Effect.runPromise(main(["read", "one.example"])), /Missing document ID/u);

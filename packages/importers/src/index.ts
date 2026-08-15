@@ -222,7 +222,7 @@ export function rewriteLegacyRfcLinks(markdown: string): string {
   return markdown.replace(
     /\((?:https?:\/\/rfcs\/|(?:\.\.\/|\.\/)?(?:rfcs?\/)?)(?:rfc[-_ ]?)?(\d+)(?:-[^)#]*)?\.md(#[^)]+)?\)/giu,
     (_match, rfcDigits: string, fragment: string | undefined) =>
-      `(/rfcs/${String(Number(rfcDigits)).padStart(4, "0")}${fragment ?? ""})`,
+      `(/rfc/${String(Number(rfcDigits)).padStart(4, "0")}${fragment ?? ""})`,
   );
 }
 
@@ -239,7 +239,7 @@ export function rewriteKnownRfcSourceLinks(
     if (rfc.legacySourceUrl === undefined || rfc.rfcNumber === undefined) continue;
     const key = legacySourceKey(rfc.legacySourceUrl);
     if (key !== undefined) {
-      routes.set(key, `/rfcs/${String(rfc.rfcNumber).padStart(4, "0")}`);
+      routes.set(key, `/rfc/${String(rfc.rfcNumber).padStart(4, "0")}`);
     }
   }
   return markdown.replace(

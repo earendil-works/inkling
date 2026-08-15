@@ -208,7 +208,7 @@ function loadRoute(url: URL): Effect.Effect<RouteModel, ApiError> {
   const api = makeApiClient(capabilityToken);
   const shared = /^\/share\/([^/]+)(?:\/(edit))?\/?$/u.exec(url.pathname);
   const documentRoute = /^\/documents\/([^/]+)(?:\/(edit))?\/?$/u.exec(url.pathname);
-  const rfcRoute = /^\/rfcs\/(\d+)(?:\/(edit))?\/?$/u.exec(url.pathname);
+  const rfcRoute = /^\/rfc\/(\d+)(?:\/(edit))?\/?$/u.exec(url.pathname);
   if (shared?.[1] !== undefined) {
     const documentId = decodeURIComponent(shared[1]);
     return loadDocumentRoute(
@@ -440,7 +440,7 @@ function isApplicationUrl(url: URL): boolean {
       url.pathname === "/labels" ||
       url.pathname === "/trash" ||
       url.pathname.startsWith("/documents/") ||
-      url.pathname.startsWith("/rfcs/") ||
+      url.pathname.startsWith("/rfc/") ||
       url.pathname.startsWith("/share/"))
   );
 }

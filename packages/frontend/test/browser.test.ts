@@ -324,7 +324,7 @@ test(
       await first.keyboard.insertText("state: draft");
       assert.equal(await first.locator("[data-document-details]").count(), 0);
       await first.locator("[data-allocate-rfc]").click();
-      await first.waitForURL(/\/rfcs\/0001\/edit$/u);
+      await first.waitForURL(/\/rfc\/0001\/edit$/u);
       await first.waitForFunction(
         () =>
           document.querySelectorAll("[data-breadcrumb]")[2]?.textContent ===
@@ -508,7 +508,7 @@ test(
         document.documentElement.dataset["browserNavigation"] = "same-document";
       });
       await first.getByRole("link", { name: "View" }).click();
-      await first.waitForURL(/\/rfcs\/0001$/u);
+      await first.waitForURL(/\/rfc\/0001$/u);
       assert.equal(
         await first.locator("html").getAttribute("data-browser-navigation"),
         "same-document",
@@ -703,9 +703,9 @@ test(
       await documentSearch.press("Enter");
       assert.match(first.url(), /\?q=rfc%3A1(?:\+|%20)%22answer%22$/u);
       await first.locator("[data-catalog-document-id][data-catalog-selected]").click();
-      await first.waitForURL(/\/rfcs\/0001$/u);
+      await first.waitForURL(/\/rfc\/0001$/u);
       await first.locator("[data-open-editor]").click();
-      await first.waitForURL(/\/rfcs\/0001\/edit$/u);
+      await first.waitForURL(/\/rfc\/0001\/edit$/u);
       await first.waitForFunction(
         () => document.querySelector("[data-save-state]")?.textContent === "Saved",
       );
@@ -968,7 +968,7 @@ test(
       await first.keyboard.press("ArrowRight");
 
       const second = await context.newPage();
-      await second.goto(`${baseUrl}/rfcs/0001/edit`);
+      await second.goto(`${baseUrl}/rfc/0001/edit`);
       await second.waitForSelector(".cm-content");
       await first.locator(".cm-content").click();
       await first.keyboard.press("ControlOrMeta+End");

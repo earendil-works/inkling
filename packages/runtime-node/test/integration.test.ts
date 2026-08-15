@@ -337,7 +337,7 @@ test(
           "architecture",
           "platform",
         ]);
-        const unavailableRfc = await fetch(`${baseUrl}/rfcs/0001`);
+        const unavailableRfc = await fetch(`${baseUrl}/rfc/0001`);
         assert.equal(unavailableRfc.status, 404);
         assert.match(unavailableRfc.headers.get("content-type") ?? "", /^text\/html/u);
         const unavailableHtml = await unavailableRfc.text();
@@ -348,7 +348,7 @@ test(
           method: "POST",
         });
         assert.equal(publish.status, 200);
-        const published = await fetch(`${baseUrl}/rfcs/0001`);
+        const published = await fetch(`${baseUrl}/rfc/0001`);
         assert.equal(published.status, 200);
         const anonymousCatalog = await fetch(`${baseUrl}/api/public/documents`);
         assert.equal(anonymousCatalog.status, 200);
@@ -359,9 +359,12 @@ test(
         assert.equal(anonymousDocuments.documents.length, 1);
         assert.equal(anonymousDocuments.documents[0]?.metadata.id, document.metadata.id);
         assert.equal(anonymousDocuments.documents[0]?.metadata.title, "Integrated RFC");
-        const legacyRfc = await fetch(`${baseUrl}/rfc/0001`, { redirect: "manual" });
-        assert.equal(legacyRfc.status, 308);
-        assert.equal(legacyRfc.headers.get("location"), "/rfcs/0001");
+        const pluralRfc = await fetch(`${baseUrl}/rfcs/0001`, { redirect: "manual" });
+        assert.equal(pluralRfc.status, 308);
+        assert.equal(pluralRfc.headers.get("location"), "/rfc/0001");
+        const numericRfc = await fetch(`${baseUrl}/0001/`, { redirect: "manual" });
+        assert.equal(numericRfc.status, 308);
+        assert.equal(numericRfc.headers.get("location"), "/rfc/0001");
         const publishedCsp = published.headers.get("content-security-policy") ?? "";
         assert.match(publishedCsp, /style-src 'self' https:\/\/fonts\.googleapis\.com/u);
         assert.match(publishedCsp, /font-src 'self' https:\/\/fonts\.gstatic\.com/u);
@@ -408,7 +411,7 @@ test(
           [
             path.resolve(import.meta.dirname, "../../cli/src/main.ts"),
             "read",
-            `${baseUrl}/rfcs/0001`,
+            `${baseUrl}/rfc/0001`,
           ],
           { ...process.env, INKLING_CONFIG: cliConfig },
         );
@@ -469,7 +472,7 @@ test(
         assert.equal(anonymousPublishedBody.metadata.title, "Integrated RFC");
         assert.match(anonymousPublishedBody.body, /# Integrated RFC/u);
         assert.doesNotMatch(anonymousPublishedBody.body, /Unpublished working title/u);
-        const isolatedPublication = await (await fetch(`${baseUrl}/rfcs/0001`)).text();
+        const isolatedPublication = await (await fetch(`${baseUrl}/rfc/0001`)).text();
         assert.match(isolatedPublication, /Integrated RFC/u);
         assert.doesNotMatch(isolatedPublication, /Unpublished working title/u);
 
@@ -549,7 +552,7 @@ test(
           /---\n\n# Unpublished working title\n\nDurable body from collaboration\n\n```ts\nconst value: number = 1;\n```$/u,
         );
         assert.equal(recovered.comments.threads.length, 1);
-        assert.equal((await fetch(`${baseUrl}/rfcs/0001`)).status, 200);
+        assert.equal((await fetch(`${baseUrl}/rfc/0001`)).status, 200);
       });
     } finally {
       await rm(directory, { force: true, recursive: true });

@@ -36,16 +36,6 @@
     "binding": "ASSETS",
     "directory": "../frontend/dist",
     "not_found_handling": "single-page-application",
-    "run_worker_first": [
-      "/AGENTS.md",
-      "/api/*",
-      "/rfc/*",
-      "/rfcs/*",
-      "/public/*",
-      "/state/*",
-      "/keyword/*",
-      "/theme.css",
-      "/theme.json",
-    ],
+    "run_worker_first": ["/*"],
   },
 }

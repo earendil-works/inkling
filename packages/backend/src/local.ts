@@ -78,6 +78,7 @@ import type {
   DocumentSnapshot,
 } from "@earendil-works/inkling-collaboration";
 import { ApplicationError, InklingApplication } from "./application.ts";
+import { canonicalRfcPath } from "./routes.ts";
 import type {
   CollaborationConnection,
   DocumentRuntimeConfiguration,
@@ -1996,10 +1997,7 @@ export function makeLocalInklingApplication(
           if (entry === undefined) {
             return yield* applicationFailure("not_found", "The published RFC does not exist.", 404);
           }
-          return yield* readPublished(
-            entry.documentId,
-            `/rfcs/${String(rfcNumber).padStart(4, "0")}`,
-          );
+          return yield* readPublished(entry.documentId, canonicalRfcPath(rfcNumber));
         }),
       reserveRfcNumber: (credentials, rawDocumentId) =>
         Effect.gen(function* () {
@@ -2737,7 +2735,7 @@ function writePublishedArtifact(
     const canonical =
       snapshot.metadata.rfcNumber === undefined
         ? `/documents/${snapshot.metadata.id}`
-        : `/rfcs/${String(snapshot.metadata.rfcNumber).padStart(4, "0")}`;
+        : canonicalRfcPath(snapshot.metadata.rfcNumber);
     const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><meta name="description" content="${description}"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><link rel="canonical" href="${canonical}"></head><body><main><h1>${title}</h1>${rendered.html}</main></body></html>`;
     const bytes = new TextEncoder().encode(html);
     const contentDigest = yield* digest.sha256(bytes);
@@ -3026,7 +3024,7 @@ function rewriteRfcUrl(url: string): string | undefined {
   const match = /(?:^|\/)rfc[-_/]?(\d+)(?:\.md)?(?:#(.*))?$/iu.exec(url);
   return match?.[1] === undefined
     ? url
-    : `/rfcs/${match[1].padStart(4, "0")}${match[2] === undefined ? "" : `#${match[2]}`}`;
+    : `${canonicalRfcPath(Number(match[1]))}${match[2] === undefined ? "" : `#${match[2]}`}`;
 }
 
 function toApplicationError(error: unknown): ApplicationError {

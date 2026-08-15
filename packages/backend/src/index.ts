@@ -37,6 +37,7 @@ import {
 import type { InklingApplicationService, RequestCredentials } from "./application.ts";
 import { finishGoogleAuthentication, startGoogleAuthentication } from "./google-auth.ts";
 import type { GoogleAuthenticationEnvironment } from "./google-auth.ts";
+import { canonicalRfcPath, rfcRedirectLocation } from "./routes.ts";
 import { defaultTheme, themeCssResponse } from "./theme.ts";
 import type { ThemeConfiguration } from "./theme.ts";
 
@@ -58,6 +59,7 @@ export {
 } from "./application.ts";
 export { localApplicationLayer, makeLocalInklingApplication } from "./local.ts";
 export type { LocalApplicationOptions } from "./local.ts";
+export { canonicalRfcPath, rfcRedirectLocation } from "./routes.ts";
 export { DigestLive, IdGeneratorLive, SecretHasherLive, SecureTokenLive } from "./crypto.ts";
 export {
   finishGoogleAuthentication,
@@ -115,6 +117,19 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
     if (context.req.path.startsWith("/api/") && context.res.headers.get("Cache-Control") === null) {
       context.header("Cache-Control", "no-store");
     }
+  });
+
+  app.use("*", async (context, next) => {
+    if (context.req.method !== "GET" && context.req.method !== "HEAD") {
+      await next();
+      return;
+    }
+    const location = rfcRedirectLocation(context.req.url);
+    if (location === undefined) {
+      await next();
+      return;
+    }
+    return context.redirect(location, 308);
   });
 
   app.get("/AGENTS.md", (context) => {
@@ -634,7 +649,7 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
     ),
   );
 
-  app.get("/rfcs/:number", (context, next) =>
+  app.get("/rfc/:number", (context, next) =>
     getCookie(context, "inkling_session") !== undefined
       ? next()
       : execute(
@@ -682,16 +697,13 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
     ),
   );
 
-  app.get("/rfcs/:number/:slug", (context, next) => {
+  app.get("/rfc/:number/:slug", (context, next) => {
     if (context.req.param("slug") === "edit") return next();
     const number = Number(context.req.param("number"));
     return Number.isSafeInteger(number)
-      ? context.redirect(`/rfcs/${String(number).padStart(4, "0")}`, 308)
+      ? context.redirect(canonicalRfcPath(number), 308)
       : context.notFound();
   });
-
-  app.get("/rfc/:number", redirectLegacyRfc);
-  app.get("/rfc/:number/:slug", redirectLegacyRfc);
 
   app.post("/api/admin/import", (context) =>
     execute(context, options, (service) =>
@@ -851,8 +863,8 @@ Do not paste the key into source files, chat transcripts, AGENTS.md, or skills. 
 Pass the complete URL directly to the CLI. Its domain and optional port select the configured workspace automatically, and RFC URLs are resolved without scraping the browser UI:
 
 \`\`\`sh
-inkling read ${baseUrl}/rfcs/0057
-inkling read ${baseUrl}/rfcs/0057/edit
+inkling read ${baseUrl}/rfc/0057
+inkling read ${baseUrl}/rfc/0057/edit
 \`\`\`
 
 A reader URL returns its published revision. An \`/edit\` URL returns the working head. Capability \`/share/\` URLs carry their own document-scoped access and can be used directly without configuring a workspace. If no workspace is configured for any other URL's origin, ask the user to connect it using the steps above.
@@ -872,7 +884,7 @@ Run \`inkling --help\` for the complete, current command list. Common operations
 \`\`\`sh
 inkling list ${workspace}
 inkling search ${workspace} 'state:discussion label:platform'
-inkling read ${baseUrl}/rfcs/0057/edit
+inkling read ${baseUrl}/rfc/0057/edit
 inkling read ${workspace} DOCUMENT_ID --lines 1:120
 inkling create ${workspace} 'Proposal title' --rfc
 inkling edit ${workspace} DOCUMENT_ID 'unique old text' 'replacement text'
@@ -914,13 +926,6 @@ description: Work with Inkling Markdown workspaces through the inkling CLI. Use 
 
 The skill may record the non-secret base URL and workspace domain \`${workspace}\`, but it must never contain an API key. Keep detailed command documentation here at ${baseUrl}/AGENTS.md so the skill does not become stale.
 `;
-}
-
-function redirectLegacyRfc(context: HonoContext): Response | Promise<Response> {
-  const number = Number(context.req.param("number"));
-  return Number.isSafeInteger(number)
-    ? context.redirect(`/rfcs/${String(number).padStart(4, "0")}`, 308)
-    : context.notFound();
 }
 
 function operationCategory(pathname: string): string {
@@ -1191,7 +1196,7 @@ function publicCatalogHtml(titleValue: string, catalog: CatalogResponse): string
       const href =
         metadata.rfcNumber === undefined
           ? `/public/documents/${encodeURIComponent(metadata.id)}`
-          : `/rfcs/${String(metadata.rfcNumber).padStart(4, "0")}`;
+          : canonicalRfcPath(metadata.rfcNumber);
       const labels = metadata.labels
         .map((label) => `<a href="/keyword/${encodeURIComponent(label)}">${escapeHtml(label)}</a>`)
         .join(" ");
