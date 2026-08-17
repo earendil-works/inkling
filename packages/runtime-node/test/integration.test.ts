@@ -317,6 +317,11 @@ test(
                 newText: "labels:\n  - architecture\n  - platform",
                 oldText: "labels: []",
               },
+              {
+                newText:
+                  "```ts\nconst value: number = 1;\n```\n\n[Recording](https://videos.example/watch?signature=a%2Bb&__require_auth=1&part=2#chapter)",
+                oldText: "```ts\nconst value: number = 1;\n```",
+              },
             ],
             expectedRevision: metadataResponse.headRevision,
           }),
@@ -348,6 +353,7 @@ test(
           method: "POST",
         });
         assert.equal(publish.status, 200);
+        const publicationMetadata = (await publish.json()) as DocumentWire["metadata"];
         const published = await fetch(`${baseUrl}/rfc/0001`);
         assert.equal(published.status, 200);
         const anonymousCatalog = await fetch(`${baseUrl}/api/public/documents`);
@@ -359,6 +365,13 @@ test(
         assert.equal(anonymousDocuments.documents.length, 1);
         assert.equal(anonymousDocuments.documents[0]?.metadata.id, document.metadata.id);
         assert.equal(anonymousDocuments.documents[0]?.metadata.title, "Integrated RFC");
+        assert.doesNotMatch(JSON.stringify(anonymousDocuments), /videos\.example|signature=a/u);
+        const protectedSearch = await fetch(
+          `${baseUrl}/api/public/documents?q=${encodeURIComponent("videos.example")}`,
+        );
+        assert.deepEqual((await protectedSearch.json()) as { documents: unknown[] }, {
+          documents: [],
+        });
         const pluralRfc = await fetch(`${baseUrl}/rfcs/0001`, { redirect: "manual" });
         assert.equal(pluralRfc.status, 308);
         assert.equal(pluralRfc.headers.get("location"), "/rfc/0001");
@@ -395,6 +408,31 @@ test(
         assert.match(publishedHtml, /<link rel="stylesheet" href="\/theme\.css">/u);
         assert.match(publishedHtml, /<link rel="stylesheet" href="\/public\.css">/u);
         assert.doesNotMatch(publishedHtml, /<style>/u);
+        assert.doesNotMatch(publishedHtml, /videos\.example|signature=a/u);
+        const protectedHref = /href="(\/auth\/link\/[^"]+)"/u.exec(publishedHtml)?.[1];
+        assert.equal(
+          protectedHref,
+          `/auth/link/${document.metadata.id}/${publicationMetadata.publishedRevision}/0`,
+        );
+        const anonymousProtectedLink = await fetch(`${baseUrl}${protectedHref}`, {
+          redirect: "manual",
+        });
+        assert.equal(anonymousProtectedLink.status, 302);
+        assert.equal(
+          anonymousProtectedLink.headers.get("location"),
+          `/api/auth/google/start?next=${encodeURIComponent(protectedHref ?? "")}`,
+        );
+        const authenticatedProtectedLink = await fetch(`${baseUrl}${protectedHref}`, {
+          headers: { Cookie: cookieHeader },
+          redirect: "manual",
+        });
+        assert.equal(authenticatedProtectedLink.status, 302);
+        assert.equal(
+          authenticatedProtectedLink.headers.get("location"),
+          "https://videos.example/watch?signature=a%2Bb&part=2#chapter",
+        );
+        assert.equal(authenticatedProtectedLink.headers.get("cache-control"), "no-store");
+        assert.equal(authenticatedProtectedLink.headers.get("referrer-policy"), "no-referrer");
 
         const cliConfig = path.join(directory, "agent-cli-config.json");
         await writeFile(
@@ -471,7 +509,8 @@ test(
         const anonymousPublishedBody = (await anonymousPublishedDocument.json()) as DocumentWire;
         assert.equal(anonymousPublishedBody.metadata.title, "Integrated RFC");
         assert.match(anonymousPublishedBody.body, /# Integrated RFC/u);
-        assert.doesNotMatch(anonymousPublishedBody.body, /Unpublished working title/u);
+        assert.match(anonymousPublishedBody.body, /\/auth\/link\//u);
+        assert.doesNotMatch(anonymousPublishedBody.body, /videos\.example|__require_auth/u);
         const isolatedPublication = await (await fetch(`${baseUrl}/rfc/0001`)).text();
         assert.match(isolatedPublication, /Integrated RFC/u);
         assert.doesNotMatch(isolatedPublication, /Unpublished working title/u);
@@ -549,7 +588,7 @@ test(
         const recovered = await readDocument(baseUrl, first.documentId, authorization);
         assert.match(
           recovered.body,
-          /---\n\n# Unpublished working title\n\nDurable body from collaboration\n\n```ts\nconst value: number = 1;\n```$/u,
+          /---\n\n# Unpublished working title\n\nDurable body from collaboration\n\n```ts\nconst value: number = 1;\n```\n\n\[Recording\]/u,
         );
         assert.equal(recovered.comments.threads.length, 1);
         assert.equal((await fetch(`${baseUrl}/rfc/0001`)).status, 200);

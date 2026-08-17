@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { canonicalRfcPath, createBackendApp, rfcRedirectLocation } from "../src/index.ts";
+import {
+  canonicalRfcPath,
+  createBackendApp,
+  protectedLinkPath,
+  rfcRedirectLocation,
+} from "../src/index.ts";
 
 test("RFC routes canonicalize singular, plural, and legacy numeric URLs", async () => {
   assert.equal(canonicalRfcPath(7), "/rfc/0007");
+  assert.equal(protectedLinkPath("doc_example", 12, 0), "/auth/link/doc_example/12/0");
   assert.equal(rfcRedirectLocation("https://rfcs.example.com/rfc/0007"), undefined);
   assert.equal(rfcRedirectLocation("https://rfcs.example.com/rfc/0007/edit"), undefined);
   assert.equal(rfcRedirectLocation("https://rfcs.example.com/0007"), "/rfc/0007");

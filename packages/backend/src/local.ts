@@ -78,7 +78,7 @@ import type {
   DocumentSnapshot,
 } from "@earendil-works/inkling-collaboration";
 import { ApplicationError, InklingApplication } from "./application.ts";
-import { canonicalRfcPath } from "./routes.ts";
+import { canonicalRfcPath, protectedLinkPath } from "./routes.ts";
 import type {
   CollaborationConnection,
   DocumentRuntimeConfiguration,
@@ -446,9 +446,23 @@ export function makeLocalInklingApplication(
           ),
         ).pipe(Effect.mapError(toApplicationError));
         const metadata = yield* metadataWithResolvedAuthors(published.metadata);
+        const anonymousBody =
+          principal.kind === "anonymous"
+            ? yield* renderer.render(published.body, { rewriteUrl: rewriteRfcUrl }).pipe(
+                Effect.mapError(toApplicationError),
+                Effect.map((rendered) =>
+                  rewriteProtectedLinkSources(
+                    published.body,
+                    rendered.protectedLinks,
+                    ({ index }) => protectedLinkPath(current.metadata.id, publishedRevision, index),
+                  ),
+                ),
+              )
+            : published.body;
         return yield* responseFromSnapshot(
           {
             ...published,
+            body: anonymousBody,
             metadata: {
               ...metadata,
               publishedRevision,
@@ -677,12 +691,21 @@ export function makeLocalInklingApplication(
           ),
         ).pipe(Effect.mapError(toApplicationError));
         const rendered = yield* renderer
-          .render(published.body, { rewriteUrl: rewriteRfcUrl })
+          .render(published.body, {
+            protectedLinkHref: ({ index }) =>
+              protectedLinkPath(current.metadata.id, publishedRevision, index),
+            rewriteUrl: rewriteRfcUrl,
+          })
           .pipe(Effect.mapError(toApplicationError));
         const metadata = yield* metadataWithResolvedAuthors(published.metadata);
+        const publicBody = rewriteProtectedLinkSources(
+          published.body,
+          rendered.protectedLinks,
+          () => "protected-link",
+        );
         return {
           canonicalPath,
-          description: excerpt(published.body),
+          description: excerpt(publicBody),
           headings: rendered.headings,
           html: rendered.html,
           metadata: {
@@ -1372,6 +1395,11 @@ export function makeLocalInklingApplication(
         Effect.gen(function* () {
           const principal = yield* resolvePrincipal(credentials);
           yield* requireAdministrator(principal);
+          if (request.publish === true) {
+            yield* renderer
+              .render(request.body, { rewriteUrl: rewriteRfcUrl })
+              .pipe(Effect.mapError(toApplicationError));
+          }
           const generatedId = yield* ids.generate(identifierTag.document);
           const importedId = request.metadata.id ?? generatedId;
           const reservation = yield* withState(
@@ -1726,15 +1754,16 @@ export function makeLocalInklingApplication(
               Effect.flatMap((snapshot) =>
                 metadataWithResolvedAuthors(snapshot.metadata).pipe(
                   Effect.map((metadata) => {
+                    const publicBody = redactProtectedLinkText(snapshot.body);
                     const searchText = normalizeSearchText(
-                      `${metadata.rfcNumber ?? ""} ${metadata.title} ${snapshot.body} ${metadata.labels.join(" ")}`,
+                      `${metadata.rfcNumber ?? ""} ${metadata.title} ${publicBody} ${metadata.labels.join(" ")}`,
                     );
                     return (normalizedQuery.length === 0 || searchText.includes(normalizedQuery)) &&
                       (lifecycleState === undefined ||
                         metadata.lifecycleState === lifecycleState) &&
                       (label === undefined || metadata.labels.includes(label))
                       ? {
-                          excerpt: excerpt(snapshot.body),
+                          excerpt: excerpt(publicBody),
                           metadata: {
                             ...metadata,
                             publishedRevision,
@@ -1881,6 +1910,9 @@ export function makeLocalInklingApplication(
               400,
             );
           }
+          yield* renderer
+            .render(current.body, { rewriteUrl: rewriteRfcUrl })
+            .pipe(Effect.mapError(toApplicationError));
           if (source.frontmatter !== undefined) {
             const frontmatter = source.frontmatter;
             yield* room
@@ -1998,6 +2030,25 @@ export function makeLocalInklingApplication(
             return yield* applicationFailure("not_found", "The published RFC does not exist.", 404);
           }
           return yield* readPublished(entry.documentId, canonicalRfcPath(rfcNumber));
+        }),
+      resolveProtectedLink: (credentials, rawDocumentId, rawRevision, linkIndex) =>
+        Effect.gen(function* () {
+          const id = yield* documentId(rawDocumentId).pipe(Effect.mapError(toApplicationError));
+          const principal = yield* resolvePrincipal(credentials, id);
+          yield* requireAccount(principal);
+          const revision = yield* documentRevision(rawRevision).pipe(
+            Effect.mapError(toApplicationError),
+          );
+          const published = yield* provideAuthorityDependencies(
+            loadDocumentRevision({ documentId: id, workspaceId: state.workspaceId }, revision),
+          ).pipe(Effect.mapError(toApplicationError));
+          const rendered = yield* renderer
+            .render(published.body, { rewriteUrl: rewriteRfcUrl })
+            .pipe(Effect.mapError(toApplicationError));
+          const link = rendered.protectedLinks[linkIndex];
+          return link === undefined
+            ? yield* applicationFailure("not_found", "The protected link does not exist.", 404)
+            : link.destination;
         }),
       reserveRfcNumber: (credentials, rawDocumentId) =>
         Effect.gen(function* () {
@@ -2719,19 +2770,28 @@ function writePublishedArtifact(
   return Effect.gen(function* () {
     const revision = snapshot.metadata.publishedRevision;
     if (revision === undefined) return;
-    const rendered = yield* renderer.render(snapshot.body, { rewriteUrl: rewriteRfcUrl }).pipe(
-      Effect.mapError(
-        (cause) =>
-          new StorageError({
-            cause,
-            message: "The published Markdown could not be rendered.",
-            operation: "render published artifact",
-            retryable: true,
-          }),
+    const rendered = yield* renderer
+      .render(snapshot.body, {
+        protectedLinkHref: ({ index }) => protectedLinkPath(snapshot.metadata.id, revision, index),
+        rewriteUrl: rewriteRfcUrl,
+      })
+      .pipe(
+        Effect.mapError(
+          (cause) =>
+            new StorageError({
+              cause,
+              message: "The published Markdown could not be rendered.",
+              operation: "render published artifact",
+              retryable: true,
+            }),
+        ),
+      );
+    const title = escapeMarkup(snapshot.metadata.title);
+    const description = escapeMarkup(
+      excerpt(
+        rewriteProtectedLinkSources(snapshot.body, rendered.protectedLinks, () => "protected-link"),
       ),
     );
-    const title = escapeMarkup(snapshot.metadata.title);
-    const description = escapeMarkup(excerpt(snapshot.body));
     const canonical =
       snapshot.metadata.rfcNumber === undefined
         ? `/documents/${snapshot.metadata.id}`
@@ -2872,6 +2932,28 @@ function authorsFrontmatterEntry(authors: readonly PersonReference[]): string {
   return authors.length === 0
     ? "authors: []\n"
     : `authors:\n${authors.map((author) => `  - ${JSON.stringify(author.email.toLocaleLowerCase("en"))}\n`).join("")}`;
+}
+
+function redactProtectedLinkText(body: string): string {
+  return body.includes("__require_auth")
+    ? body.replace(/https?:\/\/[^\s<>"']+/giu, "protected-link")
+    : body;
+}
+
+function rewriteProtectedLinkSources(
+  body: string,
+  links: readonly { readonly index: number; readonly source: string }[],
+  replacement: (link: { readonly index: number; readonly source: string }) => string,
+): string {
+  let rewritten = body;
+  const handled = new Set<string>();
+  for (const link of links) {
+    if (handled.has(link.source)) continue;
+    handled.add(link.source);
+    if (!rewritten.includes(link.source)) return "";
+    rewritten = rewritten.replaceAll(link.source, replacement(link));
+  }
+  return rewritten;
 }
 
 function excerpt(body: string): string {

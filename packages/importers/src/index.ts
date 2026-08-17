@@ -150,7 +150,11 @@ export function importEarendilRfc(
       firstString(frontmatter, ["target_decision_date", "decision_date"]),
     );
     const body = ensureTitleHeading(
-      normalizeRfcTitleHeading(rewriteLegacyRfcLinks(parsed.body), title, number),
+      normalizeRfcTitleHeading(
+        rewriteLegacyProtectedLinks(rewriteLegacyRfcLinks(parsed.body)),
+        title,
+        number,
+      ),
       title,
     );
     const metadata: ImportedMetadataInput = {
@@ -216,6 +220,13 @@ export function importExistingJot(
       warnings: [],
     };
   });
+}
+
+export function rewriteLegacyProtectedLinks(markdown: string): string {
+  return markdown.replace(
+    /([?&])require_earendil_auth=1(?=(&|#[^\s)>]*|[\s)>]|$))/gu,
+    "$1__require_auth=1",
+  );
 }
 
 export function rewriteLegacyRfcLinks(markdown: string): string {

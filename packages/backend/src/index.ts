@@ -59,7 +59,7 @@ export {
 } from "./application.ts";
 export { localApplicationLayer, makeLocalInklingApplication } from "./local.ts";
 export type { LocalApplicationOptions } from "./local.ts";
-export { canonicalRfcPath, rfcRedirectLocation } from "./routes.ts";
+export { canonicalRfcPath, protectedLinkPath, rfcRedirectLocation } from "./routes.ts";
 export { DigestLive, IdGeneratorLive, SecretHasherLive, SecureTokenLive } from "./crypto.ts";
 export {
   finishGoogleAuthentication,
@@ -111,7 +111,9 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
         status: context.res.status,
       }),
     );
-    context.header("Referrer-Policy", "strict-origin-when-cross-origin");
+    if (context.res.headers.get("Referrer-Policy") === null) {
+      context.header("Referrer-Policy", "strict-origin-when-cross-origin");
+    }
     context.header("X-Content-Type-Options", "nosniff");
     context.header("X-Frame-Options", "DENY");
     if (context.req.path.startsWith("/api/") && context.res.headers.get("Cache-Control") === null) {
@@ -187,6 +189,45 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
         ),
     );
   });
+
+  app.get("/auth/link/:documentId/:revision/:linkIndex", (context) =>
+    execute(
+      context,
+      options,
+      (service) =>
+        Effect.all({
+          linkIndex: positiveIntegerOrZero(context.req.param("linkIndex"), "protected link index"),
+          revision: positiveIntegerOrZero(context.req.param("revision"), "published revision"),
+        }).pipe(
+          Effect.flatMap(({ linkIndex, revision }) =>
+            service.resolveProtectedLink(
+              credentials(context),
+              context.req.param("documentId"),
+              revision,
+              linkIndex,
+            ),
+          ),
+        ),
+      (destination) => {
+        context.header("Cache-Control", "no-store");
+        context.header("Referrer-Policy", "no-referrer");
+        return context.redirect(destination, 302);
+      },
+      (error) => {
+        const requestCredentials = credentials(context);
+        if (
+          (error.status === 401 || error.status === 403) &&
+          requestCredentials.bearerToken === undefined
+        ) {
+          const next = new URL(context.req.url).pathname;
+          context.header("Cache-Control", "no-store");
+          context.header("Referrer-Policy", "no-referrer");
+          return context.redirect(`/api/auth/google/start?next=${encodeURIComponent(next)}`, 302);
+        }
+        return errorResponse(context, error);
+      },
+    ),
+  );
 
   app.post("/api/auth/logout", (context) =>
     execute(
@@ -901,6 +942,7 @@ Follow these rules:
 - Prefer \`inkling edit\`, which replaces unique existing text and rejects missing or ambiguous matches. Re-read and retry after a concurrent revision conflict.
 - Use \`inkling replace\` only when the user explicitly wants a full-body replacement.
 - Preserve the frontmatter and top-level title conventions shown in the document.
+- To hide an external destination from anonymous readers, append the reserved \`__require_auth=1\` query parameter to its Markdown link. Do not use it on images or internal links.
 - Use thread and message IDs printed by \`inkling read\` for replies and comment management.
 - \`inkling delete\` moves a document to Trash for 30 days. Use \`inkling undelete\` to restore it. Never use \`inkling delete --hard\` unless the user explicitly requests irreversible deletion.
 - Never print, commit, log, or embed API keys or capability URLs.

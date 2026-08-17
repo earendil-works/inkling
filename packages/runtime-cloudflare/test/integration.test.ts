@@ -128,7 +128,11 @@ test(
       const edited = await fetch(`${running.baseUrl}/api/documents/${first.metadata.id}/edits`, {
         body: JSON.stringify({
           edits: [
-            { newText: "durable", oldText: "initial" },
+            {
+              newText:
+                "durable first\n\n[Recording](https://videos.example/watch?clip=cloudflare&__require_auth=1)",
+              oldText: "initial first",
+            },
             {
               newText: "authors:\n  - armin@earendil.com\n  - alphatest0@earendil.com",
               oldText: "authors:\n  - armin@earendil.com",
@@ -143,7 +147,10 @@ test(
       });
       assert.equal(edited.status, 200);
       let changed = (await edited.json()) as DocumentWire;
-      assert.match(changed.body, /---\n\n# Cloudflare first\n\ndurable first$/u);
+      assert.match(
+        changed.body,
+        /---\n\n# Cloudflare first\n\ndurable first\n\n\[Recording\]\(https:\/\/videos\.example\/watch\?clip=cloudflare&__require_auth=1\)$/u,
+      );
       const acceptedLiveUpdate = await liveUpdate;
       assert.equal(acceptedLiveUpdate["type"], "update-accepted");
       assert.equal(typeof acceptedLiveUpdate["update"], "string");
@@ -212,6 +219,38 @@ test(
       assert.match(publicHtml, />Armin Ronacher<\/a>/u);
       assert.match(publicHtml, />Colin Hanna<\/a>/u);
       assert.match(publicHtml, /mailto:alphatest0@earendil\.com/u);
+      assert.doesNotMatch(publicHtml, /videos\.example|clip=cloudflare/u);
+      const protectedHref = /href="(\/auth\/link\/[^"]+)"/u.exec(publicHtml)?.[1];
+      assert.equal(
+        protectedHref,
+        `/auth/link/${first.metadata.id}/${publicationMetadata.publishedRevision}/0`,
+      );
+      const protectedRedirect = await fetch(`${running.baseUrl}${protectedHref}`, {
+        headers: { Cookie: cookie },
+        redirect: "manual",
+      });
+      assert.equal(protectedRedirect.status, 302);
+      assert.equal(
+        protectedRedirect.headers.get("location"),
+        "https://videos.example/watch?clip=cloudflare",
+      );
+      const anonymousProtected = await fetch(`${running.baseUrl}${protectedHref}`, {
+        redirect: "manual",
+      });
+      assert.equal(anonymousProtected.status, 302);
+      assert.match(
+        anonymousProtected.headers.get("location") ?? "",
+        /^\/api\/auth\/google\/start/u,
+      );
+      const returningCookie = await loginWithGoogle(running.baseUrl, protectedHref);
+      const returnedProtected = await fetch(`${running.baseUrl}${protectedHref}`, {
+        headers: { Cookie: returningCookie },
+        redirect: "manual",
+      });
+      assert.equal(
+        returnedProtected.headers.get("location"),
+        "https://videos.example/watch?clip=cloudflare",
+      );
       const numericRfc = await fetch(`${running.baseUrl}/0001/`, { redirect: "manual" });
       assert.equal(numericRfc.status, 308);
       assert.equal(numericRfc.headers.get("location"), "/rfc/0001");
@@ -292,7 +331,7 @@ test(
       try {
         assert.match(
           (await readDocument(running.baseUrl, first.metadata.id, authorization)).body,
-          /---\n\n# Newest projected title\n\ndurable first$/u,
+          /---\n\n# Newest projected title\n\ndurable first\n\n\[Recording\]/u,
         );
         const unlocked = await fetch(
           `${running.baseUrl}/api/documents/${first.metadata.id}/shares/unlock?cap=${encodeURIComponent(protectedCapability)}`,
@@ -553,11 +592,13 @@ async function waitForCatalog(
   return waitForCatalog(baseUrl, headers, documentId, title, attempt + 1);
 }
 
-async function loginWithGoogle(baseUrl: string): Promise<string> {
+async function loginWithGoogle(baseUrl: string, returnTo = "/"): Promise<string> {
   const status = await fetch(`${baseUrl}/api/auth/status`);
   assert.deepEqual(await status.json(), { authenticated: false });
 
-  const start = await fetch(`${baseUrl}/api/auth/google/start`, { redirect: "manual" });
+  const startUrl = new URL("/api/auth/google/start", baseUrl);
+  if (returnTo !== "/") startUrl.searchParams.set("next", returnTo);
+  const start = await fetch(startUrl, { redirect: "manual" });
   assert.equal(start.status, 302);
   const oauthCookie = start.headers
     .getSetCookie()
@@ -576,6 +617,7 @@ async function loginWithGoogle(baseUrl: string): Promise<string> {
     redirect: "manual",
   });
   assert.equal(callback.status, 302);
+  assert.equal(callback.headers.get("location"), returnTo);
   const cookie = callback.headers
     .getSetCookie()
     .map((value) => value.split(";")[0])

@@ -1,3 +1,7 @@
+export function protectedLinkPath(documentId: string, revision: number, linkIndex: number): string {
+  return `/auth/link/${encodeURIComponent(documentId)}/${revision}/${linkIndex}`;
+}
+
 /** Returns the canonical reader path for an RFC number. */
 export function canonicalRfcPath(number: number): string {
   return `/rfc/${String(number).padStart(4, "0")}`;

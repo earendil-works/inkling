@@ -19,6 +19,45 @@ test("rendering disables raw HTML and dangerous URLs", async () => {
   assert.match(rendered.html, /target="_blank"/u);
 });
 
+test("protected external links use an opaque href without changing other query bytes", async () => {
+  const rendered = await Effect.runPromise(
+    renderer.render(
+      "[recording](https://videos.example/watch?signature=a%2Bb&__require_auth=1&part=2#chapter)",
+      { protectedLinkHref: ({ index }) => `/auth/link/doc_example/7/${index}` },
+    ),
+  );
+
+  assert.deepEqual(rendered.protectedLinks, [
+    {
+      destination: "https://videos.example/watch?signature=a%2Bb&part=2#chapter",
+      index: 0,
+      source: "https://videos.example/watch?signature=a%2Bb&__require_auth=1&part=2#chapter",
+    },
+  ]);
+  assert.match(rendered.html, /href="\/auth\/link\/doc_example\/7\/0"/u);
+  assert.doesNotMatch(rendered.html, /videos\.example|signature/u);
+  assert.match(rendered.html, /target="_blank"/u);
+
+  const ordinary = await Effect.runPromise(
+    renderer.render("[ordinary](https://example.com/?require_auth=1)"),
+  );
+  assert.deepEqual(ordinary.protectedLinks, []);
+  assert.match(ordinary.html, /require_auth=1/u);
+});
+
+test("malformed or non-external protected link directives fail closed", async () => {
+  const failures = await Promise.all(
+    [
+      "[wrong value](https://example.com/?__require_auth=true)",
+      "[duplicate](https://example.com/?__require_auth=1&__require_auth=1)",
+      "[relative](/internal?__require_auth=1)",
+      "![image](https://example.com/image.png?__require_auth=1)",
+      "[invalid](https://?__require_auth=1)",
+    ].map((markdown) => Effect.runPromise(Effect.flip(renderer.render(markdown)))),
+  );
+  for (const failure of failures) assert.match(failure.message, /__require_auth/u);
+});
+
 test("frontmatter is parsed without entering rendered content", async () => {
   const source =
     "---\nstate: discussion\nvisibility: public\nlabels:\n  - architecture\n  - platform\n---\n## Decision\n\nBody";

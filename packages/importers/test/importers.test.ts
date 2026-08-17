@@ -7,6 +7,7 @@ import {
   importEarendilRfc,
   importExistingJot,
   rewriteKnownRfcSourceLinks,
+  rewriteLegacyProtectedLinks,
   rewriteLegacyRfcLinks,
 } from "../src/index.ts";
 
@@ -133,6 +134,19 @@ authors:
       { displayName: "Armin Ronacher", email: "armin@example.com" },
       { displayName: "unknown@example.com", email: "unknown@example.com" },
     ],
+  );
+});
+
+test("legacy protected links migrate to the reserved generic marker", () => {
+  assert.equal(
+    rewriteLegacyProtectedLinks(
+      "[recording](https://example.com/watch?v=1&require_earendil_auth=1#chapter)",
+    ),
+    "[recording](https://example.com/watch?v=1&__require_auth=1#chapter)",
+  );
+  assert.equal(
+    rewriteLegacyProtectedLinks("[ordinary](https://example.com/?require_auth=1)"),
+    "[ordinary](https://example.com/?require_auth=1)",
   );
 });
 

@@ -30,6 +30,7 @@ test("served agent instructions explain personal API keys and safe CLI use", asy
   assert.match(body, /inkling read rfcs\.example\.com DOCUMENT_ID/u);
   assert.match(body, /Capability .* URLs.*without configuring a workspace/u);
   assert.match(body, /API keys belong to the user who created them/u);
+  assert.match(body, /__require_auth=1/u);
   assert.match(body, /\.agents\/skills\/inkling\/SKILL\.md/u);
   assert.match(body, /never contain an API key/u);
 });

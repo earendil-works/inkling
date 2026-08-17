@@ -28,16 +28,23 @@ export interface ParsedDocumentSource {
   readonly frontmatter: DocumentFrontmatter | undefined;
 }
 
+export interface ProtectedLink {
+  readonly destination: string;
+  readonly index: number;
+  readonly source: string;
+}
+
 export interface RenderedMarkdown {
   readonly frontmatter: DocumentFrontmatter | undefined;
   readonly html: string;
   readonly headings: readonly RenderHeading[];
+  readonly protectedLinks: readonly ProtectedLink[];
   readonly title: string | undefined;
 }
 
 export interface RenderOptions {
+  readonly protectedLinkHref?: ((link: ProtectedLink) => string) | undefined;
   readonly rewriteUrl?: ((url: string) => string | undefined) | undefined;
-  readonly gateExternalLinks?: boolean | undefined;
   /** Add Markdown source ranges to rendered block elements for interactive previews. */
   readonly sourcePositions?: boolean | undefined;
 }
@@ -69,7 +76,14 @@ export function makeMarkdownRenderer(): MarkdownRendererService {
         : parseDocumentSource(markdown).pipe(
             Effect.flatMap((source) =>
               Effect.tryPromise({
-                catch: (cause) => new RenderError({ cause, message: "Markdown rendering failed." }),
+                catch: (cause) =>
+                  new RenderError({
+                    cause,
+                    message:
+                      cause instanceof ProtectedLinkError
+                        ? cause.message
+                        : "Markdown rendering failed.",
+                  }),
                 try: () => renderMarkdown(source, options),
               }),
             ),
@@ -114,6 +128,7 @@ async function renderMarkdown(
 ): Promise<RenderedMarkdown> {
   const { body: markdown, bodyOffset, frontmatter } = source;
   const headings: RenderHeading[] = [];
+  const protectedLinks: ProtectedLink[] = [];
   const usedHeadingIds = new Map<string, number>();
   const lineOffsets = sourceLineOffsets(markdown);
   const parser = new MarkdownIt({
@@ -125,13 +140,13 @@ async function renderMarkdown(
 
   parser.core.ruler.after("inline", "inkling-links-tasks-and-source-positions", (state) => {
     for (const token of state.tokens) {
-      rewriteTokenUrls(token, parser, options);
+      rewriteTokenUrls(token, parser, options, protectedLinks);
       if (options.sourcePositions === true) {
         annotateSourcePosition(token, lineOffsets, markdown.length, bodyOffset);
       }
       if (token.type === "inline" && token.children !== null) {
         for (const child of token.children) {
-          rewriteTokenUrls(child, parser, options);
+          rewriteTokenUrls(child, parser, options, protectedLinks);
         }
         rewriteTaskList(token.children, parser);
       }
@@ -204,6 +219,7 @@ async function renderMarkdown(
     frontmatter,
     headings,
     html: parser.renderer.render(contentTokens, parser.options, environment),
+    protectedLinks,
     title,
   };
 }
@@ -373,30 +389,104 @@ function annotateSourcePosition(
   token.attrSet("data-inkling-source-kind", token.type.replace(/_(?:open|block)$/u, ""));
 }
 
-function rewriteTokenUrls(token: Token, parser: MarkdownItType, options: RenderOptions): void {
+function rewriteTokenUrls(
+  token: Token,
+  parser: MarkdownItType,
+  options: RenderOptions,
+  protectedLinks: ProtectedLink[],
+): void {
   const attribute =
     token.type === "image" ? "src" : token.type === "link_open" ? "href" : undefined;
-  if (attribute === undefined) {
-    return;
-  }
+  if (attribute === undefined) return;
   const original = token.attrGet(attribute);
-  if (original === null) {
-    return;
-  }
+  if (original === null) return;
+
   const originalUrl = String(original);
-  const rewritten = options.rewriteUrl?.(originalUrl) ?? originalUrl;
+  const protectedDestination = parseProtectedLinkDestination(originalUrl);
+  if (token.type === "image" && protectedDestination !== undefined) {
+    throw new ProtectedLinkError(
+      "The __require_auth parameter can only protect links, not embedded images.",
+    );
+  }
+  const destination = protectedDestination ?? originalUrl;
+  const rewritten = options.rewriteUrl?.(destination) ?? destination;
   if (!parser.validateLink(rewritten)) {
+    if (protectedDestination !== undefined) {
+      throw new ProtectedLinkError("The protected link destination is not a safe URL.");
+    }
     token.attrSet(attribute, "#unsafe-link");
     return;
   }
-  const safeUrl =
-    options.gateExternalLinks === true && isExternalUrl(rewritten)
-      ? `/api/redirect?url=${encodeURIComponent(rewritten)}`
-      : rewritten;
-  token.attrSet(attribute, safeUrl);
+  if (protectedDestination !== undefined && !isExternalUrl(rewritten)) {
+    throw new ProtectedLinkError(
+      "The __require_auth parameter can only protect external HTTP or HTTPS links.",
+    );
+  }
+
+  const protectedLink =
+    protectedDestination === undefined
+      ? undefined
+      : ({
+          destination: rewritten,
+          index: protectedLinks.length,
+          source: originalUrl,
+        } satisfies ProtectedLink);
+  if (protectedLink !== undefined) protectedLinks.push(protectedLink);
+  token.attrSet(
+    attribute,
+    protectedLink === undefined
+      ? rewritten
+      : (options.protectedLinkHref?.(protectedLink) ?? protectedLink.destination),
+  );
   if (token.type === "link_open" && isExternalUrl(rewritten)) {
     token.attrSet("rel", "noopener noreferrer");
     token.attrSet("target", "_blank");
+  }
+}
+
+class ProtectedLinkError extends Error {}
+
+const protectedLinkParameter = "__require_auth";
+
+function parseProtectedLinkDestination(value: string): string | undefined {
+  const hashIndex = value.indexOf("#");
+  const beforeHash = hashIndex === -1 ? value : value.slice(0, hashIndex);
+  const fragment = hashIndex === -1 ? "" : value.slice(hashIndex);
+  const queryIndex = beforeHash.indexOf("?");
+  if (queryIndex === -1) return undefined;
+
+  const prefix = beforeHash.slice(0, queryIndex);
+  const components = beforeHash.slice(queryIndex + 1).split("&");
+  const markers = components.flatMap((component, index) => {
+    const separator = component.indexOf("=");
+    const rawName = separator === -1 ? component : component.slice(0, separator);
+    const rawValue = separator === -1 ? "" : component.slice(separator + 1);
+    return decodeQueryComponent(rawName) === protectedLinkParameter
+      ? [{ index, value: decodeQueryComponent(rawValue) }]
+      : [];
+  });
+  if (markers.length === 0) return undefined;
+  if (markers.length !== 1 || markers[0]?.value !== "1") {
+    throw new ProtectedLinkError(
+      "The __require_auth parameter must occur exactly once with the value 1.",
+    );
+  }
+  if (!isExternalUrl(value)) {
+    throw new ProtectedLinkError(
+      "The __require_auth parameter can only protect external HTTP or HTTPS links.",
+    );
+  }
+
+  const markerIndex = markers[0]?.index;
+  const retained = components.filter((_component, index) => index !== markerIndex);
+  return `${prefix}${retained.length === 0 ? "" : `?${retained.join("&")}`}${fragment}`;
+}
+
+function decodeQueryComponent(value: string): string {
+  try {
+    return decodeURIComponent(value.replaceAll("+", " "));
+  } catch {
+    return value;
   }
 }
 
@@ -425,5 +515,5 @@ function slugify(value: string): string {
 }
 
 function isExternalUrl(value: string): boolean {
-  return /^https?:\/\//iu.test(value);
+  return /^https?:\/\/[^/?#\s]+(?:[/?#]|$)/iu.test(value);
 }

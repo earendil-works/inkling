@@ -31,6 +31,7 @@ interface OAuthStatePayload {
   readonly expiresAt: number;
   readonly nonce: string;
   readonly redirectUri: string;
+  readonly returnTo: string;
   readonly state: string;
   readonly verifier: string;
 }
@@ -86,6 +87,7 @@ export async function startGoogleAuthentication(
     expiresAt: Date.now() + 10 * 60 * 1_000,
     nonce: randomBase64Url(24),
     redirectUri: configuration.redirectUri,
+    returnTo: safeReturnTo(request),
     state: randomBase64Url(24),
     verifier,
   };
@@ -207,7 +209,7 @@ export async function finishGoogleAuthentication(
       })),
     );
     const session = await login(identity, people);
-    const headers = new Headers({ Location: "/" });
+    const headers = new Headers({ Location: payload.returnTo });
     headers.append(
       "Set-Cookie",
       cookieHeader("inkling_session", session.sessionToken, request, {
@@ -437,6 +439,7 @@ async function verifyOAuthState(
     typeof parsed["expiresAt"] === "number" &&
     typeof parsed["nonce"] === "string" &&
     typeof parsed["redirectUri"] === "string" &&
+    typeof parsed["returnTo"] === "string" &&
     typeof parsed["state"] === "string" &&
     typeof parsed["verifier"] === "string"
     ? (parsed as unknown as OAuthStatePayload)
@@ -525,6 +528,20 @@ function parseCookies(header: string | null): Readonly<Record<string, string>> {
       return [[part.slice(0, separator).trim(), part.slice(separator + 1).trim()]];
     }),
   );
+}
+
+function safeReturnTo(request: Request): string {
+  const requestUrl = new URL(request.url);
+  const value = requestUrl.searchParams.get("next");
+  if (value === null || !value.startsWith("/") || value.startsWith("//")) return "/";
+  try {
+    const resolved = new URL(value, requestUrl.origin);
+    return resolved.origin === requestUrl.origin
+      ? `${resolved.pathname}${resolved.search}${resolved.hash}`
+      : "/";
+  } catch {
+    return "/";
+  }
 }
 
 function randomBase64Url(length: number): string {

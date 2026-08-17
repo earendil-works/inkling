@@ -53,6 +53,18 @@ creates an immutable published revision.
 The public landing page lists public, published RFCs and notes without requiring
 sign-in. Anonymous readers see only those published revisions.
 
+External destinations that should only be revealed to signed-in workspace members
+can carry Inkling's reserved `__require_auth=1` query parameter:
+
+```markdown
+[Recording](https://videos.example/recording?id=123&__require_auth=1)
+```
+
+Inkling removes the reserved parameter from the destination and sends anonymous
+readers through Google sign-in before redirecting. The parameter must occur exactly
+once with the value `1`; ordinary parameters such as `require_auth=1` are passed
+through unchanged.
+
 ## Finding documents
 
 Press `/` or <kbd>Cmd/Ctrl</kbd>+<kbd>K</kbd> from the workspace to focus

@@ -352,6 +352,12 @@ export interface InklingApplicationService {
   readonly readPublicRfc: (
     rfcNumber: number,
   ) => Effect.Effect<PublicDocumentResponse, ApplicationError>;
+  readonly resolveProtectedLink: (
+    credentials: RequestCredentials,
+    documentId: string,
+    revision: number,
+    linkIndex: number,
+  ) => Effect.Effect<string, ApplicationError>;
   readonly createApiKey: (
     credentials: RequestCredentials,
     label: string,

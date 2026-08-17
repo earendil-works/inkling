@@ -1183,13 +1183,15 @@ function parseCookies(header: string | null): Readonly<Record<string, string>> {
 }
 
 function documentIdFromPath(pathname: string): string | undefined {
-  const match =
+  const document =
     /^\/(?:api\/documents|api\/public\/documents|public\/documents)\/([^/]+)(?:\/|$)/u.exec(
       pathname,
     );
-  if (match?.[1] === undefined) return undefined;
+  const protectedLink = /^\/auth\/link\/([^/]+)\/\d+\/\d+\/?$/u.exec(pathname);
+  const rawDocumentId = document?.[1] ?? protectedLink?.[1];
+  if (rawDocumentId === undefined) return undefined;
   try {
-    return decodeURIComponent(match[1]);
+    return decodeURIComponent(rawDocumentId);
   } catch {
     return undefined;
   }
