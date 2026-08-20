@@ -1,0 +1,27 @@
+{
+  "name": "inkling-cloudflare-deployment",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "check": "pnpm run typecheck && pnpm run build",
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "@earendil-works/inkling-frontend": "0.0.1",
+    "@earendil-works/inkling-runtime-cloudflare": "0.0.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260804.1",
+    "typescript": "7.0.2",
+    "wrangler": "4.118.0"
+  },
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "packageManager": "pnpm@10.32.1"
+}

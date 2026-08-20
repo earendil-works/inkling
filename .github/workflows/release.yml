@@ -37,6 +37,12 @@ jobs:
       - run: npm install --global npm@11.15.0
       - run: pnpm install --frozen-lockfile
       - run: make check
+      - name: Check the standalone Cloudflare template
+        run: |
+          directory="$(mktemp -d)"
+          cp -R templates/cloudflare/. "$directory"
+          pnpm --dir "$directory" install --frozen-lockfile --ignore-workspace
+          pnpm --dir "$directory" check
       - name: Set the release version
         env:
           RELEASE_VERSION: ${{ inputs.version }}

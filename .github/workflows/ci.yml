@@ -26,4 +26,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: make check
+      - name: Check the standalone Cloudflare template
+        run: |
+          directory="$(mktemp -d)"
+          cp -R templates/cloudflare/. "$directory"
+          pnpm --dir "$directory" install --frozen-lockfile --ignore-workspace
+          pnpm --dir "$directory" check
       - run: pnpm release:pack

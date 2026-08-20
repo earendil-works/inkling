@@ -16,6 +16,23 @@ Install dependencies with:
 pnpm install
 ```
 
+## Standalone Cloudflare deployment
+
+[`templates/cloudflare`](templates/cloudflare) is a self-contained deployment project that consumes
+the published Inkling runtime and browser assets. It does not build or import source from this
+monorepo. Copy it to create an installation owned by you or your organization:
+
+```sh
+cp -R templates/cloudflare my-inkling
+cd my-inkling
+pnpm install --frozen-lockfile
+pnpm check
+```
+
+Follow the template's [`README.md`](templates/cloudflare/README.md) to choose Worker and R2 names,
+configure Google OAuth, provision the buckets, and deploy. A Git repository is recommended for
+repeatable upgrades and Cloudflare Git deployments, but Wrangler only requires the folder.
+
 ## Cloudflare development
 
 The primary development setup runs Vite on port 5173 and the Cloudflare Worker on port 8787. Copy the example OAuth configuration first:

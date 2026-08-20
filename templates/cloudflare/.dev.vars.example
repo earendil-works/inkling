@@ -1,0 +1,7 @@
+# Copy this file to .dev.vars. Never commit real values.
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_ALLOWED_DOMAINS=example.com,example.org
+GOOGLE_ADMIN_EMAILS=admin@example.com
+GOOGLE_REDIRECT_URI=http://localhost:8787/api/auth/google/callback
+INKLING_OAUTH_STATE_SECRET=
