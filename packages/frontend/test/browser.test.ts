@@ -878,7 +878,7 @@ test(
           prose: getComputedStyle(document.body).fontFamily,
         };
       });
-      assert.match(typography.prose, /Earendil/u);
+      assert.match(typography.prose, /Mallos Serif/u);
       assert.match(typography.editor, /Commit Mono/u);
       assert.equal(typography.code, typography.editor);
       assert.ok(typography.heading1 > typography.heading2);

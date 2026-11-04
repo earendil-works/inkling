@@ -9,7 +9,6 @@
     "build": "pnpm --filter @earendil-works/inkling-frontend run build && pnpm --filter @earendil-works/inkling-runtime-cloudflare run build && pnpm --filter \"./deployments/*\" run build",
     "build:packages": "pnpm --recursive --if-present run build:package",
     "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build",
-    "elanor": "node scripts/build-elanor.mjs",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "lint": "oxlint . && node scripts/check-cloudflare-config.ts",

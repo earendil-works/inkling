@@ -35,13 +35,15 @@ jobs:
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
       - run: npm install --global npm@11.15.0
-      - name: Build Elanor from its submodule
-        env:
-          ELANOR_TOKEN: ${{ secrets.ELANOR_TOKEN }}
+      # Elanor installs from pkg.earendil.com, which trades the job's OIDC token for an install token.
+      - name: Log in to pkg.earendil.com
         run: |
-          git -c url."https://x-access-token:${ELANOR_TOKEN}@github.com/".insteadOf="git@github.com:" \
-            submodule update --init --depth 1 vendor/elanor-src
-          node scripts/build-elanor.mjs
+          oidc=$(curl -sSf -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://pkg.earendil.com" | jq -r .value)
+          token=$(curl -sSf -X POST -H "Authorization: Bearer $oidc" \
+            https://pkg.earendil.com/-/v1/login/github-actions | jq -r .token)
+          echo "::add-mask::$token"
+          npm config set //pkg.earendil.com/:_authToken "$token"
       - run: pnpm install --frozen-lockfile
       - run: make check
       - name: Check the standalone Cloudflare template

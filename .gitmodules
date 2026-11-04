@@ -1,3 +1,0 @@
-[submodule "vendor/elanor-src"]
-	path = vendor/elanor-src
-	url = git@github.com:earendil-works/elanor.git

@@ -1,8 +1,6 @@
 .git
 .jot
 **/dist
-!vendor/elanor/**/dist
 **/node_modules
 node_modules
-vendor/elanor-src
 JOT_ARCHITECTURE.md

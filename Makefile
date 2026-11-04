@@ -1,21 +1,16 @@
 PNPM ?= pnpm
 
-.PHONY: build check dev elanor format format-check lint setup test typecheck
+.PHONY: build check dev format format-check lint setup test typecheck
 
-# Clones the Elanor submodule, builds its packages, and installs dependencies.
+# Installs dependencies. Elanor comes from pkg.earendil.com, which needs
+# `npm login --registry=https://pkg.earendil.com` once.
 setup:
-	git submodule update --init vendor/elanor-src
-	node scripts/build-elanor.mjs
 	$(PNPM) install
 
-# Rebuilds Elanor when the submodule moved; a no-op otherwise.
-elanor:
-	node scripts/build-elanor.mjs
-
-dev: elanor
+dev:
 	$(PNPM) run dev
 
-build: elanor
+build:
 	$(PNPM) run build
 
 format:
@@ -33,4 +28,4 @@ test:
 typecheck:
 	$(PNPM) run typecheck
 
-check: elanor format-check lint typecheck test build
+check: format-check lint typecheck test build

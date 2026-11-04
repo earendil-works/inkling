@@ -40,10 +40,10 @@ test("static frontend files are cached by how their URLs change", () => {
     "public, max-age=31536000, immutable",
   );
   assert.equal(
-    staticAssetCacheControl("/fonts/elanor/files/Earendil-Regular.woff2"),
+    staticAssetCacheControl("/fonts/elanor/files/MallosSerif-Variable.woff2"),
     "public, max-age=86400",
   );
-  for (const stylesheet of ["/tokens.css", "/syntax-theme.css", "/fonts/elanor/earendil.css"]) {
+  for (const stylesheet of ["/tokens.css", "/syntax-theme.css", "/fonts/elanor/mallos-serif.css"]) {
     assert.equal(
       staticAssetCacheControl(stylesheet),
       "public, max-age=300, stale-while-revalidate=86400",
@@ -51,5 +51,5 @@ test("static frontend files are cached by how their URLs change", () => {
   }
   assert.equal(staticAssetCacheControl("/"), undefined);
   assert.equal(staticAssetCacheControl("/index.html"), undefined);
-  assert.equal(staticAssetCacheControl("/fonts/elanor/licenses/earendil.txt"), undefined);
+  assert.equal(staticAssetCacheControl("/fonts/elanor/licenses/mallos-serif.txt"), undefined);
 });

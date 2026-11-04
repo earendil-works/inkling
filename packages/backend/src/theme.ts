@@ -500,7 +500,7 @@ export const paperTheme: ThemeConfiguration = {
  * deployment theme, which overrides the tokens, and the public page styles.
  */
 export const publicStylesheetLinks = [
-  "/fonts/elanor/earendil.css",
+  "/fonts/elanor/mallos-serif.css",
   "/fonts/elanor/commit-mono.css",
   "/tokens.css",
   "/theme.css",

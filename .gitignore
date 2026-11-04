@@ -14,7 +14,3 @@ coverage/
 *.dev.vars
 !.env.example
 !.dev.vars.example
-# Elanor packages built from the vendor/elanor-src submodule (scripts/build-elanor.mjs).
-/vendor/elanor/*
-!/vendor/elanor/README.md
-!/vendor/elanor/icons.json

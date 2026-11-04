@@ -27,8 +27,8 @@ Dependencies point inward. Shared packages must remain browser-, Node-, and Work
 
 ## Frontend UI
 
-- Build UI from Elanor (`@earendil-works/elanor-react`), the design system built into `vendor/elanor/` from the `vendor/elanor-src` submodule. Use its components and documented props (the `.mdx` docs in `vendor/elanor-src/packages/react/src/`). Don't style Elanor's internals or rely on undocumented `data-*` attributes; when Elanor lacks something, change Elanor rather than working around it.
-- `vendor/elanor/` holds build output; never edit it or commit it. Run `make setup` after cloning. To bump Elanor or add an icon, follow `vendor/elanor/README.md`.
+- Build UI from Elanor (`@earendil-works/elanor-react`), the design system installed from pkg.earendil.com at the commit pinned in `packages/frontend/package.json`. Use its components and documented props (the `.mdx` docs in the Elanor repository's `packages/react/src/` at that commit). Don't style Elanor's internals or rely on undocumented `data-*` attributes; when Elanor lacks something, change Elanor rather than working around it.
+- Installing needs `npm login --registry=https://pkg.earendil.com`. To bump Elanor, follow `packages/frontend/ELANOR.md`.
 - Style with Elanor's semantic tokens (`--semantic-*`) and Inkling's domain tokens in `packages/frontend/src/styles/tokens.css`; no literal colors, sizes from the token scale. Deployment themes override both.
 - Navigation that looks like a button uses `ButtonLink`, so it keeps the link role.
 

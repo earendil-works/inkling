@@ -10,15 +10,14 @@ Inkling supports two runtimes:
 - Node.js 24 or newer
 - pnpm 10 or newer
 
-The frontend uses the [Elanor](vendor/elanor/README.md) design system from the `vendor/elanor-src`
-submodule, which needs access to the Elanor repository. Clone the submodule, build Elanor, and install
-dependencies with:
+The frontend uses the [Elanor](packages/frontend/ELANOR.md) design system, installed from
+[pkg.earendil.com](https://pkg.earendil.com), which needs an Earendil Works login. Log in once (the
+token lasts 30 days), then install dependencies:
 
 ```sh
+npm login --registry=https://pkg.earendil.com
 make setup
 ```
-
-`make dev`, `make build`, and `make check` rebuild Elanor when the submodule moves.
 
 ## Standalone Cloudflare deployment
 
@@ -110,7 +109,7 @@ Inkling uses a server-side authorization-code flow with PKCE, so no Authorized J
 
 ### Theme configuration
 
-By default, Inkling uses the `earendil` brand of the [Elanor](vendor/elanor/README.md) design system: its fonts, colors, and component styles. A deployment theme overrides Elanor's semantic tokens and Inkling's own tokens for editor syntax, status chips, presence colors, and Mermaid diagrams. Inkling ships with two complete themes: [`inkling`](themes/inkling.json), the original editorial palette, and [`paper`](themes/paper.json), a warmer paper-colored palette with its own fonts. Every color is expressed in OKLCH. [`theme.schema.json`](theme.schema.json) documents the format.
+By default, Inkling uses the `earendil` brand of the [Elanor](packages/frontend/ELANOR.md) design system: its fonts, colors, and component styles. A deployment theme overrides Elanor's semantic tokens and Inkling's own tokens for editor syntax, status chips, presence colors, and Mermaid diagrams. Inkling ships with two complete themes: [`inkling`](themes/inkling.json), the original editorial palette, and [`paper`](themes/paper.json), a warmer paper-colored palette with its own fonts. Every color is expressed in OKLCH. [`theme.schema.json`](theme.schema.json) documents the format.
 
 Select a theme with `INKLING_THEME`:
 
@@ -177,11 +176,12 @@ node packages/cli/src/main.ts serve --port 8787 --data-dir .inkling
 
 ### Docker
 
-The Docker image runs the same local runtime. It copies the Elanor build from the checkout, so run
-`make setup` first. Mount the complete `/data` directory for persistence:
+The Docker image runs the same local runtime. Its build installs Elanor from pkg.earendil.com, so pass
+an npm config holding your pkg.earendil.com token as the `npmrc` build secret. Mount the complete
+`/data` directory for persistence:
 
 ```sh
-docker build -t inkling .
+docker build --secret id=npmrc,src="$HOME/.npmrc" -t inkling .
 docker run --rm -p 8787:8787 -v inkling-data:/data inkling
 ```
 

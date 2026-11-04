@@ -14,7 +14,7 @@ const MIME_TYPES: Readonly<Record<string, string>> = {
 /**
  * The application shell and the server-rendered public and OAuth pages share
  * Elanor's fonts and tokens. The server pages are not Vite entry points, so they
- * need stable URLs: serve the vendored fonts unchanged at /fonts/elanor/ and the
+ * need stable URLs: serve Elanor's fonts unchanged at /fonts/elanor/ and the
  * `earendil` brand tokens followed by Inkling's domain tokens at /tokens.css, in
  * development and in the build. Relative URLs inside the font CSS stay intact,
  * and every page links the same files, so browsers cache one copy.
@@ -24,9 +24,9 @@ export function elanorAssets(): Plugin {
   const domainTokens = new URL("../src/styles/tokens.css", import.meta.url);
   const tokens = (): Buffer =>
     Buffer.concat([readFileSync(brandTokens), Buffer.from("\n"), readFileSync(domainTokens)]);
-  const fontRoot = dirname(require.resolve("@earendil-works/elanor-fonts/earendil.css"));
+  const fontRoot = dirname(require.resolve("@earendil-works/elanor-fonts/mallos-serif.css"));
   const fontFiles = [
-    "earendil.css",
+    "mallos-serif.css",
     "commit-mono.css",
     ...["files", "licenses"].flatMap((directory) =>
       readdirSync(join(fontRoot, directory)).map((file) => `${directory}/${file}`),

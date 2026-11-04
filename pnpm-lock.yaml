@@ -164,17 +164,17 @@ importers:
         version: 13.6.32
     devDependencies:
       '@earendil-works/design-tokens':
-        specifier: workspace:*
-        version: link:../../vendor/elanor/design-tokens
+        specifier: https://pkg.earendil.com/@earendil-works/design-tokens@d3184572b22415e62df6e63b30bb7edb5c669f9b
+        version: https://pkg.earendil.com/@earendil-works/design-tokens@d3184572b22415e62df6e63b30bb7edb5c669f9b
       '@earendil-works/elanor-fonts':
-        specifier: workspace:*
-        version: link:../../vendor/elanor/elanor-fonts
+        specifier: https://pkg.earendil.com/@earendil-works/elanor-fonts@d3184572b22415e62df6e63b30bb7edb5c669f9b
+        version: https://pkg.earendil.com/@earendil-works/elanor-fonts@d3184572b22415e62df6e63b30bb7edb5c669f9b
       '@earendil-works/elanor-icons-react':
-        specifier: workspace:*
-        version: link:../../vendor/elanor/elanor-icons-react
+        specifier: https://pkg.earendil.com/@earendil-works/elanor-icons-react@d3184572b22415e62df6e63b30bb7edb5c669f9b
+        version: https://pkg.earendil.com/@earendil-works/elanor-icons-react@d3184572b22415e62df6e63b30bb7edb5c669f9b(react@19.2.8)
       '@earendil-works/elanor-react':
-        specifier: workspace:*
-        version: link:../../vendor/elanor/elanor-react
+        specifier: https://pkg.earendil.com/@earendil-works/elanor-react@d3184572b22415e62df6e63b30bb7edb5c669f9b
+        version: https://pkg.earendil.com/@earendil-works/elanor-react@d3184572b22415e62df6e63b30bb7edb5c669f9b(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@types/react':
         specifier: 19.2.18
         version: 19.2.18
@@ -318,31 +318,6 @@ importers:
       yjs:
         specifier: 13.6.32
         version: 13.6.32
-
-  vendor/elanor/design-tokens: {}
-
-  vendor/elanor/elanor-fonts: {}
-
-  vendor/elanor/elanor-icons-react:
-    dependencies:
-      react:
-        specifier: ^18.0.0 || ^19.0.0
-        version: 19.2.8
-
-  vendor/elanor/elanor-react:
-    dependencies:
-      '@base-ui/react':
-        specifier: 1.8.0
-        version: 1.8.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@earendil-works/elanor-icons-react':
-        specifier: workspace:*
-        version: link:../elanor-icons-react
-      react:
-        specifier: ^19.0.0
-        version: 19.2.8
-      react-dom:
-        specifier: ^19.0.0
-        version: 19.2.8(react@19.2.8)
 
 packages:
 
@@ -525,6 +500,27 @@ packages:
   '@cspotcode/source-map-support@0.8.1':
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
     engines: {node: '>=12'}
+
+  '@earendil-works/design-tokens@https://pkg.earendil.com/@earendil-works/design-tokens@d3184572b22415e62df6e63b30bb7edb5c669f9b':
+    resolution: {integrity: sha512-0Gphbl/yYMaxf8kuo7MFs/TRS7IyKj/HGVOund6AFGqyrUDfO7dkW2OjtyC5qDProPtB3C4ibGcGPQWMt8cXbA==, tarball: https://pkg.earendil.com/@earendil-works/design-tokens@d3184572b22415e62df6e63b30bb7edb5c669f9b}
+    version: 0.1.0
+
+  '@earendil-works/elanor-fonts@https://pkg.earendil.com/@earendil-works/elanor-fonts@d3184572b22415e62df6e63b30bb7edb5c669f9b':
+    resolution: {integrity: sha512-FumYoWIhXt8NHIwY8Ku0TecJox0aZ9rcGgu11sgOUhCPREgVkFS3C1Obo7FgT8IdqlFhzG87ryzx7bg5UPpVpQ==, tarball: https://pkg.earendil.com/@earendil-works/elanor-fonts@d3184572b22415e62df6e63b30bb7edb5c669f9b}
+    version: 0.1.0
+
+  '@earendil-works/elanor-icons-react@https://pkg.earendil.com/@earendil-works/elanor-icons-react@d3184572b22415e62df6e63b30bb7edb5c669f9b':
+    resolution: {tarball: https://pkg.earendil.com/@earendil-works/elanor-icons-react@d3184572b22415e62df6e63b30bb7edb5c669f9b}
+    version: 0.1.0
+    peerDependencies:
+      react: ^18.0.0 || ^19.0.0
+
+  '@earendil-works/elanor-react@https://pkg.earendil.com/@earendil-works/elanor-react@d3184572b22415e62df6e63b30bb7edb5c669f9b':
+    resolution: {tarball: https://pkg.earendil.com/@earendil-works/elanor-react@d3184572b22415e62df6e63b30bb7edb5c669f9b}
+    version: 0.1.0
+    peerDependencies:
+      react: ^19.0.0
+      react-dom: ^19.0.0
 
   '@effect/cluster@0.60.2':
     resolution: {integrity: sha512-GEODN5kvFJ0L0XSkANcS8s6lfhjrrA8x/ezYUV/lXerqCHf5xo3ZTPUanGMHu5Byvikng0mZDcyNvke2sGjfSQ==}
@@ -2756,6 +2752,25 @@ snapshots:
   '@cspotcode/source-map-support@0.8.1':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.9
+
+  '@earendil-works/design-tokens@https://pkg.earendil.com/@earendil-works/design-tokens@d3184572b22415e62df6e63b30bb7edb5c669f9b': {}
+
+  '@earendil-works/elanor-fonts@https://pkg.earendil.com/@earendil-works/elanor-fonts@d3184572b22415e62df6e63b30bb7edb5c669f9b': {}
+
+  '@earendil-works/elanor-icons-react@https://pkg.earendil.com/@earendil-works/elanor-icons-react@d3184572b22415e62df6e63b30bb7edb5c669f9b(react@19.2.8)':
+    dependencies:
+      react: 19.2.8
+
+  '@earendil-works/elanor-react@https://pkg.earendil.com/@earendil-works/elanor-react@d3184572b22415e62df6e63b30bb7edb5c669f9b(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+    dependencies:
+      '@base-ui/react': 1.8.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@earendil-works/elanor-icons-react': https://pkg.earendil.com/@earendil-works/elanor-icons-react@d3184572b22415e62df6e63b30bb7edb5c669f9b(react@19.2.8)
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
+    transitivePeerDependencies:
+      - '@date-fns/tz'
+      - '@types/react'
+      - date-fns
 
   '@effect/cluster@0.60.2(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/sql@0.52.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/workflow@0.19.1(@effect/experimental@0.61.1(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(@effect/platform@0.97.1(effect@3.22.1))(@effect/rpc@0.76.2(@effect/platform@0.97.1(effect@3.22.1))(effect@3.22.1))(effect@3.22.1))(effect@3.22.1)':
     dependencies:
