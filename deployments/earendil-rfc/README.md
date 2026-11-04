@@ -83,28 +83,14 @@ from a freshly synced `earendil-rfcs` checkout. The import is incremental and id
 INKLING_URL=https://rfc.earendil.com INKLING_API_KEY=... pnpm import-rfcs --publish
 ```
 
-## Cutover
+## History
 
-The cutover is complete. These steps are kept for reference; the staging hostname
-`rfc-next.earendil.com` has been retired.
+- 2026-10-22: `rfc.earendil.com` moved from the legacy site to this Worker by reassigning
+  the existing `rfc.earendil.com/*` zone route, without downtime. The legacy site now serves
+  `legacy-rfc.earendil.com` from its own Custom Domain in `earendil-works/rfcs`.
+- 2026-11-04: the staging hostname `rfc-next.earendil.com` was retired. Its Custom Domain was
+  removed from `wrangler.jsonc` and deleted in the dashboard.
 
-1. Move the legacy site to `legacy-rfc.earendil.com` in `earendil-works/rfcs`: change
-   `BASE_URL`, set `SITE_ORIGIN`, register `https://legacy-rfc.earendil.com/auth/callback` on its
-   OAuth client, and replace the `rfc.earendil.com/*` route with a
-   `legacy-rfc.earendil.com` custom domain. Merge this before the cutover: that repository
-   redeploys on every RFC sync and would otherwise reclaim the route.
-2. Freeze edits in Google Docs, sync once more, and rerun the import against `rfc-next`.
-3. In the Cloudflare dashboard, reassign the `rfc.earendil.com/*` route to `earendil-inkling`.
-   This switches without downtime.
-4. Add the route to `wrangler.jsonc` so later deploys keep it:
-
-   ```jsonc
-   "routes": [{ "pattern": "rfc.earendil.com/*", "zone_name": "earendil.com" }],
-   ```
-
-5. Check that `/0057/` redirects to `/rfc/0057`, Google sign-in works, public RFCs load
-   anonymously, private RFCs do not, and `/mcp` answers.
-6. Remove `rfc-next.earendil.com` from `wrangler.jsonc` and delete its Custom Domain under the
-   Worker's Settings → Domains & Routes (Wrangler does not detach Custom Domains that disappear
-   from the config), or redirect it to `rfc.earendil.com` with a Cloudflare redirect rule. Browser sessions and MCP OAuth grants are bound to the hostname, so users sign in
-   again and agents reconnect on `rfc.earendil.com`; API keys keep working.
+When removing a hostname, delete its Custom Domain under the Worker's Settings → Domains &
+Routes as well: Wrangler does not detach Custom Domains that disappear from the config. Browser
+sessions and MCP OAuth grants are bound to the hostname, while API keys work on any of them.
