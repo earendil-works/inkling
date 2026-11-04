@@ -12,7 +12,6 @@ sync with the template and the development Worker.
 | Cloudflare zone   | `earendil.com` (full setup)                                    |
 | Worker            | `earendil-inkling`                                             |
 | Hostname          | `rfc.earendil.com` (Worker route, live since 2026-10-22)       |
-| Staging hostname  | `rfc-next.earendil.com` (Worker Custom Domain)                 |
 | R2 buckets        | `earendil-inkling-objects`, `earendil-inkling-objects-preview` |
 | Legacy RFC site   | `legacy-rfc.earendil.com`, from `earendil-works/rfcs`          |
 | RFC source import | `~/Development/earendil-rfcs`                                  |
@@ -47,10 +46,9 @@ pnpm deploy:earendil-rfc
    pnpm exec wrangler r2 bucket create earendil-inkling-objects-preview
    ```
 
-2. On the Google OAuth web client, register these redirect URIs:
+2. On the Google OAuth web client, register this redirect URI:
 
    ```text
-   https://rfc-next.earendil.com/api/auth/google/callback
    https://rfc.earendil.com/api/auth/google/callback
    ```
 
@@ -77,15 +75,18 @@ pnpm deploy:earendil-rfc
 
 ## Importing the RFCs
 
-Sign in at `https://rfc-next.earendil.com` as an administrator, create an API key, then import
+Sign in at `https://rfc.earendil.com` as an administrator, create an API key, then import
 from a freshly synced `earendil-rfcs` checkout. The import is incremental and idempotent:
 
 ```sh
 (cd ~/Development/earendil-rfcs && git pull --ff-only && make sync)
-INKLING_URL=https://rfc-next.earendil.com INKLING_API_KEY=... pnpm import-rfcs --publish
+INKLING_URL=https://rfc.earendil.com INKLING_API_KEY=... pnpm import-rfcs --publish
 ```
 
 ## Cutover
+
+The cutover is complete. These steps are kept for reference; the staging hostname
+`rfc-next.earendil.com` has been retired.
 
 1. Move the legacy site to `legacy-rfc.earendil.com` in `earendil-works/rfcs`: change
    `BASE_URL`, set `SITE_ORIGIN`, register `https://legacy-rfc.earendil.com/auth/callback` on its
@@ -98,14 +99,12 @@ INKLING_URL=https://rfc-next.earendil.com INKLING_API_KEY=... pnpm import-rfcs -
 4. Add the route to `wrangler.jsonc` so later deploys keep it:
 
    ```jsonc
-   "routes": [
-     { "pattern": "rfc.earendil.com/*", "zone_name": "earendil.com" },
-     { "pattern": "rfc-next.earendil.com", "custom_domain": true },
-   ],
+   "routes": [{ "pattern": "rfc.earendil.com/*", "zone_name": "earendil.com" }],
    ```
 
 5. Check that `/0057/` redirects to `/rfc/0057`, Google sign-in works, public RFCs load
    anonymously, private RFCs do not, and `/mcp` answers.
-6. Retire `rfc-next.earendil.com`, or redirect it to `rfc.earendil.com` with a Cloudflare
-   redirect rule. Browser sessions and MCP OAuth grants are bound to the hostname, so users sign in
+6. Remove `rfc-next.earendil.com` from `wrangler.jsonc` and delete its Custom Domain under the
+   Worker's Settings → Domains & Routes (Wrangler does not detach Custom Domains that disappear
+   from the config), or redirect it to `rfc.earendil.com` with a Cloudflare redirect rule. Browser sessions and MCP OAuth grants are bound to the hostname, so users sign in
    again and agents reconnect on `rfc.earendil.com`; API keys keep working.

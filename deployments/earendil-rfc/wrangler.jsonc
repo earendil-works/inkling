@@ -5,11 +5,8 @@
   "compatibility_date": "2026-03-27",
   // A smaller script starts faster, and every isolate start parses it.
   "minify": true,
-  // rfc.earendil.com keeps the zone route it had for the previous site; rfc-next served staging.
-  "routes": [
-    { "pattern": "rfc.earendil.com/*", "zone_name": "earendil.com" },
-    { "pattern": "rfc-next.earendil.com", "custom_domain": true },
-  ],
+  // rfc.earendil.com keeps the zone route it had for the previous site.
+  "routes": [{ "pattern": "rfc.earendil.com/*", "zone_name": "earendil.com" }],
   // Google sign-in only works on registered callback origins, so do not expose extra hostnames.
   "workers_dev": false,
   "preview_urls": false,
