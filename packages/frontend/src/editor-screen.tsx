@@ -18,7 +18,8 @@ import type { HistoryPreview } from "./components/history-control.tsx";
 import { GuestIdentityDialog } from "./components/guest-identity-dialog.tsx";
 import { useEffectAction } from "./effect-hooks.ts";
 import { browserRuntime } from "./effect-runtime.ts";
-import { useRenderedMarkdown } from "./markdown.tsx";
+import { useDocumentMarkdown } from "./markdown.tsx";
+import type { ReferenceResolutionRecord } from "./markdown.tsx";
 import { documentHref, storedGuestName, storeGuestName } from "./ui.ts";
 import { accountPerson, collectFrontmatterVocabulary } from "./frontmatter-completion.ts";
 import type { FrontmatterVocabulary } from "./frontmatter-completion.ts";
@@ -31,6 +32,7 @@ export interface EditorScreenProps {
   readonly capabilityToken: string | undefined;
   readonly document: DocumentResponse;
   readonly frontmatterVocabulary: FrontmatterVocabulary;
+  readonly references?: ReferenceResolutionRecord | undefined;
   readonly shared: boolean;
 }
 
@@ -40,6 +42,7 @@ export function EditorScreen({
   capabilityToken,
   document: initial,
   frontmatterVocabulary: initialVocabulary,
+  references,
   shared,
 }: EditorScreenProps): React.JSX.Element {
   const { navigate, setHeaderDocument, setParticipants, setStatus, showToast } = useAppContext();
@@ -78,6 +81,7 @@ export function EditorScreen({
     initialBody: initial.body,
     initiallyEditable,
     identityId: account?.id,
+    rfcNumber: metadata.rfcNumber,
     onComments: setComments,
     onError: (message) => showToast(message, "error"),
     onMetadata: setMetadata,
@@ -105,8 +109,13 @@ export function EditorScreen({
   const canComment = permissions?.includes("comment") ?? false;
   const canDelete = permissions?.includes("delete") ?? false;
   const canEditMetadata = permissions?.includes("edit-metadata") ?? !shared;
-  const rendered = useRenderedMarkdown(body, true);
-  const historyRendered = useRenderedMarkdown(historyPreview?.document.body ?? "", true);
+  const rendered = useDocumentMarkdown(api, body, metadata, references);
+  const historyRendered = useDocumentMarkdown(
+    api,
+    historyPreview?.document.body ?? "",
+    historyPreview?.document.metadata ?? metadata,
+    references,
+  );
   const publishBlockedLabel =
     connectionState === "connecting"
       ? "Connecting…"

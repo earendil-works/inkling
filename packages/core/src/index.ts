@@ -109,6 +109,7 @@ export type { LineRange, TextReplacement } from "./domain/body.ts";
 export { applyUniqueTextReplacements, BodyEditError, readLineRange } from "./domain/body.ts";
 export type {
   CatalogBodyMatches,
+  CatalogHeading,
   CatalogSearchField,
   CatalogSearchOptions,
   CatalogSearchQuery,

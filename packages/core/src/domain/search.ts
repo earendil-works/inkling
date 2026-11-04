@@ -85,7 +85,12 @@ export function chunkMarkdown(body: string, options: ChunkOptions = {}): readonl
       flush();
       const level = heading[1].length;
       while ((headings.at(-1)?.level ?? 0) >= level) headings.pop();
-      headings.push({ level, text: (heading[2] ?? "").trim() });
+      // A trailing `{#id}` pins the section's link ID; it is not heading text.
+      const headingText = (heading[2] ?? "").replace(
+        /[\t ]+\{#[\p{Letter}\p{Number}_-]+\}[\t ]*$/u,
+        "",
+      );
+      headings.push({ level, text: headingText.trim() });
       currentPath = headings.map((entry) => entry.text).filter((entry) => entry.length > 0);
       current.push(line);
       continue;

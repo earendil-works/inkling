@@ -3,8 +3,10 @@ import { Schema } from "effect";
 import {
   AuthenticationStatusSchema,
   CatalogResponseSchema,
+  DocumentHeadingSchema,
   DocumentResponseSchema,
   PersonSchema,
+  ReferenceResolutionSchema,
 } from "@earendil-works/inkling-protocol";
 
 import type { ApiClientService } from "./api.ts";
@@ -33,6 +35,11 @@ export const RouteDataSchema = Schema.Union(
     document: DocumentResponseSchema,
     frontmatterVocabulary: FrontmatterVocabularySchema,
     publicDocument: Schema.Boolean,
+    /** Resolutions of the document's references for this reader. */
+    references: Schema.Record({
+      key: Schema.String,
+      value: ReferenceResolutionSchema,
+    }),
     screen: Schema.Literal("editor", "reader"),
     shared: Schema.Boolean,
   }),
@@ -73,11 +80,11 @@ const RenderedMarkdownSchema = Schema.Struct({
       visibility: Schema.optional(Schema.Literal("public", "private", "confidential")),
     }),
   ),
-  headings: Schema.Array(
-    Schema.Struct({ depth: Schema.Number, id: Schema.String, text: Schema.String }),
-  ),
+  headings: Schema.Array(DocumentHeadingSchema),
   html: Schema.String,
   key: Schema.String,
+  /** Reference destinations in source order. */
+  references: Schema.Array(Schema.String),
   title: Schema.optional(Schema.String),
 });
 export type PrerenderedMarkdown = typeof RenderedMarkdownSchema.Type;

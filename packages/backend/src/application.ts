@@ -26,6 +26,7 @@ import type {
   MetadataPatchRequest,
   PassageSearchResponse,
   PublicDocumentResponse,
+  ReferenceResolutionsResponse,
   ReplaceBodyRequest,
   ReplyRequest,
   ResolutionRequest,
@@ -374,6 +375,21 @@ export interface InklingApplicationService {
   readonly publicRfcRuntimeConfiguration: (
     rfcNumber: number,
   ) => Effect.Effect<DocumentRuntimeConfiguration, ApplicationError>;
+  /**
+   * Resolves `rfc:` and `doc:` references for the caller: the title and
+   * section of each target it may open, and nothing about the others.
+   */
+  readonly resolveReferences: (
+    credentials: RequestCredentials,
+    references: readonly string[],
+  ) => Effect.Effect<ReferenceResolutionsResponse, ApplicationError>;
+  /** The reader path behind a reference that anonymous readers saw redacted. */
+  readonly resolveReferenceLink: (
+    credentials: RequestCredentials,
+    documentId: string,
+    revision: number,
+    referenceIndex: number,
+  ) => Effect.Effect<string, ApplicationError>;
   readonly resolveProtectedLink: (
     credentials: RequestCredentials,
     documentId: string,

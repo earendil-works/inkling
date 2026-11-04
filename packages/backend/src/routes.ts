@@ -2,6 +2,15 @@ export function protectedLinkPath(documentId: string, revision: number, linkInde
   return `/auth/link/${encodeURIComponent(documentId)}/${revision}/${linkIndex}`;
 }
 
+/** The sign-in redirect behind a reference that anonymous readers see redacted. */
+export function referenceLinkPath(
+  documentId: string,
+  revision: number,
+  referenceIndex: number,
+): string {
+  return `/auth/reference/${encodeURIComponent(documentId)}/${revision}/${referenceIndex}`;
+}
+
 /** Returns the canonical reader path for an RFC number. */
 export function canonicalRfcPath(number: number): string {
   return `/rfc/${String(number).padStart(4, "0")}`;

@@ -13,6 +13,14 @@ import type {
 
 export type RegistryStatus = "pending" | "active" | "deleted" | "purged";
 
+/** A section heading of a document, as references resolve it. */
+export interface CatalogHeading {
+  readonly id: string;
+  /** The section number; only RFC headings are numbered. */
+  readonly number?: string | undefined;
+  readonly text: string;
+}
+
 export interface CatalogSummary {
   readonly documentId: DocumentId;
   readonly revision: DocumentRevision;
@@ -31,6 +39,8 @@ export interface CatalogSummary {
   /** Complete metadata projection for workspace reads without loading a document authority. */
   readonly metadata?: DocumentMetadata | undefined;
   readonly publishedRevision?: DocumentRevision | undefined;
+  /** Section headings of the working draft, so references resolve without loading it. */
+  readonly headings?: readonly CatalogHeading[] | undefined;
 }
 
 export interface RegistryEntry {

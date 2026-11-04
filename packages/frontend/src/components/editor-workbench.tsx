@@ -23,7 +23,9 @@ import { selectedPreviewSourceRange } from "../comments.ts";
 import type { PreviewSourceRange } from "../comments.ts";
 import { browserRuntime } from "../effect-runtime.ts";
 import type { HistoryChangeRange } from "../history-diff.ts";
+import { useHeadingLinkCopying } from "../heading-links.ts";
 import { renderMermaid, useThemeRevision } from "../markdown.tsx";
+import { documentHref } from "../ui.ts";
 import { DocumentPage } from "./document-page.tsx";
 import styles from "./editor.module.css";
 import markdownStyles from "./markdown-article.module.css";
@@ -62,6 +64,9 @@ export function EditorWorkbench({
   const renderedCallbackRef = useRef(onPreviewRendered);
   const previewScrollerRef = useRef<HTMLDivElement>(null);
   const themeRevision = useThemeRevision();
+  const copyHeadingLink = useHeadingLinkCopying(
+    documentHref(metadata.id, metadata.rfcNumber, false, "read", ""),
+  );
   const historyEditorHostRef = useRef<HTMLDivElement>(null);
   const historyEditor = useHistoricalMarkdownEditor(
     historyBody,
@@ -156,6 +161,7 @@ export function EditorWorkbench({
                 aria-label="Rendered document preview"
                 className={markdownStyles["body"]}
                 data-preview=""
+                onClick={copyHeadingLink}
                 onPointerUp={capturePreviewSelection}
                 ref={previewRef as React.Ref<HTMLDivElement>}
                 render={<article />}

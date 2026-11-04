@@ -291,6 +291,27 @@ button:focus-visible {
   font-family: var(--heading-font);
 }
 
+.public-prose .inkling-section-number,
+.public-toc .inkling-section-number {
+  color: var(--semantic-color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.public-prose .inkling-heading-anchor {
+  color: var(--semantic-color-text-secondary);
+  opacity: 0;
+  text-decoration: none;
+}
+
+.public-prose :is(h1, h2, h3, h4, h5, h6):hover .inkling-heading-anchor,
+.public-prose .inkling-heading-anchor:focus-visible {
+  opacity: 1;
+}
+
+.public-prose .inkling-reference[data-reference-status="unavailable"] {
+  color: var(--semantic-color-text-secondary);
+}
+
 .public-prose ul,
 .public-prose ol {
   padding-inline-start: var(--semantic-dimension-space-padding-xx-large);

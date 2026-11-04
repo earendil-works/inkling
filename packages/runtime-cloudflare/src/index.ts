@@ -61,6 +61,7 @@ import type {
   DocumentMetadataDto,
   DocumentResponse,
   PresenceDto,
+  ReferenceResolutionsResponse,
   ServerCollaborationMessage,
 } from "@earendil-works/inkling-protocol";
 import { renderApplication } from "@earendil-works/inkling-frontend/server";
@@ -310,6 +311,18 @@ export class WorkspaceDurableObject extends DurableObject<CloudflareEnvironment>
         Effect.flatMap(InklingApplication, (application) =>
           application.markCatalogPurged(documentId).pipe(Effect.as(true)),
         ),
+      ),
+    );
+  }
+
+  async resolveReferences(
+    requestCredentials: RequestCredentials,
+    references: readonly string[],
+  ): Promise<RpcResult<ReferenceResolutionsResponse>> {
+    return runRpc(
+      this.#runtime,
+      Effect.flatMap(InklingApplication, (application) =>
+        application.resolveReferences(requestCredentials, references),
       ),
     );
   }
@@ -587,6 +600,12 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
     };
     const peopleResolver: NonNullable<LocalApplicationOptions["peopleResolver"]> = (emails) =>
       callRpc(workspaceStub(this.#environment).resolvePeople(emails));
+    // References name other documents, which only the workspace catalog knows.
+    const referenceResolver: NonNullable<LocalApplicationOptions["referenceResolver"]> = (
+      requestCredentials,
+      references,
+    ) =>
+      callRpc(workspaceStub(this.#environment).resolveReferences(requestCredentials, references));
     const started = Date.now();
     const runtime = createApplicationRuntime(
       this.#state,
@@ -595,6 +614,7 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
         ownsCatalogProjections: false,
         peopleResolver,
         principalResolver: resolver,
+        referenceResolver,
         workspaceId: configuration.workspaceId,
       },
       "disabled",
@@ -1596,7 +1616,7 @@ function documentIdFromPath(pathname: string): string | undefined {
     /^\/(?:api\/documents|api\/public\/documents|public\/documents)\/([^/]+)(?:\/|$)/u.exec(
       pathname,
     );
-  const protectedLink = /^\/auth\/link\/([^/]+)\/\d+\/\d+\/?$/u.exec(pathname);
+  const protectedLink = /^\/auth\/(?:link|reference)\/([^/]+)\/\d+\/\d+\/?$/u.exec(pathname);
   const rawDocumentId = document?.[1] ?? protectedLink?.[1];
   if (rawDocumentId === undefined) return undefined;
   try {

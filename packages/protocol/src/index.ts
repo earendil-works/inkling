@@ -314,16 +314,51 @@ export const PublicationResponseSchema = Schema.Struct({
 });
 export type PublicationResponse = typeof PublicationResponseSchema.Type;
 
+export const DocumentHeadingSchema = Schema.Struct({
+  depth: Schema.Number,
+  id: Schema.String,
+  number: Schema.optional(Schema.String),
+  text: Schema.String,
+});
+export type DocumentHeadingDto = typeof DocumentHeadingSchema.Type;
+
 export const PublicDocumentResponseSchema = Schema.Struct({
   canonicalPath: Schema.String,
   description: Schema.String,
-  headings: Schema.Array(
-    Schema.Struct({ depth: Schema.Number, id: Schema.String, text: Schema.String }),
-  ),
+  headings: Schema.Array(DocumentHeadingSchema),
   html: Schema.String,
   metadata: DocumentMetadataSchema,
 });
 export type PublicDocumentResponse = typeof PublicDocumentResponseSchema.Type;
+
+/** At most this many references are resolved by one request. */
+export const maximumReferencesPerRequest = 200;
+
+export const ReferenceResolutionSchema = Schema.Union(
+  Schema.Struct({
+    href: Schema.String,
+    rfcNumber: Schema.optional(PositiveInteger),
+    section: Schema.optional(
+      Schema.Struct({
+        id: Schema.String,
+        number: Schema.optional(Schema.String),
+        text: Schema.String,
+      }),
+    ),
+    status: Schema.Literal("available"),
+    title: Schema.String,
+  }),
+  Schema.Struct({ status: Schema.Literal("unavailable") }),
+);
+export type ReferenceResolutionDto = typeof ReferenceResolutionSchema.Type;
+
+export const ReferenceResolutionsResponseSchema = Schema.Struct({
+  references: Schema.Record({
+    key: Schema.String,
+    value: ReferenceResolutionSchema,
+  }),
+});
+export type ReferenceResolutionsResponse = typeof ReferenceResolutionsResponseSchema.Type;
 
 export const AttachmentMetadataSchema = Schema.Struct({
   createdAt: Schema.String,

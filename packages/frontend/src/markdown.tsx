@@ -1,18 +1,27 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { Mermaid } from "mermaid";
 import { Effect } from "effect";
 
 import { makeMarkdownRenderer } from "@earendil-works/inkling-renderer";
-import type { DocumentFrontmatter, RenderHeading } from "@earendil-works/inkling-renderer";
+import type {
+  DocumentFrontmatter,
+  DocumentReference,
+  ReferenceResolution,
+  ReferenceResolutions,
+  RenderHeading,
+} from "@earendil-works/inkling-renderer";
 
+import type { ApiClientService } from "./api.ts";
 import {
   mountMermaidDiagramControls,
   mountMermaidDiagramError,
 } from "./components/mermaid-diagram-controls.ts";
 import { useEffectQuery } from "./effect-hooks.ts";
+import { browserRuntime } from "./effect-runtime.ts";
 
 const renderer = makeMarkdownRenderer();
 const emptyHeadings: readonly RenderHeading[] = [];
+const emptyReferences: readonly DocumentReference[] = [];
 let mermaidPromise: Promise<Mermaid> | undefined;
 let diagramGeneration = 0;
 
@@ -22,7 +31,16 @@ export interface RenderedMarkdown {
   readonly frontmatter: DocumentFrontmatter | undefined;
   readonly headings: readonly RenderHeading[];
   readonly loading: boolean;
+  /** References to other documents, which the caller resolves. */
+  readonly references: readonly DocumentReference[];
   readonly title: string | undefined;
+}
+
+/** How a document renders beyond its source. */
+export interface MarkdownRenderSettings {
+  /** RFCs number their sections. */
+  readonly numberHeadings?: boolean | undefined;
+  readonly references?: ReferenceResolutions | undefined;
 }
 
 export type MarkdownRenderResult = Effect.Effect.Success<ReturnType<typeof renderer.render>>;
@@ -36,26 +54,73 @@ export const PrerenderedMarkdownContext = createContext<
 >(undefined);
 
 /** Identifies one rendering of a source without repeating the source. */
-export function markdownRenderKey(source: string, sourcePositions: boolean): string {
+export function markdownRenderKey(
+  source: string,
+  sourcePositions: boolean,
+  settings: MarkdownRenderSettings = {},
+): string {
+  const input = `${settingsFingerprint(settings)}\u0000${source}`;
   let hash = 0x811c_9dc5;
-  for (let index = 0; index < source.length; index += 1) {
-    hash ^= source.charCodeAt(index);
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
     hash = Math.imul(hash, 0x0100_0193) >>> 0;
   }
   return `${sourcePositions ? "positioned" : "plain"}:${source.length}:${hash.toString(36)}`;
+}
+
+function settingsFingerprint(settings: MarkdownRenderSettings): string {
+  const references = [...(settings.references ?? new Map<string, ReferenceResolution>())]
+    .map(([key, resolution]) =>
+      resolution.status === "available"
+        ? [
+            key,
+            resolution.href,
+            resolution.rfcNumber ?? null,
+            resolution.title,
+            resolution.section?.id ?? null,
+            resolution.section?.number ?? null,
+            resolution.section?.text ?? null,
+          ]
+        : [key],
+    )
+    .toSorted((left, right) => compareStrings(String(left[0]), String(right[0])));
+  return JSON.stringify([settings.numberHeadings === true, references]);
+}
+
+function compareStrings(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 /** Renders Markdown exactly as `useRenderedMarkdown` does. */
 export function renderMarkdown(
   source: string,
   sourcePositions: boolean,
+  settings: MarkdownRenderSettings = {},
 ): ReturnType<typeof renderer.render> {
-  return renderer.render(source, { sourcePositions });
+  return renderer.render(source, {
+    numberHeadings: settings.numberHeadings,
+    references: settings.references,
+    sourcePositions,
+  });
 }
 
-export function useRenderedMarkdown(source: string, sourcePositions: boolean): RenderedMarkdown {
-  const query = useMemo(() => renderMarkdown(source, sourcePositions), [source, sourcePositions]);
-  const key = useMemo(() => markdownRenderKey(source, sourcePositions), [source, sourcePositions]);
+export function useRenderedMarkdown(
+  source: string,
+  sourcePositions: boolean,
+  settings: MarkdownRenderSettings = {},
+): RenderedMarkdown {
+  // Settings often arrive as new objects with the same content; the
+  // fingerprint keeps rendering from repeating for them.
+  const fingerprint = settingsFingerprint(settings);
+  const stableSettings = useMemo(() => settings, [fingerprint]);
+  const query = useMemo(
+    () => renderMarkdown(source, sourcePositions, stableSettings),
+    [source, sourcePositions, stableSettings],
+  );
+  const key = useMemo(
+    () => markdownRenderKey(source, sourcePositions, stableSettings),
+    [source, sourcePositions, stableSettings],
+  );
   const prerendered = useContext(PrerenderedMarkdownContext)?.get(key);
   const { state } = useEffectQuery(
     query,
@@ -68,8 +133,94 @@ export function useRenderedMarkdown(source: string, sourcePositions: boolean): R
     headings: state.data?.headings ?? emptyHeadings,
     html: state.data?.html ?? "",
     loading: state.status === "loading",
+    references: state.data?.references ?? emptyReferences,
     title: state.data?.title,
   };
+}
+
+/** Resolutions keyed by reference, as the API and route data carry them. */
+export type ReferenceResolutionRecord = Readonly<Record<string, ReferenceResolution>>;
+
+/** How the reader first renders a document: RFCs number their sections. */
+export function documentRenderSettings(
+  metadata: { readonly rfcNumber?: number | undefined },
+  references: ReferenceResolutionRecord | undefined,
+): MarkdownRenderSettings {
+  return {
+    numberHeadings: metadata.rfcNumber !== undefined,
+    references: new Map(Object.entries(references ?? {})),
+  };
+}
+
+const referenceRequestDelayMilliseconds = 300;
+
+/**
+ * Renders a document with its references resolved for the current reader.
+ * It starts from the resolutions the route loaded and asks for references
+ * added since, such as ones an author just typed.
+ */
+export function useDocumentMarkdown(
+  api: ApiClientService | undefined,
+  source: string,
+  metadata: { readonly rfcNumber?: number | undefined },
+  initialReferences: ReferenceResolutionRecord | undefined,
+): RenderedMarkdown {
+  const [resolutions, setResolutions] = useState<ReferenceResolutions>(
+    () => new Map(Object.entries(initialReferences ?? {})),
+  );
+  const requested = useRef(new Set<string>(Object.keys(initialReferences ?? {})));
+  // A route that loads again, or another document, brings fresh resolutions.
+  const [seed, setSeed] = useState(initialReferences);
+  if (seed !== initialReferences) {
+    setSeed(initialReferences);
+    setResolutions((current) => new Map([...current, ...Object.entries(initialReferences ?? {})]));
+  }
+  const rendered = useRenderedMarkdown(source, true, {
+    numberHeadings: metadata.rfcNumber !== undefined,
+    references: resolutions,
+  });
+  const missingKey = [
+    ...new Set(
+      rendered.references
+        .map((reference) => reference.key)
+        .filter((key) => !resolutions.has(key) && !requested.current.has(key)),
+    ),
+  ]
+    .toSorted(compareStrings)
+    .join("\n");
+
+  useEffect(() => {
+    if (api === undefined || missingKey === "") return;
+    const keys = missingKey.split("\n");
+    const timer = setTimeout(() => {
+      for (const key of keys) requested.current.add(key);
+      browserRuntime.runFork(
+        api.resolveReferences(keys).pipe(
+          Effect.tap((response) =>
+            Effect.sync(() =>
+              setResolutions((current) => {
+                const next = new Map(current);
+                for (const [key, resolution] of Object.entries(response.references)) {
+                  next.set(key, resolution);
+                }
+                return next;
+              }),
+            ),
+          ),
+          // Unresolved references stay pending; a later render asks again.
+          Effect.tapError(() =>
+            Effect.sync(() => {
+              for (const key of keys) requested.current.delete(key);
+            }),
+          ),
+          Effect.ignore,
+        ),
+      );
+    }, referenceRequestDelayMilliseconds);
+    return () => clearTimeout(timer);
+  }, [api, missingKey]);
+
+  return rendered;
 }
 
 export function renderMermaid(root: ParentNode): Effect.Effect<void> {

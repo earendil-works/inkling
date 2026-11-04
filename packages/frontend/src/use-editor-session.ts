@@ -37,6 +37,7 @@ import {
   removeRemotePresence,
   setRemotePresence,
 } from "./remote-presence.ts";
+import { referencePasteExtension } from "./reference-paste.ts";
 import { selectionIndentationExtension } from "./selection-indentation.ts";
 import { colorFor, randomId } from "./ui.ts";
 
@@ -71,6 +72,8 @@ interface UseEditorSessionOptions extends EditorSessionCallbacks {
   readonly initialBody: string;
   readonly initiallyEditable: boolean;
   readonly identityId: string | undefined;
+  /** The RFC number of the document, so pasted links to it become section links. */
+  readonly rfcNumber?: number | undefined;
   readonly shared: boolean;
 }
 
@@ -91,9 +94,12 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
     initialBody,
     initiallyEditable,
     identityId,
+    rfcNumber,
     shared,
     ...callbacks
   } = options;
+  const pasteTargetRef = useRef({ documentId, rfcNumber });
+  pasteTargetRef.current = { documentId, rfcNumber };
   const callbacksRef = useRef<EditorSessionCallbacks>(callbacks);
   callbacksRef.current = callbacks;
   // The vocabulary grows once the catalog loads; completions read the latest
@@ -144,6 +150,7 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
           remotePresenceExtension,
           commentDecorationsExtension,
           selectionIndentationExtension,
+          referencePasteExtension(() => pasteTargetRef.current),
           editable.of(EditorView.editable.of(initiallyEditable)),
           EditorView.lineWrapping,
           EditorView.updateListener.of((update) => {

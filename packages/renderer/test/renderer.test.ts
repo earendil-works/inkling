@@ -3,7 +3,13 @@ import test from "node:test";
 
 import { Effect } from "effect";
 
-import { makeMarkdownRenderer, serializeDocumentFrontmatter } from "../src/index.ts";
+import {
+  collectReferences,
+  makeMarkdownRenderer,
+  outlineDocument,
+  redactReferences,
+  serializeDocumentFrontmatter,
+} from "../src/index.ts";
 
 const renderer = makeMarkdownRenderer();
 
@@ -170,4 +176,197 @@ test("oversized Mermaid input is rejected without an interactive placeholder", a
   );
   assert.match(rendered.html, /exceeds the 100 KB render limit/u);
   assert.doesNotMatch(rendered.html, /data-mermaid/u);
+});
+
+test("RFC headings are numbered by nesting, and notes are not", async () => {
+  const markdown =
+    "# Title\n\n## Summary\n\n## Design\n\n### Storage\n\n#### Keys\n\n### Wire\n\n## Rollout\n\n#### Skipped level";
+  const rfc = await Effect.runPromise(renderer.render(markdown, { numberHeadings: true }));
+  assert.deepEqual(
+    rfc.headings.map((heading) => `${heading.number ?? ""} ${heading.text}`),
+    [
+      "1 Summary",
+      "2 Design",
+      "2.1 Storage",
+      "2.1.1 Keys",
+      "2.2 Wire",
+      "3 Rollout",
+      "3.1 Skipped level",
+    ],
+  );
+  assert.match(
+    rfc.html,
+    /<h3 id="storage"><span class="inkling-section-number">2\.1<\/span> Storage <a class="inkling-heading-anchor" href="#storage"/u,
+  );
+
+  const note = await Effect.runPromise(renderer.render(markdown));
+  assert.equal(
+    note.headings.every((heading) => heading.number === undefined),
+    true,
+  );
+  assert.doesNotMatch(note.html, /inkling-section-number/u);
+});
+
+test("headings can pin their ID", async () => {
+  const rendered = await Effect.runPromise(
+    renderer.render("## Why we do this {#motivation}\n\nSee [](#motivation)."),
+  );
+  assert.deepEqual(rendered.headings, [{ depth: 2, id: "motivation", text: "Why we do this" }]);
+  assert.match(rendered.html, /<h2 id="motivation">Why we do this <a/u);
+  assert.match(
+    rendered.html,
+    /<a href="#motivation" class="inkling-reference"[^>]*>Why we do this<\/a>/u,
+  );
+});
+
+test("references fill in the resolved target and section", async () => {
+  const markdown = [
+    "# Title",
+    "",
+    "## Scope",
+    "",
+    "- <rfc:57#motivation>",
+    "- [](rfc:0057)",
+    "- [the reasons](rfc:57#motivation)",
+    "- <doc:doc_abcdefghij#notes>",
+    "- <rfc:58#secret-plan>",
+    "- <rfc:57#gone>",
+    "- [](#scope)",
+    "- <rfc:59>",
+  ].join("\n");
+  const rendered = await Effect.runPromise(
+    renderer.render(markdown, {
+      numberHeadings: true,
+      references: new Map([
+        [
+          "rfc:57#motivation",
+          {
+            href: "/rfc/0057",
+            rfcNumber: 57,
+            section: { id: "motivation", number: "3.2", text: "Motivation" },
+            status: "available",
+            title: "Storage",
+          },
+        ],
+        [
+          "rfc:57",
+          {
+            href: "/rfc/0057",
+            rfcNumber: 57,
+            status: "available",
+            title: "Storage",
+          },
+        ],
+        [
+          "doc:doc_abcdefghij#notes",
+          {
+            href: "/documents/doc_abcdefghij",
+            section: { id: "notes", text: "Notes" },
+            status: "available",
+            title: "Meeting",
+          },
+        ],
+        ["rfc:58#secret-plan", { status: "unavailable" }],
+        [
+          "rfc:57#gone",
+          {
+            href: "/rfc/0057",
+            rfcNumber: 57,
+            status: "available",
+            title: "Storage",
+          },
+        ],
+      ]),
+      unavailableReferenceHref: ({ index }) => `/auth/reference/doc_source/3/${index}`,
+    }),
+  );
+  assert.deepEqual(
+    rendered.references.map(({ index, key }) => `${index}:${key}`),
+    [
+      "0:rfc:57#motivation",
+      "1:rfc:57",
+      "2:rfc:57#motivation",
+      "3:doc:doc_abcdefghij#notes",
+      "4:rfc:58#secret-plan",
+      "5:rfc:57#gone",
+      "6:rfc:59",
+    ],
+  );
+  assert.match(rendered.html, /href="\/rfc\/0057#motivation"[^>]*>RFC 0057 §3\.2 Motivation<\/a>/u);
+  assert.match(rendered.html, /href="\/rfc\/0057"[^>]*>RFC 0057: Storage<\/a>/u);
+  assert.match(
+    rendered.html,
+    /href="\/rfc\/0057#motivation"[^>]*title="RFC 0057 §3\.2 Motivation">the reasons<\/a>/u,
+  );
+  assert.match(
+    rendered.html,
+    /href="\/documents\/doc_abcdefghij#notes"[^>]*>Meeting › Notes<\/a>/u,
+  );
+  assert.match(
+    rendered.html,
+    /href="\/auth\/reference\/doc_source\/3\/4"[^>]*>RFC 0058 \(unavailable\)<\/a>/u,
+  );
+  assert.doesNotMatch(rendered.html, /secret-plan/u);
+  assert.match(
+    rendered.html,
+    /data-reference-status="missing"[^>]*>RFC 0057 \(missing section #gone\)/u,
+  );
+  assert.match(rendered.html, /href="#scope"[^>]*>§1 Scope<\/a>/u);
+  assert.match(
+    rendered.html,
+    /href="\/rfc\/0059"[^>]*data-reference-status="pending">RFC 0059<\/a>/u,
+  );
+
+  const collected = await Effect.runPromise(collectReferences(markdown));
+  assert.deepEqual(
+    collected.map(({ index, key }) => `${index}:${key}`),
+    rendered.references.map(({ index, key }) => `${index}:${key}`),
+  );
+});
+
+test("outlines match the rendered headings", async () => {
+  const markdown = "---\nstate: draft\n---\n# Title\n\n## One {#first}\n\n### Two\n\n## One";
+  const outline = await Effect.runPromise(outlineDocument(markdown, { numberHeadings: true }));
+  const rendered = await Effect.runPromise(renderer.render(markdown, { numberHeadings: true }));
+  assert.equal(outline.title, "Title");
+  assert.deepEqual(outline.headings, rendered.headings);
+  assert.deepEqual(
+    outline.headings.map(({ id, number }) => `${number ?? ""}:${id}`),
+    ["1:first", "1.1:two", "2:one"],
+  );
+});
+
+test("legacy relative RFC links are canonical while IETF RFC links stay external", async () => {
+  const rendered = await Effect.runPromise(
+    renderer.render(
+      "[a](rfc-57.md#scope) [b](../rfcs/57) [c](https://datatracker.ietf.org/doc/html/rfc9110#section-5) [d](https://www.rfc-editor.org/rfc/rfc9110)",
+    ),
+  );
+  assert.match(rendered.html, /href="\/rfc\/0057#scope"/u);
+  assert.match(rendered.html, /href="\/rfc\/0057"/u);
+  assert.match(
+    rendered.html,
+    /href="https:\/\/datatracker\.ietf\.org\/doc\/html\/rfc9110#section-5"/u,
+  );
+  assert.match(rendered.html, /href="https:\/\/www\.rfc-editor\.org\/rfc\/rfc9110"/u);
+});
+
+test("anonymous bodies hide sections of references they cannot open", () => {
+  const body = [
+    "<rfc:57#public-part> <rfc:58#secret-plan> [](rfc:58#secret-plan) [text](rfc:58#secret-plan)",
+    "`rfc:58#secret-plan` <rfc:58> rfc:58 [](doc:doc_abcdefghij#hidden)",
+  ].join("\n");
+  const redacted = redactReferences(body, {
+    available: (reference) => reference.key.startsWith("rfc:57"),
+    redirect: (reference) =>
+      reference.key === "rfc:58#secret-plan" ? "/auth/reference/doc_source/3/1" : undefined,
+  });
+  assert.equal(
+    redacted,
+    [
+      "<rfc:57#public-part> [RFC 0058 (unavailable)](/auth/reference/doc_source/3/1) [RFC 0058 (unavailable)](/auth/reference/doc_source/3/1) [text](/auth/reference/doc_source/3/1)",
+      "`/auth/reference/doc_source/3/1` [RFC 0058 (unavailable)](rfc:58) rfc:58 [Unavailable document](doc:doc_abcdefghij)",
+    ].join("\n"),
+  );
+  assert.doesNotMatch(redacted, /secret|hidden/u);
 });

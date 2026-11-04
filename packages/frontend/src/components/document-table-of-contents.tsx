@@ -36,7 +36,7 @@ export function DocumentTableOfContents({
         ref={tableOfContentsRef as React.Ref<HTMLDivElement>}
       >
         <TableOfContents.MenuTrigger label="On this page">
-          {currentHeading?.text}
+          {currentHeading === undefined ? undefined : headingLabel(currentHeading)}
         </TableOfContents.MenuTrigger>
         <TableOfContents.MenuPopup label="On this page">{list}</TableOfContents.MenuPopup>
       </TableOfContents.Menu>
@@ -68,14 +68,22 @@ function HeadingList({
     <TableOfContents.List>
       {nodes.map(({ children, heading }) => (
         <TableOfContents.Item key={heading.id}>
-          <TableOfContents.Link active={heading.id === currentId} href={`#${heading.id}`}>
-            {heading.text}
+          <TableOfContents.Link
+            active={heading.id === currentId}
+            href={`#${encodeURIComponent(heading.id)}`}
+          >
+            {headingLabel(heading)}
           </TableOfContents.Link>
           {children.length === 0 ? null : <HeadingList currentId={currentId} nodes={children} />}
         </TableOfContents.Item>
       ))}
     </TableOfContents.List>
   );
+}
+
+/** RFC sections lead with their number. */
+function headingLabel(heading: RenderHeading): string {
+  return heading.number === undefined ? heading.text : `${heading.number} ${heading.text}`;
 }
 
 /** Nests headings by depth, at most three levels deep, relative to the shallowest heading. */

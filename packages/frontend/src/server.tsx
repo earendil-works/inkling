@@ -5,7 +5,12 @@ import { makeApiClient } from "./api.ts";
 import type { ApiTransport } from "./api.ts";
 import { App, routePath, routeTitle } from "./app.tsx";
 import { clientOnlyDigest, preloadDocumentScreen } from "./components/route-view.tsx";
-import { markdownRenderKey, PrerenderedMarkdownContext, renderMarkdown } from "./markdown.tsx";
+import {
+  documentRenderSettings,
+  markdownRenderKey,
+  PrerenderedMarkdownContext,
+  renderMarkdown,
+} from "./markdown.tsx";
 import type { MarkdownRenderResult } from "./markdown.tsx";
 import { initialRouteElementId } from "./route-data.ts";
 import type { InitialRoute, PrerenderedMarkdown, RouteModel } from "./route-data.ts";
@@ -163,9 +168,15 @@ interface Prerendered {
 async function prerenderMarkdown(model: RouteModel): Promise<readonly Prerendered[]> {
   if (model.screen !== "reader") return [];
   const source = model.document.body;
-  const rendered = await Effect.runPromise(Effect.either(renderMarkdown(source, true)));
+  const settings = documentRenderSettings(model.document.metadata, model.references);
+  const rendered = await Effect.runPromise(Effect.either(renderMarkdown(source, true, settings)));
   return Either.isRight(rendered)
-    ? [{ key: markdownRenderKey(source, true), rendered: rendered.right }]
+    ? [
+        {
+          key: markdownRenderKey(source, true, settings),
+          rendered: rendered.right,
+        },
+      ]
     : [];
 }
 
@@ -175,6 +186,7 @@ function serializeMarkdown(key: string, rendered: MarkdownRenderResult): Prerend
     headings: rendered.headings,
     html: rendered.html,
     key,
+    references: rendered.references.map((reference) => reference.source),
     title: rendered.title,
   };
 }

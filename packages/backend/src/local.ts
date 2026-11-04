@@ -1,4 +1,4 @@
-import { Effect, Either, Fiber, Layer, Predicate, Schema, Stream } from "effect";
+import { Effect, Either, Fiber, Layer, Option, Predicate, Schema, Stream } from "effect";
 
 import {
   activateDocument,
@@ -60,6 +60,7 @@ import type {
   AuthenticationState,
   AuthorizationCodeRecord,
   CapabilityAccess,
+  CatalogHeading,
   CatalogSummary,
   CommentActor,
   DocumentId,
@@ -87,7 +88,7 @@ import type {
   DocumentSnapshot,
 } from "@earendil-works/inkling-collaboration";
 import { ApplicationError, InklingApplication } from "./application.ts";
-import { canonicalRfcPath, protectedLinkPath } from "./routes.ts";
+import { canonicalRfcPath, protectedLinkPath, referenceLinkPath } from "./routes.ts";
 import type {
   CollaborationConnection,
   DocumentRuntimeConfiguration,
@@ -107,6 +108,8 @@ import type {
   MetadataPatchRequest,
   PassageSearchResponse,
   PublicDocumentResponse,
+  ReferenceResolutionDto,
+  ReferenceResolutionsResponse,
   SearchPassageDto,
   SearchRebuildResponse,
   ServerCollaborationMessage,
@@ -115,11 +118,23 @@ import type {
   ShareLinksResponse,
 } from "@earendil-works/inkling-protocol";
 import {
+  collectReferences,
   MarkdownRenderer,
+  outlineDocument,
   parseDocumentSource,
+  parseReference,
+  redactReferences,
+  referenceTargetPath,
   RenderError,
   serializeDocumentFrontmatter,
 } from "@earendil-works/inkling-renderer";
+import type {
+  DocumentOutline,
+  DocumentReference,
+  ParsedReference,
+  ReferenceResolutions,
+} from "@earendil-works/inkling-renderer";
+import { maximumReferencesPerRequest } from "@earendil-works/inkling-protocol";
 
 const textEncoder = new TextEncoder();
 const maximumCachedPublishedRevisions = 128;
@@ -221,6 +236,13 @@ export interface LocalApplicationOptions {
     | undefined;
   readonly peopleResolver?:
     | ((emails: readonly string[]) => Effect.Effect<readonly PersonReference[], ApplicationError>)
+    | undefined;
+  /** Resolves references through the runtime that owns the workspace catalog. */
+  readonly referenceResolver?:
+    | ((
+        credentials: RequestCredentials,
+        references: readonly string[],
+      ) => Effect.Effect<ReferenceResolutionsResponse, ApplicationError>)
     | undefined;
 }
 
@@ -629,13 +651,24 @@ export function makeLocalInklingApplication(
         const metadata = yield* metadataWithResolvedAuthors(published.metadata);
         const anonymousBody =
           principal.kind === "anonymous"
-            ? yield* renderer.render(published.body, { rewriteUrl: rewriteRfcUrl }).pipe(
+            ? yield* renderer.render(published.body).pipe(
                 Effect.mapError(toApplicationError),
-                Effect.map((rendered) =>
-                  rewriteProtectedLinkSources(
-                    published.body,
-                    rendered.protectedLinks,
-                    ({ index }) => protectedLinkPath(current.metadata.id, publishedRevision, index),
+                Effect.flatMap((rendered) =>
+                  anonymousReferenceResolutions(rendered.references).pipe(
+                    Effect.map((resolutions) =>
+                      rewriteProtectedLinkSources(
+                        redactUnavailableReferences(
+                          published.body,
+                          rendered.references,
+                          resolutions,
+                          (index) =>
+                            referenceLinkPath(current.metadata.id, publishedRevision, index),
+                        ),
+                        rendered.protectedLinks,
+                        ({ index }) =>
+                          protectedLinkPath(current.metadata.id, publishedRevision, index),
+                      ),
+                    ),
                   ),
                 ),
               )
@@ -654,6 +687,174 @@ export function makeLocalInklingApplication(
           endLine,
         );
       });
+
+    const publishedOutlines = new Map<string, DocumentOutline>();
+
+    /** The title and headings of a published revision; revisions never change. */
+    const publishedOutline = (
+      id: DocumentId,
+      revision: DocumentRevision,
+      numbered: boolean,
+    ): Effect.Effect<DocumentOutline, ApplicationError> => {
+      const key = `${state.workspaceId}:${id}:${revision}:${numbered ? "numbered" : "plain"}`;
+      const cached = publishedOutlines.get(key);
+      if (cached !== undefined) return Effect.succeed(cached);
+      return loadPublishedRevision(id, revision).pipe(
+        Effect.flatMap((published) =>
+          outlineDocument(published.body, { numberHeadings: numbered }).pipe(
+            Effect.map((outline) => ({
+              ...outline,
+              title: published.metadata.title,
+            })),
+            Effect.mapError(toApplicationError),
+          ),
+        ),
+        Effect.tap((outline) =>
+          Effect.sync(() => {
+            publishedOutlines.set(key, outline);
+            for (const oldest of publishedOutlines.keys()) {
+              if (publishedOutlines.size <= maximumCachedPublishedRevisions) break;
+              publishedOutlines.delete(oldest);
+            }
+          }),
+        ),
+      );
+    };
+
+    /**
+     * What the principal may learn about a reference: the published revision
+     * when it may read that, otherwise the working draft when it may read
+     * that, otherwise nothing, so readers cannot tell a private document from
+     * a missing one.
+     */
+    const resolveReference = (
+      principal: Principal,
+      reference: ParsedReference,
+      now: string,
+    ): Effect.Effect<ReferenceResolutionDto> =>
+      Effect.gen(function* () {
+        const unavailable: ReferenceResolutionDto = { status: "unavailable" };
+        const target = reference.target;
+        const entry = state.catalog.entries.find(
+          (candidate) =>
+            candidate.status === "active" &&
+            (target.kind === "rfc"
+              ? (candidate.rfcNumber ?? candidate.summary?.rfcNumber) === target.rfcNumber
+              : candidate.documentId === target.documentId),
+        );
+        const summary = entry?.summary;
+        const metadata = summary?.metadata;
+        if (entry === undefined || summary === undefined || metadata === undefined) {
+          return unavailable;
+        }
+        const rfcNumber = entry.rfcNumber ?? summary.rfcNumber;
+        const publishedRevision = metadata.publishedRevision;
+        let outline: {
+          readonly headings: readonly CatalogHeading[];
+          readonly title: string;
+        };
+        if (
+          publishedRevision !== undefined &&
+          isDocumentActionAllowed(principal, "read-published", metadata, now)
+        ) {
+          const published = yield* publishedOutline(
+            entry.documentId,
+            publishedRevision,
+            rfcNumber !== undefined,
+          ).pipe(Effect.option);
+          if (Option.isNone(published)) return unavailable;
+          outline = {
+            headings: published.value.headings,
+            title: published.value.title ?? summary.title,
+          };
+        } else if (isDocumentActionAllowed(principal, "read-working", metadata, now)) {
+          outline = { headings: summary.headings ?? [], title: summary.title };
+        } else {
+          return unavailable;
+        }
+        const heading =
+          reference.anchor === undefined
+            ? undefined
+            : outline.headings.find((candidate) => candidate.id === reference.anchor);
+        return {
+          href:
+            rfcNumber === undefined
+              ? `/documents/${encodeURIComponent(entry.documentId)}`
+              : canonicalRfcPath(rfcNumber),
+          ...(rfcNumber === undefined ? {} : { rfcNumber }),
+          ...(heading === undefined
+            ? {}
+            : {
+                section: {
+                  id: heading.id,
+                  ...(heading.number === undefined ? {} : { number: heading.number }),
+                  text: heading.text,
+                },
+              }),
+          status: "available",
+          title: outline.title,
+        };
+      });
+
+    const resolveReferencesFor = (
+      principal: Principal,
+      keys: readonly string[],
+    ): Effect.Effect<ReferenceResolutionsResponse> =>
+      Effect.gen(function* () {
+        yield* flushPendingProjections;
+        const now = new Date().toISOString();
+        const references: Record<string, ReferenceResolutionDto> = {};
+        for (const key of new Set(keys)) {
+          const reference = parseReference(key);
+          references[key] =
+            reference === undefined
+              ? { status: "unavailable" }
+              : yield* resolveReference(principal, reference, now);
+        }
+        return { references };
+      });
+
+    /**
+     * Resolves references as an anonymous reader sees them. A section an
+     * anonymous reader cannot find counts as unavailable, so its ID stays
+     * hidden. Failures leave every reference unavailable.
+     */
+    const anonymousReferenceResolutions = (
+      references: readonly DocumentReference[],
+    ): Effect.Effect<ReferenceResolutions> => {
+      const keys = [...new Set(references.map((reference) => reference.key))];
+      if (keys.length === 0) return Effect.succeed(new Map());
+      const resolved =
+        options.referenceResolver === undefined
+          ? resolveReferencesFor({ kind: "anonymous" }, keys)
+          : options.referenceResolver({}, keys);
+      return resolved.pipe(
+        Effect.map(
+          (response) =>
+            new Map(
+              references.map((reference) => {
+                const resolution = response.references[reference.key];
+                return [
+                  reference.key,
+                  resolution?.status === "available" &&
+                  (reference.anchor === undefined || resolution.section !== undefined)
+                    ? resolution
+                    : ({ status: "unavailable" } as const),
+                ];
+              }),
+            ),
+        ),
+        Effect.catchAll((error) =>
+          Effect.logWarning("Reference resolution failed", error.message).pipe(
+            Effect.as(
+              new Map(
+                references.map((reference) => [reference.key, { status: "unavailable" } as const]),
+              ),
+            ),
+          ),
+        ),
+      );
+    };
 
     const indexDocumentVariants = (
       document: DocumentResponse,
@@ -683,7 +884,7 @@ export function makeLocalInklingApplication(
         if ((yield* searchIndex.indexedRevision(id, "published")) === publishedRevision) return;
         const published = yield* loadPublishedRevision(id, publishedRevision);
         yield* searchIndex.indexDocument({
-          body: redactProtectedLinkText(published.body),
+          body: redactPublicText(published.body),
           documentId: id,
           revision: publishedRevision,
           title: published.metadata.title,
@@ -969,16 +1170,22 @@ export function makeLocalInklingApplication(
           );
         }
         const published = yield* loadPublishedRevision(current.metadata.id, publishedRevision);
+        const references = yield* collectReferences(published.body).pipe(
+          Effect.mapError(toApplicationError),
+        );
         const rendered = yield* renderer
           .render(published.body, {
+            numberHeadings: current.metadata.rfcNumber !== undefined,
             protectedLinkHref: ({ index }) =>
               protectedLinkPath(current.metadata.id, publishedRevision, index),
-            rewriteUrl: rewriteRfcUrl,
+            references: yield* anonymousReferenceResolutions(references),
+            unavailableReferenceHref: ({ index }) =>
+              referenceLinkPath(current.metadata.id, publishedRevision, index),
           })
           .pipe(Effect.mapError(toApplicationError));
         const metadata = yield* metadataWithResolvedAuthors(published.metadata);
         const publicBody = rewriteProtectedLinkSources(
-          published.body,
+          redactPublicText(published.body),
           rendered.protectedLinks,
           () => "protected-link",
         );
@@ -1831,9 +2038,7 @@ export function makeLocalInklingApplication(
           const principal = yield* resolvePrincipal(credentials);
           yield* requireAdministrator(principal);
           if (request.publish === true) {
-            yield* renderer
-              .render(request.body, { rewriteUrl: rewriteRfcUrl })
-              .pipe(Effect.mapError(toApplicationError));
+            yield* renderer.render(request.body).pipe(Effect.mapError(toApplicationError));
           }
           const generatedId = yield* ids.generate(identifierTag.document);
           const importedId = request.metadata.id ?? generatedId;
@@ -1964,6 +2169,7 @@ export function makeLocalInklingApplication(
               renderer,
               objectStore,
               digest,
+              anonymousReferenceResolutions,
             ).pipe(Effect.ignore);
             yield* room.checkpoint(importedAt).pipe(Effect.mapError(toApplicationError));
           }
@@ -2207,7 +2413,7 @@ export function makeLocalInklingApplication(
                 Effect.flatMap((snapshot) =>
                   metadataWithResolvedAuthors(snapshot.metadata).pipe(
                     Effect.map((metadata) => {
-                      const publicBody = redactProtectedLinkText(snapshot.body);
+                      const publicBody = redactPublicText(snapshot.body);
                       return (normalizedQuery.length === 0 ||
                         bodyMatches.has(summary.documentId) ||
                         metadataMatches(metadata)) &&
@@ -2494,9 +2700,7 @@ export function makeLocalInklingApplication(
               400,
             );
           }
-          yield* renderer
-            .render(current.body, { rewriteUrl: rewriteRfcUrl })
-            .pipe(Effect.mapError(toApplicationError));
+          yield* renderer.render(current.body).pipe(Effect.mapError(toApplicationError));
           if (source.frontmatter !== undefined) {
             const frontmatter = source.frontmatter;
             yield* room
@@ -2528,6 +2732,7 @@ export function makeLocalInklingApplication(
             renderer,
             objectStore,
             digest,
+            anonymousReferenceResolutions,
           ).pipe(Effect.ignore);
           yield* projectDocument(room);
           yield* scheduleCheckpoint(room);
@@ -2607,6 +2812,44 @@ export function makeLocalInklingApplication(
         ),
       publicRfcRuntimeConfiguration: (rfcNumber) =>
         publicRfcDocumentId(rfcNumber).pipe(Effect.flatMap(runtimeConfiguration)),
+      resolveReferences: (credentials, references) =>
+        Effect.gen(function* () {
+          if (references.length > maximumReferencesPerRequest) {
+            return yield* applicationFailure(
+              "too_many_references",
+              `Resolve at most ${maximumReferencesPerRequest} references at once.`,
+              400,
+            );
+          }
+          if (options.referenceResolver !== undefined) {
+            return yield* options.referenceResolver(credentials, references);
+          }
+          // A share link opens one document; across documents its holder
+          // reads like anyone else, or as the account they are signed in to.
+          const principal = yield* resolvePrincipal({
+            bearerToken: credentials.bearerToken,
+            internalPrincipal: credentials.internalPrincipal,
+            sessionToken: credentials.sessionToken,
+          });
+          return yield* resolveReferencesFor(principal, references);
+        }),
+      resolveReferenceLink: (credentials, rawDocumentId, rawRevision, referenceIndex) =>
+        Effect.gen(function* () {
+          const id = yield* documentId(rawDocumentId).pipe(Effect.mapError(toApplicationError));
+          const principal = yield* resolvePrincipal(credentials, id);
+          yield* requireAccount(principal);
+          const revision = yield* documentRevision(rawRevision).pipe(
+            Effect.mapError(toApplicationError),
+          );
+          const published = yield* loadPublishedRevision(id, revision);
+          const references = yield* collectReferences(published.body).pipe(
+            Effect.mapError(toApplicationError),
+          );
+          const reference = references[referenceIndex];
+          return reference === undefined
+            ? yield* applicationFailure("not_found", "The reference does not exist.", 404)
+            : referenceDestination(reference);
+        }),
       resolveProtectedLink: (credentials, rawDocumentId, rawRevision, linkIndex) =>
         Effect.gen(function* () {
           const id = yield* documentId(rawDocumentId).pipe(Effect.mapError(toApplicationError));
@@ -2617,7 +2860,7 @@ export function makeLocalInklingApplication(
           );
           const published = yield* loadPublishedRevision(id, revision);
           const rendered = yield* renderer
-            .render(published.body, { rewriteUrl: rewriteRfcUrl })
+            .render(published.body)
             .pipe(Effect.mapError(toApplicationError));
           const link = rendered.protectedLinks[linkIndex];
           return link === undefined
@@ -3332,15 +3575,37 @@ function summaryFromSnapshot(snapshot: DocumentSnapshot): Effect.Effect<CatalogS
   return summaryFromDocument(toDocumentResponse(snapshot));
 }
 
+/** Headings a catalog summary keeps for resolving references. */
+const maximumCatalogHeadings = 300;
+
+function catalogHeadings(document: DocumentResponse): Effect.Effect<readonly CatalogHeading[]> {
+  return outlineDocument(document.body, {
+    numberHeadings: document.metadata.rfcNumber !== undefined,
+  }).pipe(
+    Effect.map((outline) =>
+      outline.headings
+        .slice(0, maximumCatalogHeadings)
+        .map((heading): CatalogHeading =>
+          heading.number === undefined
+            ? { id: heading.id, text: heading.text.slice(0, 200) }
+            : { id: heading.id, number: heading.number, text: heading.text.slice(0, 200) },
+        ),
+    ),
+    Effect.orElseSucceed((): readonly CatalogHeading[] => []),
+  );
+}
+
 function summaryFromDocument(document: DocumentResponse): Effect.Effect<CatalogSummary> {
   return parseDocumentSource(document.body).pipe(
     Effect.map((source) => source.frontmatter?.labels ?? document.metadata.labels),
     Effect.catchAll(() => Effect.succeed(document.metadata.labels)),
-    Effect.map((workingLabels) => ({
+    Effect.zip(catalogHeadings(document)),
+    Effect.map(([workingLabels, headings]) => ({
       approvers: document.metadata.approvers as readonly PersonReference[],
       authors: document.metadata.authors as readonly PersonReference[],
       documentId: document.metadata.id as DocumentMetadata["id"],
       excerpt: excerpt(document.body),
+      headings,
       labels: document.metadata.labels,
       metadata: document.metadata as DocumentMetadata,
       publishedRevision: document.metadata.publishedRevision as DocumentRevision | undefined,
@@ -3383,14 +3648,23 @@ function writePublishedArtifact(
   renderer: typeof MarkdownRenderer.Service,
   objectStore: typeof ObjectStore.Service,
   digest: typeof Digest.Service,
+  resolveReferences: (
+    references: readonly DocumentReference[],
+  ) => Effect.Effect<ReferenceResolutions>,
 ): Effect.Effect<void, StorageError> {
   return Effect.gen(function* () {
     const revision = snapshot.metadata.publishedRevision;
     if (revision === undefined) return;
+    const references = yield* collectReferences(snapshot.body).pipe(
+      Effect.orElseSucceed((): readonly DocumentReference[] => []),
+    );
     const rendered = yield* renderer
       .render(snapshot.body, {
+        numberHeadings: snapshot.metadata.rfcNumber !== undefined,
         protectedLinkHref: ({ index }) => protectedLinkPath(snapshot.metadata.id, revision, index),
-        rewriteUrl: rewriteRfcUrl,
+        references: yield* resolveReferences(references),
+        unavailableReferenceHref: ({ index }) =>
+          referenceLinkPath(snapshot.metadata.id, revision, index),
       })
       .pipe(
         Effect.mapError(
@@ -3406,7 +3680,11 @@ function writePublishedArtifact(
     const title = escapeMarkup(snapshot.metadata.title);
     const description = escapeMarkup(
       excerpt(
-        rewriteProtectedLinkSources(snapshot.body, rendered.protectedLinks, () => "protected-link"),
+        rewriteProtectedLinkSources(
+          redactPublicText(snapshot.body),
+          rendered.protectedLinks,
+          () => "protected-link",
+        ),
       ),
     );
     const canonical =
@@ -3551,10 +3829,46 @@ function authorsFrontmatterEntry(authors: readonly PersonReference[]): string {
     : `authors:\n${authors.map((author) => `  - ${JSON.stringify(author.email.toLocaleLowerCase("en"))}\n`).join("")}`;
 }
 
-function redactProtectedLinkText(body: string): string {
-  return body.includes("__require_auth")
-    ? body.replace(/https?:\/\/[^\s<>"']+/giu, "protected-link")
-    : body;
+/**
+ * Text of a published body for public listings and search: protected link
+ * destinations and the section IDs of references are removed, since either
+ * may name something the public cannot open.
+ */
+function redactPublicText(body: string): string {
+  const withoutReferenceSections = body.replace(
+    /\b((?:rfc|doc):[A-Za-z0-9_-]+)#[\p{Letter}\p{Number}\p{Mark}_%-]*/gu,
+    "$1",
+  );
+  return withoutReferenceSections.includes("__require_auth")
+    ? withoutReferenceSections.replace(/https?:\/\/[^\s<>"']+/giu, "protected-link")
+    : withoutReferenceSections;
+}
+
+/** Hides the section IDs of references an anonymous reader cannot open. */
+function redactUnavailableReferences(
+  body: string,
+  references: readonly DocumentReference[],
+  resolutions: ReferenceResolutions,
+  redirectPath: (index: number) => string,
+): string {
+  const firstIndex = new Map<string, number>();
+  for (const reference of references) {
+    if (!firstIndex.has(reference.key)) firstIndex.set(reference.key, reference.index);
+  }
+  return redactReferences(body, {
+    available: (reference) => resolutions.get(reference.key)?.status === "available",
+    redirect: (reference) => {
+      const index = firstIndex.get(reference.key);
+      return index === undefined ? undefined : redirectPath(index);
+    },
+  });
+}
+
+/** The reader path a reference leads to. */
+function referenceDestination(reference: ParsedReference): string {
+  return `${referenceTargetPath(reference.target)}${
+    reference.anchor === undefined ? "" : `#${encodeURIComponent(reference.anchor)}`
+  }`;
 }
 
 function rewriteProtectedLinkSources(
@@ -3718,13 +4032,6 @@ function convertRelated(
           Effect.map((id) => ({ documentId: id, relationship: item.relationship })),
         ),
       );
-}
-
-function rewriteRfcUrl(url: string): string | undefined {
-  const match = /(?:^|\/)rfc[-_/]?(\d+)(?:\.md)?(?:#(.*))?$/iu.exec(url);
-  return match?.[1] === undefined
-    ? url
-    : `${canonicalRfcPath(Number(match[1]))}${match[2] === undefined ? "" : `#${match[2]}`}`;
 }
 
 function toApplicationError(error: unknown): ApplicationError {

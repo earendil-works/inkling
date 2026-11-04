@@ -1,5 +1,8 @@
 import { Effect, Option } from "effect";
 
+import { collectReferences } from "@earendil-works/inkling-renderer";
+import type { DocumentResponse, ReferenceResolutionDto } from "@earendil-works/inkling-protocol";
+
 import { ApiError } from "./api.ts";
 import type { ApiClientService } from "./api.ts";
 import { accountPerson, collectFrontmatterVocabulary } from "./frontmatter-completion.ts";
@@ -272,9 +275,14 @@ function loadDocumentRoute(
       concurrency: "unbounded",
     },
   ).pipe(
+    Effect.flatMap(([document, authentication]) =>
+      resolveDocumentReferences(api, document).pipe(
+        Effect.map((references) => [document, authentication, references] as const),
+      ),
+    ),
     // The editor completes frontmatter from the whole catalog, but loads it
     // after it opens; the route only waits for what it shows first.
-    Effect.map(([document, authentication]): RouteModel => ({
+    Effect.map(([document, authentication, references]): RouteModel => ({
       account: authentication.authenticated ? authentication.principal : undefined,
       api,
       capabilityToken,
@@ -285,8 +293,29 @@ function loadDocumentRoute(
         accountPerson(authentication.principal),
       ),
       publicDocument: !authentication.authenticated && !shared,
+      references,
       screen,
       shared,
     })),
+  );
+}
+
+/**
+ * Resolves the references a document makes, so it first renders with their
+ * targets. When that fails, the document renders them pending and resolves
+ * them again once it shows.
+ */
+function resolveDocumentReferences(
+  api: ApiClientService,
+  document: DocumentResponse,
+): Effect.Effect<Readonly<Record<string, ReferenceResolutionDto>>> {
+  return collectReferences(document.body).pipe(
+    Effect.map((references) => [...new Set(references.map((reference) => reference.key))]),
+    Effect.flatMap((keys) =>
+      keys.length === 0
+        ? Effect.succeed({})
+        : api.resolveReferences(keys).pipe(Effect.map((response) => response.references)),
+    ),
+    Effect.orElseSucceed(() => ({})),
   );
 }

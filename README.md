@@ -65,6 +65,33 @@ readers through Google sign-in before redirecting. The parameter must occur exac
 once with the value `1`; ordinary parameters such as `require_auth=1` are passed
 through unchanged.
 
+### References
+
+Link to another RFC or note, or to one of its sections, with a reference
+instead of a URL. Inkling fills in the target's current title and, for RFCs, the
+section number:
+
+```markdown
+<rfc:57> → RFC 0057: Storage
+<rfc:57#motivation> → RFC 0057 §3.2 Motivation
+[](doc:doc_abc123#open-questions) → Meeting notes › Open questions
+[the motivation](rfc:57#motivation)
+[](#scope) → §2 Scope, within the same document
+```
+
+Links with their own text keep it and show the target on hover. RFC headings are
+numbered automatically, and section IDs are slugs of the heading text. Pin an ID
+with `## Heading {#id}` so renaming the heading keeps links to it working.
+Hovering a heading shows a `#` link that copies the section's URL, and pasting a
+link to a document or section of this workspace into the editor inserts a
+reference.
+
+References resolve for each reader. A reader sees the target's published
+revision when they may read it, otherwise its working draft. A reader who cannot
+open the target sees a placeholder such as “RFC 0057 (unavailable)”, and
+anonymous readers never receive the section ID. Signing in through the
+placeholder leads to the section.
+
 ## Finding documents
 
 Press `/` or <kbd>Cmd/Ctrl</kbd>+<kbd>K</kbd> from the workspace to focus

@@ -118,8 +118,10 @@ export function RouteView({ navigationKey, refresh, state }: RouteViewProps): Re
       return (
         <Suspense fallback={<LoadingScreen />}>
           <ReaderScreen
+            api={model.api}
             document={model.document}
             publicDocument={model.publicDocument}
+            references={model.references}
             shared={model.shared}
           />
         </Suspense>
@@ -134,6 +136,7 @@ export function RouteView({ navigationKey, refresh, state }: RouteViewProps): Re
             document={model.document}
             frontmatterVocabulary={model.frontmatterVocabulary}
             key={`${model.document.metadata.id}:${model.shared ? "shared" : "workspace"}`}
+            references={model.references}
             shared={model.shared}
           />
         </Suspense>

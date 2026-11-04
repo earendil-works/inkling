@@ -113,7 +113,10 @@ test("reader pages render the document and embed its data with the request's cre
   assert.ok(requests.length > 0);
   assert.ok(requests.every((request) => request.cookie === "inkling_session=session"));
   assert.match(html, /<title>Server &lt;\/script&gt; rendering<\/title>/u);
-  assert.match(html, /<h2 id="motivation"[^>]*>Motivation<\/h2>/u);
+  assert.match(
+    html,
+    /<h2 id="motivation"[^>]*><span class="inkling-section-number">1<\/span> Motivation <a class="inkling-heading-anchor" href="#motivation"/u,
+  );
   assert.match(html, /<strong>before<\/strong>/u);
   // Highlighted code is part of the page instead of loading after the script.
   assert.match(html, /class="[^"]*tok-/u);

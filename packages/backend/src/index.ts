@@ -320,6 +320,48 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
     ),
   );
 
+  app.get("/auth/reference/:documentId/:revision/:referenceIndex", (context) =>
+    execute(
+      context,
+      options,
+      (service) =>
+        Effect.all({
+          referenceIndex: positiveIntegerOrZero(
+            context.req.param("referenceIndex"),
+            "reference index",
+          ),
+          revision: positiveIntegerOrZero(context.req.param("revision"), "published revision"),
+        }).pipe(
+          Effect.flatMap(({ referenceIndex, revision }) =>
+            service.resolveReferenceLink(
+              credentials(context),
+              context.req.param("documentId"),
+              revision,
+              referenceIndex,
+            ),
+          ),
+        ),
+      (destination) => {
+        context.header("Cache-Control", "no-store");
+        context.header("Referrer-Policy", "no-referrer");
+        return context.redirect(destination, 302);
+      },
+      (error) => {
+        const requestCredentials = credentials(context);
+        if (
+          (error.status === 401 || error.status === 403) &&
+          requestCredentials.bearerToken === undefined
+        ) {
+          const next = new URL(context.req.url).pathname;
+          context.header("Cache-Control", "no-store");
+          context.header("Referrer-Policy", "no-referrer");
+          return context.redirect(`/api/auth/google/start?next=${encodeURIComponent(next)}`, 302);
+        }
+        return errorResponse(context, error);
+      },
+    ),
+  );
+
   app.post("/api/auth/logout", (context) =>
     execute(
       context,
@@ -341,6 +383,12 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
   app.get("/api/documents", (context) =>
     execute(context, options, (service) =>
       service.listDocuments(credentials(context), context.req.query("q") ?? ""),
+    ),
+  );
+
+  app.get("/api/references", (context) =>
+    execute(context, options, (service) =>
+      service.resolveReferences(credentials(context), context.req.queries("ref") ?? []),
     ),
   );
 
@@ -1276,6 +1324,7 @@ function publicDocumentHtml(document: {
   readonly headings: readonly {
     readonly depth: number;
     readonly id: string;
+    readonly number?: string | undefined;
     readonly text: string;
   }[];
   readonly html: string;
@@ -1291,7 +1340,7 @@ function publicDocumentHtml(document: {
   const toc = document.headings
     .map(
       (heading) =>
-        `<li class="depth-${heading.depth}"><a href="#${escapeHtml(heading.id)}">${escapeHtml(heading.text)}</a></li>`,
+        `<li class="depth-${heading.depth}"><a href="#${escapeHtml(encodeURIComponent(heading.id))}">${heading.number === undefined ? "" : `<span class="inkling-section-number">${escapeHtml(heading.number)}</span> `}${escapeHtml(heading.text)}</a></li>`,
     )
     .join("");
   const labels = metadata.labels

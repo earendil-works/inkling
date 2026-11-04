@@ -634,8 +634,9 @@ test(
       await first.locator("#delivery").evaluate((heading) => heading.scrollIntoView());
       await first.waitForFunction(
         () =>
-          document.querySelector('a[href="#delivery"]')?.getAttribute("aria-current") ===
-          "location",
+          document
+            .querySelector('[data-reader-toc] a[href="#delivery"]')
+            ?.getAttribute("aria-current") === "location",
       );
       assert.equal(await architectureTocLink.getAttribute("aria-current"), null);
       assert.equal(await deliveryTocLink.getAttribute("aria-current"), "location");
@@ -653,8 +654,9 @@ test(
       await first.waitForURL(/#architecture$/u);
       await first.waitForFunction(
         () =>
-          document.querySelector('a[href="#architecture"]')?.getAttribute("aria-current") ===
-          "location",
+          document
+            .querySelector('[data-reader-toc] a[href="#architecture"]')
+            ?.getAttribute("aria-current") === "location",
       );
       await first.goBack();
       await first.waitForURL(/#delivery$/u);
@@ -961,7 +963,7 @@ test(
         );
         const previewHeading = [
           ...document.querySelectorAll<HTMLElement>("[data-preview] h2"),
-        ].find((heading) => heading.textContent === "Architecture");
+        ].find((heading) => heading.id === "architecture");
         if (
           source === null ||
           preview === null ||
@@ -1439,7 +1441,7 @@ test(
         );
         const previewHeading = [
           ...document.querySelectorAll<HTMLElement>("[data-preview] h2"),
-        ].find((heading) => heading.textContent === "Wrapped source alignment");
+        ].find((heading) => heading.id === "wrapped-source-alignment");
         if (
           source === null ||
           preview === null ||

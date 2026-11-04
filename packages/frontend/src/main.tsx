@@ -2,6 +2,8 @@ import { createRoot, hydrateRoot } from "react-dom/client";
 import type { Root } from "react-dom/client";
 import { Effect, Either, Schema } from "effect";
 
+import { parseReference } from "@earendil-works/inkling-renderer";
+
 import { makeApiClient } from "./api.ts";
 import { App, routePath } from "./app.tsx";
 import { clientOnlyDigest } from "./components/route-view.tsx";
@@ -31,9 +33,19 @@ function mount(container: HTMLElement, initial: InitialRoute | undefined): Root 
     return created;
   }
   const markdown = new Map<string, MarkdownRenderResult>(
-    initial.markdown.map(({ frontmatter, headings, html, key, title }) => [
+    initial.markdown.map(({ frontmatter, headings, html, key, references, title }) => [
       key,
-      { frontmatter, headings, html, protectedLinks: [], title },
+      {
+        frontmatter,
+        headings,
+        html,
+        protectedLinks: [],
+        references: references.flatMap((source, index) => {
+          const reference = parseReference(source);
+          return reference === undefined ? [] : [{ ...reference, index, source }];
+        }),
+        title,
+      },
     ]),
   );
   return hydrateRoot(

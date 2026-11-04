@@ -784,6 +784,170 @@ test("search indexes working passages and published revisions", async () => {
   }
 });
 
+test("references resolve the sections each reader may open", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "inkling-references-"));
+  try {
+    await withServer(directory, async (baseUrl, session) => {
+      const authorization = await setupApiKey(baseUrl, "references", session);
+      const json = { ...authorization, "Content-Type": "application/json" };
+      const create = async (
+        title: string,
+        body: string,
+        allocateRfc: boolean,
+      ): Promise<DocumentWire> => {
+        const response = await fetch(`${baseUrl}/api/documents`, {
+          body: JSON.stringify({
+            allocateRfc,
+            body,
+            creationKey: title,
+            title,
+          }),
+          headers: json,
+          method: "POST",
+        });
+        assert.equal(response.status, 200);
+        return (await response.json()) as DocumentWire;
+      };
+      const makePublic = async (document: DocumentWire): Promise<void> => {
+        const response = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/edits`, {
+          body: JSON.stringify({
+            edits: [
+              {
+                newText: "visibility: public",
+                oldText: "visibility: private",
+              },
+            ],
+            expectedRevision: document.metadata.headRevision,
+          }),
+          headers: json,
+          method: "POST",
+        });
+        assert.equal(response.status, 200);
+      };
+      const publish = async (document: DocumentWire): Promise<number> => {
+        const response = await fetch(`${baseUrl}/api/documents/${document.metadata.id}/publish`, {
+          headers: authorization,
+          method: "POST",
+        });
+        assert.equal(response.status, 200);
+        return ((await response.json()) as DocumentWire["metadata"]).publishedRevision ?? -1;
+      };
+      const resolve = async (
+        headers: Readonly<Record<string, string>>,
+        keys: readonly string[],
+      ): Promise<Record<string, unknown>> => {
+        const query = keys.map((key) => `ref=${encodeURIComponent(key)}`).join("&");
+        const response = await fetch(`${baseUrl}/api/references?${query}`, {
+          headers,
+        });
+        assert.equal(response.status, 200);
+        return ((await response.json()) as { references: Record<string, unknown> }).references;
+      };
+
+      const storage = await create(
+        "Storage",
+        "## Summary\n\nShort.\n\n## Design\n\n### Motivation\n\nWhy.",
+        true,
+      );
+      await makePublic(storage);
+      await publish(storage);
+      const acquisition = await create("Acquisition", "## Secret plan\n\nHidden.", true);
+      await publish(acquisition);
+      const note = await create("Meeting", "## Hidden notes\n\nPrivate.", false);
+      const source = await create(
+        "Overview",
+        [
+          "## Context",
+          "",
+          "- <rfc:1#motivation>",
+          "- <rfc:2#secret-plan>",
+          `- [](doc:${note.metadata.id}#hidden-notes)`,
+          "- [](#context)",
+        ].join("\n"),
+        true,
+      );
+      await makePublic(source);
+      const sourceRevision = await publish(source);
+      const keys = [
+        "rfc:1#motivation",
+        "rfc:2#secret-plan",
+        `doc:${note.metadata.id}#hidden-notes`,
+      ];
+
+      assert.deepEqual(await resolve(authorization, keys), {
+        [`doc:${note.metadata.id}#hidden-notes`]: {
+          href: `/documents/${note.metadata.id}`,
+          section: { id: "hidden-notes", text: "Hidden notes" },
+          status: "available",
+          title: "Meeting",
+        },
+        "rfc:1#motivation": {
+          href: "/rfc/0001",
+          rfcNumber: 1,
+          section: { id: "motivation", number: "2.1", text: "Motivation" },
+          status: "available",
+          title: "Storage",
+        },
+        "rfc:2#secret-plan": {
+          href: "/rfc/0002",
+          rfcNumber: 2,
+          section: { id: "secret-plan", number: "1", text: "Secret plan" },
+          status: "available",
+          title: "Acquisition",
+        },
+      });
+      const anonymous = await resolve({}, keys);
+      assert.equal((anonymous["rfc:1#motivation"] as { status: string }).status, "available");
+      assert.deepEqual(anonymous["rfc:2#secret-plan"], {
+        status: "unavailable",
+      });
+      assert.deepEqual(anonymous[`doc:${note.metadata.id}#hidden-notes`], {
+        status: "unavailable",
+      });
+
+      const page = await fetch(`${baseUrl}/rfc/0003`);
+      assert.equal(page.status, 200);
+      const html = await page.text();
+      assert.match(html, /href="\/rfc\/0001#motivation"[^>]*>RFC 0001 §2\.1 Motivation<\/a>/u);
+      const redirect = `/auth/reference/${source.metadata.id}/${sourceRevision}/1`;
+      assert.match(html, new RegExp(`href="${redirect}"[^>]*>RFC 0002 \\(unavailable\\)</a>`, "u"));
+      assert.match(html, />Unavailable document<\/a>/u);
+      assert.match(html, /href="#context"[^>]*>§1 Context<\/a>/u);
+      assert.match(html, /<span class="inkling-section-number">1<\/span> Context/u);
+      assert.doesNotMatch(html, /secret-plan|hidden-notes|Acquisition|Meeting/u);
+
+      const anonymousBody = (
+        (await (
+          await fetch(`${baseUrl}/api/documents/${source.metadata.id}?published=true`)
+        ).json()) as DocumentWire
+      ).body;
+      assert.match(anonymousBody, /<rfc:1#motivation>/u);
+      assert.match(
+        anonymousBody,
+        new RegExp(`\\[RFC 0002 \\(unavailable\\)\\]\\(${redirect}\\)`, "u"),
+      );
+      assert.doesNotMatch(anonymousBody, /secret-plan|hidden-notes/u);
+
+      const signIn = await fetch(`${baseUrl}${redirect}`, {
+        redirect: "manual",
+      });
+      assert.equal(signIn.status, 302);
+      assert.equal(
+        signIn.headers.get("location"),
+        `/api/auth/google/start?next=${encodeURIComponent(redirect)}`,
+      );
+      const member = await fetch(`${baseUrl}${redirect}`, {
+        headers: { Cookie: session.cookieHeader },
+        redirect: "manual",
+      });
+      assert.equal(member.status, 302);
+      assert.equal(member.headers.get("location"), "/rfc/0002#secret-plan");
+    });
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
+});
+
 test("document history is available over HTTP and restores forward", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "inkling-history-"));
   try {

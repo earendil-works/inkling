@@ -12,6 +12,7 @@ import {
   DocumentResponseSchema,
   ProtocolErrorSchema,
   PublicDocumentResponseSchema,
+  ReferenceResolutionsResponseSchema,
   ShareLinksResponseSchema,
   ShareUnlockResponseSchema,
 } from "@earendil-works/inkling-protocol";
@@ -28,9 +29,21 @@ import type {
   DocumentMetadataDto,
   DocumentResponse,
   PublicDocumentResponse,
+  ReferenceResolutionsResponse,
   ShareLinksResponse,
   ShareUnlockResponse,
 } from "@earendil-works/inkling-protocol";
+
+/** References per request, which keeps request URLs short. */
+const referencesPerRequest = 50;
+
+function chunks<A>(values: readonly A[], size: number): readonly (readonly A[])[] {
+  const result: A[][] = [];
+  for (let index = 0; index < values.length; index += size) {
+    result.push(values.slice(index, index + size));
+  }
+  return result;
+}
 
 export class ApiError extends Data.TaggedError("ApiError")<{
   readonly code: string;
@@ -144,6 +157,10 @@ export interface ApiClientService {
   readonly publish: (documentId: string) => Effect.Effect<DocumentMetadataDto, ApiError>;
   readonly unpublish: (documentId: string) => Effect.Effect<DocumentMetadataDto, ApiError>;
   readonly readPublicRfc: (number: number) => Effect.Effect<PublicDocumentResponse, ApiError>;
+  /** Resolves `rfc:` and `doc:` reference keys for the current reader. */
+  readonly resolveReferences: (
+    references: readonly string[],
+  ) => Effect.Effect<ReferenceResolutionsResponse, ApiError>;
 }
 
 export const ApiClient = Context.GenericTag<ApiClientService>("@earendil-works/inkling/ApiClient");
@@ -382,6 +399,20 @@ export function makeApiClient(
         DocumentResponseSchema,
       ),
     readPublicRfc: (number) => request(`/api/public/rfc/${number}`, PublicDocumentResponseSchema),
+    resolveReferences: (references) =>
+      Effect.forEach(
+        chunks([...new Set(references)], referencesPerRequest),
+        (keys) =>
+          request(
+            `/api/references?${keys.map((key) => `ref=${encodeURIComponent(key)}`).join("&")}`,
+            ReferenceResolutionsResponseSchema,
+          ),
+        { concurrency: 4 },
+      ).pipe(
+        Effect.map((responses) => ({
+          references: Object.assign({}, ...responses.map((response) => response.references)),
+        })),
+      ),
     revealApiKey: (keyId) =>
       request(`/api/api-keys/${encodeURIComponent(keyId)}`, ApiKeyCreatedSchema),
     reply: (documentId, threadId, parentId, body, authorDisplayName) =>

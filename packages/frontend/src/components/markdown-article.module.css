@@ -157,6 +157,34 @@
   font-weight: var(--semantic-font-weight-ui-emphasis);
 }
 
+/* RFC section numbers lead their headings. */
+.body :global(.inkling-section-number) {
+  color: var(--semantic-color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Each heading links to itself; the link appears on hover and copies the section's link. */
+.body :global(.inkling-heading-anchor) {
+  color: var(--semantic-color-text-secondary);
+  opacity: 0;
+  text-decoration: none;
+}
+
+.body :where(h1, h2, h3, h4, h5, h6):hover :global(.inkling-heading-anchor),
+.body :global(.inkling-heading-anchor:focus-visible) {
+  opacity: 1;
+}
+
+/* References a reader cannot open, or whose section no longer exists. */
+.body :global(.inkling-reference[data-reference-status="unavailable"]) {
+  color: var(--semantic-color-text-secondary);
+}
+
+.body :global(.inkling-reference[data-reference-status="missing"]) {
+  text-decoration-color: var(--semantic-color-text-negative);
+  text-decoration-style: wavy;
+}
+
 .body :global(.inkling-mermaid) {
   position: relative;
   min-block-size: 12rem;
