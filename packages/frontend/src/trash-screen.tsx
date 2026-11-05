@@ -25,10 +25,16 @@ import workspaceStyles from "./workspace.module.css";
 
 export interface TrashScreenProps {
   readonly api: ApiClientService;
+  /** Administrators delete any document permanently; members only their personal ones. */
+  readonly canDeletePermanently: boolean;
   readonly initialCatalog: CatalogResponse;
 }
 
-export function TrashScreen({ api, initialCatalog }: TrashScreenProps): React.JSX.Element {
+export function TrashScreen({
+  api,
+  canDeletePermanently,
+  initialCatalog,
+}: TrashScreenProps): React.JSX.Element {
   const { showToast } = useAppContext();
   const { search } = useCurrentUrl();
   const formatDeletionDate = useHydrated() ? formatLocalDate : formatDate;
@@ -164,16 +170,18 @@ export function TrashScreen({ api, initialCatalog }: TrashScreenProps): React.JS
                         >
                           Restore
                         </Button>
-                        <Button
-                          data-hard-delete-document={metadata.id}
-                          density="compact"
-                          disabled={busy}
-                          hierarchy="tertiary"
-                          onClick={() => setPermanentCandidate(document)}
-                          semantic="negative"
-                        >
-                          Delete forever
-                        </Button>
+                        {canDeletePermanently || metadata.personalOwner !== undefined ? (
+                          <Button
+                            data-hard-delete-document={metadata.id}
+                            density="compact"
+                            disabled={busy}
+                            hierarchy="tertiary"
+                            onClick={() => setPermanentCandidate(document)}
+                            semantic="negative"
+                          >
+                            Delete forever
+                          </Button>
+                        ) : null}
                       </div>
                     </article>
                   );

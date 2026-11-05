@@ -1266,6 +1266,318 @@ test("documents move through Trash, restore, and permanent deletion", async () =
   }
 });
 
+test("personal documents stay hidden from everyone but their owner", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "inkling-personal-"));
+  try {
+    await withServer(directory, async (baseUrl, session, running) => {
+      const administrator = await setupApiKey(baseUrl, "administrator", session);
+      const ownerId = await Effect.runPromise(personId("owner@example.com"));
+      const ownerLogin = await running.runtime.runPromise(
+        Effect.flatMap(InklingApplication, (application) =>
+          application.loginWorkspaceIdentity({
+            displayName: "Personal Owner",
+            email: "owner@example.com",
+            personId: ownerId,
+            role: "member",
+          }),
+        ),
+      );
+      const owner = await setupApiKey(baseUrl, "owner", {
+        cookieHeader: `inkling_session=${ownerLogin.sessionToken}; inkling_csrf=${ownerLogin.csrfToken}`,
+        csrf: ownerLogin.csrfToken,
+      });
+      const create = (
+        headers: Readonly<Record<string, string>>,
+        request: Readonly<Record<string, unknown>>,
+      ): Promise<Response> =>
+        fetch(`${baseUrl}/api/documents`, {
+          body: JSON.stringify(request),
+          headers: { ...headers, "Content-Type": "application/json" },
+          method: "POST",
+        });
+      const catalogIds = async (
+        headers: Readonly<Record<string, string>>,
+        route: string,
+      ): Promise<readonly string[]> => {
+        const response = await fetch(`${baseUrl}${route}`, { headers });
+        assert.equal(response.status, 200);
+        return ((await response.json()) as { documents: readonly DocumentWire[] }).documents.map(
+          (document) => document.metadata.id,
+        );
+      };
+
+      const rejected = await create(owner, {
+        allocateRfc: true,
+        creationKey: "personal-rfc",
+        personal: true,
+        title: "Secret RFC",
+      });
+      assert.equal(rejected.status, 400);
+      assert.equal(((await rejected.json()) as { code: string }).code, "personal_rfc");
+
+      const createdResponse = await create(owner, {
+        body: "Thoughts about zephyrine pricing.",
+        creationKey: "personal-note",
+        personal: true,
+        title: "Private thoughts",
+      });
+      assert.equal(createdResponse.status, 200);
+      const created = (await createdResponse.json()) as DocumentWire;
+      const id = created.metadata.id;
+      assert.equal(created.metadata.personalOwner, "owner@example.com");
+
+      const readerView = await fetch(`${baseUrl}/api/documents/${id}?published=true`, {
+        headers: owner,
+      });
+      assert.match(((await readerView.json()) as DocumentWire).body, /zephyrine pricing/u);
+      assert.deepEqual(await catalogIds(owner, "/api/documents?q=zephyrine"), [id]);
+      assert.deepEqual(await catalogIds(owner, "/api/documents?q=is%3Apersonal"), [id]);
+      assert.deepEqual(await catalogIds(administrator, "/api/documents?q="), []);
+      assert.deepEqual(await catalogIds(administrator, "/api/documents?q=zephyrine"), []);
+      assert.deepEqual(await catalogIds(administrator, "/api/public/documents?q="), []);
+      const ownerPassages = await fetch(`${baseUrl}/api/search?q=zephyrine`, { headers: owner });
+      assert.equal(
+        ((await ownerPassages.json()) as { passages: readonly unknown[] }).passages.length,
+        1,
+      );
+      const hiddenPassages = await fetch(`${baseUrl}/api/search?q=zephyrine`, {
+        headers: administrator,
+      });
+      assert.deepEqual(
+        ((await hiddenPassages.json()) as { passages: readonly unknown[] }).passages,
+        [],
+      );
+      const reference = await fetch(
+        `${baseUrl}/api/references?ref=${encodeURIComponent(`doc:${id}`)}`,
+        { headers: administrator },
+      );
+      assert.deepEqual(
+        Object.values(
+          ((await reference.json()) as { references: Record<string, { status: string }> })
+            .references,
+        ).map((resolution) => resolution.status),
+        ["unavailable"],
+      );
+      const forbidden = await Promise.all(
+        (
+          [
+            ["GET", ""],
+            ["GET", "/history"],
+            ["GET", "/attachments"],
+            ["POST", "/publish"],
+            ["POST", `/workspace?expectedRevision=${created.metadata.headRevision}`],
+            ["DELETE", `?expectedRevision=${created.metadata.headRevision}`],
+          ] as const
+        ).map(async ([method, suffix]) => {
+          const response = await fetch(`${baseUrl}/api/documents/${id}${suffix}`, {
+            headers: administrator,
+            method,
+          });
+          return `${method} ${suffix}: ${response.status}`;
+        }),
+      );
+      assert.deepEqual(
+        forbidden,
+        forbidden.map((result) => result.replace(/\d+$/u, "403")),
+      );
+
+      assert.equal(
+        (await fetch(`${baseUrl}/api/documents/${id}/publish`, { headers: owner, method: "POST" }))
+          .status,
+        403,
+      );
+      const allocation = await fetch(`${baseUrl}/api/documents/${id}/rfc`, {
+        headers: owner,
+        method: "POST",
+      });
+      assert.equal(allocation.status, 409);
+
+      const current = await readDocument(baseUrl, id, owner);
+      const moved = await fetch(
+        `${baseUrl}/api/documents/${id}/workspace?expectedRevision=${current.metadata.headRevision}`,
+        { headers: owner, method: "POST" },
+      );
+      assert.equal(moved.status, 200);
+      assert.equal(((await moved.json()) as DocumentWire["metadata"]).personalOwner, undefined);
+      assert.deepEqual(await catalogIds(administrator, "/api/documents?q=zephyrine"), [id]);
+      assert.equal((await readDocument(baseUrl, id, administrator)).metadata.id, id);
+
+      const trashedResponse = await create(owner, {
+        creationKey: "personal-trash",
+        personal: true,
+        title: "Discarded thoughts",
+      });
+      const trashed = (await trashedResponse.json()) as DocumentWire;
+      const deleted = await fetch(
+        `${baseUrl}/api/documents/${trashed.metadata.id}?expectedRevision=${trashed.metadata.headRevision}`,
+        { headers: owner, method: "DELETE" },
+      );
+      assert.equal(deleted.status, 200);
+      assert.deepEqual(await catalogIds(owner, "/api/trash"), [trashed.metadata.id]);
+      assert.deepEqual(await catalogIds(administrator, "/api/trash"), []);
+      const inTrash = await readDocument(baseUrl, trashed.metadata.id, owner);
+      const purged = await fetch(
+        `${baseUrl}/api/documents/${trashed.metadata.id}/permanent?expectedRevision=${inTrash.metadata.headRevision}`,
+        { headers: owner, method: "DELETE" },
+      );
+      assert.equal(purged.status, 200);
+      assert.deepEqual(await catalogIds(owner, "/api/trash"), []);
+    });
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
+});
+
+test("personal documents are shared with named people and through links", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "inkling-personal-sharing-"));
+  try {
+    await withServer(directory, async (baseUrl, session, running) => {
+      const administrator = await setupApiKey(baseUrl, "administrator", session);
+      const signIn = async (email: string, displayName: string) => {
+        const id = await Effect.runPromise(personId(email));
+        const login = await running.runtime.runPromise(
+          Effect.flatMap(InklingApplication, (application) =>
+            application.loginWorkspaceIdentity({
+              displayName,
+              email,
+              personId: id,
+              role: "member",
+            }),
+          ),
+        );
+        return setupApiKey(baseUrl, email, {
+          cookieHeader: `inkling_session=${login.sessionToken}; inkling_csrf=${login.csrfToken}`,
+          csrf: login.csrfToken,
+        });
+      };
+      const owner = await signIn("owner@example.com", "Personal Owner");
+      const friend = await signIn("friend@example.com", "Trusted Friend");
+      const request = (
+        headers: Readonly<Record<string, string>>,
+        method: string,
+        route: string,
+        body?: unknown,
+      ): Promise<Response> =>
+        fetch(`${baseUrl}${route}`, {
+          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+          headers: { ...headers, "Content-Type": "application/json" },
+          method,
+        });
+      const head = async (id: string): Promise<number> =>
+        (await readDocument(baseUrl, id, owner)).metadata.headRevision;
+
+      const created = (await (
+        await request(owner, "POST", "/api/documents", {
+          body: "Draft for a few trusted readers.",
+          creationKey: "shared-personal",
+          personal: true,
+          title: "Shared draft",
+        })
+      ).json()) as DocumentWire;
+      const id = created.metadata.id;
+      const documentRoute = `/api/documents/${id}`;
+      assert.equal((await request(friend, "GET", documentRoute)).status, 403);
+
+      const people = await request(friend, "PUT", `${documentRoute}/people`, {
+        emails: ["friend@example.com"],
+        expectedRevision: await head(id),
+      });
+      assert.equal(people.status, 403);
+      const sharedResponse = await request(owner, "PUT", `${documentRoute}/people`, {
+        emails: ["Friend@Example.com", "owner@example.com"],
+        expectedRevision: await head(id),
+      });
+      assert.equal(sharedResponse.status, 200);
+      const shared = (await sharedResponse.json()) as DocumentWire["metadata"] & {
+        sharedWith?: readonly { email: string; displayName: string }[];
+      };
+      assert.deepEqual(
+        shared.sharedWith?.map((person) => [person.email, person.displayName]),
+        [["friend@example.com", "Trusted Friend"]],
+      );
+
+      const friendCatalog = await request(friend, "GET", "/api/documents?q=is%3Ashared");
+      assert.deepEqual(
+        ((await friendCatalog.json()) as { documents: readonly DocumentWire[] }).documents.map(
+          (document) => document.metadata.id,
+        ),
+        [id],
+      );
+      const edited = await request(friend, "POST", `${documentRoute}/edits`, {
+        edits: [{ newText: "trusted", oldText: "few trusted" }],
+        expectedRevision: await head(id),
+      });
+      assert.equal(edited.status, 200);
+      const denied = await Promise.all(
+        [
+          request(friend, "POST", `${documentRoute}/workspace?expectedRevision=${await head(id)}`),
+          request(friend, "DELETE", `${documentRoute}?expectedRevision=${await head(id)}`),
+          request(friend, "GET", `${documentRoute}/shares`),
+          request(administrator, "GET", documentRoute),
+        ].map(async (response) => (await response).status),
+      );
+      assert.deepEqual(denied, [403, 403, 403, 403]);
+
+      const linksResponse = await request(owner, "POST", `${documentRoute}/shares`, {
+        access: "comment",
+        expectedRevision: await head(id),
+      });
+      assert.equal(linksResponse.status, 200);
+      const links = (await linksResponse.json()) as { links: readonly { url?: string }[] };
+      const capability = new URL(links.links[0]?.url ?? "", baseUrl).searchParams.get("cap");
+      assert.ok(capability);
+      const withLink = `?cap=${encodeURIComponent(capability)}`;
+
+      const guestRead = await fetch(`${baseUrl}${documentRoute}${withLink}`);
+      assert.equal(guestRead.status, 200);
+      const linkedRead = await request(administrator, "GET", `${documentRoute}${withLink}`);
+      assert.equal(linkedRead.status, 200);
+      const commentResponse = await request(
+        administrator,
+        "POST",
+        `${documentRoute}/comments${withLink}`,
+        {
+          authorDisplayName: "Ignored guest name",
+          body: "Looks good",
+          selection: { end: 5, start: 0 },
+        },
+      );
+      assert.equal(commentResponse.status, 200);
+      const comments = (await commentResponse.json()) as {
+        threads: readonly {
+          messages: readonly { authorDisplayName: string; authorId: string }[];
+        }[];
+      };
+      assert.deepEqual(
+        comments.threads[0]?.messages.map((message) => [
+          message.authorId,
+          message.authorDisplayName,
+        ]),
+        [["admin@example.com", "Integration Admin"]],
+      );
+      const linkedEdit = await request(administrator, "POST", `${documentRoute}/edits${withLink}`, {
+        edits: [{ newText: "readers!", oldText: "readers." }],
+        expectedRevision: await head(id),
+      });
+      assert.equal(linkedEdit.status, 403);
+      assert.equal(
+        (await request(administrator, "GET", `/api/documents?q=${encodeURIComponent("is:shared")}`))
+          .status,
+        200,
+      );
+
+      const unshared = await request(owner, "PUT", `${documentRoute}/people`, {
+        emails: [],
+        expectedRevision: await head(id),
+      });
+      assert.equal(unshared.status, 200);
+      assert.equal((await request(friend, "GET", documentRoute)).status, 403);
+    });
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
+});
+
 test("backup corruption is rejected and a fresh installation restores portably", async () => {
   const sourceDirectory = await mkdtemp(path.join(tmpdir(), "inkling-backup-source-"));
   const targetDirectory = await mkdtemp(path.join(tmpdir(), "inkling-backup-target-"));
@@ -1355,6 +1667,7 @@ interface DocumentWire {
     readonly deletedAt?: string | undefined;
     readonly headRevision: number;
     readonly id: string;
+    readonly personalOwner?: string | undefined;
     readonly publishedRevision?: number | undefined;
     readonly rfcNumber?: number | undefined;
     readonly title: string;
@@ -1442,6 +1755,32 @@ test("agents read and write documents over MCP", { timeout: 30_000 }, async () =
         start_line: passages.structuredContent.passages[0]?.startLine,
       });
       assert.match(passageLines.structuredContent.body, /partitioned per tenant/u);
+
+      const personal = await call("create_document", {
+        body: "# Agent scratchpad\n\nOnly for me.\n",
+        personal: true,
+        title: "Agent scratchpad",
+      });
+      const personalId = personal.structuredContent.metadata.id as string;
+      assert.equal(personal.structuredContent.metadata.personalOwner, "admin@example.com");
+      const sharedPersonal = await call("share_personal_document", {
+        document: personalId,
+        people: ["Reviewer@Example.com"],
+      });
+      assert.deepEqual(
+        sharedPersonal.structuredContent.metadata.sharedWith.map(
+          (person: { email: string }) => person.email,
+        ),
+        ["reviewer@example.com"],
+      );
+      assert.match(sharedPersonal.content[0]?.text ?? "", /reviewer@example\.com/u);
+      const personalRead = await call("read_document", { document: personalId });
+      assert.match(personalRead.content[0]?.text ?? "", /shared with reviewer@example\.com/u);
+      const unsharedPersonal = await call("share_personal_document", {
+        document: personalId,
+        people: [],
+      });
+      assert.equal(unsharedPersonal.structuredContent.metadata.sharedWith, undefined);
 
       const commented = await call("add_comment", {
         body: "Which partition key?",

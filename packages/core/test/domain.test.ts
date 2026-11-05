@@ -46,6 +46,10 @@ import {
   emptyWorkspaceCatalog,
   hasPendingPublicationChanges,
   identifierTag,
+  isDocumentActionAllowed,
+  sharePersonalDocument,
+  documentActions,
+  moveToWorkspace,
   taggedId,
   tombstoneDocument,
   updateDocumentMetadata,
@@ -56,6 +60,8 @@ import type {
   CatalogSummary,
   CommentActor,
   DocumentMetadata,
+  PersonId,
+  PersonReference,
   Principal,
   WorkspaceCatalogState,
 } from "../src/index.ts";
@@ -69,6 +75,14 @@ const fakeTokenHasher = {
   verify: (token: string, hash: string) =>
     Effect.succeed(hash === `hashed:${token}` || hash === `legacy:${token}`),
 };
+
+function person(id: PersonId, email: string): PersonReference {
+  return { displayName: email, email, id };
+}
+
+function summaryIds(summaries: readonly CatalogSummary[]): readonly string[] {
+  return summaries.map((summary) => summary.documentId).toSorted();
+}
 
 function catalogSummary(metadata: DocumentMetadata, body: string): CatalogSummary {
   return {
@@ -516,6 +530,260 @@ test("deleted documents remain restorable for 30 days before permanent deletion"
     }).pipe(Effect.either),
   );
   assert.equal(Either.isLeft(reusedNumber) && reusedNumber.left.code, "duplicate_rfc_number");
+});
+
+test("personal documents are invisible to everyone but their owner until moved", async () => {
+  const ownerId = await Effect.runPromise(personId("owner@example.com"));
+  const administratorId = await Effect.runPromise(personId("admin@example.com"));
+  const memberId = await Effect.runPromise(personId("member@example.com"));
+  const owner: Principal = { kind: "workspace", personId: ownerId, role: "member" };
+  const ownerKey: Principal = {
+    keyId: "key_owner",
+    kind: "api-key",
+    personId: ownerId,
+    role: "member",
+  };
+  const administrator: Principal = {
+    kind: "workspace",
+    personId: administratorId,
+    role: "administrator",
+  };
+  const member: Principal = { kind: "workspace", personId: memberId, role: "member" };
+  const system: Principal = {
+    kind: "workspace",
+    personId: administratorId,
+    role: "administrator",
+    system: true,
+  };
+  const capability: Principal = {
+    access: "edit",
+    documentId: "document_personal1",
+    generation: 0,
+    kind: "capability",
+  };
+  const personal = await Effect.runPromise(
+    createDocumentMetadata(
+      { id: "document_personal1", personalOwner: ownerId, title: "Private thoughts" },
+      now,
+    ),
+  );
+  const allowed = (principal: Principal, metadata: DocumentMetadata): readonly string[] =>
+    documentActions.filter((action) => isDocumentActionAllowed(principal, action, metadata, now));
+
+  for (const outsider of [administrator, member, capability, { kind: "anonymous" } as const]) {
+    assert.deepEqual(allowed(outsider, personal), []);
+  }
+  const ownerActions = [
+    "discover",
+    "read-working",
+    "read-history",
+    "comment",
+    "edit-body",
+    "edit-metadata",
+    "manage-comments",
+    "manage-sharing",
+    "delete",
+    "restore",
+    "restore-history",
+    "move-to-workspace",
+  ];
+  assert.deepEqual(allowed(owner, personal), ownerActions);
+  assert.deepEqual(allowed(ownerKey, personal), ownerActions);
+  assert.equal(isDocumentActionAllowed(system, "read-working", personal, now), true);
+
+  const trashed = await Effect.runPromise(markDeleted(personal, personal.headRevision, now));
+  assert.deepEqual(allowed(administrator, trashed), []);
+  assert.equal(isDocumentActionAllowed(owner, "restore", trashed, now), true);
+  assert.equal(isDocumentActionAllowed(owner, "hard-delete", trashed, now), true);
+  assert.equal(isDocumentActionAllowed(owner, "move-to-workspace", trashed, now), false);
+
+  const numbered = await Effect.runPromise(assignRfcNumber(personal, 12, now).pipe(Effect.either));
+  assert.equal(Either.isLeft(numbered) && numbered.left.code, "personal_rfc");
+  const createdAsRfc = await Effect.runPromise(
+    createDocumentMetadata(
+      { id: "document_personal2", personalOwner: ownerId, rfcNumber: 3, title: "RFC" },
+      now,
+    ).pipe(Effect.either),
+  );
+  assert.equal(Either.isLeft(createdAsRfc) && createdAsRfc.left.code, "personal_rfc");
+
+  const stale = await Effect.runPromise(
+    moveToWorkspace(personal, personal.headRevision + 1, now).pipe(Effect.either),
+  );
+  assert.equal(Either.isLeft(stale) && stale.left.code, "revision_conflict");
+  const shared = await Effect.runPromise(moveToWorkspace(personal, personal.headRevision, now));
+  assert.equal("personalOwner" in shared, false);
+  assert.equal(shared.headRevision, personal.headRevision + 1);
+  assert.equal(isDocumentActionAllowed(member, "edit-body", shared, now), true);
+  assert.equal(isDocumentActionAllowed(administrator, "publish", shared, now), true);
+  assert.equal(isDocumentActionAllowed(owner, "move-to-workspace", shared, now), false);
+  const again = await Effect.runPromise(
+    moveToWorkspace(shared, shared.headRevision, now).pipe(Effect.either),
+  );
+  assert.equal(Either.isLeft(again) && again.left.code, "document_not_personal");
+
+  const workspaceNote = await Effect.runPromise(
+    createDocumentMetadata({ id: "document_workspace1", title: "Shared note" }, now),
+  );
+  const catalog = await Effect.runPromise(
+    Effect.reduce([personal, workspaceNote], emptyWorkspaceCatalog(), (current, metadata) =>
+      reserveDocument(current, {
+        allocateRfc: false,
+        creationKey: metadata.id,
+        documentId: metadata.id,
+      }).pipe(
+        Effect.flatMap((reserved) => activateDocument(reserved.state, metadata.id)),
+        Effect.flatMap((active) =>
+          applyCatalogSummary(active, catalogSummary(metadata, metadata.title)),
+        ),
+      ),
+    ),
+  );
+  const visibleTo =
+    (principal: Principal) =>
+    (summary: CatalogSummary): boolean =>
+      summary.metadata === undefined ||
+      isDocumentActionAllowed(principal, "discover", summary.metadata, now);
+  assert.deepEqual(summaryIds(searchCatalog(catalog, "", { visible: visibleTo(member) })), [
+    workspaceNote.id,
+  ]);
+  assert.deepEqual(summaryIds(searchCatalog(catalog, "", { visible: visibleTo(owner) })), [
+    personal.id,
+    workspaceNote.id,
+  ]);
+  assert.deepEqual(
+    summaryIds(
+      searchCatalog(catalog, "is:personal", {
+        currentPersonId: ownerId,
+        visible: visibleTo(owner),
+      }),
+    ),
+    [personal.id],
+  );
+  assert.deepEqual(
+    summaryIds(filterCatalog(catalog, parseCatalogSearchQuery(""), { visible: visibleTo(member) })),
+    [workspaceNote.id],
+  );
+});
+
+test("personal documents open to the people and links their owner shares them with", async () => {
+  const ownerId = await Effect.runPromise(personId("owner@example.com"));
+  const collaboratorId = await Effect.runPromise(personId("friend@example.com"));
+  const administratorId = await Effect.runPromise(personId("admin@example.com"));
+  const owner: Principal = { kind: "workspace", personId: ownerId, role: "member" };
+  const collaborator: Principal = { kind: "workspace", personId: collaboratorId, role: "member" };
+  const administrator: Principal = {
+    kind: "workspace",
+    personId: administratorId,
+    role: "administrator",
+  };
+  const created = await Effect.runPromise(
+    createDocumentMetadata(
+      { id: "document_shared01", personalOwner: ownerId, title: "Shared thoughts" },
+      now,
+    ),
+  );
+  const allowed = (principal: Principal, metadata: DocumentMetadata): readonly string[] =>
+    documentActions.filter((action) => isDocumentActionAllowed(principal, action, metadata, now));
+
+  const notPersonal = await Effect.runPromise(
+    sharePersonalDocument(
+      { ...created, personalOwner: undefined },
+      [person(collaboratorId, "friend@example.com")],
+      created.headRevision,
+      now,
+    ).pipe(Effect.either),
+  );
+  assert.equal(Either.isLeft(notPersonal) && notPersonal.left.code, "document_not_personal");
+
+  const shared = await Effect.runPromise(
+    sharePersonalDocument(
+      created,
+      [
+        person(collaboratorId, "friend@example.com"),
+        person(collaboratorId, "friend@example.com"),
+        person(ownerId, "owner@example.com"),
+      ],
+      created.headRevision,
+      now,
+    ),
+  );
+  assert.deepEqual(
+    shared.sharedWith?.map((entry) => entry.id),
+    [collaboratorId],
+  );
+  assert.deepEqual(allowed(collaborator, shared), [
+    "discover",
+    "read-working",
+    "read-history",
+    "comment",
+    "edit-body",
+    "edit-metadata",
+    "restore-history",
+  ]);
+  assert.deepEqual(allowed(administrator, shared), []);
+  const trashed = await Effect.runPromise(markDeleted(shared, shared.headRevision, now));
+  assert.deepEqual(allowed(collaborator, trashed), []);
+
+  const unshared = await Effect.runPromise(
+    sharePersonalDocument(shared, [], shared.headRevision, now),
+  );
+  assert.equal("sharedWith" in unshared, false);
+  assert.deepEqual(allowed(collaborator, unshared), []);
+
+  const linked = await Effect.runPromise(
+    updateSharingPolicy(unshared, "comment", unshared.headRevision, now),
+  );
+  const grant = {
+    access: "comment" as const,
+    documentId: linked.id,
+    generation: linked.sharing.generation,
+  };
+  const signedInWithLink: Principal = { ...administrator, capability: grant };
+  assert.deepEqual(allowed(signedInWithLink, linked), ["discover", "read-working", "comment"]);
+  assert.deepEqual(allowed({ ...grant, kind: "capability" }, linked), [
+    "discover",
+    "read-working",
+    "comment",
+  ]);
+  assert.deepEqual(
+    allowed({ ...administrator, capability: { ...grant, documentId: "document_other01" } }, linked),
+    [],
+  );
+  const revoked = await Effect.runPromise(
+    updateSharingPolicy(linked, "disabled", linked.headRevision, now),
+  );
+  assert.deepEqual(allowed(signedInWithLink, revoked), []);
+  const workspaceDocument = await Effect.runPromise(
+    moveToWorkspace(shared, shared.headRevision, now),
+  );
+  assert.equal("sharedWith" in workspaceDocument, false);
+
+  const reserved = await Effect.runPromise(
+    reserveDocument(emptyWorkspaceCatalog(), {
+      allocateRfc: false,
+      creationKey: shared.id,
+      documentId: shared.id,
+    }),
+  );
+  const active = await Effect.runPromise(activateDocument(reserved.state, shared.id));
+  const catalog = await Effect.runPromise(
+    applyCatalogSummary(active, catalogSummary(shared, shared.title)),
+  );
+  const search = (query: string, principal: Principal, reader: PersonId): readonly string[] =>
+    summaryIds(
+      searchCatalog(catalog, query, {
+        currentPersonId: reader,
+        visible: (summary) =>
+          summary.metadata !== undefined &&
+          isDocumentActionAllowed(principal, "discover", summary.metadata, now),
+      }),
+    );
+  assert.deepEqual(search("is:shared", collaborator, collaboratorId), [shared.id]);
+  assert.deepEqual(search("is:personal", collaborator, collaboratorId), []);
+  assert.deepEqual(search("is:shared", owner, ownerId), []);
+  assert.deepEqual(search("is:personal", owner, ownerId), [shared.id]);
+  assert.deepEqual(search("", administrator, administratorId), []);
 });
 
 test("capability generations revoke existing principals", async () => {

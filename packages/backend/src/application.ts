@@ -32,6 +32,7 @@ import type {
   ResolutionRequest,
   SearchRebuildResponse,
   ShareLinkCreateRequest,
+  SharePeopleRequest,
   ShareLinksResponse,
   ShareUnlockResponse,
   ServerCollaborationMessage,
@@ -296,6 +297,18 @@ export interface InklingApplicationService {
     documentId: string,
     expectedRevision: number,
   ) => Effect.Effect<void, ApplicationError>;
+  /** Replaces the people the owner's personal document is shared with. */
+  readonly sharePersonalDocument: (
+    credentials: RequestCredentials,
+    documentId: string,
+    request: SharePeopleRequest,
+  ) => Effect.Effect<DocumentMetadataDto, ApplicationError>;
+  /** Makes the owner's personal document visible to the whole workspace. */
+  readonly moveToWorkspace: (
+    credentials: RequestCredentials,
+    documentId: string,
+    expectedRevision: number,
+  ) => Effect.Effect<DocumentMetadataDto, ApplicationError>;
   readonly listShareLinks: (
     credentials: RequestCredentials,
     documentId: string,

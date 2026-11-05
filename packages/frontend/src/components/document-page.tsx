@@ -7,7 +7,7 @@ import type { RenderHeading } from "@earendil-works/inkling-renderer";
 
 import { documentFolio, formatDate } from "../ui.ts";
 import { DocumentTableOfContents } from "./document-table-of-contents.tsx";
-import { Chip, LifecycleStateChip, VisibilityChip } from "./chip.tsx";
+import { AudienceChip, Chip, LifecycleStateChip } from "./chip.tsx";
 import styles from "./reader.module.css";
 
 export interface DocumentPageProps {
@@ -44,10 +44,7 @@ export function DocumentPage({
               href={`/?q=${encodeURIComponent(`state:${metadata.lifecycleState}`)}`}
               state={metadata.lifecycleState}
             />
-            <VisibilityChip
-              href={`/?q=${encodeURIComponent(`visibility:${metadata.visibility}`)}`}
-              visibility={metadata.visibility}
-            />
+            <AudienceChip linked metadata={metadata} />
           </div>
           <Heading className={styles["title"]} level={1} size={presentation === "preview" ? 2 : 1}>
             {metadata.title}
@@ -80,6 +77,22 @@ function DocumentMetadata({
 }): React.JSX.Element {
   return (
     <KeyValue.Grid className={styles["metadata"]} data-document-metadata="">
+      {metadata.personalOwner === undefined ? null : (
+        <>
+          <KeyValue.Key>Owner</KeyValue.Key>
+          <KeyValue.Value data-document-owner="">
+            <PeopleList people={[personalOwner(metadata)]} />
+          </KeyValue.Value>
+        </>
+      )}
+      {metadata.sharedWith === undefined || metadata.sharedWith.length === 0 ? null : (
+        <>
+          <KeyValue.Key>Shared with</KeyValue.Key>
+          <KeyValue.Value data-document-shared-with="">
+            <PeopleList people={metadata.sharedWith} />
+          </KeyValue.Value>
+        </>
+      )}
       <KeyValue.Key>Authors</KeyValue.Key>
       <KeyValue.Value>
         {metadata.authors.length === 0 ? (
@@ -123,6 +136,16 @@ function DocumentMetadata({
         </>
       )}
     </KeyValue.Grid>
+  );
+}
+
+/** The owner of a personal document, named as its authors name them when they do. */
+function personalOwner(metadata: DocumentMetadataDto): DocumentMetadataDto["authors"][number] {
+  const id = metadata.personalOwner ?? "";
+  return (
+    [...metadata.authors, ...metadata.reviewers, ...metadata.approvers].find(
+      (person) => person.id === id,
+    ) ?? { displayName: id, email: id, id }
   );
 }
 

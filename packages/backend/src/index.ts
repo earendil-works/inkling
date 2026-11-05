@@ -18,6 +18,7 @@ import {
   RestoreHistoryRequestSchema,
   ResolutionRequestSchema,
   ShareLinkCreateRequestSchema,
+  SharePeopleRequestSchema,
   ShareUnlockRequestSchema,
 } from "@earendil-works/inkling-protocol";
 import { identifierTag, taggedId, uuidV7Bytes } from "@earendil-works/inkling-core";
@@ -596,6 +597,34 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
       mutation(context, requiredRevision(context)).pipe(
         Effect.flatMap((expectedRevision) =>
           service.restoreDocument(
+            credentials(context),
+            context.req.param("documentId"),
+            expectedRevision,
+          ),
+        ),
+      ),
+    ),
+  );
+
+  app.put("/api/documents/:documentId/people", (context) =>
+    execute(context, options, (service) =>
+      mutation(context, readJson(context, SharePeopleRequestSchema)).pipe(
+        Effect.flatMap((request) =>
+          service.sharePersonalDocument(
+            credentials(context),
+            context.req.param("documentId"),
+            request,
+          ),
+        ),
+      ),
+    ),
+  );
+
+  app.post("/api/documents/:documentId/workspace", (context) =>
+    execute(context, options, (service) =>
+      mutation(context, requiredRevision(context)).pipe(
+        Effect.flatMap((expectedRevision) =>
+          service.moveToWorkspace(
             credentials(context),
             context.req.param("documentId"),
             expectedRevision,

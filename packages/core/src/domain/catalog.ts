@@ -76,6 +76,11 @@ export interface RfcAllocation {
 export type CatalogBodyMatches = ReadonlyMap<string, ReadonlySet<DocumentId>>;
 
 export interface CatalogSearchOptions {
+  /**
+   * Keeps only summaries the reader may see, before ranking and limits apply,
+   * so documents hidden from the reader never displace visible ones.
+   */
+  readonly visible?: ((summary: CatalogSummary) => boolean) | undefined;
   readonly bodyMatches?: CatalogBodyMatches | undefined;
   readonly currentPersonId?: PersonId | undefined;
   readonly includeDeleted?: boolean | undefined;
@@ -285,10 +290,13 @@ export function searchCatalog(
         : options.includeDeleted === true || entry.status === "active",
     )
     .flatMap((entry) => (entry.summary === undefined ? [] : [entry.summary]))
+    .filter((summary) => options.visible === undefined || options.visible(summary))
     .filter(
       (summary) =>
         options.publicOnly !== true ||
-        (summary.visibility === "public" && summary.publishedRevision !== undefined),
+        (summary.visibility === "public" &&
+          summary.publishedRevision !== undefined &&
+          summary.metadata?.personalOwner === undefined),
     )
     .flatMap((summary) => {
       const score = scoreSummary(summary, parsed, state.people, options);
@@ -315,12 +323,13 @@ export function searchCatalog(
 export function filterCatalog(
   state: WorkspaceCatalogState,
   query: CatalogSearchQuery,
-  options: Pick<CatalogSearchOptions, "currentPersonId"> = {},
+  options: Pick<CatalogSearchOptions, "currentPersonId" | "visible"> = {},
 ): readonly CatalogSummary[] {
   const filters = query.terms.filter((term) => term.field !== undefined);
   return state.entries.flatMap((entry) => {
     const summary = entry.summary;
     if (entry.status !== "active" || summary === undefined) return [];
+    if (options.visible !== undefined && !options.visible(summary)) return [];
     if (filters.length === 0) return [summary];
     const indexed = indexSummary(summary, state.people);
     return filters.every((term) => {
@@ -586,6 +595,17 @@ function matchesSearchFilter(
           return summary.visibility === "public";
         case "private":
           return summary.visibility === "private";
+        // Personal documents of the reader, and those others shared with them.
+        case "personal":
+          return (
+            summary.metadata?.personalOwner !== undefined &&
+            summary.metadata.personalOwner === currentPersonId
+          );
+        case "shared":
+          return (
+            summary.metadata?.personalOwner !== undefined &&
+            summary.metadata.personalOwner !== currentPersonId
+          );
         default:
           return false;
       }

@@ -221,7 +221,10 @@ test("advertised tool schemas agree with the argument decoders", async () => {
       tool.name,
     );
   }
-  assert.ok(!listed.some((tool) => /hard|permanent|share|api_key/u.test(tool.name)));
+  // Agents may share personal documents with named workspace people, but never
+  // mint share links, purge documents, or manage credentials.
+  assert.ok(listed.some((tool) => tool.name === "share_personal_document"));
+  assert.ok(!listed.some((tool) => /hard|permanent|link|api_key/u.test(tool.name)));
 });
 
 test("document references accept IDs, RFC numbers, and workspace URLs", () => {

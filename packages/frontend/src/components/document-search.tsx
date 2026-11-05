@@ -21,7 +21,7 @@ const operators: readonly { readonly description: string; readonly token: string
   { description: "Filter by lifecycle state", token: "state:" },
   { description: "Find an author or email", token: "author:" },
   { description: "Jump to an RFC number", token: "rfc:" },
-  { description: "RFCs, notes, or publications", token: "is:" },
+  { description: "RFCs, notes, publications, or personal and shared documents", token: "is:" },
   { description: "Public, private, or confidential documents", token: "visibility:" },
 ];
 
@@ -271,7 +271,17 @@ function searchCompletions(query: string, catalog: CatalogResponse): readonly Se
             : [formatRfcNumber(document.metadata.rfcNumber)],
         );
       case "is":
-        return ["rfc", "note", "published", "unpublished", "public", "private", "confidential"];
+        return [
+          "rfc",
+          "note",
+          "personal",
+          "shared",
+          "published",
+          "unpublished",
+          "public",
+          "private",
+          "confidential",
+        ];
       case "has":
         return ["rfc", "publication"];
       default:

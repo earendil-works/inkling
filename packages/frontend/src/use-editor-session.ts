@@ -182,7 +182,7 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
         documentId,
         yDocument,
         capabilityToken,
-        shared ? displayName : undefined,
+        shared && identityId === undefined ? displayName : undefined,
         {
           onComments: (comments) => callbacksRef.current.onComments(comments),
           onError: (message) => callbacksRef.current.onError(message),

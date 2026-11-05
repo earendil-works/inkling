@@ -31,6 +31,21 @@ and have canonical routes such as `/rfc/0042`. Notes are more informal and
 always have their own internal document IDs as URL. They are for meeting notes
 and other throwaway documents that do not need to live forever.
 
+### Personal documents
+
+A note can be created as personal. Only its creator can find, open, or edit a
+personal document; nobody else in the workspace, administrators included, sees
+it in the catalog, in search, through references, or in Trash.
+
+Its owner can share it with named people by email and through share links.
+People it is shared with find it under “Shared with me” (`is:shared`) and can
+read, comment on, and edit it, but cannot share it further, trash it, or move
+it. Signed-in people who open a share link appear as themselves rather than as
+guests. Personal documents cannot be published or numbered as RFCs. When it is
+ready, its owner moves it to the workspace, which makes it an ordinary
+workspace document. That move cannot be undone. Workspace backups still
+contain personal documents.
+
 The first top-level Markdown heading is the document title. Publication
 metadata lives in YAML frontmatter at the beginning of the collaborative source:
 
@@ -109,6 +124,7 @@ Search supports Gmail-style filters:
 | People          | `author:name@example.com`, `reviewer:alex`, `approver:sam`, or `person:lee` |
 | RFC number      | `rfc:42`                                                                    |
 | Document kind   | `is:rfc`, `is:note`, `is:published`, or `is:unpublished`                    |
+| Personal        | `is:personal` (yours) or `is:shared` (shared with you)                      |
 | Presence        | `has:rfc` or `has:publication`                                              |
 
 ## Working With Agents

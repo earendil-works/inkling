@@ -223,7 +223,7 @@ const searchDocuments = defineTool({
   }),
   description: `List or search documents in the workspace. Without a query, lists recently updated documents.
 
-Plain terms search titles, RFC numbers, labels, states, and people by substring and working-draft bodies by word prefix; terms are combined with AND. Quote phrases and prefix a term with - to exclude it. To find the sections that discuss something, use search_passages instead. Filters: label:platform, state:discussion, visibility:public|private|confidential, author:email, reviewer:name, approver:name, person:name, rfc:42, is:rfc, is:note, is:published, is:unpublished, has:publication.`,
+Plain terms search titles, RFC numbers, labels, states, and people by substring and working-draft bodies by word prefix; terms are combined with AND. Quote phrases and prefix a term with - to exclude it. To find the sections that discuss something, use search_passages instead. Filters: label:platform, state:discussion, visibility:public|private|confidential, author:email, reviewer:name, approver:name, person:name, rfc:42, is:rfc, is:note, is:personal (the user's own personal documents), is:shared (personal documents others shared with the user), is:published, is:unpublished, has:publication.`,
   idempotent: true,
   name: "search_documents",
   properties: {
@@ -303,7 +303,7 @@ Write natural-language questions or keywords; documents matching more of the ter
 const listTrash = defineTool({
   arguments: Schema.Struct({}),
   description:
-    "List documents in Trash. Deleted documents stay restorable for 30 days. Requires a workspace administrator.",
+    "List documents in Trash. Deleted documents stay restorable for 30 days. Administrators see every workspace document; everyone sees their own personal documents.",
   idempotent: true,
   name: "list_trash",
   properties: {},
@@ -428,22 +428,27 @@ const listDocumentHistory = defineTool({
 const createDocument = defineTool({
   arguments: Schema.Struct({
     body: Schema.optional(Schema.String),
+    personal: Schema.optional(Schema.Boolean),
     rfc: Schema.optional(Schema.Boolean),
     title: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(300)),
   }),
   description: `Create a note or a numbered RFC. The working draft is private to the workspace until it is published.
 
-Inkling adds frontmatter and a top-level heading from the title when the body has none. Only set rfc when the user wants a numbered RFC: RFC numbers are permanent and never reused.`,
+Inkling adds frontmatter and a top-level heading from the title when the body has none. Only set rfc when the user wants a numbered RFC: RFC numbers are permanent and never reused. Set personal for a note only the user can see, such as private notes or early drafts; nobody else in the workspace, administrators included, can find or open it unless the user shares it with share_personal_document or moves it with move_to_workspace. Personal documents cannot be RFCs.`,
   idempotent: false,
   name: "create_document",
   properties: {
     body: { description: "Initial Markdown body.", type: "string" },
+    personal: {
+      description: "Keep the document visible only to the user.",
+      type: "boolean",
+    },
     rfc: { description: "Allocate the next RFC number.", type: "boolean" },
     title: { maxLength: 300, minLength: 1, type: "string" },
   },
   required: ["title"],
   risk: "write",
-  run: ({ body, rfc = false, title }, api) =>
+  run: ({ body, personal = false, rfc = false, title }, api) =>
     Effect.gen(function* () {
       const creationKey = yield* Effect.sync(() =>
         taggedId(
@@ -455,6 +460,7 @@ Inkling adds frontmatter and a top-level heading from the title when the body ha
         allocateRfc: rfc,
         ...(body === undefined ? {} : { body }),
         creationKey,
+        ...(personal ? { personal } : {}),
         title,
       });
       return mutationOutput(api, created.metadata, `Created ${describe(created.metadata)}.`);
@@ -949,7 +955,7 @@ const deleteDocument = defineTool({
     expected_revision: Schema.optional(Revision),
   }),
   description:
-    "Move a document to Trash. Administrators can restore it with restore_document for 30 days, after which it is permanently deleted. Only do this when the user asks.",
+    "Move a document to Trash. It can be restored with restore_document for 30 days, after which it is permanently deleted; administrators restore workspace documents and owners their personal ones. Only do this when the user asks.",
   idempotent: true,
   name: "delete_document",
   properties: {
@@ -982,7 +988,8 @@ const deleteDocument = defineTool({
 
 const restoreDocument = defineTool({
   arguments: Schema.Struct({ document: DocumentReference }),
-  description: "Restore a document from Trash. Requires a workspace administrator.",
+  description:
+    "Restore a document from Trash. Requires a workspace administrator, except for the user's own personal documents.",
   idempotent: true,
   name: "restore_document",
   properties: {
@@ -1016,6 +1023,89 @@ const restoreDocument = defineTool({
   title: "Restore document",
 });
 
+const sharePersonalDocument = defineTool({
+  arguments: Schema.Struct({
+    document: DocumentReference,
+    expected_revision: Schema.optional(Revision),
+    people: Schema.Array(Schema.String.pipe(Schema.minLength(3), Schema.maxLength(320))).pipe(
+      Schema.maxItems(100),
+    ),
+  }),
+  description:
+    "Set who one of the user's personal documents is shared with, by workspace email address. The list replaces the current one, so include everyone who should keep access; an empty list unshares it. People it is shared with can find, read, comment on, and edit it, but cannot share it further. Share links are managed in Inkling itself. Only do this when the user asks.",
+  idempotent: true,
+  name: "share_personal_document",
+  properties: {
+    document: documentProperty,
+    expected_revision: expectedRevisionProperty(
+      "Fails if anything changed since; defaults to the current head.",
+    ),
+    people: {
+      description: "Email addresses of everyone the document should be shared with.",
+      items: { maxLength: 320, minLength: 3, type: "string" },
+      maxItems: 100,
+      type: "array",
+    },
+  },
+  required: ["document", "people"],
+  risk: "write",
+  run: ({ document, expected_revision, people }, api) =>
+    Effect.gen(function* () {
+      const documentId = yield* resolveDocumentId(api, document);
+      const metadata = yield* api.request(
+        "PUT",
+        documentPath(documentId, "/people"),
+        DocumentMetadataSchema,
+        {
+          emails: people,
+          expectedRevision: expected_revision ?? (yield* headRevision(api, documentId)),
+        },
+      );
+      const shared = metadata.sharedWith ?? [];
+      return mutationOutput(
+        api,
+        metadata,
+        shared.length === 0
+          ? `${describe(metadata)} is no longer shared with anyone.`
+          : `Shared ${describe(metadata)} with ${shared.map((person) => person.email).join(", ")}.`,
+      );
+    }),
+  title: "Share personal document",
+});
+
+const moveToWorkspace = defineTool({
+  arguments: Schema.Struct({
+    document: DocumentReference,
+    expected_revision: Schema.optional(Revision),
+  }),
+  description:
+    "Move one of the user's personal documents to the workspace, so everyone in the workspace can find, read, and edit it. This cannot be undone: documents never become personal again. Only do this when the user asks.",
+  idempotent: false,
+  name: "move_to_workspace",
+  properties: {
+    document: documentProperty,
+    expected_revision: expectedRevisionProperty(
+      "Fails if anything changed since; defaults to the current head.",
+    ),
+  },
+  required: ["document"],
+  risk: "write",
+  run: ({ document, expected_revision }, api) =>
+    Effect.gen(function* () {
+      const documentId = yield* resolveDocumentId(api, document);
+      const metadata = yield* api.request(
+        "POST",
+        documentPath(
+          documentId,
+          `/workspace?expectedRevision=${expected_revision ?? (yield* headRevision(api, documentId))}`,
+        ),
+        DocumentMetadataSchema,
+      );
+      return mutationOutput(api, metadata, `Moved ${describe(metadata)} to the workspace.`);
+    }),
+  title: "Move document to workspace",
+});
+
 export const inklingTools: readonly InklingTool[] = [
   searchDocuments,
   searchPassages,
@@ -1036,6 +1126,8 @@ export const inklingTools: readonly InklingTool[] = [
   deleteDocument,
   listTrash,
   restoreDocument,
+  sharePersonalDocument,
+  moveToWorkspace,
 ];
 
 // Helpers.

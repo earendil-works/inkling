@@ -174,9 +174,10 @@ const helpTopics: Readonly<Record<string, HelpTopic>> = {
     ],
     options: [
       ["--rfc", "Allocate the next RFC number."],
+      ["--personal", "Keep the note visible only to you; personal notes cannot be RFCs."],
       ["--body MARKDOWN", "Use MARKDOWN instead of reading standard input."],
     ],
-    usage: ["inkling create WORKSPACE TITLE [--rfc] [--body MARKDOWN]"],
+    usage: ["inkling create WORKSPACE TITLE [--rfc | --personal] [--body MARKDOWN]"],
   },
   edit: {
     arguments: [

@@ -17,7 +17,9 @@ import {
   markPublished,
   markRestored,
   markUnpublished,
+  moveToWorkspace,
   nextDocumentRevision,
+  sharePersonalDocument,
   normalizeDocumentMetadata,
   ObjectStore,
   replaceCommentAnchor,
@@ -42,6 +44,7 @@ import type {
   JournalEntryKind,
   JournalEntrySource,
   MetadataPatch,
+  PersonReference,
   Principal,
   TextReplacement,
 } from "@earendil-works/inkling-core";
@@ -313,6 +316,19 @@ export interface DocumentAuthorityService {
     principal: Principal,
     now: string,
   ) => Effect.Effect<DocumentMetadata, AuthorityError>;
+  /** Makes a personal document visible to the whole workspace; see `moveToWorkspace`. */
+  readonly moveToWorkspace: (
+    principal: Principal,
+    expectedRevision: number,
+    now: string,
+  ) => Effect.Effect<DocumentMetadata, AuthorityError>;
+  /** Replaces who a personal document is shared with; see `sharePersonalDocument`. */
+  readonly sharePersonalDocument: (
+    principal: Principal,
+    people: readonly PersonReference[],
+    expectedRevision: number,
+    now: string,
+  ) => Effect.Effect<DocumentMetadata, AuthorityError>;
   readonly checkpoint: (now: string) => Effect.Effect<void, AuthorityError>;
   readonly events: Stream.Stream<AuthorityEvent>;
   readonly close: Effect.Effect<void>;
@@ -458,6 +474,34 @@ export function makeDocumentAuthority(
           update,
         };
       });
+
+    /** Changes who may access the document, which connected clients learn at once. */
+    const changeAccess = (
+      principal: Principal,
+      action: "manage-sharing" | "move-to-workspace",
+      now: string,
+      change: (metadata: DocumentMetadata) => Effect.Effect<DocumentMetadata, DomainError>,
+    ): Effect.Effect<DocumentMetadata, AuthorityError> =>
+      withLock(
+        Effect.gen(function* () {
+          yield* authorizeDocument(principal, action, state.metadata, now);
+          const metadata = yield* change(state.metadata);
+          const entry = yield* persist(
+            "sharing-event",
+            metadata,
+            state.comments,
+            undefined,
+            principal,
+            now,
+            "command",
+          );
+          state = { ...state, dirty: true, metadata, sequence: entry.sequence };
+          yield* PubSub.publish(pubsub, { metadata, type: "metadata-changed" });
+          // Permissions follow, so collaborators who lost access are disconnected.
+          yield* PubSub.publish(pubsub, { metadata, type: "sharing-changed" });
+          return metadata;
+        }),
+      );
 
     const snapshot = (
       principal: Principal,
@@ -661,6 +705,10 @@ export function makeDocumentAuthority(
           editCommentMessage(comments, threadId, messageId, body, actor, now),
         ),
       events: Stream.fromPubSub(pubsub),
+      moveToWorkspace: (principal, expectedRevision, now) =>
+        changeAccess(principal, "move-to-workspace", now, (metadata) =>
+          moveToWorkspace(metadata, expectedRevision, now),
+        ),
       publish: (principal, now) =>
         withLock(
           Effect.gen(function* () {
@@ -739,6 +787,10 @@ export function makeDocumentAuthority(
       reply: (principal, threadId, messageId, parentId, body, actor, now) =>
         updateComments(principal, now, (comments) =>
           replyToCommentThread(comments, threadId, messageId, parentId, body, actor, now),
+        ),
+      sharePersonalDocument: (principal, people, expectedRevision, now) =>
+        changeAccess(principal, "manage-sharing", now, (metadata) =>
+          sharePersonalDocument(metadata, people, expectedRevision, now),
         ),
       setThreadResolution: (principal, threadId, resolved, now) =>
         updateComments(principal, now, (comments) =>

@@ -28,6 +28,7 @@ import {
   filterCatalog,
   IdGenerator,
   identifierTag,
+  isAdministrator,
   isDocumentActionAllowed,
   ObjectStore,
   parseCatalogSearchQuery,
@@ -301,6 +302,7 @@ export function makeLocalInklingApplication(
       kind: "workspace",
       personId: systemId,
       role: "administrator",
+      system: true,
     };
 
     // The catalog files in object storage are projections kept for backups.
@@ -530,7 +532,6 @@ export function makeLocalInklingApplication(
     // lock; only the occasional record refresh takes it.
     const resolveStoredPrincipal = (
       credentials: RequestCredentials,
-      targetDocumentId?: string,
     ): Effect.Effect<Principal, ApplicationError> =>
       Effect.gen(function* () {
         const now = new Date().toISOString();
@@ -562,20 +563,32 @@ export function makeLocalInklingApplication(
           }
           return authenticated.principal;
         }
-        if (credentials.capabilityToken !== undefined && targetDocumentId !== undefined) {
-          yield* ensurePrivateDocumentState([targetDocumentId]);
-          return yield* resolveCapability(
-            state,
-            credentials.capabilityToken,
-            targetDocumentId,
-            credentials.guestName,
-            credentials.capabilityProof,
-            tokenHasher,
-          );
-        }
         return { kind: "anonymous" } as const;
       });
 
+    /** Who signed in, from the workspace's sessions and keys; never a share link. */
+    const resolveAccount = (
+      credentials: RequestCredentials,
+      targetDocumentId?: string,
+    ): Effect.Effect<Principal, ApplicationError> => {
+      if (credentials.bearerToken === undefined && credentials.sessionToken === undefined) {
+        return Effect.succeed({ kind: "anonymous" });
+      }
+      const account: RequestCredentials = {
+        bearerToken: credentials.bearerToken,
+        sessionToken: credentials.sessionToken,
+      };
+      return options.principalResolver === undefined
+        ? resolveStoredPrincipal(account)
+        : options.principalResolver(account, targetDocumentId);
+    };
+
+    /**
+     * Share links belong to the document's private state, so the runtime that
+     * owns the document resolves them, while the workspace resolves who signed
+     * in. Signed-in people who open a link act as themselves, with the link's
+     * access added; everyone else acts as the link's guest.
+     */
     const resolvePrincipal = (
       credentials: RequestCredentials,
       targetDocumentId?: string,
@@ -583,10 +596,43 @@ export function makeLocalInklingApplication(
       if (credentials.internalPrincipal !== undefined) {
         return Effect.succeed(credentials.internalPrincipal);
       }
-      if (options.principalResolver === undefined || credentials.capabilityToken !== undefined) {
-        return resolveStoredPrincipal(credentials, targetDocumentId);
-      }
-      return options.principalResolver(credentials, targetDocumentId);
+      return resolveAccount(credentials, targetDocumentId).pipe(
+        Effect.flatMap((principal) => {
+          const token = credentials.capabilityToken;
+          if (token === undefined || targetDocumentId === undefined) {
+            return Effect.succeed(principal);
+          }
+          const guest = ensurePrivateDocumentState([targetDocumentId]).pipe(
+            Effect.zipRight(
+              Effect.suspend(() =>
+                resolveCapability(
+                  state,
+                  token,
+                  targetDocumentId,
+                  credentials.guestName,
+                  credentials.capabilityProof,
+                  tokenHasher,
+                ),
+              ),
+            ),
+          );
+          if (principal.kind !== "workspace" && principal.kind !== "api-key") return guest;
+          return guest.pipe(
+            Effect.map(
+              ({ access, documentId: grantedDocumentId, expiresAt, generation }): Principal => ({
+                ...principal,
+                capability: { access, documentId: grantedDocumentId, expiresAt, generation },
+              }),
+            ),
+            // A link that no longer works leaves the person with their own
+            // access; a password still has to be entered to use the link.
+            Effect.catchIf(
+              (error) => error.code !== "capability_password_required",
+              () => Effect.succeed(principal),
+            ),
+          );
+        }),
+      );
     };
 
     const responseFromSnapshot = (
@@ -638,6 +684,12 @@ export function makeLocalInklingApplication(
             body: "",
             comments: { revision: current.comments.revision, threads: [] },
           };
+        }
+        // Personal documents are never published, so whoever may read them
+        // this far, their owner, people they are shared with, or a share
+        // link, reads the working draft instead.
+        if (current.metadata.personalOwner !== undefined) {
+          return yield* responseFromSnapshot(current, startLine, endLine);
         }
         const publishedRevision = current.metadata.publishedRevision;
         if (publishedRevision === undefined) {
@@ -1160,6 +1212,7 @@ export function makeLocalInklingApplication(
         const publishedRevision = current.metadata.publishedRevision;
         if (
           current.metadata.deletedAt !== undefined ||
+          current.metadata.personalOwner !== undefined ||
           current.metadata.visibility !== "public" ||
           publishedRevision === undefined
         ) {
@@ -1208,7 +1261,8 @@ export function makeLocalInklingApplication(
           item.status === "active" &&
           (item.rfcNumber === rfcNumber || item.summary?.rfcNumber === rfcNumber) &&
           item.summary?.visibility === "public" &&
-          item.summary.publishedRevision !== undefined,
+          item.summary.publishedRevision !== undefined &&
+          item.summary.metadata?.personalOwner === undefined,
       );
       return entry === undefined
         ? applicationFailure("not_found", "The published RFC does not exist.", 404)
@@ -1963,6 +2017,22 @@ export function makeLocalInklingApplication(
           yield* authorizeWorkspace(principal, "create-document").pipe(
             Effect.mapError(toApplicationError),
           );
+          const personalOwner =
+            request.personal === true &&
+            (principal.kind === "workspace" || principal.kind === "api-key")
+              ? principal.personId
+              : undefined;
+          // Checked before reserving, which would otherwise spend an RFC number.
+          if (
+            personalOwner !== undefined &&
+            (request.allocateRfc === true || request.requestedRfcNumber !== undefined)
+          ) {
+            return yield* applicationFailure(
+              "personal_rfc",
+              "Personal documents cannot be RFCs. Create the RFC in the workspace instead.",
+              400,
+            );
+          }
           const now = new Date().toISOString();
           const generatedId = yield* ids.generate(identifierTag.document);
           const reservation = yield* withState(
@@ -1999,6 +2069,7 @@ export function makeLocalInklingApplication(
             {
               authors: author === undefined ? [] : [author],
               id: reservation.entry.documentId,
+              personalOwner,
               rfcNumber: reservation.entry.rfcNumber,
               title: documentTitleFromMarkdown(request.body ?? "") ?? request.title,
             },
@@ -2257,11 +2328,47 @@ export function makeLocalInklingApplication(
           yield* room.checkpoint(now).pipe(Effect.mapError(toApplicationError));
           return metadata as DocumentMetadataDto;
         }),
+      sharePersonalDocument: (credentials, rawDocumentId, request) =>
+        Effect.gen(function* () {
+          const room = yield* getRoom(rawDocumentId);
+          const principal = yield* resolvePrincipal(credentials, rawDocumentId);
+          const now = new Date().toISOString();
+          const current = yield* room
+            .snapshot(principal, now)
+            .pipe(Effect.mapError(toApplicationError));
+          const directoryPeople = yield* resolvePeople(request.emails);
+          const people = yield* resolveAuthorsByEmail(request.emails, [
+            ...directoryPeople,
+            ...(current.metadata.sharedWith ?? []),
+          ]).pipe(Effect.mapError(toApplicationError));
+          const metadata = yield* room
+            .sharePersonalDocument(principal, people, request.expectedRevision, now)
+            .pipe(Effect.mapError(toApplicationError));
+          yield* projectDocument(room);
+          // Access changed, so the change is durable before anyone relies on it.
+          yield* room.checkpoint(now).pipe(Effect.mapError(toApplicationError));
+          return metadata as DocumentMetadataDto;
+        }),
+      moveToWorkspace: (credentials, rawDocumentId, expectedRevision) =>
+        Effect.gen(function* () {
+          const room = yield* getRoom(rawDocumentId);
+          const principal = yield* resolvePrincipal(credentials, rawDocumentId);
+          const now = new Date().toISOString();
+          const metadata = yield* room
+            .moveToWorkspace(principal, expectedRevision, now)
+            .pipe(Effect.mapError(toApplicationError));
+          yield* projectDocument(room);
+          // Access widened, so the change is durable before anyone relies on it.
+          yield* room.checkpoint(now).pipe(Effect.mapError(toApplicationError));
+          return metadata as DocumentMetadataDto;
+        }),
       hardDeleteDocument: (credentials, rawDocumentId, expectedRevision) =>
         Effect.gen(function* () {
           const id = yield* documentId(rawDocumentId).pipe(Effect.mapError(toApplicationError));
           const principal = yield* resolvePrincipal(credentials, rawDocumentId);
-          yield* requireAdministrator(principal);
+          // Administrators purge workspace documents; owners purge their personal ones.
+          // Either way the document's metadata authorizes the purge below.
+          yield* requireAccount(principal);
           const entry = state.catalog.entries.find((candidate) => candidate.documentId === id);
           if (entry === undefined || entry.status === "purged") return;
           if (entry.status !== "deleted") {
@@ -2462,12 +2569,14 @@ export function makeLocalInklingApplication(
               ),
             ),
           );
+          const now = new Date().toISOString();
           const summaries = searchCatalog(state.catalog, query, {
             bodyMatches,
             currentPersonId:
               principal.kind === "workspace" || principal.kind === "api-key"
                 ? principal.personId
                 : undefined,
+            visible: (summary) => mayDiscover(principal, summary, now),
           });
           const positiveTerms = parsed.terms.flatMap((term) =>
             term.field === undefined && !term.negated ? [term.value] : [],
@@ -2491,25 +2600,33 @@ export function makeLocalInklingApplication(
           const documents = yield* Effect.forEach(summaries, (summary) =>
             summary.metadata === undefined
               ? getRoom(summary.documentId).pipe(
-                  Effect.flatMap((room) =>
-                    room.snapshot(systemPrincipal, new Date().toISOString()),
-                  ),
+                  Effect.flatMap((room) => room.snapshot(systemPrincipal, now)),
                   Effect.mapError(toApplicationError),
-                  Effect.map((snapshot) => ({
-                    excerpt: excerpts.get(summary.documentId) ?? summary.excerpt,
-                    metadata: snapshot.metadata as DocumentMetadataDto,
-                  })),
+                  // Summaries without metadata predate personal documents, but
+                  // the authoritative metadata decides all the same.
+                  Effect.map((snapshot) =>
+                    isDocumentActionAllowed(principal, "discover", snapshot.metadata, now)
+                      ? [
+                          {
+                            excerpt: excerpts.get(summary.documentId) ?? summary.excerpt,
+                            metadata: snapshot.metadata as DocumentMetadataDto,
+                          },
+                        ]
+                      : [],
+                  ),
                 )
-              : Effect.succeed({
-                  excerpt: excerpts.get(summary.documentId) ?? summary.excerpt,
-                  metadata: {
-                    ...summary.metadata,
-                    labels: summary.workingLabels ?? summary.metadata.labels,
-                  } as DocumentMetadataDto,
-                }),
+              : Effect.succeed([
+                  {
+                    excerpt: excerpts.get(summary.documentId) ?? summary.excerpt,
+                    metadata: {
+                      ...summary.metadata,
+                      labels: summary.workingLabels ?? summary.metadata.labels,
+                    } as DocumentMetadataDto,
+                  },
+                ]),
           );
           return {
-            documents,
+            documents: documents.flat(),
             people: workspacePeople(state.catalog, state.authentication).map(
               (person) => person as DocumentMetadataDto["authors"][number],
             ),
@@ -2553,7 +2670,10 @@ export function makeLocalInklingApplication(
               ? principal.personId
               : undefined;
           // Authorization happens here, against structured metadata, before anything surfaces.
-          const readable = filterCatalog(state.catalog, parsed, { currentPersonId }).filter(
+          const readable = filterCatalog(state.catalog, parsed, {
+            currentPersonId,
+            visible: (summary) => mayDiscover(principal, summary, now),
+          }).filter(
             (summary) =>
               summary.metadata !== undefined &&
               isDocumentActionAllowed(principal, "read-working", summary.metadata, now) &&
@@ -2613,29 +2733,42 @@ export function makeLocalInklingApplication(
         Effect.gen(function* () {
           yield* flushPendingProjections;
           const principal = yield* resolvePrincipal(credentials);
-          yield* requireAdministrator(principal);
+          // Administrators see every workspace document in the trash; everyone
+          // sees the personal documents they trashed themselves.
+          yield* requireAccount(principal);
+          const now = new Date().toISOString();
           const summaries = searchCatalog(state.catalog, "", {
             limit: 500,
             onlyDeleted: true,
+            visible: (summary) =>
+              summary.metadata === undefined
+                ? isAdministrator(principal)
+                : isDocumentActionAllowed(principal, "restore", summary.metadata, now),
           });
           const documents = yield* Effect.forEach(summaries, (summary) =>
             summary.metadata === undefined
               ? getRoom(summary.documentId).pipe(
-                  Effect.flatMap((room) =>
-                    room.snapshot(systemPrincipal, new Date().toISOString()),
-                  ),
+                  Effect.flatMap((room) => room.snapshot(systemPrincipal, now)),
                   Effect.mapError(toApplicationError),
-                  Effect.map((snapshot) => ({
-                    excerpt: summary.excerpt,
-                    metadata: snapshot.metadata as DocumentMetadataDto,
-                  })),
+                  Effect.map((snapshot) =>
+                    isDocumentActionAllowed(principal, "restore", snapshot.metadata, now)
+                      ? [
+                          {
+                            excerpt: summary.excerpt,
+                            metadata: snapshot.metadata as DocumentMetadataDto,
+                          },
+                        ]
+                      : [],
+                  ),
                 )
-              : Effect.succeed({
-                  excerpt: summary.excerpt,
-                  metadata: summary.metadata as DocumentMetadataDto,
-                }),
+              : Effect.succeed([
+                  {
+                    excerpt: summary.excerpt,
+                    metadata: summary.metadata as DocumentMetadataDto,
+                  },
+                ]),
           );
-          return { documents } satisfies CatalogResponse;
+          return { documents: documents.flat() } satisfies CatalogResponse;
         }),
       loginWorkspaceIdentity: (identity, directoryPeople = []) =>
         withState(
@@ -2873,6 +3006,23 @@ export function makeLocalInklingApplication(
           yield* authorizeWorkspace(principal, "create-document").pipe(
             Effect.mapError(toApplicationError),
           );
+          // The document authority refuses RFC numbers for personal documents
+          // too; refusing here keeps the workspace from spending one on them.
+          const metadata = state.catalog.entries.find((entry) => entry.documentId === rawDocumentId)
+            ?.summary?.metadata;
+          if (metadata?.personalOwner !== undefined) {
+            yield* authorizeDocument(
+              principal,
+              "edit-metadata",
+              metadata,
+              new Date().toISOString(),
+            ).pipe(Effect.mapError(toApplicationError));
+            return yield* applicationFailure(
+              "personal_rfc",
+              "Personal documents cannot be RFCs. Move the document to the workspace first.",
+              409,
+            );
+          }
           return yield* withState(
             allocateRfcNumber(state.catalog, rawDocumentId).pipe(
               Effect.mapError(toApplicationError),
@@ -3443,7 +3593,7 @@ function resolveCapability(
   guestName: string | undefined,
   capabilityProof: string | undefined,
   tokenHasher: typeof TokenHasher.Service,
-): Effect.Effect<Principal, ApplicationError> {
+): Effect.Effect<Extract<Principal, { readonly kind: "capability" }>, ApplicationError> {
   return Effect.gen(function* () {
     const record = yield* findCapabilityRecord(state, token, targetDocumentId, tokenHasher);
     if (
@@ -3559,6 +3709,16 @@ function shareLinksResponse(
     })
     .toSorted((left, right) => right.createdAt.localeCompare(left.createdAt));
   return { links, policy: metadata.sharing, revision: metadata.headRevision };
+}
+
+/** Whether a catalog summary may surface to the principal at all. */
+function mayDiscover(principal: Principal, summary: CatalogSummary, now: string): boolean {
+  // Summaries without metadata predate personal documents; callers that list
+  // them check the authoritative metadata once they load it.
+  return (
+    summary.metadata === undefined ||
+    isDocumentActionAllowed(principal, "discover", summary.metadata, now)
+  );
 }
 
 function allowedActions(

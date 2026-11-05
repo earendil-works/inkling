@@ -89,6 +89,7 @@ test(
       assert.equal(await first.locator("[data-api-status]").count(), 0);
       assert.equal(await first.locator("[data-catalog-tools] [data-logout]").count(), 0);
       assert.deepEqual(await first.locator("[data-catalog-tool-links] a").allTextContents(), [
+        "Shared with me",
         "Browse labels",
         "Trash",
       ]);
@@ -1588,6 +1589,71 @@ test(
       await first.waitForSelector(`[data-trash-document="${trashDocumentId}"]`, {
         state: "detached",
       });
+
+      await first.goto(baseUrl);
+      await first.locator("[data-new-document]").click();
+      await first.locator('input[name="title"]').fill("Personal browser note");
+      await first.getByText("Create as an RFC and allocate a number").click();
+      await first.getByText("Keep it personal so only you can see it").click();
+      assert.equal(await first.locator('input[name="rfc"]').isChecked(), false);
+      assert.equal(await first.locator('input[name="personal"]').isChecked(), true);
+      await first.getByRole("button", { name: "Create personal note" }).click();
+      await first.waitForURL(/\/documents\/[^/]+\/edit$/u);
+      await first.waitForSelector("[data-move-to-workspace]");
+      const personalDocumentId = first.url().split("/").at(-2);
+      assert.ok(personalDocumentId);
+      assert.equal(await first.locator("[data-publish]").count(), 0);
+      assert.equal(await first.locator("[data-allocate-rfc]").count(), 0);
+      await first.waitForSelector("[data-document-page] [data-personal-document]");
+      assert.equal(await first.locator("[data-document-page] [data-shared-document]").count(), 0);
+
+      await first.locator("[data-share]").click();
+      await first.getByLabel("Share with").fill("colleague@example.com");
+      await first
+        .locator("[data-share-people-form]")
+        .getByRole("button", { name: "Share", exact: true })
+        .click();
+      await first.waitForSelector('[data-shared-person="colleague@example.com"]');
+      await first.getByRole("radio", { name: "View, comment, and edit" }).check();
+      await first.getByRole("button", { name: "Create and copy link" }).click();
+      await first.locator('[data-share-link] >> text="Can edit"').waitFor();
+      const personalLink = await first.evaluate(async (id) => {
+        const response = await fetch(`/api/documents/${id}/shares`);
+        const links = (await response.json()) as { links: { url: string }[] };
+        return links.links[0]?.url;
+      }, personalDocumentId);
+      assert.ok(personalLink);
+      await first.getByRole("button", { name: "Close sharing settings" }).click();
+      await first.waitForSelector("[data-document-page] [data-shared-document]");
+      assert.match(
+        await first.locator("[data-document-shared-with]").innerText(),
+        /colleague@example\.com/u,
+      );
+
+      // A signed-in reader who opens a share link joins as themselves, not as a guest.
+      const linkedPage = await context.newPage();
+      const linkedUrl = new URL(personalLink);
+      linkedUrl.pathname = `${linkedUrl.pathname}/edit`;
+      await linkedPage.goto(linkedUrl.href);
+      await linkedPage.waitForFunction(
+        () => document.querySelector(".cm-content")?.getAttribute("contenteditable") === "true",
+      );
+      assert.equal(await linkedPage.getByLabel("Display name").count(), 0);
+      assert.equal(await linkedPage.locator("[data-account]").count(), 1);
+      await linkedPage.close();
+      await first.locator("[data-editor-toolbar]").getByRole("link", { name: "View" }).click();
+      await first.waitForSelector("[data-reader] [data-personal-document]");
+      assert.equal(await first.locator("[data-unpublished]").count(), 0);
+      await first.goBack();
+      await first.waitForSelector("[data-move-to-workspace]");
+      await first.locator("[data-move-to-workspace]").click();
+      await first
+        .locator("[data-confirmation-dialog]")
+        .getByRole("button", { name: "Move to workspace" })
+        .click();
+      await first.waitForSelector("[data-move-to-workspace]", { state: "detached" });
+      await first.waitForSelector("[data-publish]");
+      assert.equal(await first.locator("[data-document-page] [data-personal-document]").count(), 0);
 
       const publicNote = await first.evaluate(async () => {
         const csrf = document.cookie

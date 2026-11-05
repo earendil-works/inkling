@@ -15,6 +15,7 @@ import { ButtonLink } from "./button-link.tsx";
 import styles from "./editor.module.css";
 import { HistoryControl } from "./history-control.tsx";
 import type { HistoryControlProps } from "./history-control.tsx";
+import { MoveToWorkspaceButton } from "./move-to-workspace-button.tsx";
 import { PublishButton } from "./publish-button.tsx";
 import type { PublishButtonProps } from "./publish-button.tsx";
 import { SharingControl } from "./sharing-control.tsx";
@@ -24,6 +25,8 @@ export interface EditorToolbarProps {
   readonly canDelete: boolean;
   readonly canEdit: boolean;
   readonly canEditMetadata: boolean;
+  readonly canManageSharing: boolean;
+  readonly canMoveToWorkspace: boolean;
   readonly commentsButtonRef?: React.Ref<HTMLButtonElement> | undefined;
   readonly metadata: DocumentMetadataDto;
   readonly onAttachment: (attachment: AttachmentMetadataDto) => void;
@@ -48,6 +51,8 @@ export function EditorToolbar({
   canDelete,
   canEdit,
   canEditMetadata,
+  canManageSharing,
+  canMoveToWorkspace,
   commentsButtonRef,
   metadata,
   onAttachment,
@@ -66,6 +71,9 @@ export function EditorToolbar({
   shared,
 }: EditorToolbarProps): React.JSX.Element {
   const trashed = metadata.deletedAt !== undefined;
+  // Personal documents move to the workspace before they are published, and
+  // only their owner shares them.
+  const personal = metadata.personalOwner !== undefined;
   return (
     <section
       className={`${styles["bar"]}${trashed ? ` ${styles["trashedBar"]}` : ""}`}
@@ -118,16 +126,29 @@ export function EditorToolbar({
         )}
         <AllocateRfcButton
           api={api}
-          canAllocate={canEditMetadata}
+          canAllocate={canEditMetadata && !personal}
           metadata={metadata}
           onAllocated={onMetadataChanged}
         />
-        {shared || trashed ? null : (
+        {canMoveToWorkspace && personal && !trashed ? (
+          <MoveToWorkspaceButton
+            api={api}
+            beforeMove={saveChanges}
+            documentId={metadata.id}
+            onMoved={onMetadataChanged}
+          />
+        ) : null}
+        {shared || trashed || (personal && !canManageSharing) ? null : (
           <SharingControl
             access={metadata.sharing.access}
             api={api}
             documentId={metadata.id}
             onUpdated={onSharingChanged}
+            personal={
+              personal
+                ? { onPeopleChanged: onMetadataChanged, people: metadata.sharedWith ?? [] }
+                : undefined
+            }
           />
         )}
         <ButtonLink
@@ -137,7 +158,7 @@ export function EditorToolbar({
         >
           View
         </ButtonLink>
-        {shared || trashed ? null : (
+        {shared || trashed || personal ? null : (
           <PublishButton
             api={api}
             beforePublish={saveChanges}

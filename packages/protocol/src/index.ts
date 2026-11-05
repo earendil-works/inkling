@@ -52,10 +52,14 @@ export const DocumentMetadataSchema = Schema.Struct({
   labels: Schema.Array(Schema.String),
   legacySourceUrl: Schema.optional(Schema.String),
   lifecycleState: NonEmptyString,
+  /** Set on personal documents, which only this person can access. */
+  personalOwner: Schema.optional(NonEmptyString),
   publishedRevision: Schema.optional(Revision),
   relatedDocuments: Schema.Array(RelatedDocumentSchema),
   reviewers: Schema.Array(PersonSchema),
   rfcNumber: Schema.optional(PositiveInteger),
+  /** People besides the owner who may read and edit a personal document. */
+  sharedWith: Schema.optional(Schema.Array(PersonSchema)),
   sharing: SharingPolicySchema,
   targetDecisionDate: Schema.optional(Schema.String),
   title: NonEmptyString,
@@ -187,6 +191,8 @@ export const CreateDocumentRequestSchema = Schema.Struct({
   allocateRfc: Schema.optional(Schema.Boolean),
   body: Schema.optional(Schema.String),
   creationKey: NonEmptyString,
+  /** Creates a document only its creator can access until they move it to the workspace. */
+  personal: Schema.optional(Schema.Boolean),
   requestedRfcNumber: Schema.optional(PositiveInteger),
   title: NonEmptyString,
 });
@@ -299,6 +305,15 @@ export const ShareLinkCreateRequestSchema = Schema.Struct({
   password: Schema.optional(Schema.String.pipe(Schema.minLength(8), Schema.maxLength(1024))),
 });
 export type ShareLinkCreateRequest = typeof ShareLinkCreateRequestSchema.Type;
+
+/** Replaces the people a personal document is shared with. */
+export const SharePeopleRequestSchema = Schema.Struct({
+  emails: Schema.Array(Schema.String.pipe(Schema.minLength(3), Schema.maxLength(320))).pipe(
+    Schema.maxItems(100),
+  ),
+  expectedRevision: Revision,
+});
+export type SharePeopleRequest = typeof SharePeopleRequestSchema.Type;
 
 export const ShareUnlockRequestSchema = Schema.Struct({
   password: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(1024)),

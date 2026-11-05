@@ -1354,10 +1354,9 @@ async function dispatchDocument(
         documentId,
       );
       if (!authorized.ok) return protocolErrorResponse(authorized.error);
-      if (
-        (authorized.value.kind === "workspace" || authorized.value.kind === "api-key") &&
-        authorized.value.role === "administrator"
-      ) {
+      // Administrators and owners of personal documents purge; a retry after
+      // the purge succeeds for either, since the owner is no longer known.
+      if (authorized.value.kind === "workspace" || authorized.value.kind === "api-key") {
         return Response.json({}, { headers: { "Cache-Control": "no-store" } });
       }
     }

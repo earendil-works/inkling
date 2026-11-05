@@ -82,7 +82,15 @@ export function renderDocument(
     `${metadata.rfcNumber === undefined ? "Note" : formatRfcNumber(metadata.rfcNumber)}: ${metadata.title}`,
     `ID: ${metadata.id}`,
     `Revision: ${metadata.headRevision} (${view})`,
-    `State: ${metadata.lifecycleState}; visibility: ${metadata.visibility}; ${
+    `State: ${metadata.lifecycleState}; ${
+      metadata.personalOwner === undefined
+        ? `visibility: ${metadata.visibility}`
+        : metadata.sharedWith === undefined || metadata.sharedWith.length === 0
+          ? `personal, owned by ${metadata.personalOwner}`
+          : `personal, owned by ${metadata.personalOwner}, shared with ${metadata.sharedWith
+              .map((person) => person.email)
+              .join(", ")}`
+    }; ${
       metadata.publishedRevision === undefined
         ? "unpublished"
         : `published revision ${metadata.publishedRevision}`
@@ -162,7 +170,7 @@ export function renderCatalog(
     const folio = metadata.rfcNumber === undefined ? "Note" : formatRfcNumber(metadata.rfcNumber);
     const status = trash
       ? `deleted ${metadata.deletedAt ?? "unknown"}`
-      : `${metadata.lifecycleState}, ${metadata.visibility}, ${
+      : `${metadata.lifecycleState}, ${metadata.personalOwner === undefined ? metadata.visibility : "personal"}, ${
           metadata.publishedRevision === undefined ? "unpublished" : "published"
         }, updated ${metadata.updatedAt.slice(0, 10)}`;
     const summary = excerpt.replace(/\s+/gu, " ").trim();

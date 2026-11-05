@@ -13,14 +13,14 @@ export interface WorkspaceScreenProps {
   readonly api: ApiClientService;
   readonly initialCatalog: CatalogResponse;
   readonly publicCatalog?: boolean | undefined;
-  readonly showTrash?: boolean | undefined;
+  readonly signedIn?: boolean | undefined;
 }
 
 export function WorkspaceScreen({
   api,
   initialCatalog,
   publicCatalog = false,
-  showTrash = false,
+  signedIn = false,
 }: WorkspaceScreenProps): React.JSX.Element {
   const [catalog, setCatalog] = useState(initialCatalog);
 
@@ -56,7 +56,7 @@ export function WorkspaceScreen({
             initialCatalog={initialCatalog}
             onResultsChange={setCatalog}
             publicCatalog={publicCatalog}
-            showTrash={showTrash}
+            signedIn={signedIn}
           />
           <DocumentCatalog catalog={catalog} publicCatalog={publicCatalog} />
         </Page>

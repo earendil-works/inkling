@@ -1,4 +1,4 @@
-import { DeleteIcon, LabelIcon } from "@earendil-works/elanor-icons-react";
+import { DeleteIcon, GroupsIcon, LabelIcon } from "@earendil-works/elanor-icons-react";
 import type { CatalogResponse } from "@earendil-works/inkling-protocol";
 
 import type { ApiClientService } from "../api.ts";
@@ -11,7 +11,8 @@ export interface CatalogControlsProps {
   readonly initialCatalog: CatalogResponse;
   readonly onResultsChange: (catalog: CatalogResponse) => void;
   readonly publicCatalog?: boolean | undefined;
-  readonly showTrash?: boolean | undefined;
+  /** Shows the reader's own places: what others shared with them, and Trash. */
+  readonly signedIn?: boolean | undefined;
 }
 
 export function CatalogControls({
@@ -19,7 +20,7 @@ export function CatalogControls({
   initialCatalog,
   onResultsChange,
   publicCatalog = false,
-  showTrash = false,
+  signedIn = false,
 }: CatalogControlsProps): React.JSX.Element {
   return (
     <section aria-label="Document tools" className={styles["tools"]} data-catalog-tools="">
@@ -30,10 +31,20 @@ export function CatalogControls({
         publicCatalog={publicCatalog}
       />
       <div className={styles["links"]} data-catalog-tool-links="">
+        {signedIn ? (
+          <ButtonLink
+            data-shared-with-me=""
+            hierarchy="tertiary"
+            iconStart={<GroupsIcon />}
+            href={`/?q=${encodeURIComponent("is:shared")}`}
+          >
+            Shared with me
+          </ButtonLink>
+        ) : null}
         <ButtonLink hierarchy="tertiary" iconStart={<LabelIcon />} href="/labels">
           Browse labels
         </ButtonLink>
-        {showTrash ? (
+        {signedIn ? (
           <ButtonLink hierarchy="tertiary" iconStart={<DeleteIcon />} href="/trash">
             Trash
           </ButtonLink>

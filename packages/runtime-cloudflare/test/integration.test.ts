@@ -391,6 +391,81 @@ test(
         401,
       );
 
+      // Sessions and keys live in the workspace authority, while share links
+      // live with the document, so a signed-in reader with a link spans both.
+      const personalResponse = await fetch(`${running.baseUrl}/api/documents`, {
+        body: JSON.stringify({
+          body: "Personal cloud draft",
+          creationKey: "cloudflare-personal",
+          personal: true,
+          title: "Cloudflare personal",
+        }),
+        headers: { ...authorization, "Content-Type": "application/json" },
+        method: "POST",
+      });
+      assert.equal(personalResponse.status, 200);
+      const personal = (await personalResponse.json()) as DocumentWire;
+      const personalRoute = `${running.baseUrl}/api/documents/${personal.metadata.id}`;
+      const sharedPeople = await fetch(`${personalRoute}/people`, {
+        body: JSON.stringify({
+          emails: ["colin@earendil.com"],
+          expectedRevision: personal.metadata.headRevision,
+        }),
+        headers: { ...authorization, "Content-Type": "application/json" },
+        method: "PUT",
+      });
+      assert.equal(sharedPeople.status, 200);
+      assert.deepEqual(
+        (
+          (await sharedPeople.json()) as { sharedWith?: readonly { displayName: string }[] }
+        ).sharedWith?.map((person) => person.displayName),
+        ["Colin Hanna"],
+      );
+      const personalLinks = await fetch(`${personalRoute}/shares`, {
+        body: JSON.stringify({
+          access: "comment",
+          expectedRevision: (
+            await readDocument(running.baseUrl, personal.metadata.id, authorization)
+          ).metadata.headRevision,
+        }),
+        headers: { ...authorization, "Content-Type": "application/json" },
+        method: "POST",
+      });
+      assert.equal(personalLinks.status, 200);
+      const personalCapability = new URL(
+        ((await personalLinks.json()) as { links: { url: string }[] }).links[0]?.url ?? "",
+      ).searchParams.get("cap");
+      assert.ok(personalCapability);
+      const linkQuery = `?cap=${encodeURIComponent(personalCapability)}`;
+      assert.equal((await fetch(`${personalRoute}${linkQuery}`)).status, 200);
+      const linkedComment = await fetch(`${personalRoute}/comments${linkQuery}`, {
+        body: JSON.stringify({
+          authorDisplayName: "Not a guest",
+          body: "Signed in through a link",
+          selection: { end: 5, start: 0 },
+        }),
+        headers: { ...authorization, "Content-Type": "application/json" },
+        method: "POST",
+      });
+      assert.equal(linkedComment.status, 200);
+      assert.equal(
+        (
+          (await linkedComment.json()) as {
+            threads: readonly { messages: readonly { authorId: string }[] }[];
+          }
+        ).threads[0]?.messages[0]?.authorId,
+        "armin@earendil.com",
+      );
+      assert.equal(
+        (
+          await fetch(
+            `${running.baseUrl}/api/documents/${first.metadata.id}?cap=${encodeURIComponent(protectedCapability)}`,
+            { headers: authorization },
+          )
+        ).status,
+        401,
+      );
+
       const backup = await fetch(`${running.baseUrl}/api/admin/backup`, {
         headers: authorization,
       });

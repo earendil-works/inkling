@@ -24,6 +24,7 @@ export {
   documentTitleFromMarkdown,
   documentTrashExpiresAt,
   documentTrashRetentionMilliseconds,
+  maximumSharedPeople,
   DomainError,
   hasPendingPublicationChanges,
   isDocumentTrashExpired,
@@ -32,6 +33,8 @@ export {
   markPublished,
   markRestored,
   markUnpublished,
+  moveToWorkspace,
+  sharePersonalDocument,
   nextDocumentRevision,
   normalizeDocumentMetadata,
   personId,
@@ -64,6 +67,7 @@ export {
   setCommentThreadResolution,
 } from "./domain/comments.ts";
 export type {
+  CapabilityGrant,
   DocumentAction,
   Principal,
   WorkspaceAction,

@@ -68,7 +68,7 @@ export interface CliClient {
   readonly create: (
     title: string,
     body: string,
-    allocateRfc: boolean,
+    options: { readonly allocateRfc: boolean; readonly personal: boolean },
   ) => Effect.Effect<DocumentResponse, ClientError>;
   readonly replaceBody: (
     documentId: string,
@@ -364,7 +364,7 @@ export function makeCliClient(instance: Instance): CliClient {
           ),
         ),
       ),
-    create: (title, body, allocateRfc) =>
+    create: (title, body, { allocateRfc, personal }) =>
       mutate("/api/documents", DocumentResponseSchema, "POST", {
         allocateRfc,
         body,
@@ -372,6 +372,7 @@ export function makeCliClient(instance: Instance): CliClient {
           identifierTag.request,
           uuidV7Bytes(Date.now(), crypto.getRandomValues(new Uint8Array(10))),
         ),
+        ...(personal ? { personal } : {}),
         title,
       }),
     replaceBody: (documentId, body, expectedRevision) =>

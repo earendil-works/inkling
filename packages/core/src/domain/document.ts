@@ -64,7 +64,16 @@ export interface DocumentMetadata {
   readonly publishedRevision?: DocumentRevision | undefined;
   readonly sharing: SharingPolicy;
   readonly deletedAt?: string | undefined;
+  /**
+   * Set on personal documents: only this person may access them until they
+   * move the document to the workspace. Never inferred from Markdown.
+   */
+  readonly personalOwner?: PersonId | undefined;
+  /** People besides the owner who may read and edit a personal document. */
+  readonly sharedWith?: readonly PersonReference[] | undefined;
 }
+
+export const maximumSharedPeople = 100;
 
 export interface AttachmentMetadata {
   readonly id: AttachmentId;
@@ -93,6 +102,7 @@ export interface CreateMetadataInput {
   readonly targetDecisionDate?: string | undefined;
   readonly relatedDocuments?: readonly RelatedDocumentReference[] | undefined;
   readonly legacySourceUrl?: string | undefined;
+  readonly personalOwner?: PersonId | undefined;
 }
 
 export interface MetadataPatch {
@@ -255,6 +265,12 @@ export function createDocumentMetadata(
     ) {
       return yield* fail("invalid_rfc_number", "RFC numbers must be positive integers.");
     }
+    if (input.rfcNumber !== undefined && input.personalOwner !== undefined) {
+      return yield* fail(
+        "personal_rfc",
+        "Personal documents cannot be RFCs. Move the document to the workspace first.",
+      );
+    }
 
     return {
       approvers,
@@ -265,6 +281,7 @@ export function createDocumentMetadata(
       labels,
       legacySourceUrl,
       lifecycleState,
+      ...(input.personalOwner === undefined ? {} : { personalOwner: input.personalOwner }),
       relatedDocuments,
       reviewers,
       rfcNumber: input.rfcNumber,
@@ -284,6 +301,12 @@ export function assignRfcNumber(
 ): Effect.Effect<DocumentMetadata, DomainError> {
   if (!Number.isSafeInteger(rfcNumber) || rfcNumber < 1) {
     return fail("invalid_rfc_number", "RFC numbers must be positive integers.");
+  }
+  if (metadata.personalOwner !== undefined) {
+    return fail(
+      "personal_rfc",
+      "Personal documents cannot be RFCs. Move the document to the workspace first.",
+    );
   }
   if (metadata.rfcNumber !== undefined) {
     return metadata.rfcNumber === rfcNumber
@@ -470,6 +493,70 @@ export function markRestored(
       deletedAt: undefined,
       headRevision: nextDocumentRevision(metadata.headRevision),
       updatedAt: restoredAt,
+    };
+  });
+}
+
+/**
+ * Makes a personal document a workspace document. The transition is one-way,
+ * so no member can hide a workspace document from the rest of the workspace.
+ */
+export function moveToWorkspace(
+  metadata: DocumentMetadata,
+  expectedRevision: number,
+  now: string,
+): Effect.Effect<DocumentMetadata, DomainError> {
+  return Effect.gen(function* () {
+    yield* requireRevision(metadata, expectedRevision);
+    if (metadata.personalOwner === undefined) {
+      return yield* fail("document_not_personal", "The document is already in the workspace.");
+    }
+    const { personalOwner: _personalOwner, sharedWith: _sharedWith, ...withoutOwner } = metadata;
+    return {
+      ...withoutOwner,
+      headRevision: nextDocumentRevision(metadata.headRevision),
+      updatedAt: yield* fromEither(validateDate(now, "update date")),
+    };
+  });
+}
+
+/**
+ * Replaces the people a personal document is shared with. The owner is
+ * implied and dropped from the list, and an empty list unshares it.
+ */
+export function sharePersonalDocument(
+  metadata: DocumentMetadata,
+  people: readonly PersonReference[],
+  expectedRevision: number,
+  now: string,
+): Effect.Effect<DocumentMetadata, DomainError> {
+  return Effect.gen(function* () {
+    yield* requireRevision(metadata, expectedRevision);
+    if (metadata.personalOwner === undefined) {
+      return yield* fail(
+        "document_not_personal",
+        "Workspace documents are already shared with the whole workspace.",
+      );
+    }
+    const owner = metadata.personalOwner;
+    const unique = [
+      ...new Map(
+        people.filter((person) => person.id !== owner).map((person) => [person.id, person]),
+      ).values(),
+    ];
+    if (unique.length > maximumSharedPeople) {
+      return yield* fail(
+        "too_many_people",
+        `Personal documents may be shared with up to ${maximumSharedPeople} people.`,
+      );
+    }
+    const sharedWith = yield* validatePeople(unique);
+    const { sharedWith: _previous, ...withoutPeople } = metadata;
+    return {
+      ...withoutPeople,
+      ...(sharedWith.length === 0 ? {} : { sharedWith }),
+      headRevision: nextDocumentRevision(metadata.headRevision),
+      updatedAt: yield* fromEither(validateDate(now, "update date")),
     };
   });
 }

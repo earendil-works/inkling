@@ -36,7 +36,11 @@ export function ReaderDocument({
       />
     );
   }
-  if (document.metadata.publishedRevision === undefined) {
+  // Personal documents are never published; their reader shows the working draft.
+  if (
+    document.metadata.publishedRevision === undefined &&
+    document.metadata.personalOwner === undefined
+  ) {
     return (
       <EmptyMessage
         data-reader=""

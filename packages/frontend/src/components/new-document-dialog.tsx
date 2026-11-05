@@ -34,6 +34,7 @@ export function NewDocumentDialog({
   const { navigate } = useAppContext();
   const [title, setTitle] = useState("");
   const [allocateRfc, setAllocateRfc] = useState(false);
+  const [personal, setPersonal] = useState(false);
   const createDocument = useEffectAction<CreateDocumentRequest, DocumentResponse, ApiError>(
     (input) => api.createDocument(input),
   );
@@ -45,6 +46,7 @@ export function NewDocumentDialog({
         allocateRfc,
         body: "",
         creationKey: randomId(identifierTag.request),
+        personal,
         title,
       },
       {
@@ -62,7 +64,7 @@ export function NewDocumentDialog({
     <Dialog
       attributes={{ "data-new-dialog": "" }}
       closeLabel="Close new document dialog"
-      description="Notes suit meeting minutes and sketches; RFCs get a permanent number."
+      description="Notes suit meeting minutes and sketches; RFCs get a permanent number. Personal notes stay hidden from everyone else until you move them to the workspace."
       onClose={onDismiss}
       open={open}
       pending={createDocument.state.pending}
@@ -81,17 +83,40 @@ export function NewDocumentDialog({
         </ControlAndLabel>
         <SelectionControlAndLabel
           control={
-            <Checkbox.Root checked={allocateRfc} name="rfc" onCheckedChange={setAllocateRfc}>
+            <Checkbox.Root
+              checked={allocateRfc}
+              name="rfc"
+              onCheckedChange={(checked) => {
+                setAllocateRfc(checked);
+                if (checked) setPersonal(false);
+              }}
+            >
               <Checkbox.Indicator />
             </Checkbox.Root>
           }
         >
           Create as an RFC and allocate a number
         </SelectionControlAndLabel>
+        <SelectionControlAndLabel
+          control={
+            <Checkbox.Root
+              checked={personal}
+              name="personal"
+              onCheckedChange={(checked) => {
+                setPersonal(checked);
+                if (checked) setAllocateRfc(false);
+              }}
+            >
+              <Checkbox.Indicator />
+            </Checkbox.Root>
+          }
+        >
+          Keep it personal so only you can see it
+        </SelectionControlAndLabel>
         <FormError data-new-error="">{createDocument.state.error?.message}</FormError>
         <Modal.Actions>
           <Button pending={createDocument.state.pending} type="submit">
-            {allocateRfc ? "Create RFC" : "Create note"}
+            {allocateRfc ? "Create RFC" : personal ? "Create personal note" : "Create note"}
           </Button>
         </Modal.Actions>
       </Form>

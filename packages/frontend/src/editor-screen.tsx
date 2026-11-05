@@ -52,8 +52,10 @@ export function EditorScreen({
   const [metadata, setMetadata] = useState(initial.metadata);
   const [comments, setComments] = useState(initial.comments);
   const [historyPreview, setHistoryPreview] = useState<HistoryPreview>();
-  const [displayName, setDisplayName] = useState<string | undefined>(() =>
-    shared ? storedGuestName() : (account?.displayName ?? "Workspace member"),
+  const [displayName, setDisplayName] = useState<string | undefined>(
+    () =>
+      // Signed-in people who open a share link edit as themselves, not as guests.
+      account?.displayName ?? (shared ? storedGuestName() : "Workspace member"),
   );
   const [permissions, setPermissions] = useState<readonly string[]>();
   const [previewRevision, setPreviewRevision] = useState(0);
@@ -109,6 +111,8 @@ export function EditorScreen({
   const canComment = permissions?.includes("comment") ?? false;
   const canDelete = permissions?.includes("delete") ?? false;
   const canEditMetadata = permissions?.includes("edit-metadata") ?? !shared;
+  const canMoveToWorkspace = permissions?.includes("move-to-workspace") ?? false;
+  const canManageSharing = permissions?.includes("manage-sharing") ?? false;
   const rendered = useDocumentMarkdown(api, body, metadata, references);
   const historyRendered = useDocumentMarkdown(
     api,
@@ -182,6 +186,8 @@ export function EditorScreen({
         canDelete={canDelete}
         canEdit={canEdit}
         canEditMetadata={canEditMetadata}
+        canManageSharing={canManageSharing}
+        canMoveToWorkspace={canMoveToWorkspace}
         commentsButtonRef={commentsButtonRef}
         metadata={metadata}
         onAttachment={(attachment) => {

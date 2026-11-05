@@ -17,6 +17,8 @@ import {
   Text,
 } from "@earendil-works/elanor-react";
 import type {
+  DocumentMetadataDto,
+  PersonDto,
   ShareLinkDto,
   ShareLinksResponse,
   SharingPolicyDto,
@@ -52,6 +54,13 @@ export interface SharingControlProps {
   readonly api: ApiClientService;
   readonly documentId: string;
   readonly onUpdated: (response: ShareLinksResponse) => void;
+  /** Personal documents are also shared with named people. */
+  readonly personal?:
+    | {
+        readonly onPeopleChanged: (metadata: DocumentMetadataDto) => void;
+        readonly people: readonly PersonDto[];
+      }
+    | undefined;
 }
 
 export function SharingControl({
@@ -59,6 +68,7 @@ export function SharingControl({
   api,
   documentId,
   onUpdated,
+  personal,
 }: SharingControlProps): React.JSX.Element {
   const { showToast } = useAppContext();
   const [open, setOpen] = useState(false);
@@ -117,13 +127,28 @@ export function SharingControl({
       </Button>
       <Dialog
         closeLabel="Close sharing settings"
-        description="Links grant access to the working draft without a workspace account."
+        description={
+          personal === undefined
+            ? "Links grant access to the working draft without a workspace account."
+            : "Only you and the people and links below can open this personal document. Signed-in people who open a link appear as themselves."
+        }
         onClose={() => setOpen(false)}
         open={open}
         pending={pending}
-        title="Share document"
+        title={personal === undefined ? "Share document" : "Share personal document"}
       >
         <Stack align="stretch" gap="large">
+          {personal === undefined ? null : (
+            <>
+              <SharedPeople
+                api={api}
+                documentId={documentId}
+                onChanged={personal.onPeopleChanged}
+                people={personal.people}
+              />
+              <Separator />
+            </>
+          )}
           <section aria-labelledby="share-link-list-title" className={styles["section"]}>
             <Stack align="center" direction="row" gap="auto">
               <Heading id="share-link-list-title" level={3}>
@@ -267,6 +292,129 @@ export function SharingControl({
         </Stack>
       </Dialog>
     </>
+  );
+}
+
+/** The people a personal document is shared with, by email. */
+function SharedPeople({
+  api,
+  documentId,
+  onChanged,
+  people,
+}: {
+  readonly api: ApiClientService;
+  readonly documentId: string;
+  readonly onChanged: (metadata: DocumentMetadataDto) => void;
+  readonly people: readonly PersonDto[];
+}): React.JSX.Element {
+  const { showToast } = useAppContext();
+  const [email, setEmail] = useState("");
+  // The revision moves with every edit, so the change reads it right before applying.
+  const update = useEffectAction<readonly string[], DocumentMetadataDto, ApiError>((emails) =>
+    api
+      .listShareLinks(documentId)
+      .pipe(
+        Effect.flatMap((current) =>
+          api.sharePersonalDocument(documentId, emails, current.revision),
+        ),
+      ),
+  );
+  const normalized = email.trim().toLocaleLowerCase("en");
+  const alreadyShared = people.some(
+    (person) => person.email.toLocaleLowerCase("en") === normalized,
+  );
+
+  return (
+    <section aria-labelledby="share-people-title" className={styles["section"]}>
+      <Stack align="center" direction="row" gap="auto">
+        <Heading id="share-people-title" level={3}>
+          People
+        </Heading>
+        <span className={styles["count"]}>{people.length}</span>
+      </Stack>
+      {people.length === 0 ? (
+        <Text className={styles["note"]}>Nobody else can open this document yet.</Text>
+      ) : (
+        <ul className={styles["links"]}>
+          {people.map((person) => (
+            <li className={styles["link"]} data-shared-person={person.email} key={person.id}>
+              <Stack gap="xxSmall">
+                <strong className={styles["linkLabel"]}>{person.displayName}</strong>
+                {person.displayName === person.email ? null : (
+                  <Text className={styles["meta"]}>{person.email}</Text>
+                )}
+              </Stack>
+              <Button
+                aria-label={`Stop sharing with ${person.displayName}`}
+                density="compact"
+                disabled={update.state.pending}
+                hierarchy="tertiary"
+                onClick={() =>
+                  update.execute(
+                    people
+                      .filter((candidate) => candidate.id !== person.id)
+                      .map((candidate) => candidate.email),
+                    {
+                      onSuccess: (metadata) => {
+                        onChanged(metadata);
+                        showToast(`Stopped sharing with ${person.displayName}.`, "success");
+                      },
+                    },
+                  )
+                }
+                semantic="negative"
+              >
+                Remove
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <Form
+        aria-labelledby="share-people-title"
+        className={styles["section"]}
+        data-share-people-form=""
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (normalized === "" || alreadyShared) return;
+          update.execute([...people.map((person) => person.email), normalized], {
+            onSuccess: (metadata) => {
+              onChanged(metadata);
+              setEmail("");
+              showToast("Document shared.", "success");
+            },
+          });
+        }}
+      >
+        <ControlAndLabel
+          description="They can find, read, comment on, and edit it, but not share it further."
+          label="Share with"
+        >
+          <Input
+            autoComplete="email"
+            name="share-email"
+            onValueChange={setEmail}
+            placeholder="name@example.com"
+            required
+            type="email"
+            value={email}
+          />
+        </ControlAndLabel>
+        {alreadyShared ? (
+          <Text className={styles["note"]}>This document is already shared with them.</Text>
+        ) : null}
+        <FormError>{update.state.error?.message}</FormError>
+        <div>
+          <Button
+            disabled={normalized === "" || alreadyShared}
+            pending={update.state.pending}
+            type="submit"
+          >
+            Share
+          </Button>
+        </div>
+      </Form>
+    </section>
   );
 }
 

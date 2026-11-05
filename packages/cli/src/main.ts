@@ -167,7 +167,10 @@ export function main(arguments_: readonly string[]): Effect.Effect<void, unknown
       case "create": {
         const title = yield* argument(arguments_, 2, "title");
         const body = option(arguments_, "--body") ?? (yield* readStandardInput());
-        const created = yield* client.create(title, body, arguments_.includes("--rfc"));
+        const created = yield* client.create(title, body, {
+          allocateRfc: arguments_.includes("--rfc"),
+          personal: arguments_.includes("--personal"),
+        });
         console.log(`${created.metadata.id}\t${created.metadata.title}`);
         return;
       }

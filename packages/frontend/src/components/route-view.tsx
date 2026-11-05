@@ -101,11 +101,17 @@ export function RouteView({ navigationKey, refresh, state }: RouteViewProps): Re
           initialCatalog={model.catalog}
           key={navigationKey}
           publicCatalog={model.publicCatalog}
-          showTrash={model.account?.role === "administrator"}
+          signedIn={model.account !== undefined}
         />
       );
     case "trash":
-      return <TrashScreen api={model.api} initialCatalog={model.catalog} />;
+      return (
+        <TrashScreen
+          api={model.api}
+          canDeletePermanently={model.account?.role === "administrator"}
+          initialCatalog={model.catalog}
+        />
+      );
     case "labels":
       return (
         <LabelsScreen

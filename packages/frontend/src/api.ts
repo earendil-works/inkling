@@ -124,6 +124,10 @@ export interface ApiClientService {
     documentId: string,
     expectedRevision: number,
   ) => Effect.Effect<void, ApiError>;
+  readonly moveToWorkspace: (
+    documentId: string,
+    expectedRevision: number,
+  ) => Effect.Effect<DocumentMetadataDto, ApiError>;
   readonly reply: (
     documentId: string,
     threadId: string,
@@ -154,6 +158,12 @@ export interface ApiClientService {
     documentId: string,
     password: string,
   ) => Effect.Effect<ShareUnlockResponse, ApiError>;
+  /** Replaces the people a personal document is shared with. */
+  readonly sharePersonalDocument: (
+    documentId: string,
+    emails: readonly string[],
+    expectedRevision: number,
+  ) => Effect.Effect<DocumentMetadataDto, ApiError>;
   readonly publish: (documentId: string) => Effect.Effect<DocumentMetadataDto, ApiError>;
   readonly unpublish: (documentId: string) => Effect.Effect<DocumentMetadataDto, ApiError>;
   readonly readPublicRfc: (number: number) => Effect.Effect<PublicDocumentResponse, ApiError>;
@@ -360,6 +370,12 @@ export function makeApiClient(
         Schema.Unknown,
         "DELETE",
       ).pipe(Effect.asVoid),
+    moveToWorkspace: (documentId, expectedRevision) =>
+      mutation(
+        `/api/documents/${encodeURIComponent(documentId)}/workspace?expectedRevision=${expectedRevision}`,
+        DocumentMetadataSchema,
+        "POST",
+      ),
     editMessage: (documentId, threadId, messageId, body) =>
       mutation(
         `/api/documents/${encodeURIComponent(documentId)}/comments/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(messageId)}`,
@@ -484,6 +500,13 @@ export function makeApiClient(
       ),
     listShareLinks: (documentId) =>
       request(`/api/documents/${encodeURIComponent(documentId)}/shares`, ShareLinksResponseSchema),
+    sharePersonalDocument: (documentId, emails, expectedRevision) =>
+      mutation(
+        `/api/documents/${encodeURIComponent(documentId)}/people`,
+        DocumentMetadataSchema,
+        "PUT",
+        { emails, expectedRevision },
+      ),
     unlockShareLink: (documentId, password) =>
       mutation(
         `/api/documents/${encodeURIComponent(documentId)}/shares/unlock`,
