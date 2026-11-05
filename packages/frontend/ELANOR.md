@@ -33,17 +33,9 @@ select font families; the font stylesheets only register faces.
 
 ## Updating
 
-Pick an Elanor `main` commit whose Preview packages run succeeded, and replace the commit in all four URLs:
+Dependabot (`.github/dependabot.yml`) checks npm daily and opens one PR that moves all four packages to Elanor's newest
+release, updating `package.json` and `pnpm-lock.yaml` together. It ignores major releases, so moving to Elanor 1.0 is a
+deliberate change.
 
-```sh
-sha=$(git ls-remote git@github.com:earendil-works/elanor.git refs/heads/main | cut -f1)
-sed -i.bak -E "s#(pkg\.earendil\.com/@earendil-works/[a-z-]+@)[0-9a-f]{40}#\1$sha#" package.json && rm package.json.bak
-pnpm install
-```
-
-Commit `package.json` and `pnpm-lock.yaml` together.
-
-Builds of a commit expire 30 days after upload. Before that, a maintainer can keep one by running Elanor's **Preview
-packages** workflow with the commit SHA; it stays available as `main-<first 12 SHA characters>`, and the URLs can use that
-label instead. Released versions (`vX.Y.Z`) are kept too, and once Elanor publishes to npm, plain version ranges replace
-the URLs.
+Keep the four packages in one update: `elanor-react` depends on an exact `elanor-icons-react` version, and a mismatch
+installs two copies of the icons.
