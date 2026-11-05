@@ -1578,6 +1578,125 @@ test("personal documents are shared with named people and through links", async 
   }
 });
 
+test("unpublished workspace notes become personal again for their creator", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "inkling-make-personal-"));
+  try {
+    await withServer(directory, async (baseUrl, session, running) => {
+      const administrator = await setupApiKey(baseUrl, "administrator", session);
+      const signIn = async (email: string, displayName: string) => {
+        const id = await Effect.runPromise(personId(email));
+        const login = await running.runtime.runPromise(
+          Effect.flatMap(InklingApplication, (application) =>
+            application.loginWorkspaceIdentity({
+              displayName,
+              email,
+              personId: id,
+              role: "member",
+            }),
+          ),
+        );
+        return setupApiKey(baseUrl, email, {
+          cookieHeader: `inkling_session=${login.sessionToken}; inkling_csrf=${login.csrfToken}`,
+          csrf: login.csrfToken,
+        });
+      };
+      const creator = await signIn("creator@example.com", "Note Creator");
+      const editor = await signIn("editor@example.com", "Helpful Editor");
+      const commenter = await signIn("commenter@example.com", "Curious Commenter");
+      const request = (
+        headers: Readonly<Record<string, string>>,
+        method: string,
+        route: string,
+        body?: unknown,
+      ): Promise<Response> =>
+        fetch(`${baseUrl}${route}`, {
+          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+          headers: { ...headers, "Content-Type": "application/json" },
+          method,
+        });
+      const head = async (id: string): Promise<number> =>
+        (await readDocument(baseUrl, id, administrator)).metadata.headRevision;
+      const create = async (title: string): Promise<string> =>
+        (
+          (await (
+            await request(creator, "POST", "/api/documents", {
+              body: "Workspace draft.",
+              creationKey: title,
+              title,
+            })
+          ).json()) as DocumentWire
+        ).metadata.id;
+
+      const id = await create("Second thoughts");
+      const route = `/api/documents/${id}`;
+      assert.equal(
+        (
+          await request(editor, "POST", `${route}/edits`, {
+            edits: [{ newText: "Workspace draft, edited.", oldText: "Workspace draft." }],
+            expectedRevision: await head(id),
+          })
+        ).status,
+        200,
+      );
+      assert.equal(
+        (
+          await request(commenter, "POST", `${route}/comments`, {
+            authorDisplayName: "Curious Commenter",
+            body: "Why?",
+            selection: { end: 5, start: 0 },
+          })
+        ).status,
+        200,
+      );
+      assert.equal(
+        (await request(editor, "POST", `${route}/personal?expectedRevision=${await head(id)}`))
+          .status,
+        403,
+      );
+      const madePersonal = await request(
+        creator,
+        "POST",
+        `${route}/personal?expectedRevision=${await head(id)}`,
+      );
+      assert.equal(madePersonal.status, 200);
+      const personal = (await madePersonal.json()) as DocumentWire["metadata"] & {
+        sharedWith?: readonly { email: string }[];
+      };
+      assert.equal(personal.personalOwner, "creator@example.com");
+      assert.deepEqual(personal.sharedWith?.map((person) => person.email).toSorted(), [
+        "commenter@example.com",
+        "editor@example.com",
+      ]);
+      assert.equal((await request(administrator, "GET", route)).status, 403);
+      assert.equal((await request(editor, "GET", route)).status, 200);
+
+      const publishedId = await create("Published once");
+      const publishedRoute = `/api/documents/${publishedId}`;
+      assert.equal((await request(creator, "POST", `${publishedRoute}/publish`)).status, 200);
+      assert.equal(
+        (
+          await request(
+            creator,
+            "POST",
+            `${publishedRoute}/personal?expectedRevision=${await head(publishedId)}`,
+          )
+        ).status,
+        403,
+      );
+      assert.equal((await request(creator, "POST", `${publishedRoute}/unpublish`)).status, 200);
+      const withdrawn = await request(
+        creator,
+        "POST",
+        `${publishedRoute}/personal?expectedRevision=${await head(publishedId)}`,
+      );
+      assert.equal(withdrawn.status, 400);
+      assert.equal(((await withdrawn.json()) as { code: string }).code, "document_published");
+    });
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
+});
+
 test("backup corruption is rejected and a fresh installation restores portably", async () => {
   const sourceDirectory = await mkdtemp(path.join(tmpdir(), "inkling-backup-source-"));
   const targetDirectory = await mkdtemp(path.join(tmpdir(), "inkling-backup-target-"));
@@ -1781,6 +1900,10 @@ test("agents read and write documents over MCP", { timeout: 30_000 }, async () =
         people: [],
       });
       assert.equal(unsharedPersonal.structuredContent.metadata.sharedWith, undefined);
+      const movedPersonal = await call("move_to_workspace", { document: personalId });
+      assert.equal(movedPersonal.structuredContent.metadata.personalOwner, undefined);
+      const takenBack = await call("make_document_personal", { document: personalId });
+      assert.equal(takenBack.structuredContent.metadata.personalOwner, "admin@example.com");
 
       const commented = await call("add_comment", {
         body: "Which partition key?",

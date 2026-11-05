@@ -620,6 +620,20 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
     ),
   );
 
+  app.post("/api/documents/:documentId/personal", (context) =>
+    execute(context, options, (service) =>
+      mutation(context, requiredRevision(context)).pipe(
+        Effect.flatMap((expectedRevision) =>
+          service.makePersonal(
+            credentials(context),
+            context.req.param("documentId"),
+            expectedRevision,
+          ),
+        ),
+      ),
+    ),
+  );
+
   app.post("/api/documents/:documentId/workspace", (context) =>
     execute(context, options, (service) =>
       mutation(context, requiredRevision(context)).pipe(

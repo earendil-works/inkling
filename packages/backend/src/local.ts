@@ -2068,6 +2068,10 @@ export function makeLocalInklingApplication(
           const metadata = yield* createDocumentMetadata(
             {
               authors: author === undefined ? [] : [author],
+              createdBy:
+                principal.kind === "workspace" || principal.kind === "api-key"
+                  ? principal.personId
+                  : undefined,
               id: reservation.entry.documentId,
               personalOwner,
               rfcNumber: reservation.entry.rfcNumber,
@@ -2346,6 +2350,60 @@ export function makeLocalInklingApplication(
             .pipe(Effect.mapError(toApplicationError));
           yield* projectDocument(room);
           // Access changed, so the change is durable before anyone relies on it.
+          yield* room.checkpoint(now).pipe(Effect.mapError(toApplicationError));
+          return metadata as DocumentMetadataDto;
+        }),
+      makePersonal: (credentials, rawDocumentId, expectedRevision) =>
+        Effect.gen(function* () {
+          const room = yield* getRoom(rawDocumentId);
+          const principal = yield* resolvePrincipal(credentials, rawDocumentId);
+          const now = new Date().toISOString();
+          const current = yield* room
+            .snapshot(principal, now)
+            .pipe(Effect.mapError(toApplicationError));
+          yield* authorizeDocument(principal, "make-personal", current.metadata, now).pipe(
+            Effect.mapError(toApplicationError),
+          );
+          // Everyone the history and comments name as having worked on the
+          // document keeps access to it. Guests have no account to share with.
+          yield* room.checkpoint(now).pipe(Effect.mapError(toApplicationError));
+          const history = yield* provideAuthorityDependencies(
+            readDocumentHistory({ documentId: room.documentId, workspaceId: state.workspaceId }),
+          ).pipe(Effect.mapError(toApplicationError));
+          const contributors = [
+            ...new Set(
+              [
+                ...history.events.flatMap((event) =>
+                  event.actor?.kind === "workspace" || event.actor?.kind === "api-key"
+                    ? [event.actor.id ?? ""]
+                    : [],
+                ),
+                ...current.comments.threads.flatMap((thread) =>
+                  thread.messages.map((message) => message.authorId),
+                ),
+              ].map((id) => id.toLocaleLowerCase("en")),
+            ),
+          ].filter(
+            (id) =>
+              id !== systemId &&
+              id !==
+                (principal.kind === "workspace" || principal.kind === "api-key"
+                  ? principal.personId
+                  : "") &&
+              /^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(id),
+          );
+          const collaborators = yield* resolvePeople(contributors).pipe(
+            Effect.flatMap((directoryPeople) =>
+              resolveAuthorsByEmail(contributors, directoryPeople).pipe(
+                Effect.mapError(toApplicationError),
+              ),
+            ),
+          );
+          const metadata = yield* room
+            .makePersonal(principal, collaborators, expectedRevision, now)
+            .pipe(Effect.mapError(toApplicationError));
+          yield* projectDocument(room);
+          // Access narrowed, so the change is durable before anyone relies on it.
           yield* room.checkpoint(now).pipe(Effect.mapError(toApplicationError));
           return metadata as DocumentMetadataDto;
         }),

@@ -57,6 +57,7 @@ export const documentActions = [
   "restore",
   "restore-history",
   "move-to-workspace",
+  "make-personal",
 ] as const;
 
 export type DocumentAction = (typeof documentActions)[number];
@@ -131,6 +132,7 @@ function isIdentityActionAllowed(
     return isPersonalDocumentActionAllowed(principal, action, metadata);
   }
   if (action === "move-to-workspace") return false;
+  if (action === "make-personal") return mayMakePersonal(principal, metadata);
 
   if (metadata.deletedAt !== undefined) {
     if (principal.kind !== "workspace" && principal.kind !== "api-key") return false;
@@ -178,6 +180,23 @@ function isIdentityActionAllowed(
   return false;
 }
 
+/**
+ * Its creator, or an administrator, may take a workspace document back into
+ * their personal space until it is first published. Documents created before
+ * their creator was recorded need an administrator. The document authority
+ * also confirms no publication was ever withdrawn.
+ */
+function mayMakePersonal(principal: Principal, metadata: DocumentMetadata): boolean {
+  return (
+    (principal.kind === "workspace" || principal.kind === "api-key") &&
+    !isSystemPrincipal(principal) &&
+    metadata.deletedAt === undefined &&
+    metadata.rfcNumber === undefined &&
+    metadata.publishedRevision === undefined &&
+    (principal.role === "administrator" || metadata.createdBy === principal.personId)
+  );
+}
+
 function isGrantActionAllowed(
   grant: CapabilityGrant,
   action: DocumentAction,
@@ -211,6 +230,7 @@ function isGrantActionAllowed(
     case "delete":
     case "edit-metadata":
     case "hard-delete":
+    case "make-personal":
     case "manage-comments":
     case "manage-sharing":
     case "move-to-workspace":
@@ -244,6 +264,7 @@ function isPersonalDocumentActionAllowed(
     );
   }
   switch (action) {
+    case "make-personal":
     case "publish":
     case "read-published":
       return false;
@@ -278,6 +299,7 @@ function isCollaboratorAction(action: DocumentAction): boolean {
       return true;
     case "delete":
     case "hard-delete":
+    case "make-personal":
     case "manage-comments":
     case "manage-sharing":
     case "move-to-workspace":

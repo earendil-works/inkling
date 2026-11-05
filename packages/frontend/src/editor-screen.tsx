@@ -113,6 +113,7 @@ export function EditorScreen({
   const canEditMetadata = permissions?.includes("edit-metadata") ?? !shared;
   const canMoveToWorkspace = permissions?.includes("move-to-workspace") ?? false;
   const canManageSharing = permissions?.includes("manage-sharing") ?? false;
+  const canMakePersonal = permissions?.includes("make-personal") ?? false;
   const rendered = useDocumentMarkdown(api, body, metadata, references);
   const historyRendered = useDocumentMarkdown(
     api,
@@ -186,6 +187,7 @@ export function EditorScreen({
         canDelete={canDelete}
         canEdit={canEdit}
         canEditMetadata={canEditMetadata}
+        canMakePersonal={canMakePersonal}
         canManageSharing={canManageSharing}
         canMoveToWorkspace={canMoveToWorkspace}
         commentsButtonRef={commentsButtonRef}

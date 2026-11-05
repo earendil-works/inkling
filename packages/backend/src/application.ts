@@ -303,6 +303,12 @@ export interface InklingApplicationService {
     documentId: string,
     request: SharePeopleRequest,
   ) => Effect.Effect<DocumentMetadataDto, ApplicationError>;
+  /** Takes a never-published workspace document into the caller's personal space. */
+  readonly makePersonal: (
+    credentials: RequestCredentials,
+    documentId: string,
+    expectedRevision: number,
+  ) => Effect.Effect<DocumentMetadataDto, ApplicationError>;
   /** Makes the owner's personal document visible to the whole workspace. */
   readonly moveToWorkspace: (
     credentials: RequestCredentials,

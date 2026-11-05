@@ -1073,13 +1073,53 @@ const sharePersonalDocument = defineTool({
   title: "Share personal document",
 });
 
+const makeDocumentPersonal = defineTool({
+  arguments: Schema.Struct({
+    document: DocumentReference,
+    expected_revision: Schema.optional(Revision),
+  }),
+  description:
+    "Take a workspace document back into the user's personal space, shared only with the people who edited or commented on it. Only possible for notes the user created (or any note, for administrators) that have no RFC number and have never been published. Everyone else loses access, though they may have read it already. Only do this when the user asks.",
+  idempotent: false,
+  name: "make_document_personal",
+  properties: {
+    document: documentProperty,
+    expected_revision: expectedRevisionProperty(
+      "Fails if anything changed since; defaults to the current head.",
+    ),
+  },
+  required: ["document"],
+  risk: "write",
+  run: ({ document, expected_revision }, api) =>
+    Effect.gen(function* () {
+      const documentId = yield* resolveDocumentId(api, document);
+      const metadata = yield* api.request(
+        "POST",
+        documentPath(
+          documentId,
+          `/personal?expectedRevision=${expected_revision ?? (yield* headRevision(api, documentId))}`,
+        ),
+        DocumentMetadataSchema,
+      );
+      const shared = metadata.sharedWith ?? [];
+      return mutationOutput(
+        api,
+        metadata,
+        shared.length === 0
+          ? `${describe(metadata)} is now personal.`
+          : `${describe(metadata)} is now personal, shared with ${shared.map((person) => person.email).join(", ")}.`,
+      );
+    }),
+  title: "Make document personal",
+});
+
 const moveToWorkspace = defineTool({
   arguments: Schema.Struct({
     document: DocumentReference,
     expected_revision: Schema.optional(Revision),
   }),
   description:
-    "Move one of the user's personal documents to the workspace, so everyone in the workspace can find, read, and edit it. This cannot be undone: documents never become personal again. Only do this when the user asks.",
+    "Move one of the user's personal documents to the workspace, so everyone in the workspace can find, read, and edit it. It can become personal again with make_document_personal until it is first published. Only do this when the user asks.",
   idempotent: false,
   name: "move_to_workspace",
   properties: {
@@ -1128,6 +1168,7 @@ export const inklingTools: readonly InklingTool[] = [
   restoreDocument,
   sharePersonalDocument,
   moveToWorkspace,
+  makeDocumentPersonal,
 ];
 
 // Helpers.

@@ -43,8 +43,9 @@ read, comment on, and edit it, but cannot share it further, trash it, or move
 it. Signed-in people who open a share link appear as themselves rather than as
 guests. Personal documents cannot be published or numbered as RFCs. When it is
 ready, its owner moves it to the workspace, which makes it an ordinary
-workspace document. That move cannot be undone. Workspace backups still
-contain personal documents.
+workspace document. Until a workspace note is first published, its creator or
+an administrator can make it personal again; everyone who edited or commented
+on it keeps access. Workspace backups still contain personal documents.
 
 The first top-level Markdown heading is the document title. Publication
 metadata lives in YAML frontmatter at the beginning of the collaborative source:

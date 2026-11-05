@@ -33,6 +33,7 @@ export {
   markPublished,
   markRestored,
   markUnpublished,
+  makePersonal,
   moveToWorkspace,
   sharePersonalDocument,
   nextDocumentRevision,

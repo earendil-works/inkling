@@ -13,6 +13,7 @@ import {
   DurableDocumentJournal,
   editCommentMessage,
   emptyCommentState,
+  makePersonal,
   markDeleted,
   markPublished,
   markRestored,
@@ -322,6 +323,16 @@ export interface DocumentAuthorityService {
     expectedRevision: number,
     now: string,
   ) => Effect.Effect<DocumentMetadata, AuthorityError>;
+  /**
+   * Takes a never-published workspace document into the principal's personal
+   * space, shared with the collaborators given; see `makePersonal`.
+   */
+  readonly makePersonal: (
+    principal: Principal,
+    collaborators: readonly PersonReference[],
+    expectedRevision: number,
+    now: string,
+  ) => Effect.Effect<DocumentMetadata, AuthorityError>;
   /** Replaces who a personal document is shared with; see `sharePersonalDocument`. */
   readonly sharePersonalDocument: (
     principal: Principal,
@@ -478,9 +489,11 @@ export function makeDocumentAuthority(
     /** Changes who may access the document, which connected clients learn at once. */
     const changeAccess = (
       principal: Principal,
-      action: "manage-sharing" | "move-to-workspace",
+      action: "make-personal" | "manage-sharing" | "move-to-workspace",
       now: string,
-      change: (metadata: DocumentMetadata) => Effect.Effect<DocumentMetadata, DomainError>,
+      change: (
+        metadata: DocumentMetadata,
+      ) => Effect.Effect<DocumentMetadata, DomainError | StorageError>,
     ): Effect.Effect<DocumentMetadata, AuthorityError> =>
       withLock(
         Effect.gen(function* () {
@@ -705,6 +718,37 @@ export function makeDocumentAuthority(
           editCommentMessage(comments, threadId, messageId, body, actor, now),
         ),
       events: Stream.fromPubSub(pubsub),
+      makePersonal: (principal, collaborators, expectedRevision, now) =>
+        changeAccess(principal, "make-personal", now, (metadata) =>
+          Effect.gen(function* () {
+            // Withdrawing a publication clears it from the metadata, but its
+            // revisions stay stored, so they show it was published once.
+            const published = yield* objectStore.list(publishedRevisionsPrefix(options));
+            if (published.length > 0) {
+              return yield* Effect.fail(
+                new DomainError({
+                  code: "document_published",
+                  message: "Documents that have been published cannot become personal again.",
+                }),
+              );
+            }
+            if (principal.kind !== "workspace" && principal.kind !== "api-key") {
+              return yield* Effect.fail(
+                new DomainError({
+                  code: "account_required",
+                  message: "Only a signed-in person can own a personal document.",
+                }),
+              );
+            }
+            return yield* makePersonal(
+              metadata,
+              principal.personId,
+              collaborators,
+              expectedRevision,
+              now,
+            );
+          }),
+        ),
       moveToWorkspace: (principal, expectedRevision, now) =>
         changeAccess(principal, "move-to-workspace", now, (metadata) =>
           moveToWorkspace(metadata, expectedRevision, now),
@@ -1659,7 +1703,12 @@ function headKey(options: MakeDocumentAuthorityOptions): string {
 }
 
 function revisionKey(options: MakeDocumentAuthorityOptions, revision: DocumentRevision): string {
-  return `workspaces/${options.workspaceId}/documents/${options.documentId}/revisions/${revision}.json`;
+  return `${publishedRevisionsPrefix(options)}${revision}.json`;
+}
+
+/** Where published revisions are stored; nothing else is stored there. */
+function publishedRevisionsPrefix(options: MakeDocumentAuthorityOptions): string {
+  return `workspaces/${options.workspaceId}/documents/${options.documentId}/revisions/`;
 }
 
 function collaborationFailure(

@@ -47,6 +47,7 @@ import {
   hasPendingPublicationChanges,
   identifierTag,
   isDocumentActionAllowed,
+  makePersonal,
   sharePersonalDocument,
   documentActions,
   moveToWorkspace,
@@ -784,6 +785,79 @@ test("personal documents open to the people and links their owner shares them wi
   assert.deepEqual(search("is:shared", owner, ownerId), []);
   assert.deepEqual(search("is:personal", owner, ownerId), [shared.id]);
   assert.deepEqual(search("", administrator, administratorId), []);
+});
+
+test("unpublished workspace documents can become personal again", async () => {
+  const creatorId = await Effect.runPromise(personId("creator@example.com"));
+  const memberId = await Effect.runPromise(personId("member@example.com"));
+  const administratorId = await Effect.runPromise(personId("admin@example.com"));
+  const creator: Principal = { kind: "workspace", personId: creatorId, role: "member" };
+  const member: Principal = { kind: "workspace", personId: memberId, role: "member" };
+  const administrator: Principal = {
+    kind: "workspace",
+    personId: administratorId,
+    role: "administrator",
+  };
+  const document = await Effect.runPromise(
+    createDocumentMetadata(
+      { createdBy: creatorId, id: "document_takeback1", title: "Second thoughts" },
+      now,
+    ),
+  );
+  const legacy = await Effect.runPromise(
+    createDocumentMetadata({ id: "document_takeback2", title: "Before creators" }, now),
+  );
+  const may = (principal: Principal, metadata: DocumentMetadata): boolean =>
+    isDocumentActionAllowed(principal, "make-personal", metadata, now);
+
+  assert.equal(may(creator, document), true);
+  assert.equal(may(administrator, document), true);
+  assert.equal(may(member, document), false);
+  assert.equal(
+    may({ access: "edit", documentId: document.id, generation: 0, kind: "capability" }, document),
+    false,
+  );
+  assert.equal(may(creator, legacy), false);
+  assert.equal(may(administrator, legacy), true);
+  const published = await Effect.runPromise(markPublished(document, document.headRevision, now));
+  assert.equal(may(creator, published), false);
+  const numbered = await Effect.runPromise(assignRfcNumber(document, 4, now));
+  assert.equal(may(creator, numbered), false);
+  const trashed = await Effect.runPromise(markDeleted(document, document.headRevision, now));
+  assert.equal(may(creator, trashed), false);
+
+  const personal = await Effect.runPromise(
+    makePersonal(
+      document,
+      creatorId,
+      [person(memberId, "member@example.com"), person(creatorId, "creator@example.com")],
+      document.headRevision,
+      now,
+    ),
+  );
+  assert.equal(personal.personalOwner, creatorId);
+  assert.equal(personal.createdBy, creatorId);
+  assert.deepEqual(
+    personal.sharedWith?.map((entry) => entry.id),
+    [memberId],
+  );
+  assert.equal(personal.headRevision, document.headRevision + 1);
+  assert.equal(isDocumentActionAllowed(member, "edit-body", personal, now), true);
+  assert.equal(isDocumentActionAllowed(administrator, "discover", personal, now), false);
+  assert.equal(may(creator, personal), false);
+  const again = await Effect.runPromise(
+    makePersonal(personal, creatorId, [], personal.headRevision, now).pipe(Effect.either),
+  );
+  assert.equal(Either.isLeft(again) && again.left.code, "document_personal");
+  const refused = await Effect.runPromise(
+    makePersonal(published, creatorId, [], published.headRevision, now).pipe(Effect.either),
+  );
+  assert.equal(Either.isLeft(refused) && refused.left.code, "document_published");
+  const backInWorkspace = await Effect.runPromise(
+    moveToWorkspace(personal, personal.headRevision, now),
+  );
+  assert.equal(backInWorkspace.createdBy, creatorId);
+  assert.equal(may(creator, backInWorkspace), true);
 });
 
 test("capability generations revoke existing principals", async () => {

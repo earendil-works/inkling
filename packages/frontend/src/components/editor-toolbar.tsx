@@ -15,7 +15,7 @@ import { ButtonLink } from "./button-link.tsx";
 import styles from "./editor.module.css";
 import { HistoryControl } from "./history-control.tsx";
 import type { HistoryControlProps } from "./history-control.tsx";
-import { MoveToWorkspaceButton } from "./move-to-workspace-button.tsx";
+import { AudienceButton } from "./audience-button.tsx";
 import { PublishButton } from "./publish-button.tsx";
 import type { PublishButtonProps } from "./publish-button.tsx";
 import { SharingControl } from "./sharing-control.tsx";
@@ -25,6 +25,7 @@ export interface EditorToolbarProps {
   readonly canDelete: boolean;
   readonly canEdit: boolean;
   readonly canEditMetadata: boolean;
+  readonly canMakePersonal: boolean;
   readonly canManageSharing: boolean;
   readonly canMoveToWorkspace: boolean;
   readonly commentsButtonRef?: React.Ref<HTMLButtonElement> | undefined;
@@ -51,6 +52,7 @@ export function EditorToolbar({
   canDelete,
   canEdit,
   canEditMetadata,
+  canMakePersonal,
   canManageSharing,
   canMoveToWorkspace,
   commentsButtonRef,
@@ -130,12 +132,28 @@ export function EditorToolbar({
           metadata={metadata}
           onAllocated={onMetadataChanged}
         />
-        {canMoveToWorkspace && personal && !trashed ? (
-          <MoveToWorkspaceButton
+        {canMoveToWorkspace && personal && !trashed && !shared ? (
+          <AudienceButton
             api={api}
-            beforeMove={saveChanges}
+            beforeChange={saveChanges}
+            destination="workspace"
             documentId={metadata.id}
-            onMoved={onMetadataChanged}
+            onChanged={onMetadataChanged}
+          />
+        ) : null}
+        {canMakePersonal &&
+        !personal &&
+        !trashed &&
+        !shared &&
+        // Permissions arrive with the connection; publishing or numbering since ends eligibility.
+        metadata.publishedRevision === undefined &&
+        metadata.rfcNumber === undefined ? (
+          <AudienceButton
+            api={api}
+            beforeChange={saveChanges}
+            destination="personal"
+            documentId={metadata.id}
+            onChanged={onMetadataChanged}
           />
         ) : null}
         {shared || trashed || (personal && !canManageSharing) ? null : (

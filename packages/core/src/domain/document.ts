@@ -64,6 +64,8 @@ export interface DocumentMetadata {
   readonly publishedRevision?: DocumentRevision | undefined;
   readonly sharing: SharingPolicy;
   readonly deletedAt?: string | undefined;
+  /** Who created the document; recorded for documents created since it was introduced. */
+  readonly createdBy?: PersonId | undefined;
   /**
    * Set on personal documents: only this person may access them until they
    * move the document to the workspace. Never inferred from Markdown.
@@ -102,6 +104,7 @@ export interface CreateMetadataInput {
   readonly targetDecisionDate?: string | undefined;
   readonly relatedDocuments?: readonly RelatedDocumentReference[] | undefined;
   readonly legacySourceUrl?: string | undefined;
+  readonly createdBy?: PersonId | undefined;
   readonly personalOwner?: PersonId | undefined;
 }
 
@@ -276,6 +279,7 @@ export function createDocumentMetadata(
       approvers,
       authors,
       createdAt: createdDate,
+      ...(input.createdBy === undefined ? {} : { createdBy: input.createdBy }),
       headRevision: 0 as DocumentRevision,
       id,
       labels,
@@ -498,8 +502,8 @@ export function markRestored(
 }
 
 /**
- * Makes a personal document a workspace document. The transition is one-way,
- * so no member can hide a workspace document from the rest of the workspace.
+ * Makes a personal document a workspace document. Taking it back is only
+ * possible until it is first published; see `makePersonal`.
  */
 export function moveToWorkspace(
   metadata: DocumentMetadata,
@@ -558,6 +562,46 @@ export function sharePersonalDocument(
       headRevision: nextDocumentRevision(metadata.headRevision),
       updatedAt: yield* fromEither(validateDate(now, "update date")),
     };
+  });
+}
+
+/**
+ * Takes a workspace document back into its owner's personal space, shared
+ * with the people who worked on it. Callers authorize the owner and confirm
+ * the document was never published, which its metadata alone cannot show
+ * once a publication is withdrawn.
+ */
+export function makePersonal(
+  metadata: DocumentMetadata,
+  owner: PersonId,
+  collaborators: readonly PersonReference[],
+  expectedRevision: number,
+  now: string,
+): Effect.Effect<DocumentMetadata, DomainError> {
+  return Effect.gen(function* () {
+    yield* requireRevision(metadata, expectedRevision);
+    if (metadata.personalOwner !== undefined) {
+      return yield* fail("document_personal", "The document is already personal.");
+    }
+    if (metadata.deletedAt !== undefined) {
+      return yield* fail("document_deleted", "Restore the document from Trash first.");
+    }
+    if (metadata.rfcNumber !== undefined) {
+      return yield* fail("personal_rfc", "RFCs cannot become personal documents.");
+    }
+    if (metadata.publishedRevision !== undefined) {
+      return yield* fail(
+        "document_published",
+        "Documents that have been published cannot become personal again.",
+      );
+    }
+    const personal = yield* sharePersonalDocument(
+      { ...metadata, personalOwner: owner },
+      collaborators,
+      expectedRevision,
+      now,
+    );
+    return personal;
   });
 }
 

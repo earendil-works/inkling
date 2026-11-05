@@ -1655,6 +1655,16 @@ test(
       await first.waitForSelector("[data-publish]");
       assert.equal(await first.locator("[data-document-page] [data-personal-document]").count(), 0);
 
+      // Until it is first published, its creator can take it back.
+      await first.locator("[data-make-personal]").click();
+      await first
+        .locator("[data-confirmation-dialog]")
+        .getByRole("button", { name: "Make personal" })
+        .click();
+      await first.waitForSelector("[data-move-to-workspace]");
+      await first.waitForSelector("[data-document-page] [data-personal-document]");
+      assert.equal(await first.locator("[data-make-personal]").count(), 0);
+
       const publicNote = await first.evaluate(async () => {
         const csrf = document.cookie
           .split(";")

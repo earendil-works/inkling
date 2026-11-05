@@ -128,6 +128,10 @@ export interface ApiClientService {
     documentId: string,
     expectedRevision: number,
   ) => Effect.Effect<DocumentMetadataDto, ApiError>;
+  readonly makePersonal: (
+    documentId: string,
+    expectedRevision: number,
+  ) => Effect.Effect<DocumentMetadataDto, ApiError>;
   readonly reply: (
     documentId: string,
     threadId: string,
@@ -370,6 +374,12 @@ export function makeApiClient(
         Schema.Unknown,
         "DELETE",
       ).pipe(Effect.asVoid),
+    makePersonal: (documentId, expectedRevision) =>
+      mutation(
+        `/api/documents/${encodeURIComponent(documentId)}/personal?expectedRevision=${expectedRevision}`,
+        DocumentMetadataSchema,
+        "POST",
+      ),
     moveToWorkspace: (documentId, expectedRevision) =>
       mutation(
         `/api/documents/${encodeURIComponent(documentId)}/workspace?expectedRevision=${expectedRevision}`,
