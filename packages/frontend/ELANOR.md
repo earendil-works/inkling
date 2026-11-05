@@ -1,8 +1,7 @@
 # Elanor
 
-The frontend builds its UI from the [Elanor](https://github.com/earendil-works/elanor) design system. Elanor's main
-builds are published to [pkg.earendil.com](https://pkg.earendil.com), and `package.json` pins each package to the same
-Elanor commit by URL:
+The frontend builds its UI from the [Elanor](https://github.com/earendil-works/elanor) design system. Its packages come
+from npm, and `package.json` pins each one to an exact version:
 
 | Package                              | Contents                                                     |
 | ------------------------------------ | ------------------------------------------------------------ |
@@ -13,22 +12,10 @@ Elanor commit by URL:
 
 They are development dependencies because Vite bundles them; published Inkling packages never depend on them.
 
-## Access
-
-Installing needs an Earendil Works login. Log in once; the token lasts 30 days and lives in `~/.npmrc`:
-
-```sh
-npm login --registry=https://pkg.earendil.com
-```
-
-Never put a pkg.earendil.com token in the project's `.npmrc`. GitHub Actions workflows trade their OIDC token for an
-install token instead (`permissions: id-token: write`), and the Docker build takes an npm config as the `npmrc` build
-secret.
-
 ## Components and docs
 
 Use Elanor's components and their documented props. The documentation is the `.mdx` file next to each component in
-`packages/react/src/` of the Elanor repository at the pinned commit.
+`packages/react/src/` of the Elanor repository at the release tag (`v<version>`) of the pinned version.
 
 ## Styles
 
@@ -46,17 +33,9 @@ select font families; the font stylesheets only register faces.
 
 ## Updating
 
-Pick an Elanor `main` commit whose Preview packages run succeeded, and replace the commit in all four URLs:
+Dependabot (`.github/dependabot.yml`) checks npm daily and opens one PR that moves all four packages to Elanor's newest
+release, updating `package.json` and `pnpm-lock.yaml` together. It ignores major releases, so moving to Elanor 1.0 is a
+deliberate change.
 
-```sh
-sha=$(git ls-remote git@github.com:earendil-works/elanor.git refs/heads/main | cut -f1)
-sed -i.bak -E "s#(pkg\.earendil\.com/@earendil-works/[a-z-]+@)[0-9a-f]{40}#\1$sha#" package.json && rm package.json.bak
-pnpm install
-```
-
-Commit `package.json` and `pnpm-lock.yaml` together.
-
-Builds of a commit expire 30 days after upload. Before that, a maintainer can keep one by running Elanor's **Preview
-packages** workflow with the commit SHA; it stays available as `main-<first 12 SHA characters>`, and the URLs can use that
-label instead. Released versions (`vX.Y.Z`) are kept too, and once Elanor publishes to npm, plain version ranges replace
-the URLs.
+Keep the four packages in one update: `elanor-react` depends on an exact `elanor-icons-react` version, and a mismatch
+installs two copies of the icons.

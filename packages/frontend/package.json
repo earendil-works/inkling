@@ -54,10 +54,10 @@
     "yjs": "13.6.32"
   },
   "devDependencies": {
-    "@earendil-works/design-tokens": "https://pkg.earendil.com/@earendil-works/design-tokens@d3184572b22415e62df6e63b30bb7edb5c669f9b",
-    "@earendil-works/elanor-fonts": "https://pkg.earendil.com/@earendil-works/elanor-fonts@d3184572b22415e62df6e63b30bb7edb5c669f9b",
-    "@earendil-works/elanor-icons-react": "https://pkg.earendil.com/@earendil-works/elanor-icons-react@d3184572b22415e62df6e63b30bb7edb5c669f9b",
-    "@earendil-works/elanor-react": "https://pkg.earendil.com/@earendil-works/elanor-react@d3184572b22415e62df6e63b30bb7edb5c669f9b",
+    "@earendil-works/design-tokens": "0.1.0",
+    "@earendil-works/elanor-fonts": "0.1.0",
+    "@earendil-works/elanor-icons-react": "0.1.0",
+    "@earendil-works/elanor-react": "0.1.0",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
     "@vitejs/plugin-react": "6.0.5",

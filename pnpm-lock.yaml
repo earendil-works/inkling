@@ -164,17 +164,17 @@ importers:
         version: 13.6.32
     devDependencies:
       '@earendil-works/design-tokens':
-        specifier: https://pkg.earendil.com/@earendil-works/design-tokens@d3184572b22415e62df6e63b30bb7edb5c669f9b
-        version: https://pkg.earendil.com/@earendil-works/design-tokens@d3184572b22415e62df6e63b30bb7edb5c669f9b
+        specifier: 0.1.0
+        version: 0.1.0
       '@earendil-works/elanor-fonts':
-        specifier: https://pkg.earendil.com/@earendil-works/elanor-fonts@d3184572b22415e62df6e63b30bb7edb5c669f9b
-        version: https://pkg.earendil.com/@earendil-works/elanor-fonts@d3184572b22415e62df6e63b30bb7edb5c669f9b
+        specifier: 0.1.0
+        version: 0.1.0
       '@earendil-works/elanor-icons-react':
-        specifier: https://pkg.earendil.com/@earendil-works/elanor-icons-react@d3184572b22415e62df6e63b30bb7edb5c669f9b
-        version: https://pkg.earendil.com/@earendil-works/elanor-icons-react@d3184572b22415e62df6e63b30bb7edb5c669f9b(react@19.2.8)
+        specifier: 0.1.0
+        version: 0.1.0(react@19.2.8)
       '@earendil-works/elanor-react':
-        specifier: https://pkg.earendil.com/@earendil-works/elanor-react@d3184572b22415e62df6e63b30bb7edb5c669f9b
-        version: https://pkg.earendil.com/@earendil-works/elanor-react@d3184572b22415e62df6e63b30bb7edb5c669f9b(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        specifier: 0.1.0
+        version: 0.1.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@types/react':
         specifier: 19.2.18
         version: 19.2.18
@@ -501,23 +501,19 @@ packages:
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
     engines: {node: '>=12'}
 
-  '@earendil-works/design-tokens@https://pkg.earendil.com/@earendil-works/design-tokens@d3184572b22415e62df6e63b30bb7edb5c669f9b':
-    resolution: {integrity: sha512-0Gphbl/yYMaxf8kuo7MFs/TRS7IyKj/HGVOund6AFGqyrUDfO7dkW2OjtyC5qDProPtB3C4ibGcGPQWMt8cXbA==, tarball: https://pkg.earendil.com/@earendil-works/design-tokens@d3184572b22415e62df6e63b30bb7edb5c669f9b}
-    version: 0.1.0
+  '@earendil-works/design-tokens@0.1.0':
+    resolution: {integrity: sha512-xY6+O52jX7VJGso8kEA+bLdV7N8nSooJ2vjtrYq71gi1Hkd3qHwz2g3UprmgpcKSHtZO6vOxzGWxbT1jAS7sVA==}
 
-  '@earendil-works/elanor-fonts@https://pkg.earendil.com/@earendil-works/elanor-fonts@d3184572b22415e62df6e63b30bb7edb5c669f9b':
-    resolution: {integrity: sha512-FumYoWIhXt8NHIwY8Ku0TecJox0aZ9rcGgu11sgOUhCPREgVkFS3C1Obo7FgT8IdqlFhzG87ryzx7bg5UPpVpQ==, tarball: https://pkg.earendil.com/@earendil-works/elanor-fonts@d3184572b22415e62df6e63b30bb7edb5c669f9b}
-    version: 0.1.0
+  '@earendil-works/elanor-fonts@0.1.0':
+    resolution: {integrity: sha512-FumYoWIhXt8NHIwY8Ku0TecJox0aZ9rcGgu11sgOUhCPREgVkFS3C1Obo7FgT8IdqlFhzG87ryzx7bg5UPpVpQ==}
 
-  '@earendil-works/elanor-icons-react@https://pkg.earendil.com/@earendil-works/elanor-icons-react@d3184572b22415e62df6e63b30bb7edb5c669f9b':
-    resolution: {tarball: https://pkg.earendil.com/@earendil-works/elanor-icons-react@d3184572b22415e62df6e63b30bb7edb5c669f9b}
-    version: 0.1.0
+  '@earendil-works/elanor-icons-react@0.1.0':
+    resolution: {integrity: sha512-Ri6xEWAvuhbKWgKcjphhxOMGAISKAyCAttQx4qlxflSORnGc0nPCA8pD0LsmmSCpdi/GmSJwUibPkwC0xn9BrQ==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
 
-  '@earendil-works/elanor-react@https://pkg.earendil.com/@earendil-works/elanor-react@d3184572b22415e62df6e63b30bb7edb5c669f9b':
-    resolution: {tarball: https://pkg.earendil.com/@earendil-works/elanor-react@d3184572b22415e62df6e63b30bb7edb5c669f9b}
-    version: 0.1.0
+  '@earendil-works/elanor-react@0.1.0':
+    resolution: {integrity: sha512-9zh26YB9Y64QOw//k4agAT9sWdYmE2unGavmUIHSDQRVIdfyVgdMXHCkgjEf1CTnmzCI069UnPWUdEmcS7RzUQ==}
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
@@ -2753,18 +2749,18 @@ snapshots:
     dependencies:
       '@jridgewell/trace-mapping': 0.3.9
 
-  '@earendil-works/design-tokens@https://pkg.earendil.com/@earendil-works/design-tokens@d3184572b22415e62df6e63b30bb7edb5c669f9b': {}
+  '@earendil-works/design-tokens@0.1.0': {}
 
-  '@earendil-works/elanor-fonts@https://pkg.earendil.com/@earendil-works/elanor-fonts@d3184572b22415e62df6e63b30bb7edb5c669f9b': {}
+  '@earendil-works/elanor-fonts@0.1.0': {}
 
-  '@earendil-works/elanor-icons-react@https://pkg.earendil.com/@earendil-works/elanor-icons-react@d3184572b22415e62df6e63b30bb7edb5c669f9b(react@19.2.8)':
+  '@earendil-works/elanor-icons-react@0.1.0(react@19.2.8)':
     dependencies:
       react: 19.2.8
 
-  '@earendil-works/elanor-react@https://pkg.earendil.com/@earendil-works/elanor-react@d3184572b22415e62df6e63b30bb7edb5c669f9b(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+  '@earendil-works/elanor-react@0.1.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
       '@base-ui/react': 1.8.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@earendil-works/elanor-icons-react': https://pkg.earendil.com/@earendil-works/elanor-icons-react@d3184572b22415e62df6e63b30bb7edb5c669f9b(react@19.2.8)
+      '@earendil-works/elanor-icons-react': 0.1.0(react@19.2.8)
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
     transitivePeerDependencies:

@@ -1,0 +1,19 @@
+# Elanor releases only; other dependencies are updated by hand.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: daily
+    versioning-strategy: increase
+    allow:
+      - dependency-name: "@earendil-works/elanor-*"
+      - dependency-name: "@earendil-works/design-tokens"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      elanor:
+        patterns:
+          - "@earendil-works/elanor-*"
+          - "@earendil-works/design-tokens"
