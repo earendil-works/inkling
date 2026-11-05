@@ -10,12 +10,9 @@ Inkling supports two runtimes:
 - Node.js 24 or newer
 - pnpm 10 or newer
 
-The frontend uses the [Elanor](packages/frontend/ELANOR.md) design system, installed from
-[pkg.earendil.com](https://pkg.earendil.com), which needs an Earendil Works login. Log in once (the
-token lasts 30 days), then install dependencies:
+The frontend uses the [Elanor](packages/frontend/ELANOR.md) design system from npm. Install dependencies:
 
 ```sh
-npm login --registry=https://pkg.earendil.com
 make setup
 ```
 
@@ -176,12 +173,10 @@ node packages/cli/src/main.ts serve --port 8787 --data-dir .inkling
 
 ### Docker
 
-The Docker image runs the same local runtime. Its build installs Elanor from pkg.earendil.com, so pass
-an npm config holding your pkg.earendil.com token as the `npmrc` build secret. Mount the complete
-`/data` directory for persistence:
+The Docker image runs the same local runtime. Mount the complete `/data` directory for persistence:
 
 ```sh
-docker build --secret id=npmrc,src="$HOME/.npmrc" -t inkling .
+docker build -t inkling .
 docker run --rm -p 8787:8787 -v inkling-data:/data inkling
 ```
 

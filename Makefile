@@ -2,8 +2,7 @@ PNPM ?= pnpm
 
 .PHONY: build check dev format format-check lint setup test typecheck
 
-# Installs dependencies. Elanor comes from pkg.earendil.com, which needs
-# `npm login --registry=https://pkg.earendil.com` once.
+# Installs dependencies.
 setup:
 	$(PNPM) install
 

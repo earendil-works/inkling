@@ -11,9 +11,7 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json theme.schema.json .npmrc ./
 COPY themes ./themes
 COPY packages ./packages
-# Elanor installs from pkg.earendil.com; pass an npm config with its token as the `npmrc` build secret.
-RUN --mount=type=secret,id=npmrc,target=/root/.npmrc \
-    pnpm install --frozen-lockfile \
+RUN pnpm install --frozen-lockfile \
       --filter @earendil-works/inkling-cli... \
       --filter @earendil-works/inkling-frontend \
     && pnpm --filter @earendil-works/inkling-frontend run build
