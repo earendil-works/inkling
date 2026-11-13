@@ -416,3 +416,110 @@ test("recovery tolerates checkpoint success followed by journal truncation failu
   const after = await Effect.runPromise(recovered.snapshot(fixtureValue.principal, now));
   assert.equal(after.body, "hello once");
 });
+
+test("a stale authority cannot replace a newer checkpoint", async () => {
+  const fixtureValue = await fixture();
+  const stale = await fixtureValue.make();
+  await Effect.runPromise(stale.checkpoint(now));
+  await Effect.runPromise(
+    stale.applyTextEdits(
+      fixtureValue.principal,
+      [{ newText: "hello one", oldText: "hello" }],
+      fixtureValue.metadata.headRevision,
+      now,
+    ),
+  );
+
+  // A second authority for the same document checkpoints further, but its journal
+  // truncation fails, so the stale authority can still archive its older tail.
+  const current = await fixtureValue.make(false);
+  await Effect.runPromise(
+    current.applyTextEdits(
+      fixtureValue.principal,
+      [{ newText: "hello two", oldText: "hello one" }],
+      await Effect.runPromise(documentRevision(1)),
+      now,
+    ),
+  );
+  fixtureValue.storage.state.failTruncate = true;
+  await Effect.runPromise(current.checkpoint(now).pipe(Effect.either));
+  fixtureValue.storage.state.failTruncate = false;
+
+  const checkpoint = await Effect.runPromise(stale.checkpoint(now).pipe(Effect.either));
+  assert.equal(Either.isLeft(checkpoint), true);
+  assert.deepEqual(
+    fixtureValue.storage.state.entries.map((entry) => entry.sequence),
+    [1, 2],
+  );
+  const recovered = await fixtureValue.make(false);
+  const snapshot = await Effect.runPromise(recovered.snapshot(fixtureValue.principal, now));
+  assert.equal(snapshot.body, "hello two");
+});
+
+async function journalBehindRegressedCheckpoint() {
+  const fixtureValue = await fixture();
+  const authority = await fixtureValue.make();
+  const edit = async (oldText: string, newText: string, revision: number) =>
+    Effect.runPromise(
+      authority.applyTextEdits(
+        fixtureValue.principal,
+        [{ newText, oldText }],
+        await Effect.runPromise(documentRevision(revision)),
+        now,
+      ),
+    );
+  const headKey = `workspaces/test/documents/${fixtureValue.id}/head.json`;
+  await edit("hello", "hello one", 0);
+  await Effect.runPromise(authority.checkpoint(now));
+  const olderHead = fixtureValue.storage.state.objects.get(headKey);
+  assert.ok(olderHead);
+  await edit("hello one", "hello two", 1);
+  await Effect.runPromise(authority.checkpoint(now));
+  await edit("hello two", "hello three", 2);
+  // A stale authority overwrote the newer checkpoint after the journal was truncated past it.
+  fixtureValue.storage.state.objects.set(headKey, olderHead);
+  assert.deepEqual(
+    fixtureValue.storage.state.entries.map((entry) => entry.sequence),
+    [3],
+  );
+  return fixtureValue;
+}
+
+test("recovery replays archived history a regressed checkpoint no longer covers", async () => {
+  const fixtureValue = await journalBehindRegressedCheckpoint();
+  const recovered = await fixtureValue.make(false);
+  const snapshot = await Effect.runPromise(recovered.snapshot(fixtureValue.principal, now));
+  assert.equal(snapshot.body, "hello three");
+
+  await Effect.runPromise(recovered.checkpoint(now));
+  assert.equal(fixtureValue.storage.state.entries.length, 0);
+  const again = await fixtureValue.make(false);
+  const checkpointed = await Effect.runPromise(again.snapshot(fixtureValue.principal, now));
+  assert.equal(checkpointed.body, "hello three");
+});
+
+test("recovery falls back to the checkpoint when the archive does not cover a journal gap", async () => {
+  const fixtureValue = await journalBehindRegressedCheckpoint();
+  for (const key of fixtureValue.storage.state.objects.keys()) {
+    if (key.includes("/history/segments/")) fixtureValue.storage.state.objects.delete(key);
+  }
+  const recovered = await fixtureValue.make(false);
+  const snapshot = await Effect.runPromise(recovered.snapshot(fixtureValue.principal, now));
+  assert.equal(snapshot.body, "hello one");
+
+  // The document stays editable and checkpoints again, so its owners can restore lost edits.
+  await Effect.runPromise(recovered.checkpoint(now));
+  assert.equal(fixtureValue.storage.state.entries.length, 0);
+  await Effect.runPromise(
+    recovered.applyTextEdits(
+      fixtureValue.principal,
+      [{ newText: "restored", oldText: "hello one" }],
+      snapshot.metadata.headRevision,
+      now,
+    ),
+  );
+  await Effect.runPromise(recovered.checkpoint(now));
+  const again = await fixtureValue.make(false);
+  const restored = await Effect.runPromise(again.snapshot(fixtureValue.principal, now));
+  assert.equal(restored.body, "restored");
+});

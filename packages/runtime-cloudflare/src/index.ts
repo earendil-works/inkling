@@ -80,6 +80,7 @@ import {
   makeR2ObjectStore,
   WebCryptoDigest,
 } from "./storage.ts";
+import { singleFlight } from "./single-flight.ts";
 
 export interface CloudflareEnvironment {
   /** Workers AI; with INKLING_VECTORS it enables semantic search. */
@@ -344,6 +345,8 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
   #runtime: ManagedRuntimeType.ManagedRuntime<InklingApplicationService, never> | undefined;
   #app: ReturnType<typeof createBackendApp> | undefined;
   #configuration: DocumentRuntimeConfiguration | undefined;
+  /** Two runtimes would be two authorities over one journal, so starts are shared. */
+  readonly #startRuntime = singleFlight();
   /** Mirrors the stored `catalog:stale` flag so keystrokes write it only once. */
   #catalogStale = false;
   #catalogProjectionTimer: ReturnType<typeof setTimeout> | undefined;
@@ -579,6 +582,11 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
 
   async #ensureRuntime(configuration: DocumentRuntimeConfiguration): Promise<void> {
     if (this.#runtime !== undefined) return;
+    await this.#startRuntime(() => this.#createRuntime(configuration));
+  }
+
+  async #createRuntime(configuration: DocumentRuntimeConfiguration): Promise<void> {
+    if (this.#runtime !== undefined) return;
     const resolver: NonNullable<LocalApplicationOptions["principalResolver"]> = (
       requestCredentials,
       documentId,
@@ -619,7 +627,12 @@ export class DocumentDurableObject extends DurableObject<CloudflareEnvironment> 
       },
       "disabled",
     );
-    await runtime.runtime();
+    try {
+      await runtime.runtime();
+    } catch (error) {
+      await runtime.dispose();
+      throw error;
+    }
     logStartup("document", Date.now() - started);
     this.#configuration = configuration;
     this.#runtime = runtime;

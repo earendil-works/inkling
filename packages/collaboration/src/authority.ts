@@ -1149,13 +1149,38 @@ function recoverState(
       yield* applyDocumentUpdate(collaborative.document, update);
     }
 
-    const checkpointSequence = sequence;
-    const entries = yield* journal.entriesAfter(options.documentId, sequence);
-    for (const entry of entries.toSorted((left, right) => left.sequence - right.sequence)) {
-      const wire = yield* decodeJournalWire(entry.payload);
+    const entries = (yield* journal.entriesAfter(options.documentId, sequence)).toSorted(
+      (left, right) => left.sequence - right.sequence,
+    );
+    if (entries.some((entry, index) => entry.sequence !== (entries[0]?.sequence ?? 0) + index)) {
+      return yield* recoveryFailure("checkpoint_corrupt", "The document journal has gaps.");
+    }
+    // A checkpoint can trail a journal that was already archived and truncated past it, for
+    // example when a stale authority overwrote a newer checkpoint. The archived history usually
+    // still holds those entries; replay them rather than silently dropping acknowledged edits.
+    const gap = yield* archivedJournalGap(
+      options,
+      sequence,
+      entries[0]?.sequence,
+      objectStore,
+      digest,
+    );
+    const archived = gap.entries;
+    const checkpointSequence = gap.checkpointSequence;
+    const replay = [
+      ...archived,
+      ...(yield* Effect.forEach(entries, (entry) =>
+        decodeJournalWire(entry.payload).pipe(
+          Effect.map((payload) => ({ payload, sequence: entry.sequence })),
+        ),
+      )),
+    ];
+    for (const { payload: wire, sequence: entrySequence } of replay) {
       metadata = normalizeDocumentMetadata(wire.metadata as DocumentMetadata);
       comments = (wire.comments ?? comments) as CommentState;
-      if (wire.bodyUpdate !== undefined) {
+      // Without the missing updates, the tail's deletions would apply while its insertions
+      // stay pending, so an uncovered gap keeps the checkpoint's body intact instead.
+      if (wire.bodyUpdate !== undefined && gap.covered) {
         const update = yield* decodeBase64(wire.bodyUpdate).pipe(
           Effect.mapError(
             (error) => new RecoveryError({ code: "checkpoint_corrupt", message: error.message }),
@@ -1163,19 +1188,88 @@ function recoverState(
         );
         yield* applyDocumentUpdate(collaborative.document, update);
       }
-      sequence = entry.sequence;
+      sequence = entrySequence;
     }
 
     return {
       checkpointSequence,
       collaborative,
       comments,
-      dirty: entries.length > 0 || stored === undefined || historySnapshotSequence === undefined,
+      dirty: replay.length > 0 || stored === undefined || historySnapshotSequence === undefined,
       historySnapshotSequence,
       metadata,
       sequence,
     };
   });
+}
+
+function storedCheckpointSequence(
+  options: MakeDocumentAuthorityOptions,
+  objectStore: typeof ObjectStore.Service,
+): Effect.Effect<number | undefined, StorageError | RecoveryError> {
+  return objectStore
+    .get(headKey(options))
+    .pipe(
+      Effect.flatMap((stored) =>
+        stored === undefined
+          ? Effect.succeed(undefined)
+          : decodeCheckpoint(stored.bytes).pipe(Effect.map((checkpoint) => checkpoint.sequence)),
+      ),
+    );
+}
+
+/**
+ * The archived entries between a checkpoint and the first entry left in the journal, and the
+ * sequence the next checkpoint archives from. When the archive cannot fill the gap, recovery
+ * keeps the document available with its checkpointed body instead of refusing to load it, so
+ * its owners can restore the lost edits; the loss is logged and the tail stays in history.
+ */
+function archivedJournalGap(
+  options: MakeDocumentAuthorityOptions,
+  checkpointSequence: number,
+  firstJournalSequence: number | undefined,
+  objectStore: typeof ObjectStore.Service,
+  digest: typeof Digest.Service,
+): Effect.Effect<
+  {
+    readonly checkpointSequence: number;
+    readonly covered: boolean;
+    readonly entries: readonly HistoryEntryWire[];
+  },
+  StorageError
+> {
+  if (firstJournalSequence === undefined || firstJournalSequence === checkpointSequence + 1) {
+    return Effect.succeed({ checkpointSequence, covered: true, entries: [] });
+  }
+  const unrecoverable = Effect.logError(
+    "Document journal gap is not covered by archived history; recovering from the checkpoint",
+  ).pipe(
+    Effect.annotateLogs({
+      checkpointSequence,
+      documentId: options.documentId,
+      firstJournalSequence,
+    }),
+    Effect.as({ checkpointSequence: firstJournalSequence - 1, covered: false, entries: [] }),
+  );
+  return loadArchivedHistoryEvents(options, objectStore, digest).pipe(
+    Effect.flatMap((events) => {
+      const missing = events.filter(
+        (event) => event.sequence > checkpointSequence && event.sequence < firstJournalSequence,
+      );
+      return missing.length === firstJournalSequence - checkpointSequence - 1 &&
+        missing.every((event, index) => event.sequence === checkpointSequence + 1 + index)
+        ? Effect.succeed({
+            checkpointSequence: firstJournalSequence - 1,
+            covered: true,
+            entries: missing,
+          })
+        : unrecoverable;
+    }),
+    Effect.catchIf(
+      (error): error is RecoveryError => error instanceof RecoveryError,
+      () => unrecoverable,
+    ),
+  );
 }
 
 function checkpointState(
@@ -1218,6 +1312,18 @@ function checkpointState(
       journal,
       digest,
     );
+    // Only one authority should own a document, but if another one has already checkpointed
+    // further, replacing its checkpoint would leave the truncated journal unrecoverable.
+    const storedSequence = yield* storedCheckpointSequence(options, objectStore);
+    if (storedSequence !== undefined && storedSequence > plan.capture.sequence) {
+      return yield* Effect.fail(
+        new StorageError({
+          message: "A newer checkpoint was written by another document authority.",
+          operation: "write document checkpoint",
+          retryable: false,
+        }),
+      );
+    }
     const bytes = encodeCheckpoint(plan.capture);
     const objectDigest = yield* digest.sha256(bytes);
     yield* objectStore.put(headKey(options), bytes, {
