@@ -27,8 +27,9 @@ export function ReaderScreen({
     <Layout.Main className={styles["layout"]} id="app" tabIndex={-1}>
       <Container>
         <ReaderToolbar
-          metadata={document.metadata}
+          document={document}
           publicDocument={publicDocument}
+          references={references}
           shared={shared}
         />
         <ReaderDocument api={api} document={document} references={references} />
