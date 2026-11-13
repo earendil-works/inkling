@@ -6,6 +6,10 @@ updates:
     schedule:
       interval: daily
     versioning-strategy: increase
+    cooldown:
+      default-days: 7
+      exclude:
+        - "@earendil-works/*"
     allow:
       - dependency-name: "@earendil-works/elanor-*"
       - dependency-name: "@earendil-works/design-tokens"
