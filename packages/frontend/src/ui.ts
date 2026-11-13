@@ -36,6 +36,25 @@ export function formatRfcNumber(rfcNumber: number): string {
   return String(rfcNumber).padStart(4, "0");
 }
 
+/** Names an exported file after the document: `rfc-0042-title` or `title`. */
+export function documentExportFileName(
+  title: string,
+  rfcNumber: number | undefined,
+  extension: "docx" | "pdf",
+): string {
+  const slug = title
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, "-")
+    .replace(/^-+|-+$/gu, "")
+    .slice(0, 80)
+    .replace(/-+$/u, "");
+  const prefix = rfcNumber === undefined ? "" : `rfc-${formatRfcNumber(rfcNumber)}`;
+  const name = [prefix, slug].filter((part) => part !== "").join("-") || "document";
+  return `${name}.${extension}`;
+}
+
 /** Names a document's kind: its RFC number, or "Note". */
 export function documentFolio(rfcNumber: number | undefined): string {
   return rfcNumber === undefined ? "Note" : `RFC ${formatRfcNumber(rfcNumber)}`;
