@@ -173,8 +173,8 @@ importers:
         specifier: 0.1.0
         version: 0.1.0(react@19.2.8)
       '@earendil-works/elanor-react':
-        specifier: 0.1.0
-        version: 0.1.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        specifier: 0.1.1
+        version: 0.1.1(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@types/react':
         specifier: 19.2.18
         version: 19.2.18
@@ -324,8 +324,8 @@ packages:
   '@antfu/install-pkg@1.1.0':
     resolution: {integrity: sha512-MGQsmw10ZyI+EJo45CdSER4zEb+p31LpDAFp2Z3gkSd1yqVZGi0Ebx++YTEMonJy4oChEMLsxZ64j8FH6sSqtQ==}
 
-  '@babel/runtime@7.29.10':
-    resolution: {integrity: sha512-NpugTzbKgGrNe45Ui32cN8vCFFMxVtP/9rtfwv0nP5FRDAjvYBxJcLVpYA9mr1jxP6cnIT7x9LUzuDTbWYYNRA==}
+  '@babel/runtime@7.29.14':
+    resolution: {integrity: sha512-Y5tqevQaUAZhhj82BpYMNC1ssvLQTVAfwKdm8iy8qwmhvC2/CpcAu8OC+QEtjM7pMk7knx83u1Qj8gzkicyelw==}
     engines: {node: '>=6.9.0'}
 
   '@base-ui/react@1.8.0':
@@ -512,8 +512,8 @@ packages:
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
 
-  '@earendil-works/elanor-react@0.1.0':
-    resolution: {integrity: sha512-9zh26YB9Y64QOw//k4agAT9sWdYmE2unGavmUIHSDQRVIdfyVgdMXHCkgjEf1CTnmzCI069UnPWUdEmcS7RzUQ==}
+  '@earendil-works/elanor-react@0.1.1':
+    resolution: {integrity: sha512-k8GvkdEPIE8VQLiU/rZ2OEElaGN4xjLGRznGBMwBM2kMjfzQ8lVEFGlcnw7oS1jPX1gbOBRm9d1tQVfk94dC/A==}
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
@@ -2440,11 +2440,11 @@ snapshots:
       package-manager-detector: 1.8.0
       tinyexec: 1.3.0
 
-  '@babel/runtime@7.29.10': {}
+  '@babel/runtime@7.29.14': {}
 
   '@base-ui/react@1.8.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
-      '@babel/runtime': 7.29.10
+      '@babel/runtime': 7.29.14
       '@base-ui/utils': 0.4.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@floating-ui/react-dom': 2.1.9(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@floating-ui/utils': 0.2.12
@@ -2456,7 +2456,7 @@ snapshots:
 
   '@base-ui/utils@0.4.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
-      '@babel/runtime': 7.29.10
+      '@babel/runtime': 7.29.14
       '@floating-ui/utils': 0.2.12
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
@@ -2757,7 +2757,7 @@ snapshots:
     dependencies:
       react: 19.2.8
 
-  '@earendil-works/elanor-react@0.1.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+  '@earendil-works/elanor-react@0.1.1(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
       '@base-ui/react': 1.8.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@earendil-works/elanor-icons-react': 0.1.0(react@19.2.8)
