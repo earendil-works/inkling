@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { autocompletion } from "@codemirror/autocomplete";
+import { acceptCompletion, autocompletion } from "@codemirror/autocomplete";
 import type { CompletionSource } from "@codemirror/autocomplete";
 import { markdown } from "@codemirror/lang-markdown";
 import { yamlFrontmatter, yamlLanguage } from "@codemirror/lang-yaml";
 import { syntaxHighlighting } from "@codemirror/language";
-import { Compartment, EditorState } from "@codemirror/state";
+import { Compartment, EditorState, Prec } from "@codemirror/state";
+import { keymap } from "@codemirror/view";
 import { EditorView, basicSetup } from "codemirror";
 import { Effect, Fiber } from "effect";
 import { Awareness } from "y-protocols/awareness";
@@ -146,6 +147,10 @@ export function useEditorSession(options: UseEditorSessionOptions): EditorSessio
             activateOnCompletion: (completion) =>
               completion.detail === frontmatterFieldCompletionDetail,
           }),
+          // CodeMirror only accepts completions with Enter. Tab accepts too while
+          // the popup is open and otherwise falls through to snippet fields,
+          // selection indentation, or focus movement.
+          Prec.highest(keymap.of([{ key: "Tab", run: acceptCompletion }])),
           yCollab(yBody, awareness),
           remotePresenceExtension,
           commentDecorationsExtension,
