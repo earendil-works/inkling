@@ -1149,12 +1149,7 @@ test(
           ),
         ),
       );
-      const editorGeometryBeforeComment = await second.evaluate(() =>
-        [...document.querySelectorAll<HTMLElement>(".cm-line")].slice(0, 2).map((line) => {
-          const bounds = line.getBoundingClientRect();
-          return { height: bounds.height, top: bounds.top };
-        }),
-      );
+      const editorGeometryBeforeComment = await second.evaluate(settledLineGeometry);
 
       await first.evaluate(async (id) => {
         const csrf = document.cookie
@@ -1207,12 +1202,7 @@ test(
       assert.ok(
         Math.abs(sourceBubbleLayout.bubbleCenter - (sourceBubbleLayout.lineCenter ?? 0)) < 2,
       );
-      const editorGeometryAfterComment = await second.evaluate(() =>
-        [...document.querySelectorAll<HTMLElement>(".cm-line")].slice(0, 2).map((line) => {
-          const bounds = line.getBoundingClientRect();
-          return { height: bounds.height, top: bounds.top };
-        }),
-      );
+      const editorGeometryAfterComment = await second.evaluate(settledLineGeometry);
       assert.deepEqual(editorGeometryAfterComment, editorGeometryBeforeComment);
       const previewPlacement = await second
         .locator('[data-preview] [data-comment-bubble][data-comment-surface="preview"]')
@@ -1846,6 +1836,35 @@ async function availablePort(): Promise<number> {
   }
   await new Promise<void>((resolve) => server.close(() => resolve()));
   return address.port;
+}
+
+/**
+ * The first two editor lines' heights and positions once they stop moving.
+ * After typing, CodeMirror scrolls the cursor into view in a later animation
+ * frame, so an immediate measurement can land before that scroll. Runs in the
+ * page, so it carries everything it uses.
+ */
+function settledLineGeometry(): Promise<{ height: number; top: number }[]> {
+  return new Promise((resolve) => {
+    let previous = "";
+    let frames = 0;
+    const measure = (): void => {
+      const current = JSON.stringify(
+        [...document.querySelectorAll<HTMLElement>(".cm-line")].slice(0, 2).map((line) => {
+          const bounds = line.getBoundingClientRect();
+          return { height: bounds.height, top: bounds.top };
+        }),
+      );
+      if (current === previous || frames >= 60) {
+        resolve(JSON.parse(current) as { height: number; top: number }[]);
+        return;
+      }
+      previous = current;
+      frames += 1;
+      requestAnimationFrame(measure);
+    };
+    measure();
+  });
 }
 
 async function findBrowser(): Promise<string | undefined> {
