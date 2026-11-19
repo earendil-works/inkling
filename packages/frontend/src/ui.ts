@@ -1,4 +1,4 @@
-import { taggedId, uuidV7Bytes } from "@earendil-works/inkling-core";
+import { taggedId, uuidV7Bytes, wikiLabel } from "@earendil-works/inkling-core";
 import type { IdentifierTag } from "@earendil-works/inkling-core";
 
 export function randomId(tag: IdentifierTag): string {
@@ -32,11 +32,10 @@ export function signInHref(url: URL): string {
 }
 
 /**
- * The wiki's index note. Other notes labelled {@link WIKI_LABEL} show it as a breadcrumb.
+ * The wiki's index note. Other notes labelled `wiki` show it as a breadcrumb.
  * Inkling has no deployment-level frontend configuration yet, so this is rfc.earendil.com's index.
  */
 export const WIKI_DOCUMENT_ID = "doc_350cqpzub87Kx5nMlXNBv";
-export const WIKI_LABEL = "wiki";
 
 /** Whether a note is a wiki page below the wiki index. RFCs are never wiki pages. */
 export function isWikiPage(document: {
@@ -47,7 +46,7 @@ export function isWikiPage(document: {
   return (
     document.rfcNumber === undefined &&
     document.id !== WIKI_DOCUMENT_ID &&
-    document.labels.includes(WIKI_LABEL)
+    document.labels.includes(wikiLabel)
   );
 }
 

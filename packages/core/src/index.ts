@@ -29,6 +29,8 @@ export {
   hasPendingPublicationChanges,
   isDocumentTrashExpired,
   knownLifecycleStates,
+  visibleLabels,
+  wikiLabel,
   markDeleted,
   markPublished,
   markRestored,

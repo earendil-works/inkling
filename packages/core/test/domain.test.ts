@@ -59,6 +59,7 @@ import {
   updateDocumentMetadata,
   updateSharingPolicy,
   uuidV7Bytes,
+  visibleLabels,
 } from "../src/index.ts";
 import type {
   CatalogSummary,
@@ -1246,4 +1247,10 @@ test("comment authors may edit their messages while stable anchors remain struct
   );
   assert.equal(comments.threads[0]?.messages[0]?.authorId, authorId);
   assert.equal(await Effect.runPromise(documentId("document_123456789")), "document_123456789");
+});
+
+test("visible labels hide the navigation-only wiki label", () => {
+  assert.deepEqual(visibleLabels(["platform", "wiki", "team"]), ["platform", "team"]);
+  assert.deepEqual(visibleLabels(["wiki"]), []);
+  assert.deepEqual(visibleLabels([]), []);
 });
