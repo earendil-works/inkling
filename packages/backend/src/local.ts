@@ -30,6 +30,7 @@ import {
   identifierTag,
   isAdministrator,
   isDocumentActionAllowed,
+  isReadOnlyPrincipal,
   ObjectStore,
   parseCatalogSearchQuery,
   personId,
@@ -1124,7 +1125,7 @@ export function makeLocalInklingApplication(
           return {
             displayName: principal.displayName ?? "API key",
             id: principal.personId,
-            manageAll: principal.role === "administrator",
+            manageAll: isAdministrator(principal),
           };
         }
         if (principal.kind === "capability" && principal.guestId !== undefined) {
@@ -1906,12 +1907,14 @@ export function makeLocalInklingApplication(
           }
           return { authenticated: false };
         }),
-      createApiKey: (credentials, label) =>
+      createApiKey: (credentials, label, access) =>
         Effect.gen(function* () {
           const principal = yield* resolvePrincipal(credentials);
-          const account = yield* requireAccount(principal);
+          const account = yield* requireKeyManager(principal);
           return yield* withState(
-            createApiKey(state.authentication, account, label, new Date().toISOString()).pipe(
+            createApiKey(state.authentication, account, label, new Date().toISOString(), {
+              access,
+            }).pipe(
               Effect.provideService(IdGenerator, ids),
               Effect.provideService(TokenHasher, tokenHasher),
               Effect.provideService(SecureToken, tokens),
@@ -2514,7 +2517,7 @@ export function makeLocalInklingApplication(
       listApiKeys: (credentials) =>
         Effect.gen(function* () {
           const principal = yield* resolvePrincipal(credentials);
-          const account = yield* requireAccount(principal);
+          const account = yield* requireKeyManager(principal);
           return state.authentication.apiKeys
             .filter((record) => apiKeyBelongsTo(record, account.personId))
             .map((record) => apiKeyDto(record, account.personId));
@@ -2522,7 +2525,7 @@ export function makeLocalInklingApplication(
       revealApiKey: (credentials, keyId) =>
         Effect.gen(function* () {
           const principal = yield* resolvePrincipal(credentials);
-          const account = yield* requireAccount(principal);
+          const account = yield* requireKeyManager(principal);
           const record = state.authentication.apiKeys.find(
             (candidate) =>
               candidate.id === keyId &&
@@ -3169,7 +3172,7 @@ export function makeLocalInklingApplication(
       revokeApiKey: (credentials, keyId) =>
         Effect.gen(function* () {
           const principal = yield* resolvePrincipal(credentials);
-          const account = yield* requireAccount(principal);
+          const account = yield* requireKeyManager(principal);
           yield* withState(
             revokeApiKey(
               state.authentication,
@@ -3628,7 +3631,8 @@ function normalizeAuthenticationState(value: unknown): AuthenticationState {
         (key): key is ApiKeyRecord =>
           Predicate.isReadonlyRecord(key) &&
           typeof key["personId"] === "string" &&
-          (key["role"] === "member" || key["role"] === "administrator"),
+          (key["role"] === "member" || key["role"] === "administrator") &&
+          (key["access"] === undefined || key["access"] === "full" || key["access"] === "read"),
       )
     : [];
   const authorizationCodes = Array.isArray(value["authorizationCodes"])
@@ -4128,6 +4132,7 @@ function toDocumentResponse(snapshot: DocumentSnapshot): DocumentResponse {
 
 function apiKeyDto(record: ApiKeyRecord, fallbackPersonId: PersonReference["id"]): ApiKeyDto {
   return {
+    access: record.access ?? "full",
     createdAt: record.createdAt,
     id: record.id,
     label: record.label,
@@ -4157,9 +4162,19 @@ function requireAccount(principal: Principal): Effect.Effect<
   });
 }
 
+/**
+ * The account behind a session or a full API key. A read-only key may not
+ * create, reveal, or revoke keys: that would let it mint a key that does more.
+ */
+function requireKeyManager(principal: Principal): ReturnType<typeof requireAccount> {
+  if (isReadOnlyPrincipal(principal)) {
+    return applicationFailure("forbidden", "A read-only API key cannot manage API keys.", 403);
+  }
+  return requireAccount(principal);
+}
+
 function requireAdministrator(principal: Principal): Effect.Effect<void, ApplicationError> {
-  return (principal.kind === "workspace" || principal.kind === "api-key") &&
-    principal.role === "administrator"
+  return isAdministrator(principal)
     ? Effect.void
     : applicationFailure("forbidden", "Workspace administrator access is required.", 403);
 }

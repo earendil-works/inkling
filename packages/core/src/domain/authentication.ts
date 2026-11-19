@@ -4,7 +4,7 @@ import { identifierTag } from "../application/identifiers.ts";
 import { IdGenerator, SecureToken, TokenHasher } from "../application/ports.ts";
 import type { StorageError } from "../application/ports.ts";
 import type { PersonId } from "./document.ts";
-import type { Principal, WorkspaceRole } from "./authorization.ts";
+import type { ApiKeyAccess, Principal, WorkspaceRole } from "./authorization.ts";
 
 export interface SessionRecord {
   readonly id: string;
@@ -31,6 +31,8 @@ export interface ApiKeyRecord {
   readonly lastUsedAt?: string | undefined;
   /** Set when the key was issued to an OAuth client instead of created by its owner. */
   readonly oauthClientName?: string | undefined;
+  /** Keys created before access levels have none and keep full access. */
+  readonly access?: ApiKeyAccess | undefined;
   readonly revokedAt?: string | undefined;
 }
 
@@ -223,6 +225,8 @@ export function createApiKey(
   options: {
     /** OAuth clients keep their own copy; their keys are never revealable. */
     readonly oauthClientName?: string | undefined;
+    /** `read` creates a key that only reads; the default is full access. */
+    readonly access?: ApiKeyAccess | undefined;
   } = {},
 ): Effect.Effect<
   CreatedApiKey,
@@ -240,6 +244,7 @@ export function createApiKey(
     const id = yield* ids.generate(identifierTag.apiKey);
     const secret = yield* tokens.generate(32);
     const record: ApiKeyRecord = {
+      access: options.access ?? "full",
       createdAt: now,
       displayName: identity.displayName,
       id,
@@ -301,7 +306,11 @@ export function authenticateApiKey(
     if (!(yield* hasher.verify(secret, record.tokenHash))) {
       return yield* authenticationFailure("invalid_token", "The API key is invalid.");
     }
-    if (record.personId === undefined || !isWorkspaceRole(record.role)) {
+    if (
+      record.personId === undefined ||
+      !isWorkspaceRole(record.role) ||
+      !isApiKeyAccess(record.access)
+    ) {
       return yield* authenticationFailure("invalid_token", "The API key is invalid or revoked.");
     }
     const outdatedHash = hasher.isOutdated(record.tokenHash);
@@ -315,6 +324,7 @@ export function authenticateApiKey(
         kind: "api-key",
         personId: record.personId,
         role: record.role,
+        ...(record.access === "read" ? { access: "read" } : {}),
       },
       updatedRecord:
         outdatedHash || staleUse
@@ -469,6 +479,11 @@ function liveAuthorizationCodes(
 
 function isWorkspaceRole(role: WorkspaceRole | undefined): role is WorkspaceRole {
   return role === "member" || role === "administrator";
+}
+
+/** Absent on older keys, which keep full access; anything else is not a key. */
+function isApiKeyAccess(access: unknown): access is ApiKeyAccess | undefined {
+  return access === undefined || access === "full" || access === "read";
 }
 
 function authenticationFailure<A = never>(

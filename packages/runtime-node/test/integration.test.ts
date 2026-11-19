@@ -593,6 +593,133 @@ test(
   },
 );
 
+test("read-only API keys read documents and change nothing", { timeout: 30_000 }, async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "inkling-read-only-"));
+  try {
+    await withServer(directory, async (baseUrl, session) => {
+      const writer = await setupApiKey(baseUrl, "writer", session);
+      const created = await fetch(`${baseUrl}/api/documents`, {
+        body: JSON.stringify({
+          allocateRfc: false,
+          body: "Read me",
+          creationKey: "read-only-document",
+          title: "Handbook",
+        }),
+        headers: { ...writer, "Content-Type": "application/json" },
+        method: "POST",
+      });
+      assert.equal(created.status, 200);
+      const document = (await created.json()) as DocumentWire;
+      const documentPath = `${baseUrl}/api/documents/${document.metadata.id}`;
+      const publish = await fetch(`${documentPath}/publish`, { headers: writer, method: "POST" });
+      assert.equal(publish.status, 200);
+      const before = await readDocument(baseUrl, document.metadata.id, writer);
+
+      const keyResponse = await fetch(`${baseUrl}/api/api-keys`, {
+        body: JSON.stringify({ access: "read", label: "wiki" }),
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: session.cookieHeader,
+          Origin: baseUrl,
+          "X-CSRF-Token": session.csrf,
+        },
+        method: "POST",
+      });
+      assert.equal(keyResponse.status, 200);
+      const readOnlyKey = (await keyResponse.json()) as {
+        key: string;
+        metadata: { access: string; id: string };
+      };
+      assert.equal(readOnlyKey.metadata.access, "read");
+      const reader = { Authorization: `Bearer ${readOnlyKey.key}` };
+      const keyList = (await (
+        await fetch(`${baseUrl}/api/api-keys`, { headers: { Cookie: session.cookieHeader } })
+      ).json()) as { access: string; id: string }[];
+      assert.deepEqual(keyList.map((key) => key.access).toSorted(), ["full", "read"]);
+
+      // Reading works: the working draft, the published revision, history, and the catalog.
+      assert.equal(
+        (await readDocument(baseUrl, document.metadata.id, reader)).body.length > 0,
+        true,
+      );
+      assert.equal(
+        (await fetch(`${documentPath}?published=true`, { headers: reader })).status,
+        200,
+      );
+      assert.equal((await fetch(`${documentPath}/history`, { headers: reader })).status, 200);
+      const catalog = await fetch(`${baseUrl}/api/documents?q=handbook`, { headers: reader });
+      assert.equal(catalog.status, 200);
+      assert.equal(((await catalog.json()) as { documents: unknown[] }).documents.length > 0, true);
+
+      // Nothing changes: documents, comments, publication, keys, or the workspace.
+      const json = (body: unknown) => ({
+        body: JSON.stringify(body),
+        headers: { ...reader, "Content-Type": "application/json" },
+      });
+      const refused: [string, string, RequestInit][] = [
+        [
+          "create a document",
+          `${baseUrl}/api/documents`,
+          {
+            ...json({ allocateRfc: false, body: "x", creationKey: "nope", title: "Nope" }),
+            method: "POST",
+          },
+        ],
+        [
+          "edit",
+          `${documentPath}/edits`,
+          {
+            ...json({
+              edits: [{ newText: "Changed", oldText: "Read me" }],
+              expectedRevision: document.metadata.headRevision,
+            }),
+            method: "POST",
+          },
+        ],
+        [
+          "comment",
+          `${documentPath}/comments`,
+          {
+            ...json({ authorDisplayName: "Wiki", body: "Hi", selection: { end: 2, start: 0 } }),
+            method: "POST",
+          },
+        ],
+        ["publish", `${documentPath}/publish`, { headers: reader, method: "POST" }],
+        [
+          "trash",
+          `${documentPath}?expectedRevision=${before.metadata.headRevision}`,
+          { headers: reader, method: "DELETE" },
+        ],
+        ["create a key", `${baseUrl}/api/api-keys`, { ...json({ label: "more" }), method: "POST" }],
+        ["list keys", `${baseUrl}/api/api-keys`, { headers: reader }],
+        [
+          "reveal its own key",
+          `${baseUrl}/api/api-keys/${readOnlyKey.metadata.id}`,
+          { headers: reader },
+        ],
+        [
+          "revoke a key",
+          `${baseUrl}/api/api-keys/${readOnlyKey.metadata.id}`,
+          { headers: reader, method: "DELETE" },
+        ],
+        ["back up the workspace", `${baseUrl}/api/admin/backup`, { headers: reader }],
+      ];
+      const statuses = await Promise.all(
+        refused.map(async ([action, url, init]) => [action, (await fetch(url, init)).status]),
+      );
+      for (const [action, status] of statuses) {
+        assert.equal(status, 403, `a read-only key may not ${action}`);
+      }
+      const after = await readDocument(baseUrl, document.metadata.id, writer);
+      assert.equal(after.metadata.headRevision, before.metadata.headRevision);
+      assert.equal(after.body, before.body);
+      assert.equal(after.comments.threads.length, 0);
+    });
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
+});
+
 test("application pages render on the server with the reader's data", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "inkling-render-"));
   try {

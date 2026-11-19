@@ -991,7 +991,9 @@ export function createBackendApp(options: BackendOptions = {}): Hono {
   app.post("/api/api-keys", (context) =>
     execute(context, options, (service) =>
       mutation(context, readJson(context, ApiKeyCreateRequestSchema)).pipe(
-        Effect.flatMap(({ label }) => service.createApiKey(credentials(context), label)),
+        Effect.flatMap(({ access, label }) =>
+          service.createApiKey(credentials(context), label, access),
+        ),
       ),
     ),
   );

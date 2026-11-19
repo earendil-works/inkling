@@ -133,12 +133,22 @@ test(
       assert.match(revealedKey, /^key_[0-9A-Za-z]+\./u);
       assert.equal(await first.locator("[data-copy-api-key]").textContent(), "Copy API key");
       assert.equal(await first.getByRole("button", { name: "Create another key" }).count(), 1);
+      assert.equal(await first.locator("[data-read-only-key]").count(), 0);
+      await first.getByRole("button", { name: "Create another key" }).click();
+      await first.getByLabel("Key name").fill("Wiki");
+      await first.locator("[data-api-key-read-only]").click();
+      await first.getByRole("button", { name: "Create API key" }).click();
+      await first.locator("[data-read-only-key]").waitFor();
+      assert.equal(await first.locator("[data-read-only-key]").count(), 1);
       await first.getByLabel("Close API keys").click();
 
       await first.locator("[data-account-trigger]").click();
       await first.locator("[data-open-api-keys]").click();
       assert.equal(await first.locator("[data-api-key-secret]").count(), 0);
-      await first.locator("[data-show-api-key]").click();
+      await first
+        .locator("[data-api-key]", { hasText: "Browser agent" })
+        .locator("[data-show-api-key]")
+        .click();
       assert.equal((await first.locator("[data-api-key-secret]").textContent()) ?? "", revealedKey);
       await first.getByLabel("Close API keys").click();
 
