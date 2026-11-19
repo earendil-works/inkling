@@ -31,6 +31,26 @@ export function signInHref(url: URL): string {
   return `/api/auth/google/start?next=${encodeURIComponent(`${url.pathname}${url.search}${url.hash}`)}`;
 }
 
+/**
+ * The wiki's index note. Other notes labelled {@link WIKI_LABEL} show it as a breadcrumb.
+ * Inkling has no deployment-level frontend configuration yet, so this is rfc.earendil.com's index.
+ */
+export const WIKI_DOCUMENT_ID = "doc_350cqpzub87Kx5nMlXNBv";
+export const WIKI_LABEL = "wiki";
+
+/** Whether a note is a wiki page below the wiki index. RFCs are never wiki pages. */
+export function isWikiPage(document: {
+  readonly id: string;
+  readonly labels: readonly string[];
+  readonly rfcNumber?: number | undefined;
+}): boolean {
+  return (
+    document.rfcNumber === undefined &&
+    document.id !== WIKI_DOCUMENT_ID &&
+    document.labels.includes(WIKI_LABEL)
+  );
+}
+
 /** An RFC number as Inkling shows and routes it, zero-padded to four digits. */
 export function formatRfcNumber(rfcNumber: number): string {
   return String(rfcNumber).padStart(4, "0");

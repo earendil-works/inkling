@@ -155,14 +155,23 @@ export function EditorScreen({
           frontmatterVocabulary.people,
         );
 
+  // A stable key, so the header only updates when the labels change.
+  const headerLabels = previewMetadata.labels.join("\n");
   useEffect(() => {
     document.title = previewMetadata.title;
     setHeaderDocument({
       id: previewMetadata.id,
+      labels: headerLabels.split("\n").filter((label) => label !== ""),
       rfcNumber: previewMetadata.rfcNumber,
       title: previewMetadata.title,
     });
-  }, [previewMetadata.id, previewMetadata.rfcNumber, previewMetadata.title, setHeaderDocument]);
+  }, [
+    headerLabels,
+    previewMetadata.id,
+    previewMetadata.rfcNumber,
+    previewMetadata.title,
+    setHeaderDocument,
+  ]);
   useEffect(() => () => setHeaderDocument(undefined), [setHeaderDocument]);
 
   const openCount = comments.threads.filter((thread) => !thread.resolved).length;
