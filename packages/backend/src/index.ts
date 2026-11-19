@@ -21,7 +21,7 @@ import {
   SharePeopleRequestSchema,
   ShareUnlockRequestSchema,
 } from "@earendil-works/inkling-protocol";
-import { identifierTag, taggedId, uuidV7Bytes } from "@earendil-works/inkling-core";
+import { identifierTag, taggedId, uuidV7Bytes, visibleLabels } from "@earendil-works/inkling-core";
 import type {
   CatalogResponse,
   DocumentMetadataDto,
@@ -1346,7 +1346,7 @@ function publicCatalogHtml(titleValue: string, catalog: CatalogResponse): string
         metadata.rfcNumber === undefined
           ? `/public/documents/${encodeURIComponent(metadata.id)}`
           : canonicalRfcPath(metadata.rfcNumber);
-      const labels = metadata.labels
+      const labels = visibleLabels(metadata.labels)
         .map((label) => `<a href="/keyword/${encodeURIComponent(label)}">${escapeHtml(label)}</a>`)
         .join(" ");
       const state = publicStateLink(metadata.lifecycleState, "public-catalog-state");
@@ -1386,7 +1386,7 @@ function publicDocumentHtml(document: {
         `<li class="depth-${heading.depth}"><a href="#${escapeHtml(encodeURIComponent(heading.id))}">${heading.number === undefined ? "" : `<span class="inkling-section-number">${escapeHtml(heading.number)}</span> `}${escapeHtml(heading.text)}</a></li>`,
     )
     .join("");
-  const labels = metadata.labels
+  const labels = visibleLabels(metadata.labels)
     .map((label) => `<a href="/keyword/${encodeURIComponent(label)}">${escapeHtml(label)}</a>`)
     .join("");
   const tocHtml =

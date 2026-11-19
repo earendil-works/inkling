@@ -21,6 +21,14 @@ export const knownLifecycleStates = [
 
 export type KnownLifecycleState = (typeof knownLifecycleStates)[number];
 export type LifecycleState = KnownLifecycleState | (string & {});
+/** Marks a note as a wiki page. It only drives navigation, so it is never shown as a label. */
+export const wikiLabel = "wiki";
+
+/** The labels to show on a document, without navigation-only labels such as {@link wikiLabel}. */
+export function visibleLabels(labels: readonly string[]): readonly string[] {
+  return labels.filter((label) => label !== wikiLabel);
+}
+
 export type Visibility = "public" | "private" | "confidential";
 export type CapabilityAccess = "disabled" | "view" | "comment" | "edit";
 
