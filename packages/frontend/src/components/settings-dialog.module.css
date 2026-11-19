@@ -45,16 +45,3 @@
   white-space: pre-wrap;
   word-break: break-all;
 }
-
-.createControls {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: var(--semantic-dimension-space-gap-small);
-}
-
-@media (width <= 34rem) {
-  .createControls {
-    grid-template-columns: 1fr;
-  }
-}

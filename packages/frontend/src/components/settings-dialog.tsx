@@ -266,21 +266,16 @@ export function SettingsDialog({
                   Use a separate key only when it needs its own revocation lifecycle.
                 </Text>
               </Stack>
-              <div className={styles["createControls"]}>
-                <ControlAndLabel label="Key name">
-                  <Input
-                    maxLength={200}
-                    name="api-key-label"
-                    onValueChange={setLabel}
-                    placeholder="Agent access"
-                    required
-                    value={label}
-                  />
-                </ControlAndLabel>
-                <Button pending={createKey.state.pending} type="submit">
-                  Create API key
-                </Button>
-              </div>
+              <ControlAndLabel label="Key name">
+                <Input
+                  maxLength={200}
+                  name="api-key-label"
+                  onValueChange={setLabel}
+                  placeholder="Agent access"
+                  required
+                  value={label}
+                />
+              </ControlAndLabel>
               <SelectionControlAndLabel
                 control={
                   <Checkbox.Root
@@ -295,13 +290,16 @@ export function SettingsDialog({
                 Read-only: the key can read documents but not change, comment on, or publish them,
                 or manage keys
               </SelectionControlAndLabel>
-              {activeKeys.length > 0 ? (
-                <div>
+              <Stack direction="row" gap="xSmall" wrap="wrap">
+                <Button pending={createKey.state.pending} type="submit">
+                  Create API key
+                </Button>
+                {activeKeys.length > 0 ? (
                   <Button hierarchy="tertiary" onClick={() => setCreateOpen(false)}>
                     Cancel
                   </Button>
-                </div>
-              ) : null}
+                ) : null}
+              </Stack>
             </Form>
           ) : (
             <Stack align="center" direction="row" gap="auto" wrap="wrap">
