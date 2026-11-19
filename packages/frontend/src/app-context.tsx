@@ -15,6 +15,7 @@ export type ToastKind = "error" | "success";
 
 export interface HeaderDocument {
   readonly id: string;
+  readonly labels: readonly string[];
   readonly rfcNumber?: number | undefined;
   readonly title: string;
 }

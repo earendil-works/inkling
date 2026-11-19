@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { colorFor, documentHref, publicDocumentHref } from "../src/ui.ts";
+import {
+  WIKI_DOCUMENT_ID,
+  colorFor,
+  documentHref,
+  isWikiPage,
+  publicDocumentHref,
+} from "../src/ui.ts";
 
 test("RFC document links use canonical number routes", () => {
   assert.equal(documentHref("doc_example123", 42, false, "read", ""), "/rfc/0042");
@@ -29,4 +35,11 @@ test("participant colors are stable and use perceptual OKLCH values", () => {
   assert.match(first, /^oklch\(68% 0\.16 \d+(?:\.\d+)?\)$/u);
   assert.match(second, /^oklch\(68% 0\.16 \d+(?:\.\d+)?\)$/u);
   assert.notEqual(first, second);
+});
+
+test("notes labelled wiki are wiki pages below the wiki index", () => {
+  assert.equal(isWikiPage({ id: "doc_example123", labels: ["team", "wiki"] }), true);
+  assert.equal(isWikiPage({ id: "doc_example123", labels: ["team"] }), false);
+  assert.equal(isWikiPage({ id: "doc_example123", labels: ["wiki"], rfcNumber: 42 }), false);
+  assert.equal(isWikiPage({ id: WIKI_DOCUMENT_ID, labels: ["wiki"] }), false);
 });
