@@ -2,16 +2,18 @@ import { useEffect, useState } from "react";
 
 import {
   Button,
+  Checkbox,
   CodeSnippet,
   ControlAndLabel,
   Form,
   Heading,
   Input,
+  SelectionControlAndLabel,
   Separator,
   Stack,
   Text,
 } from "@earendil-works/elanor-react";
-import type { ApiKeyCreated, ApiKeyDto } from "@earendil-works/inkling-protocol";
+import type { ApiKeyAccess, ApiKeyCreated, ApiKeyDto } from "@earendil-works/inkling-protocol";
 
 import type { ApiClientService, ApiError } from "../api.ts";
 import { copyText } from "../clipboard.ts";
@@ -35,6 +37,7 @@ export function SettingsDialog({
   onOpenAgentAccess,
 }: SettingsDialogProps): React.JSX.Element {
   const [label, setLabel] = useState("Agent access");
+  const [readOnly, setReadOnly] = useState(false);
   const [keys, setKeys] = useState<readonly ApiKeyDto[]>([]);
   const [revealedKeys, setRevealedKeys] = useState<ReadonlyMap<string, string>>(new Map());
   const [visibleKeyIds, setVisibleKeyIds] = useState<ReadonlySet<string>>(new Set());
@@ -43,9 +46,11 @@ export function SettingsDialog({
   const [createOpen, setCreateOpen] = useState(false);
   const [keyToRevoke, setKeyToRevoke] = useState<ApiKeyDto>();
   const keyQuery = useEffectQuery(api.listApiKeys, "api-keys");
-  const createKey = useEffectAction<string, ApiKeyCreated, ApiError>((value) =>
-    api.createApiKey(value),
-  );
+  const createKey = useEffectAction<
+    { readonly access: ApiKeyAccess; readonly label: string },
+    ApiKeyCreated,
+    ApiError
+  >(({ access, label: keyLabel }) => api.createApiKey(keyLabel, access));
   const revealKey = useEffectAction<string, ApiKeyCreated, ApiError>((keyId) =>
     api.revealApiKey(keyId),
   );
@@ -75,15 +80,19 @@ export function SettingsDialog({
     event.preventDefault();
     const normalizedLabel = label.trim();
     if (normalizedLabel === "") return;
-    createKey.execute(normalizedLabel, {
-      onSuccess: (created) => {
-        setKeys((current) => [created.metadata, ...current]);
-        showSecret(created.metadata.id, created.key);
-        setCopiedKeyId(undefined);
-        setCreateOpen(false);
-        setLabel("Agent access");
+    createKey.execute(
+      { access: readOnly ? "read" : "full", label: normalizedLabel },
+      {
+        onSuccess: (created) => {
+          setKeys((current) => [created.metadata, ...current]);
+          showSecret(created.metadata.id, created.key);
+          setCopiedKeyId(undefined);
+          setCreateOpen(false);
+          setLabel("Agent access");
+          setReadOnly(false);
+        },
       },
-    });
+    );
   };
 
   const toggleKey = (key: ApiKeyDto): void => {
@@ -129,7 +138,7 @@ export function SettingsDialog({
         <Stack align="stretch" gap="large">
           <Stack align="center" direction="row" gap="auto" wrap="wrap">
             <Text className={styles["note"]} data-settings-note="">
-              Keys and connected agents act with your permissions.
+              Keys and connected agents act with your permissions; read-only keys only read.
             </Text>
             <Button data-settings-agent-access="" hierarchy="secondary" onClick={onOpenAgentAccess}>
               Connect an agent
@@ -183,6 +192,11 @@ export function SettingsDialog({
                         className={styles["secret"]}
                       >{`${key.id}.••••••••••••`}</CodeSnippet>
                     )}
+                    {key.access === "read" ? (
+                      <Text className={styles["meta"]} data-read-only-key="">
+                        Read-only: reads what you can read and changes nothing.
+                      </Text>
+                    ) : null}
                     {key.oauthClientName !== undefined ? (
                       <Text className={styles["meta"]} data-oauth-key="">
                         Connected by signing in from {key.oauthClientName}. Revoke it to disconnect.
@@ -252,28 +266,40 @@ export function SettingsDialog({
                   Use a separate key only when it needs its own revocation lifecycle.
                 </Text>
               </Stack>
-              <div className={styles["createControls"]}>
-                <ControlAndLabel label="Key name">
-                  <Input
-                    maxLength={200}
-                    name="api-key-label"
-                    onValueChange={setLabel}
-                    placeholder="Agent access"
-                    required
-                    value={label}
-                  />
-                </ControlAndLabel>
+              <ControlAndLabel label="Key name">
+                <Input
+                  maxLength={200}
+                  name="api-key-label"
+                  onValueChange={setLabel}
+                  placeholder="Agent access"
+                  required
+                  value={label}
+                />
+              </ControlAndLabel>
+              <SelectionControlAndLabel
+                control={
+                  <Checkbox.Root
+                    checked={readOnly}
+                    data-api-key-read-only=""
+                    onCheckedChange={setReadOnly}
+                  >
+                    <Checkbox.Indicator />
+                  </Checkbox.Root>
+                }
+              >
+                Read-only: the key can read documents but not change, comment on, or publish them,
+                or manage keys
+              </SelectionControlAndLabel>
+              <Stack direction="row" gap="xSmall" wrap="wrap">
                 <Button pending={createKey.state.pending} type="submit">
                   Create API key
                 </Button>
-              </div>
-              {activeKeys.length > 0 ? (
-                <div>
+                {activeKeys.length > 0 ? (
                   <Button hierarchy="tertiary" onClick={() => setCreateOpen(false)}>
                     Cancel
                   </Button>
-                </div>
-              ) : null}
+                ) : null}
+              </Stack>
             </Form>
           ) : (
             <Stack align="center" direction="row" gap="auto" wrap="wrap">

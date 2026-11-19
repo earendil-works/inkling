@@ -440,10 +440,19 @@ export const AuthenticationStatusSchema = Schema.Struct({
 });
 export type AuthenticationStatus = typeof AuthenticationStatusSchema.Type;
 
-export const ApiKeyCreateRequestSchema = Schema.Struct({ label: NonEmptyString });
+/** `full` keys act with all their owner's permissions; `read` keys only read. */
+export const ApiKeyAccessSchema = Schema.Literal("full", "read");
+export type ApiKeyAccess = typeof ApiKeyAccessSchema.Type;
+
+export const ApiKeyCreateRequestSchema = Schema.Struct({
+  /** Defaults to `full`. */
+  access: Schema.optional(ApiKeyAccessSchema),
+  label: NonEmptyString,
+});
 export type ApiKeyCreateRequest = typeof ApiKeyCreateRequestSchema.Type;
 
 export const ApiKeySchema = Schema.Struct({
+  access: ApiKeyAccessSchema,
   createdAt: Schema.String,
   id: Schema.String,
   label: Schema.String,

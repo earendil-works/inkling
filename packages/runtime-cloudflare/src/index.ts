@@ -5,6 +5,8 @@ import type { ManagedRuntime as ManagedRuntimeType } from "effect";
 import {
   documentTrashRetentionMilliseconds,
   DurableDocumentJournal,
+  isAdministrator,
+  isReadOnlyPrincipal,
   ObjectStore,
   SearchIndex,
   WorkspaceStateStore,
@@ -1104,10 +1106,7 @@ async function route(request: Request, environment: CloudflareEnvironment): Prom
       }
       const authorized = await workspaceStub(environment).authorize(credentials(request));
       if (!authorized.ok) return protocolErrorResponse(authorized.error);
-      if (
-        (authorized.value.kind !== "workspace" && authorized.value.kind !== "api-key") ||
-        authorized.value.role !== "administrator"
-      ) {
+      if (!isAdministrator(authorized.value)) {
         return protocolErrorResponse({
           code: "forbidden",
           message: "Workspace administrator access is required.",
@@ -1369,7 +1368,10 @@ async function dispatchDocument(
       if (!authorized.ok) return protocolErrorResponse(authorized.error);
       // Administrators and owners of personal documents purge; a retry after
       // the purge succeeds for either, since the owner is no longer known.
-      if (authorized.value.kind === "workspace" || authorized.value.kind === "api-key") {
+      if (
+        (authorized.value.kind === "workspace" || authorized.value.kind === "api-key") &&
+        !isReadOnlyPrincipal(authorized.value)
+      ) {
         return Response.json({}, { headers: { "Cache-Control": "no-store" } });
       }
     }

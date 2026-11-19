@@ -17,6 +17,7 @@ import {
   ShareUnlockResponseSchema,
 } from "@earendil-works/inkling-protocol";
 import type {
+  ApiKeyAccess,
   ApiKeyCreated,
   ApiKeyDto,
   AttachmentMetadataDto,
@@ -55,7 +56,10 @@ export class ApiError extends Data.TaggedError("ApiError")<{
 
 export interface ApiClientService {
   readonly authenticationStatus: Effect.Effect<AuthenticationStatus, ApiError>;
-  readonly createApiKey: (label: string) => Effect.Effect<ApiKeyCreated, ApiError>;
+  readonly createApiKey: (
+    label: string,
+    access?: ApiKeyAccess,
+  ) => Effect.Effect<ApiKeyCreated, ApiError>;
   readonly listApiKeys: Effect.Effect<readonly ApiKeyDto[], ApiError>;
   readonly revealApiKey: (keyId: string) => Effect.Effect<ApiKeyCreated, ApiError>;
   readonly revokeApiKey: (keyId: string) => Effect.Effect<void, ApiError>;
@@ -337,7 +341,8 @@ export function makeApiClient(
           )
         : Effect.succeed(cached);
     }),
-    createApiKey: (label) => mutation("/api/api-keys", ApiKeyCreatedSchema, "POST", { label }),
+    createApiKey: (label, access = "full") =>
+      mutation("/api/api-keys", ApiKeyCreatedSchema, "POST", { access, label }),
     createDocument: (input) => mutation("/api/documents", DocumentResponseSchema, "POST", input),
     createThread: (documentId, anchor, body, authorDisplayName) =>
       mutation(

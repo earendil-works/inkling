@@ -12,6 +12,7 @@ import {
   authenticateApiKey,
   assignRfcNumber,
   authorizeDocument,
+  authorizeWorkspace,
   createApiKey,
   createAuthorizationCode,
   createCommentThread,
@@ -46,7 +47,9 @@ import {
   emptyWorkspaceCatalog,
   hasPendingPublicationChanges,
   identifierTag,
+  isAdministrator,
   isDocumentActionAllowed,
+  isReadOnlyPrincipal,
   makePersonal,
   sharePersonalDocument,
   documentActions,
@@ -531,6 +534,95 @@ test("deleted documents remain restorable for 30 days before permanent deletion"
     }).pipe(Effect.either),
   );
   assert.equal(Either.isLeft(reusedNumber) && reusedNumber.left.code, "duplicate_rfc_number");
+});
+
+test("read-only API keys read what their owner may read and change nothing", async () => {
+  const ownerId = await Effect.runPromise(personId("reader@example.com"));
+  const hasher = fakeTokenHasher;
+  const created = await Effect.runPromise(
+    createApiKey(
+      emptyAuthenticationState(),
+      { displayName: "Wiki", personId: ownerId, role: "administrator" },
+      "Wiki",
+      now,
+      { access: "read" },
+    ).pipe(
+      Effect.provideService(IdGenerator, { generate: () => Effect.succeed("key_readonly1") }),
+      Effect.provideService(TokenHasher, hasher),
+      Effect.provideService(SecureToken, { generate: () => Effect.succeed("key-secret") }),
+    ),
+  );
+  assert.equal(created.record.access, "read");
+  const { principal } = await Effect.runPromise(
+    authenticateApiKey(created.state, created.token, now).pipe(
+      Effect.provideService(TokenHasher, hasher),
+    ),
+  );
+  assert.deepEqual(principal, {
+    access: "read",
+    displayName: "Wiki",
+    keyId: "key_readonly1",
+    kind: "api-key",
+    personId: ownerId,
+    role: "administrator",
+  });
+  assert.equal(isReadOnlyPrincipal(principal), true);
+  // An administrator's read-only key administers nothing.
+  assert.equal(isAdministrator(principal), false);
+
+  const readActions = ["discover", "read-working", "read-published", "read-history"];
+  const allowed = (metadata: DocumentMetadata, from: Principal = principal): readonly string[] =>
+    documentActions.filter((action) => isDocumentActionAllowed(from, action, metadata, now));
+  const document = await Effect.runPromise(
+    createDocumentMetadata({ id: "document_readonly1", title: "Handbook" }, now),
+  );
+  const published = await Effect.runPromise(markPublished(document, document.headRevision, now));
+  assert.deepEqual(allowed(published), readActions);
+  // A share link granting edits adds no more.
+  const withEditLink: Principal = {
+    ...principal,
+    capability: {
+      access: "edit",
+      documentId: published.id,
+      generation: published.sharing.generation,
+    },
+  } as Principal;
+  assert.deepEqual(
+    allowed({ ...published, sharing: { ...published.sharing, access: "edit" } }, withEditLink),
+    readActions,
+  );
+  const trashed = await Effect.runPromise(markDeleted(document, document.headRevision, now));
+  assert.deepEqual(allowed(trashed), ["discover", "read-working", "read-history"]);
+
+  const workspace = (action: "administer-workspace" | "create-document" | "read-catalog") =>
+    Effect.runPromise(authorizeWorkspace(principal, action).pipe(Effect.either)).then(
+      Either.isRight,
+    );
+  assert.equal(await workspace("read-catalog"), true);
+  assert.equal(await workspace("create-document"), false);
+  assert.equal(await workspace("administer-workspace"), false);
+
+  // Keys without an access level keep full access; unknown levels are no keys at all.
+  const legacy = {
+    ...created.state,
+    apiKeys: [{ ...created.record, access: undefined }],
+  };
+  const legacyKey = await Effect.runPromise(
+    authenticateApiKey(legacy, created.token, now).pipe(Effect.provideService(TokenHasher, hasher)),
+  );
+  assert.equal(isReadOnlyPrincipal(legacyKey.principal), false);
+  assert.equal(isAdministrator(legacyKey.principal), true);
+  const unknown = {
+    ...created.state,
+    apiKeys: [{ ...created.record, access: "write" as unknown as "read" }],
+  };
+  const rejected = await Effect.runPromise(
+    authenticateApiKey(unknown, created.token, now).pipe(
+      Effect.provideService(TokenHasher, hasher),
+      Effect.either,
+    ),
+  );
+  assert.equal(Either.isLeft(rejected), true);
 });
 
 test("personal documents are invisible to everyone but their owner until moved", async () => {

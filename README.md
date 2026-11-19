@@ -146,6 +146,13 @@ Claude Code, and Codex with the instance's own URL. Approved agents are listed
 under **API keys**, where they can be revoked. The MCP server's instructions
 cover document addressing and safe editing, so agents need no further setup.
 
+Integrations that only need to read, such as a wiki built from published
+documents, should use a read-only key: create it under **API keys** with
+**Read-only** checked. It reads whatever its owner may read and nothing more:
+it cannot edit, comment, publish, trash, administer the workspace, or create,
+reveal, or revoke keys, even when its owner is an administrator. Keys created
+without it keep their owner's full permissions.
+
 The `inkling` command-line client remains for administration that does not fit
 a tool call, such as imports, backups, restores, and attachment uploads:
 

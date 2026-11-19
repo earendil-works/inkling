@@ -68,6 +68,7 @@ export {
   setCommentThreadResolution,
 } from "./domain/comments.ts";
 export type {
+  ApiKeyAccess,
   CapabilityGrant,
   DocumentAction,
   Principal,
@@ -81,6 +82,7 @@ export {
   documentActions,
   isAdministrator,
   isDocumentActionAllowed,
+  isReadOnlyPrincipal,
 } from "./domain/authorization.ts";
 export type {
   ApiKeyIdentity,

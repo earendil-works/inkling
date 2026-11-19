@@ -4,6 +4,13 @@ import type { CapabilityAccess, DocumentMetadata, PersonId } from "./document.ts
 
 export type WorkspaceRole = "member" | "administrator";
 
+/**
+ * What an API key may do: everything its owner may (`full`), or only read
+ * what its owner may read (`read`), for integrations that should never
+ * change anything.
+ */
+export type ApiKeyAccess = "full" | "read";
+
 /** What a share link grants on the one document it was issued for. */
 export interface CapabilityGrant {
   readonly documentId: string;
@@ -33,6 +40,8 @@ export type Principal =
       readonly keyId: string;
       readonly personId: PersonId;
       readonly role: WorkspaceRole;
+      /** `read` limits the key to reading; absent means full access. */
+      readonly access?: ApiKeyAccess | undefined;
       /** A share link the key's owner opened; see the workspace principal. */
       readonly capability?: CapabilityGrant | undefined;
     }
@@ -63,6 +72,19 @@ export const documentActions = [
 export type DocumentAction = (typeof documentActions)[number];
 export type WorkspaceAction = "administer-workspace" | "create-document" | "read-catalog";
 
+/** The document actions a read-only API key may take: reading and nothing else. */
+const readOnlyDocumentActions: ReadonlySet<DocumentAction> = new Set<DocumentAction>([
+  "discover",
+  "read-working",
+  "read-published",
+  "read-history",
+]);
+
+/** Whether the principal is an API key limited to reading. */
+export function isReadOnlyPrincipal(principal: Principal): boolean {
+  return principal.kind === "api-key" && principal.access === "read";
+}
+
 export class AuthorizationError extends Data.TaggedError("AuthorizationError")<{
   readonly action: DocumentAction | WorkspaceAction;
   readonly message: string;
@@ -91,7 +113,9 @@ export function authorizeWorkspace(
 ): Effect.Effect<void, AuthorizationError> {
   const allowed =
     principal.kind === "workspace" || principal.kind === "api-key"
-      ? action !== "administer-workspace" || principal.role === "administrator"
+      ? isReadOnlyPrincipal(principal)
+        ? action === "read-catalog"
+        : action !== "administer-workspace" || principal.role === "administrator"
       : false;
   return allowed
     ? Effect.void
@@ -105,7 +129,8 @@ export function authorizeWorkspace(
 
 /**
  * Whether the principal may act on the document, either as who it is or
- * through the share link it carries, whichever allows more.
+ * through the share link it carries, whichever allows more. A read-only API
+ * key only ever reads, whatever its owner or a share link would allow.
  */
 export function isDocumentActionAllowed(
   principal: Principal,
@@ -113,6 +138,7 @@ export function isDocumentActionAllowed(
   metadata: DocumentMetadata,
   now: string,
 ): boolean {
+  if (isReadOnlyPrincipal(principal) && !readOnlyDocumentActions.has(action)) return false;
   if (isIdentityActionAllowed(principal, action, metadata)) return true;
   const grant =
     principal.kind === "capability"
@@ -314,9 +340,11 @@ function isSystemPrincipal(principal: Principal): boolean {
   return principal.kind === "workspace" && principal.system === true;
 }
 
+/** Whether the principal administers the workspace; read-only keys never do. */
 export function isAdministrator(principal: Principal): boolean {
   return (
     (principal.kind === "workspace" || principal.kind === "api-key") &&
-    principal.role === "administrator"
+    principal.role === "administrator" &&
+    !isReadOnlyPrincipal(principal)
   );
 }

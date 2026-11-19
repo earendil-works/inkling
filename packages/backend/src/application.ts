@@ -9,6 +9,7 @@ import type {
   WorkspaceIdentity,
 } from "@earendil-works/inkling-core";
 import type {
+  ApiKeyAccess,
   ApiKeyCreated,
   ApiKeyDto,
   AttachmentMetadataDto,
@@ -418,6 +419,7 @@ export interface InklingApplicationService {
   readonly createApiKey: (
     credentials: RequestCredentials,
     label: string,
+    access?: ApiKeyAccess,
   ) => Effect.Effect<ApiKeyCreated, ApplicationError>;
   readonly listApiKeys: (
     credentials: RequestCredentials,
