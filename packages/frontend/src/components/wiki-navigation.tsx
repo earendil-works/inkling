@@ -7,6 +7,7 @@ import type {
   WikiNavigation as WikiNavigationData,
   WikiNavigationItem,
 } from "../wiki-navigation.ts";
+import styles from "./wiki-navigation.module.css";
 
 /*
  * The wiki's navigation, rendered twice from the same data like pi.dev's
@@ -71,18 +72,20 @@ export function WikiNavigation({ wiki, current }: WikiNavigationProps): React.JS
 }
 
 function SideList({
+  className,
   current,
   items,
   labelledBy,
   path,
 }: {
+  readonly className?: string | undefined;
   readonly current: string;
   readonly items: readonly WikiNavigationItem[];
   readonly labelledBy?: string | undefined;
   readonly path: string;
 }): React.JSX.Element {
   return (
-    <SideNavigation.List aria-labelledby={labelledBy}>
+    <SideNavigation.List aria-labelledby={labelledBy} className={className}>
       {items.map((item, index) => {
         const itemPath = `${path}/${index}`;
         return item.kind === "section" ? (
@@ -95,7 +98,12 @@ function SideList({
               {item.label}
             </SideNavigation.Link>
             {item.items.length === 0 ? null : (
-              <SideList current={current} items={item.items} path={itemPath} />
+              <SideList
+                className={styles["nested"]}
+                current={current}
+                items={item.items}
+                path={itemPath}
+              />
             )}
           </SideNavigation.Item>
         );
@@ -143,16 +151,18 @@ export function WikiMenuNavigation({ wiki, current }: WikiNavigationProps): Reac
 }
 
 function MenuList({
+  className,
   current,
   items,
   path,
 }: {
+  readonly className?: string | undefined;
   readonly current: string;
   readonly items: readonly WikiNavigationItem[];
   readonly path: string;
 }): React.JSX.Element {
   return (
-    <TopNavigation.MenuList>
+    <TopNavigation.MenuList className={className}>
       {items.map((item, index) => {
         const itemPath = `${path}/${index}`;
         return item.kind === "section" ? (
@@ -165,7 +175,12 @@ function MenuList({
               {item.label}
             </TopNavigation.MenuLink>
             {item.items.length === 0 ? null : (
-              <MenuList current={current} items={item.items} path={itemPath} />
+              <MenuList
+                className={styles["nestedMenu"]}
+                current={current}
+                items={item.items}
+                path={itemPath}
+              />
             )}
           </TopNavigation.MenuItem>
         );
