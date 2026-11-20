@@ -110,45 +110,12 @@ placeholder leads to the section.
 
 ### Wiki
 
-Notes can also form a wiki: published notes labelled `wiki` are its pages,
-and one published note labelled `wiki-index` lays it out and is read at
-`/wiki`. Wiki pages keep their own addresses and read beside the wiki's
-navigation, built from the index:
-
-```markdown
-# Earendil Wiki
-
-How we work, who does what, and where things are.
-
-- [](doc:doc_wifi)
-
-## Company
-
-- [](doc:doc_abc123)
-- [Time off](doc:doc_def456)
-
-## Engineering
-
-### Decisions
-
-- <rfc:12>
-
-### Runbooks
-
-- [Deploying](doc:doc_ghi789)
-  - [](doc:doc_rollback)
-- Incidents
-  - [](doc:doc_oncall)
-```
-
-Pages listed before the first `##` heading come first. Each `##` heading
-heads a group; each `###` heading starts a section that folds (`####` one
-inside it), and so does a list item without a link that holds a list. A
-linked document is a page, named by its title or the link's own text, and a
-list inside its item lists pages below it. Sections open on the pages inside
-them. Notes labelled `wiki` that the index doesn't list appear under
-**Unsorted**. Each reader sees only the pages they may open, and the `wiki`
-and `wiki-index` labels never show as labels.
+Published notes labelled `wiki` form a wiki, read beside a navigation and
+search like a documentation site. One published note labelled `wiki-index`
+lays it out and is read at `/wiki`: its `##` headings group the pages it
+links, and `###` headings or link-less list items holding a list become
+sections that fold. Wiki notes it doesn't list appear under Unsorted; each
+reader sees only the pages they may open.
 
 ## Finding documents
 
