@@ -1,0 +1,131 @@
+/*
+ * A wiki page (wiki-document.tsx), as Elanor's and pi.dev's docs set a page:
+ * the article on Elanor's 12-column grid, its title and metadata close
+ * together, then the content; from 75rem, nine columns for the article and
+ * three for its sections, which stick below the top bar. Narrower, the
+ * sections are a sticky menu above the content, whose borders replace the
+ * page's separator.
+ */
+
+.grid {
+  align-items: start;
+}
+
+.article {
+  display: grid;
+  grid-column: 1 / -1;
+  row-gap: var(--semantic-dimension-space-gap-x-large);
+  min-inline-size: 0;
+  max-inline-size: var(--semantic-dimension-size-max-width-text);
+}
+
+/* Wide code and tables scroll inside their own boxes instead of widening the page. */
+.article > * {
+  min-inline-size: 0;
+}
+
+/* The title and its metadata sit close together, and so does whatever follows them. */
+.header {
+  display: grid;
+  row-gap: var(--semantic-dimension-space-gap-small);
+  margin-block-end: calc(
+    var(--semantic-dimension-space-gap-small) - var(--semantic-dimension-space-gap-x-large)
+  );
+}
+
+.header h1 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.metadata {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--semantic-dimension-space-gap-small);
+  color: var(--semantic-color-text-secondary);
+  font: var(--semantic-typography-ui-secondary);
+}
+
+.updated {
+  font: var(--semantic-typography-code-primary);
+}
+
+/* Shorter than the row, so it divides the items without reaching their edges. */
+.metadataSeparator {
+  block-size: var(--semantic-dimension-size-x-small);
+}
+
+/* Gray tertiary buttons, like the docs' "Copy page"; Elanor's tertiary button is the link color. */
+.action {
+  box-shadow: inset 0 0 0 var(--semantic-dimension-border-width-default)
+    var(--semantic-color-background-fill-ghost-neutral);
+  background: var(--semantic-color-background-fill-ghost-neutral);
+  color: var(--semantic-color-text-secondary);
+}
+
+@media (hover: hover) {
+  .action:hover:not([data-disabled]) {
+    box-shadow: inset 0 0 0 var(--semantic-dimension-border-width-default)
+      var(--semantic-color-background-fill-ghost-neutral-hover);
+    background: var(--semantic-color-background-fill-ghost-neutral-hover);
+  }
+}
+
+.status {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The sections' menu sticks below the top bar. */
+.tocMenu {
+  inset-block-start: calc(
+    var(--semantic-dimension-size-top-navigation) - var(--semantic-dimension-border-width-small)
+  );
+}
+
+.article:has(.tocMenu) .pageSeparator {
+  display: none;
+}
+
+.tocColumn {
+  display: none;
+}
+
+@media (width >= 75rem) {
+  .article[data-toc] {
+    grid-column: 1 / span 9;
+  }
+
+  .article[data-toc] .tocMenu {
+    display: none;
+  }
+
+  .article[data-toc] .pageSeparator {
+    display: revert-layer;
+  }
+
+  .tocColumn {
+    position: sticky;
+    display: block;
+    grid-column: 10 / span 3;
+    inset-block-start: var(--semantic-dimension-size-top-navigation);
+    min-inline-size: 0;
+    max-block-size: calc(100dvh - var(--semantic-dimension-size-top-navigation));
+    padding-block: var(--semantic-dimension-space-padding-xxx-large);
+    margin-block-start: calc(-1 * var(--semantic-dimension-space-padding-xxx-large));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* The column scrolls itself; Inkling's own list would stick again inside it. */
+  .toc {
+    position: static;
+    max-block-size: none;
+    overflow: visible;
+  }
+}

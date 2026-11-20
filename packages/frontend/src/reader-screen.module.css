@@ -1,0 +1,85 @@
+/*
+ * The wiki's shell (reader-screen.tsx), like Elanor's and pi.dev's docs, with
+ * pi.dev's geometry: the sticky top bar (wiki-header.tsx); from 61.625rem, the
+ * side navigation (`size.sidebar`) fixed at the window's start below it, with
+ * the search above the navigation. The content is Elanor's Container, centered
+ * in the window unless that would put it under the side navigation.
+ * Narrower, the top bar's menu holds the navigation.
+ */
+
+.main:focus {
+  outline: 0;
+}
+
+.content {
+  padding-block: var(--semantic-dimension-space-padding-x-large)
+    var(--semantic-dimension-space-padding-xxxx-large);
+}
+
+.navigation {
+  display: none;
+}
+
+@media (width >= 48rem /* token: semantic.dimension.breakpoint.small */) {
+  .content {
+    padding-block-start: var(--semantic-dimension-space-padding-xxx-large);
+  }
+}
+
+@media (width >= 61.625rem) {
+  .navigation {
+    position: fixed;
+    /* Above the content, below the sticky top bar. */
+    z-index: var(--semantic-number-layer-raised);
+    inset-block: var(--semantic-dimension-size-top-navigation) 0;
+    inset-inline-start: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    inline-size: var(--semantic-dimension-size-sidebar);
+    border-inline-end: var(--semantic-dimension-border-width-small) solid
+      var(--semantic-color-border-secondary);
+    background: var(--semantic-color-background-canvas);
+  }
+
+  /* The search above the navigation: it lines up with the page title. */
+  .search {
+    display: grid;
+    gap: var(--semantic-dimension-space-gap-medium);
+    padding-block-start: var(--semantic-dimension-space-padding-xxx-large);
+    padding-inline: var(--semantic-dimension-space-padding-x-large);
+  }
+
+  .scroll {
+    min-block-size: 0;
+    padding-block: var(--semantic-dimension-space-padding-x-large)
+      var(--semantic-dimension-space-padding-xxx-large);
+    padding-inline: var(--semantic-dimension-space-padding-x-large);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* The navigation scrolls up and down only: long labels truncate as Elanor sets them. */
+  .scroll > * {
+    contain: inline-size;
+  }
+
+  /* Centered in the window like every other container, unless that would put the content
+     under the side navigation. */
+  .content {
+    inline-size: auto;
+    margin-inline: max(
+        var(--semantic-dimension-size-sidebar),
+        calc(
+          (100% - var(--semantic-dimension-size-max-width-content-large)) / 2 -
+            var(--semantic-dimension-space-padding-x-large)
+        )
+      )
+      max(
+        var(--semantic-dimension-space-padding-none),
+        calc(
+          (100% - var(--semantic-dimension-size-max-width-content-large)) / 2 -
+            var(--semantic-dimension-space-padding-x-large)
+        )
+      );
+  }
+}

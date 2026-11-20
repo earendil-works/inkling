@@ -21,6 +21,20 @@ export const knownLifecycleStates = [
 
 export type KnownLifecycleState = (typeof knownLifecycleStates)[number];
 export type LifecycleState = KnownLifecycleState | (string & {});
+/** Marks a note as a wiki page. It only drives navigation, so it is never shown as a label. */
+export const wikiLabel = "wiki";
+
+/**
+ * Marks the wiki's index: the note at `/wiki` that lays out the wiki's
+ * navigation. Like {@link wikiLabel}, it is never shown as a label.
+ */
+export const wikiIndexLabel = "wiki-index";
+
+/** The labels to show on a document, without navigation-only labels such as {@link wikiLabel}. */
+export function visibleLabels(labels: readonly string[]): readonly string[] {
+  return labels.filter((label) => label !== wikiLabel && label !== wikiIndexLabel);
+}
+
 export type Visibility = "public" | "private" | "confidential";
 export type CapabilityAccess = "disabled" | "view" | "comment" | "edit";
 

@@ -28,14 +28,6 @@ body {
   isolation: isolate;
 }
 
-::selection {
-  background: color-mix(
-    in oklch,
-    var(--semantic-color-focus-ring) 28%,
-    var(--semantic-color-background-canvas)
-  );
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

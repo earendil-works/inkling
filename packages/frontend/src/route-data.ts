@@ -10,6 +10,7 @@ import {
 } from "@earendil-works/inkling-protocol";
 
 import type { ApiClientService } from "./api.ts";
+import { WikiNavigationSchema } from "./wiki-navigation.ts";
 
 const AccountSchema = AuthenticationStatusSchema.fields.principal;
 
@@ -42,6 +43,8 @@ export const RouteDataSchema = Schema.Union(
     }),
     screen: Schema.Literal("editor", "reader"),
     shared: Schema.Boolean,
+    /** The wiki's navigation, for the index and wiki pages in the reader. */
+    wiki: Schema.optional(WikiNavigationSchema),
   }),
   Schema.Struct({
     ...RouteBaseFields,

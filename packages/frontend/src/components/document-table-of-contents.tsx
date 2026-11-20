@@ -10,6 +10,9 @@ export interface DocumentTableOfContentsProps {
   readonly headings: readonly RenderHeading[];
   /** `list` sits beside the document; `menu` collapses into a sticky bar above it. */
   readonly presentation: "list" | "menu";
+  /** Heads the list with "On this page"; documentation pages, such as the wiki's, leave it out. */
+  readonly titled?: boolean | undefined;
+  readonly className?: string | undefined;
 }
 
 interface HeadingNode {
@@ -18,8 +21,10 @@ interface HeadingNode {
 }
 
 export function DocumentTableOfContents({
+  className,
   headings,
   presentation,
+  titled = true,
 }: DocumentTableOfContentsProps): React.JSX.Element | null {
   const tableOfContentsRef = useRef<HTMLElement>(null);
   const [activeHeadingId, setActiveHeadingId] = useState<string>();
@@ -32,6 +37,7 @@ export function DocumentTableOfContents({
   if (presentation === "menu") {
     return (
       <TableOfContents.Menu
+        className={className}
         data-reader-toc=""
         ref={tableOfContentsRef as React.Ref<HTMLDivElement>}
       >
@@ -46,11 +52,11 @@ export function DocumentTableOfContents({
   return (
     <TableOfContents.Root
       aria-label="On this page"
-      className={styles["toc"]}
+      className={className ?? styles["toc"]}
       data-reader-toc=""
       ref={tableOfContentsRef}
     >
-      <p className={styles["tocTitle"]}>On this page</p>
+      {titled ? <p className={styles["tocTitle"]}>On this page</p> : null}
       {list}
       <TableOfContents.Indicator />
     </TableOfContents.Root>

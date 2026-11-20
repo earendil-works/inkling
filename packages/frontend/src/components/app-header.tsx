@@ -1,8 +1,7 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 
-import { DarkModeIcon, LightModeIcon } from "@earendil-works/elanor-icons-react";
-import { IconButton, Layout, TopNavigation } from "@earendil-works/elanor-react";
+import { Layout, TopNavigation } from "@earendil-works/elanor-react";
 import type { PresenceDto } from "@earendil-works/inkling-protocol";
 
 import type { ApiClientService } from "../api.ts";
@@ -13,13 +12,7 @@ import { AccountControl } from "./account-control.tsx";
 import type { AccountControlProps } from "./account-control.tsx";
 import styles from "./app-header.module.css";
 import { ButtonLink } from "./button-link.tsx";
-import {
-  applyColorScheme,
-  currentColorScheme,
-  serverColorScheme,
-  subscribeToColorScheme,
-  syncThemeColor,
-} from "./color-scheme.ts";
+import { ThemeToggle } from "./theme-toggle.tsx";
 
 export interface BreadcrumbItem {
   readonly href?: string | undefined;
@@ -45,17 +38,8 @@ export function AppHeader({
   participants,
   status,
 }: AppHeaderProps): React.JSX.Element {
-  const scheme = useSyncExternalStore(
-    subscribeToColorScheme,
-    currentColorScheme,
-    serverColorScheme,
-  );
   const navigation = useNavigationProgress(navigating);
   const url = useCurrentUrl();
-
-  useEffect(() => syncThemeColor(), [scheme]);
-
-  const nextScheme = scheme === "dark" ? "light" : "dark";
 
   return (
     <Layout.Header
@@ -119,15 +103,7 @@ export function AppHeader({
             <span data-api-status="">{status.label}</span>
           </div>
         )}
-        <IconButton
-          aria-label={`Switch to ${nextScheme} theme`}
-          data-theme-toggle=""
-          onClick={(event) => {
-            if (event.detail <= 1) toggleScheme();
-          }}
-        >
-          {scheme === "dark" ? <LightModeIcon /> : <DarkModeIcon />}
-        </IconButton>
+        <ThemeToggle />
         {api === undefined ? null : account === undefined ? (
           <ButtonLink data-sign-in="" href={signInHref(url)}>
             Sign in
@@ -138,10 +114,6 @@ export function AppHeader({
       </TopNavigation.Actions>
     </Layout.Header>
   );
-}
-
-function toggleScheme(): void {
-  applyColorScheme(currentColorScheme() === "dark" ? "light" : "dark", true);
 }
 
 /** Loading while navigating, then briefly complete so the progress bar can finish and fade. */

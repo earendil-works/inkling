@@ -2,6 +2,7 @@ import { useCallback, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 
 import { Heading, KeyValue } from "@earendil-works/elanor-react";
+import { visibleLabels } from "@earendil-works/inkling-core";
 import type { DocumentMetadataDto } from "@earendil-works/inkling-protocol";
 import type { RenderHeading } from "@earendil-works/inkling-renderer";
 
@@ -24,6 +25,7 @@ export function DocumentPage({
   presentation = "reader",
 }: DocumentPageProps): React.JSX.Element {
   const wide = useMediaQuery("(width > 68rem)", true);
+  const labels = visibleLabels(metadata.labels);
   const tableOfContents = (
     <DocumentTableOfContents
       headings={headings}
@@ -49,9 +51,9 @@ export function DocumentPage({
           <Heading className={styles["title"]} level={1} size={presentation === "preview" ? 2 : 1}>
             {metadata.title}
           </Heading>
-          {metadata.labels.length === 0 ? null : (
+          {labels.length === 0 ? null : (
             <div aria-label="Labels" className={styles["labels"]}>
-              {metadata.labels.map((label) => (
+              {labels.map((label) => (
                 <Chip href={`/labels?label=${encodeURIComponent(label)}`} key={label}>
                   {label}
                 </Chip>
@@ -172,7 +174,7 @@ function PeopleList({
  * Whether a media query matches, following changes. The server renders for
  * `serverMatches`, and hydration switches to the browser's answer.
  */
-function useMediaQuery(query: string, serverMatches: boolean): boolean {
+export function useMediaQuery(query: string, serverMatches: boolean): boolean {
   const subscribe = useCallback(
     (onChange: () => void) => {
       const media = matchMedia(query);

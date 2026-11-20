@@ -18,7 +18,7 @@ import type { ClientRouter, NavigateOptions } from "./navigation.ts";
 import type { RouteData, RouteModel } from "./route-data.ts";
 import { isApplicationPath, loadRoute } from "./route-loader.ts";
 import type { RouteEnvironment } from "./route-loader.ts";
-import { formatRfcNumber } from "./ui.ts";
+import { WIKI_PATH, formatRfcNumber, isWikiPage } from "./ui.ts";
 
 const browserAuthentication = makeAuthenticationCache();
 
@@ -105,6 +105,7 @@ export function App({
   useEffect(() => {
     document.title = pageTitle;
   }, [pageTitle]);
+  const wikiMode = route.state.data?.screen === "reader" && route.state.data.wiki !== undefined;
   useEffect(() => {
     if (route.state.status === "failure" && route.state.data !== undefined) {
       showToast(route.state.error.message, "error");
@@ -127,14 +128,17 @@ export function App({
     <AppContext.Provider value={context}>
       <LocationContext.Provider value={locationState.url}>
         <Layout.Root>
-          <AppHeader
-            account={route.state.data?.account}
-            api={route.state.data?.api}
-            breadcrumbs={breadcrumbs}
-            navigating={navigating}
-            participants={participants}
-            status={status}
-          />
+          {/* Wiki pages read like a documentation site, with their own navigation. */}
+          {wikiMode ? null : (
+            <AppHeader
+              account={route.state.data?.account}
+              api={route.state.data?.api}
+              breadcrumbs={breadcrumbs}
+              navigating={navigating}
+              participants={participants}
+              status={status}
+            />
+          )}
           <RouteView
             navigationKey={locationState.generation}
             refresh={route.refresh}
@@ -217,9 +221,11 @@ function breadcrumbsForRoute(
     label: documentLabel,
     truncate: true,
   };
+  const parents: readonly BreadcrumbItem[] =
+    !deleted && isWikiPage(document) ? [section, { href: WIKI_PATH, label: "Wiki" }] : [section];
   return model.screen === "editor"
-    ? [home, section, documentBreadcrumb, { label: "Edit" }]
-    : [home, section, documentBreadcrumb];
+    ? [home, ...parents, documentBreadcrumb, { label: "Edit" }]
+    : [home, ...parents, documentBreadcrumb];
 }
 
 function isApplicationUrl(url: URL): boolean {

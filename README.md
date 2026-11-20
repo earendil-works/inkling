@@ -108,6 +108,15 @@ open the target sees a placeholder such as “RFC 0057 (unavailable)”, and
 anonymous readers never receive the section ID. Signing in through the
 placeholder leads to the section.
 
+### Wiki
+
+Published notes labelled `wiki` form a wiki, read beside a navigation and
+search like a documentation site. One published note labelled `wiki-index`
+lays it out and is read at `/wiki`: its `##` headings group the pages it
+links, and `###` headings or link-less list items holding a list become
+sections that fold. Wiki notes it doesn't list appear under Unsorted; each
+reader sees only the pages they may open.
+
 ## Finding documents
 
 Press `/` or <kbd>Cmd/Ctrl</kbd>+<kbd>K</kbd> from the workspace to focus

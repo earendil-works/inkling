@@ -181,15 +181,6 @@
   border-inline-start-color: var(--semantic-color-text-primary);
 }
 
-.editorHost :global(.cm-selectionBackground),
-.editorHost :global(.cm-content ::selection) {
-  background: color-mix(
-    in oklch,
-    var(--semantic-color-focus-ring) 28%,
-    var(--editor-background)
-  ) !important;
-}
-
 .editorHost :global(.cm-panels),
 .editorHost :global(.cm-tooltip) {
   border: 0;

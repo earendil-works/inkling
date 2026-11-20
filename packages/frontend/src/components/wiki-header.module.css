@@ -1,0 +1,55 @@
+/*
+ * The wiki's top bar (wiki-header.tsx), like pi.dev's docs: Elanor's
+ * TopNavigation as a sticky bar, `size.topNavigation` tall with its bottom
+ * border, full width, the identity and the actions at the window's edges.
+ * Below 61.625rem, where the side navigation leaves, the search button and the
+ * menu show.
+ */
+
+.header {
+  position: sticky;
+  z-index: var(--semantic-number-layer-sticky);
+  inset-block-start: 0;
+  padding-inline: var(--semantic-dimension-space-padding-x-large);
+  border-block-end: var(--semantic-dimension-border-width-small) solid
+    var(--semantic-color-border-secondary);
+  background: var(--semantic-color-background-canvas);
+}
+
+/*
+ * The identity: the Earendil symbol beside "Wiki", set like the brand's horizontal lockup
+ * (@earendil-works/elanor-logos) with "Wiki" in place of the wordmark. The lockup is measured in
+ * the wordmark's cap height (570 units), so the symbol is sized and placed in the name's cap
+ * height (`cap`): its 840-unit frame, the one EarendilSymbol draws, with its bottom 38 units
+ * below the baseline, and 232 units between the frame and the name.
+ */
+.identity:any-link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: calc(232 / 570 * 1cap);
+  color: var(--semantic-color-text-primary);
+  font: var(--semantic-typography-heading-app-4);
+  text-decoration: none;
+}
+
+/* Without a baseline of its own, the symbol's bottom sits on the name's baseline; the translation
+   moves it to its place in the lockup. */
+.mark {
+  display: block;
+  flex: none;
+  inline-size: auto;
+  block-size: calc(840 / 570 * 1cap);
+  translate: 0 calc(38 / 570 * 1cap);
+}
+
+.actions {
+  align-items: center;
+}
+
+@media (width >= 61.625rem) {
+  .search,
+  .menuTrigger,
+  .menu {
+    display: none;
+  }
+}

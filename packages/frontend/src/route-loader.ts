@@ -1,5 +1,6 @@
 import { Effect, Option } from "effect";
 
+import { wikiIndexLabel } from "@earendil-works/inkling-core";
 import { collectReferences } from "@earendil-works/inkling-renderer";
 import type { DocumentResponse, ReferenceResolutionDto } from "@earendil-works/inkling-protocol";
 
@@ -7,7 +8,8 @@ import { ApiError } from "./api.ts";
 import type { ApiClientService } from "./api.ts";
 import { accountPerson, collectFrontmatterVocabulary } from "./frontmatter-completion.ts";
 import type { RouteModel } from "./route-data.ts";
-import { formatRfcNumber } from "./ui.ts";
+import { WIKI_PATH, formatRfcNumber, isWikiDocument } from "./ui.ts";
+import { findWikiIndex, loadWikiNavigation } from "./wiki-navigation.ts";
 
 /** How routes reach the API and their code; the server renderer supplies its own. */
 export interface RouteEnvironment {
@@ -21,6 +23,7 @@ export function isApplicationPath(pathname: string): boolean {
     pathname === "/" ||
     pathname === "/labels" ||
     pathname === "/trash" ||
+    pathname === WIKI_PATH ||
     pathname.startsWith("/documents/") ||
     pathname.startsWith("/rfc/") ||
     pathname.startsWith("/share/")
@@ -81,6 +84,9 @@ function loadRouteWith(
           }),
       ),
     );
+  }
+  if (url.pathname === WIKI_PATH) {
+    return loadWikiRoute(environment, api, capabilityToken);
   }
   if (documentRoute?.[1] !== undefined) {
     return loadDocumentRoute(
@@ -207,6 +213,34 @@ function loadRfcRoute(
   );
 }
 
+/** The wiki's index note, read with the wiki's navigation. */
+function loadWikiRoute(
+  environment: RouteEnvironment,
+  api: ApiClientService,
+  capabilityToken: string | undefined,
+): Effect.Effect<RouteModel, ApiError> {
+  return findWikiIndex(api).pipe(
+    Effect.flatMap((index) =>
+      index === undefined
+        ? api.authenticationStatus.pipe(
+            Effect.flatMap((authentication) =>
+              Effect.fail(
+                authentication.authenticated
+                  ? new ApiError({
+                      code: "not_found",
+                      message: `The wiki has no index yet: label a note “${wikiIndexLabel}” and publish it.`,
+                      retryable: false,
+                      status: 404,
+                    })
+                  : signInRequired(404),
+              ),
+            ),
+          )
+        : loadDocumentRoute(environment, api, capabilityToken, index.metadata.id, "reader", false),
+    ),
+  );
+}
+
 /**
  * Explains a refused document without authorization internals, and asks
  * anonymous readers to sign in.
@@ -276,13 +310,22 @@ function loadDocumentRoute(
     },
   ).pipe(
     Effect.flatMap(([document, authentication]) =>
-      resolveDocumentReferences(api, document).pipe(
-        Effect.map((references) => [document, authentication, references] as const),
+      Effect.all(
+        [
+          resolveDocumentReferences(api, document),
+          // Wiki pages read with the wiki's navigation; without it, they read as notes.
+          screen === "reader" && !shared && isWikiDocument(document.metadata)
+            ? loadWikiNavigation(api).pipe(Effect.orElseSucceed(() => undefined))
+            : Effect.succeed(undefined),
+        ],
+        { concurrency: "unbounded" },
+      ).pipe(
+        Effect.map(([references, wiki]) => [document, authentication, references, wiki] as const),
       ),
     ),
     // The editor completes frontmatter from the whole catalog, but loads it
     // after it opens; the route only waits for what it shows first.
-    Effect.map(([document, authentication, references]): RouteModel => ({
+    Effect.map(([document, authentication, references, wiki]): RouteModel => ({
       account: authentication.authenticated ? authentication.principal : undefined,
       api,
       capabilityToken,
@@ -296,6 +339,7 @@ function loadDocumentRoute(
       references,
       screen,
       shared,
+      ...(wiki === undefined ? {} : { wiki }),
     })),
   );
 }

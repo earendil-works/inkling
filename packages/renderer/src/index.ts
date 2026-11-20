@@ -9,6 +9,7 @@ import YAML from "yaml";
 import {
   parseReference,
   pendingReferenceLabel,
+  referenceKey,
   referenceTargetPath,
   referenceTitle,
   resolvedReferenceLabel,
@@ -16,7 +17,7 @@ import {
   sectionLabel,
   unavailableReferenceLabel,
 } from "./references.ts";
-import type { DocumentReference, ReferenceResolutions } from "./references.ts";
+import type { DocumentReference, ParsedReference, ReferenceResolutions } from "./references.ts";
 
 export * from "./references.ts";
 
@@ -317,6 +318,131 @@ export function collectReferences(
       }),
     ),
   );
+}
+
+/** An entry of a wiki index: a linked page, or a section that folds; both may hold more. */
+export type WikiOutlineItem =
+  | {
+      readonly kind: "page";
+      /** The link's target, such as `rfc:12` or `doc:doc_abc123`, without a section. */
+      readonly reference: ParsedReference;
+      /** The link's own text; absent for `<rfc:12>` and `[](doc:…)`, which take the target's. */
+      readonly label?: string | undefined;
+      readonly items: readonly WikiOutlineItem[];
+    }
+  | {
+      readonly kind: "section";
+      readonly label: string;
+      readonly items: readonly WikiOutlineItem[];
+    };
+
+/** The entries under a `##` heading, or, without a label, those before the first one. */
+export interface WikiOutlineGroup {
+  readonly label?: string | undefined;
+  readonly items: readonly WikiOutlineItem[];
+}
+
+/**
+ * The navigation a wiki index lays out, read as rendering reads it. Each `##`
+ * heading starts a group; each `###` heading in it starts a section that
+ * folds, and each deeper heading one inside that. A list item linking to a
+ * document is a page, and a list inside it lists pages below it; a list item
+ * without a link that holds a list is a section. Other content is left out.
+ */
+export function outlineWiki(
+  markdown: string,
+): Effect.Effect<readonly WikiOutlineGroup[], RenderError> {
+  return parseDocumentSource(markdown).pipe(
+    Effect.flatMap((source) =>
+      Effect.try({
+        catch: (cause) => new RenderError({ cause, message: "Markdown rendering failed." }),
+        try: () => outlineWikiTokens(createParser().parse(source.body, {})),
+      }),
+    ),
+  );
+}
+
+interface WikiDraftItem {
+  label: string;
+  reference?: ParsedReference | undefined;
+  ownLabel?: string | undefined;
+  items: WikiOutlineItem[];
+  /** Whether the item's own text, before any list inside it, was read. */
+  read: boolean;
+}
+
+function outlineWikiTokens(tokens: readonly Token[]): WikiOutlineGroup[] {
+  const groups: { label?: string | undefined; items: WikiOutlineItem[] }[] = [{ items: [] }];
+  // Where list items go: the group, or the sections of `###` and deeper headings.
+  let headings: { depth: number; items: WikiOutlineItem[] }[] = [
+    { depth: 2, items: groups[0]!.items },
+  ];
+  const lists: WikiOutlineItem[][] = [];
+  const items: { draft: WikiDraftItem; into: WikiOutlineItem[] }[] = [];
+
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index]!;
+    if (token.type === "heading_open" && lists.length === 0) {
+      const depth = Number(token.tag.slice(1));
+      const label = inlineTokenText(tokens[index + 1]) ?? "";
+      if (depth === 2) {
+        const group = { label, items: [] as WikiOutlineItem[] };
+        groups.push(group);
+        headings = [{ depth: 2, items: group.items }];
+      } else if (depth > 2) {
+        while (headings.length > 1 && headings.at(-1)!.depth >= depth) headings.pop();
+        const section = { kind: "section" as const, label, items: [] as WikiOutlineItem[] };
+        headings.at(-1)!.items.push(section);
+        headings.push({ depth, items: section.items });
+      }
+    } else if (token.type === "bullet_list_open" || token.type === "ordered_list_open") {
+      lists.push(items.at(-1)?.draft.items ?? headings.at(-1)!.items);
+    } else if (token.type === "bullet_list_close" || token.type === "ordered_list_close") {
+      lists.pop();
+    } else if (token.type === "list_item_open") {
+      items.push({ draft: { items: [], label: "", read: false }, into: lists.at(-1)! });
+    } else if (token.type === "inline" && items.length > 0 && !items.at(-1)!.draft.read) {
+      const draft = items.at(-1)!.draft;
+      draft.read = true;
+      draft.label = inlineTokenText(token) ?? "";
+      const children = token.children ?? [];
+      const linkIndex = children.findIndex(
+        (child) =>
+          child.type === "link_open" && parseReference(String(child.attrGet("href"))) !== undefined,
+      );
+      if (linkIndex !== -1) {
+        const href = String(children[linkIndex]!.attrGet("href"));
+        const reference = parseReference(href)!;
+        const closeIndex = children.findIndex(
+          (child, childIndex) => childIndex > linkIndex && child.type === "link_close",
+        );
+        const text = children
+          .slice(linkIndex + 1, closeIndex === -1 ? undefined : closeIndex)
+          .map((child) => child.content)
+          .join("")
+          .trim();
+        draft.reference =
+          reference.anchor === undefined
+            ? reference
+            : { key: referenceKey(reference.target), target: reference.target };
+        // Autolinks show their destination as text; that is no label of their own.
+        draft.ownLabel = text === "" || text === href ? undefined : text;
+      }
+    } else if (token.type === "list_item_close") {
+      const { draft, into } = items.pop()!;
+      if (draft.reference !== undefined) {
+        into.push({
+          items: draft.items,
+          kind: "page",
+          label: draft.ownLabel,
+          reference: draft.reference,
+        });
+      } else if (draft.items.length > 0) {
+        into.push({ items: draft.items, kind: "section", label: draft.label || "More" });
+      }
+    }
+  }
+  return groups.filter((group) => group.items.length > 0);
 }
 
 interface HeadingMeta {

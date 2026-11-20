@@ -12,6 +12,7 @@ import {
   DocumentResponseSchema,
   ProtocolErrorSchema,
   PublicDocumentResponseSchema,
+  PassageSearchResponseSchema,
   ReferenceResolutionsResponseSchema,
   ShareLinksResponseSchema,
   ShareUnlockResponseSchema,
@@ -30,6 +31,7 @@ import type {
   DocumentMetadataDto,
   DocumentResponse,
   PublicDocumentResponse,
+  PassageSearchResponse,
   ReferenceResolutionsResponse,
   ShareLinksResponse,
   ShareUnlockResponse,
@@ -179,6 +181,11 @@ export interface ApiClientService {
   readonly resolveReferences: (
     references: readonly string[],
   ) => Effect.Effect<ReferenceResolutionsResponse, ApiError>;
+  /** Ranked passages of the documents the query's filters select, such as `label:wiki`. */
+  readonly searchPassages: (
+    query: string,
+    limit?: number,
+  ) => Effect.Effect<PassageSearchResponse, ApiError>;
 }
 
 export const ApiClient = Context.GenericTag<ApiClientService>("@earendil-works/inkling/ApiClient");
@@ -430,6 +437,11 @@ export function makeApiClient(
         DocumentResponseSchema,
       ),
     readPublicRfc: (number) => request(`/api/public/rfc/${number}`, PublicDocumentResponseSchema),
+    searchPassages: (query, limit = 20) =>
+      request(
+        `/api/search?q=${encodeURIComponent(query)}&limit=${limit}`,
+        PassageSearchResponseSchema,
+      ),
     resolveReferences: (references) =>
       Effect.forEach(
         chunks([...new Set(references)], referencesPerRequest),
