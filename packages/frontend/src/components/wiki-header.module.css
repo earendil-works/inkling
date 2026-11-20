@@ -16,20 +16,30 @@
   background: var(--semantic-color-background-canvas);
 }
 
+/*
+ * The identity: the Earendil symbol beside "Wiki", set like the brand's horizontal lockup
+ * (@earendil-works/elanor-logos) with "Wiki" in place of the wordmark. The lockup is measured in
+ * the wordmark's cap height (570 units), so the symbol is sized and placed in the name's cap
+ * height (`cap`): its 840-unit frame, the one EarendilSymbol draws, with its bottom 38 units
+ * below the baseline, and 232 units between the frame and the name.
+ */
 .identity:any-link {
   display: inline-flex;
-  align-items: center;
-  gap: var(--semantic-dimension-space-gap-small);
+  align-items: baseline;
+  gap: calc(232 / 570 * 1cap);
   color: var(--semantic-color-text-primary);
   font: var(--semantic-typography-heading-app-4);
   text-decoration: none;
 }
 
-/* The symbol as tall as pi.dev's docs logo; its width follows. */
+/* Without a baseline of its own, the symbol's bottom sits on the name's baseline; the translation
+   moves it to its place in the lockup. */
 .mark {
   display: block;
   flex: none;
-  block-size: var(--semantic-dimension-size-small);
+  inline-size: auto;
+  block-size: calc(840 / 570 * 1cap);
+  translate: 0 calc(38 / 570 * 1cap);
 }
 
 .actions {
