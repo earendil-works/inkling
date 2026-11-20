@@ -1,0 +1,18 @@
+/*
+ * Pages listed below a page (wiki-navigation.tsx) read like a section's pages:
+ * Elanor indents those by one step, `padding.xLarge`, and so do these, links and
+ * section titles alike. The side navigation's lists keep their gap above them;
+ * the menu's items already space them.
+ */
+
+.nested {
+  margin-block-start: var(--semantic-dimension-space-gap-small);
+}
+
+.nested :is(a, button),
+.nestedMenu :is(a, button) {
+  padding-inline-start: calc(
+    var(--semantic-dimension-space-control-padding-inline-small) +
+      var(--semantic-dimension-space-padding-x-large)
+  );
+}

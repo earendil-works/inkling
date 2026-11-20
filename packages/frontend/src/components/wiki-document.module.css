@@ -96,6 +96,13 @@
   display: none;
 }
 
+/* The column sticks and scrolls, so the list itself doesn't (Inkling's reader makes it sticky).
+   It is the indicator's containing block: Elanor measures the current section from the list's
+   top, and the column's padding would otherwise lift the indicator above its first section. */
+.toc {
+  position: relative;
+}
+
 @media (width >= 75rem) {
   .article[data-toc] {
     grid-column: 1 / span 9;
@@ -120,12 +127,5 @@
     margin-block-start: calc(-1 * var(--semantic-dimension-space-padding-xxx-large));
     overflow-y: auto;
     overscroll-behavior: contain;
-  }
-
-  /* The column scrolls itself; Inkling's own list would stick again inside it. */
-  .toc {
-    position: static;
-    max-block-size: none;
-    overflow: visible;
   }
 }
