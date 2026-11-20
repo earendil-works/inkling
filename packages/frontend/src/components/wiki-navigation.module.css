@@ -1,19 +1,101 @@
 /*
- * The wiki's navigation: in the aside on wide screens (reader-screen.tsx), in
- * a side panel on narrow ones.
+ * The wiki's navigation (wiki-navigation.tsx): a full-height rail on wide
+ * screens, a bar with a side panel on narrow ones.
  */
 
-.navigation {
-  min-inline-size: 0;
+.rail {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  block-size: 100%;
 }
 
-.drawerTrigger {
-  margin-block-end: var(--semantic-dimension-space-gap-large);
+/* The wiki's name, as an identity: where pi.dev's docs set their logo. */
+.identity:any-link {
+  display: block;
+  overflow: hidden;
+  color: var(--semantic-color-text-primary);
+  font: var(--semantic-typography-heading-app-4);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* Above Inkling's header, which has its own layer. */
+.rail > .identity {
+  padding: var(--semantic-dimension-space-padding-xx-large)
+    var(--semantic-dimension-space-padding-x-large) var(--semantic-dimension-space-padding-large);
+}
+
+.scroll {
+  min-block-size: 0;
+  padding: var(--semantic-dimension-space-padding-medium)
+    var(--semantic-dimension-space-padding-x-large) var(--semantic-dimension-space-padding-xx-large);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* The navigation scrolls up and down only: long labels truncate as Elanor sets them. */
+.scroll > * {
+  contain: inline-size;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--semantic-dimension-space-gap-small);
+  padding: var(--semantic-dimension-space-padding-medium)
+    var(--semantic-dimension-space-padding-x-large);
+  border-block-start: var(--semantic-dimension-border-width-small) solid
+    var(--semantic-color-border-secondary);
+}
+
+.inkling:any-link {
+  color: var(--semantic-color-text-secondary);
+  font: var(--semantic-typography-ui-secondary);
+}
+
+/* Narrow screens: the bar above the page. */
+.bar {
+  position: sticky;
+  z-index: var(--semantic-number-layer-sticky);
+  inset-block-start: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--semantic-dimension-space-gap-small);
+  block-size: var(--semantic-dimension-size-top-navigation);
+  padding-inline: var(--semantic-dimension-space-padding-x-large);
+  border-block-end: var(--semantic-dimension-border-width-small) solid
+    var(--semantic-color-border-secondary);
+  background: var(--semantic-color-background-canvas);
+}
+
+/* Above everything else, the bar included. */
 .drawerPortal {
   position: fixed;
   z-index: var(--semantic-number-layer-overlay);
   inset: 0;
+}
+
+.drawerContent {
+  display: grid;
+  gap: var(--semantic-dimension-space-gap-large);
+}
+
+.drawerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--semantic-dimension-space-gap-small);
+}
+
+.drawerTitle {
+  overflow: hidden;
+  font: var(--semantic-typography-heading-app-4);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.navigation {
+  min-inline-size: 0;
 }

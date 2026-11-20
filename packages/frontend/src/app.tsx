@@ -105,6 +105,7 @@ export function App({
   useEffect(() => {
     document.title = pageTitle;
   }, [pageTitle]);
+  const wikiMode = route.state.data?.screen === "reader" && route.state.data.wiki !== undefined;
   useEffect(() => {
     if (route.state.status === "failure" && route.state.data !== undefined) {
       showToast(route.state.error.message, "error");
@@ -127,14 +128,17 @@ export function App({
     <AppContext.Provider value={context}>
       <LocationContext.Provider value={locationState.url}>
         <Layout.Root>
-          <AppHeader
-            account={route.state.data?.account}
-            api={route.state.data?.api}
-            breadcrumbs={breadcrumbs}
-            navigating={navigating}
-            participants={participants}
-            status={status}
-          />
+          {/* Wiki pages read like a documentation site, with their own navigation. */}
+          {wikiMode ? null : (
+            <AppHeader
+              account={route.state.data?.account}
+              api={route.state.data?.api}
+              breadcrumbs={breadcrumbs}
+              navigating={navigating}
+              participants={participants}
+              status={status}
+            />
+          )}
           <RouteView
             navigationKey={locationState.generation}
             refresh={route.refresh}

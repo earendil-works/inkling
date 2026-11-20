@@ -1,28 +1,44 @@
 /*
- * The wiki's reader (reader-screen.tsx): its navigation in an aside beside the
- * page from Layout's breakpoint (semantic.dimension.breakpoint.medium, where
- * Body becomes a row and asides stick); narrower, in a side panel that a
- * button above the page opens.
+ * The wiki's reader (reader-screen.tsx), without Inkling's header: from
+ * Layout's breakpoint (semantic.dimension.breakpoint.medium, where Body becomes
+ * a row and asides stick), the navigation is a full-height rail beside the
+ * page; narrower, a bar above the page opens it in a side panel.
  */
+
+.body {
+  /* No header above the wiki: sticky parts, such as the sections' list, stick to the top. */
+  --masthead-height: 0px;
+}
+
+.column {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.main {
+  padding-block: var(--semantic-dimension-space-padding-xx-large)
+    var(--semantic-dimension-space-padding-xxxx-large);
+}
 
 .aside {
   display: none;
 }
 
 @media (width >= 64rem /* token: semantic.dimension.breakpoint.medium */) {
-  .body {
-    border-block-start: 0;
-  }
-
   .aside {
     display: block;
-    padding: var(--semantic-dimension-space-padding-xxx-large)
-      var(--semantic-dimension-space-padding-x-large);
+    block-size: 100dvh;
+    max-block-size: 100dvh;
+    overflow: hidden;
     border-inline-end: var(--semantic-dimension-border-width-small) solid
       var(--semantic-color-border-secondary);
   }
 
-  .drawer {
+  .main {
+    padding-block-start: var(--semantic-dimension-space-padding-xxx-large);
+  }
+
+  .column > [data-wiki-bar] {
     display: none;
   }
 }

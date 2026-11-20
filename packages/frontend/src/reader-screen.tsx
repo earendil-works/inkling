@@ -7,7 +7,8 @@ import type { WikiNavigation as WikiNavigationData } from "./wiki-navigation.ts"
 
 import { ReaderDocument } from "./components/reader-document.tsx";
 import { ReaderToolbar } from "./components/reader-toolbar.tsx";
-import { WikiNavigation, WikiNavigationDrawer } from "./components/wiki-navigation.tsx";
+import { WikiDocument } from "./components/wiki-document.tsx";
+import { WikiBar, WikiRail } from "./components/wiki-navigation.tsx";
 import { wikiReaderPath } from "./wiki-navigation.ts";
 import styles from "./workspace.module.css";
 import wikiStyles from "./reader-screen.module.css";
@@ -30,34 +31,41 @@ export function ReaderScreen({
   shared,
   wiki,
 }: ReaderScreenProps): React.JSX.Element {
-  const content = (
-    <>
-      <ReaderToolbar metadata={document.metadata} publicDocument={publicDocument} shared={shared} />
-      <ReaderDocument api={api} document={document} references={references} />
-    </>
-  );
   if (wiki === undefined) {
     return (
       <Layout.Main className={styles["layout"]} id="app" tabIndex={-1}>
-        <Container>{content}</Container>
+        <Container>
+          <ReaderToolbar
+            metadata={document.metadata}
+            publicDocument={publicDocument}
+            shared={shared}
+          />
+          <ReaderDocument api={api} document={document} references={references} />
+        </Container>
       </Layout.Main>
     );
   }
-  // Wiki pages read beside the wiki's navigation, like a documentation site.
+  // Wiki pages read like a documentation site: beside the wiki's navigation, without Inkling's
+  // header (app.tsx leaves it out) and its document metadata.
   const current = wikiReaderPath(document.metadata, wiki);
   return (
     <Layout.Body className={wikiStyles["body"]} data-wiki="">
       <Layout.Aside aria-label="Wiki navigation" className={wikiStyles["aside"]}>
-        <WikiNavigation current={current} wiki={wiki} />
+        <WikiRail current={current} wiki={wiki} />
       </Layout.Aside>
-      <Layout.Main className={styles["layout"]} id="app" tabIndex={-1}>
-        <Container>
-          <div className={wikiStyles["drawer"]}>
-            <WikiNavigationDrawer current={current} wiki={wiki} />
-          </div>
-          {content}
-        </Container>
-      </Layout.Main>
+      <div className={wikiStyles["column"]}>
+        <WikiBar current={current} wiki={wiki} />
+        <Layout.Main className={wikiStyles["main"]} id="app" tabIndex={-1}>
+          <Container>
+            <WikiDocument
+              api={api}
+              document={document}
+              editable={!publicDocument && !shared}
+              references={references}
+            />
+          </Container>
+        </Layout.Main>
+      </div>
     </Layout.Body>
   );
 }

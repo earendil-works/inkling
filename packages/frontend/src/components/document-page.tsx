@@ -174,7 +174,7 @@ function PeopleList({
  * Whether a media query matches, following changes. The server renders for
  * `serverMatches`, and hydration switches to the browser's answer.
  */
-function useMediaQuery(query: string, serverMatches: boolean): boolean {
+export function useMediaQuery(query: string, serverMatches: boolean): boolean {
   const subscribe = useCallback(
     (onChange: () => void) => {
       const media = matchMedia(query);

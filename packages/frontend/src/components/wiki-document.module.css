@@ -1,0 +1,52 @@
+/*
+ * A wiki page (wiki-document.tsx), like Elanor's and pi.dev's docs: the title
+ * and a line of metadata close together, a separator, then the content, with
+ * the page's sections in a column beside it on wide screens.
+ */
+
+.page {
+  display: grid;
+  min-inline-size: 0;
+  gap: var(--semantic-dimension-space-gap-x-large);
+}
+
+.header {
+  display: grid;
+  gap: var(--semantic-dimension-space-gap-small);
+}
+
+.title {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.metadata {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--semantic-dimension-space-gap-medium);
+  color: var(--semantic-color-text-secondary);
+  font: var(--semantic-typography-ui-secondary);
+}
+
+.updated {
+  font: var(--semantic-typography-code-primary);
+}
+
+/* A gray tertiary button, like the docs' "Copy page"; Elanor's tertiary button is the link color. */
+.edit {
+  color: var(--semantic-color-text-secondary);
+}
+
+.content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--semantic-dimension-space-gap-x-large);
+  align-items: start;
+}
+
+@media (width > 68rem) {
+  .content {
+    grid-template-columns: minmax(0, 1fr) minmax(12rem, 15rem);
+  }
+}
