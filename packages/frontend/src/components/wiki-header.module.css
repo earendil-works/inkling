@@ -1,0 +1,45 @@
+/*
+ * The wiki's top bar (wiki-header.tsx), like pi.dev's docs: Elanor's
+ * TopNavigation as a sticky bar, `size.topNavigation` tall with its bottom
+ * border, full width, the identity and the actions at the window's edges.
+ * Below 61.625rem, where the side navigation leaves, the search button and the
+ * menu show.
+ */
+
+.header {
+  position: sticky;
+  z-index: var(--semantic-number-layer-sticky);
+  inset-block-start: 0;
+  padding-inline: var(--semantic-dimension-space-padding-x-large);
+  border-block-end: var(--semantic-dimension-border-width-small) solid
+    var(--semantic-color-border-secondary);
+  background: var(--semantic-color-background-canvas);
+}
+
+.identity:any-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--semantic-dimension-space-gap-small);
+  color: var(--semantic-color-text-primary);
+  font: var(--semantic-typography-heading-app-4);
+  text-decoration: none;
+}
+
+/* The symbol as tall as pi.dev's docs logo; its width follows. */
+.mark {
+  display: block;
+  flex: none;
+  block-size: var(--semantic-dimension-size-small);
+}
+
+.actions {
+  align-items: center;
+}
+
+@media (width >= 61.625rem) {
+  .search,
+  .menuTrigger,
+  .menu {
+    display: none;
+  }
+}

@@ -172,6 +172,9 @@ importers:
       '@earendil-works/elanor-icons-react':
         specifier: 0.1.0
         version: 0.1.0(react@19.2.8)
+      '@earendil-works/elanor-logos-react':
+        specifier: 0.1.0
+        version: 0.1.0(react@19.2.8)
       '@earendil-works/elanor-react':
         specifier: 0.1.1
         version: 0.1.1(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -509,6 +512,11 @@ packages:
 
   '@earendil-works/elanor-icons-react@0.1.0':
     resolution: {integrity: sha512-Ri6xEWAvuhbKWgKcjphhxOMGAISKAyCAttQx4qlxflSORnGc0nPCA8pD0LsmmSCpdi/GmSJwUibPkwC0xn9BrQ==}
+    peerDependencies:
+      react: ^18.0.0 || ^19.0.0
+
+  '@earendil-works/elanor-logos-react@0.1.0':
+    resolution: {integrity: sha512-6vsGdCHu3SUli/VV2vMJrz9Rhzg1f0UG6qixQzp1usTFEYY+VpYZiPj5XoGvw8cnZSa9hGnCTJdwBmwmDInm6A==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
 
@@ -2754,6 +2762,10 @@ snapshots:
   '@earendil-works/elanor-fonts@0.1.0': {}
 
   '@earendil-works/elanor-icons-react@0.1.0(react@19.2.8)':
+    dependencies:
+      react: 19.2.8
+
+  '@earendil-works/elanor-logos-react@0.1.0(react@19.2.8)':
     dependencies:
       react: 19.2.8
 

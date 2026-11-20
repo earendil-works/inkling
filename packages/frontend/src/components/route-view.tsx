@@ -124,6 +124,7 @@ export function RouteView({ navigationKey, refresh, state }: RouteViewProps): Re
       return (
         <Suspense fallback={<LoadingScreen />}>
           <ReaderScreen
+            account={model.account}
             api={model.api}
             document={model.document}
             publicDocument={model.publicDocument}
