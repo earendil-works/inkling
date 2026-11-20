@@ -18,7 +18,7 @@ import type { ClientRouter, NavigateOptions } from "./navigation.ts";
 import type { RouteData, RouteModel } from "./route-data.ts";
 import { isApplicationPath, loadRoute } from "./route-loader.ts";
 import type { RouteEnvironment } from "./route-loader.ts";
-import { WIKI_DOCUMENT_ID, documentHref, formatRfcNumber, isWikiPage } from "./ui.ts";
+import { WIKI_PATH, formatRfcNumber, isWikiPage } from "./ui.ts";
 
 const browserAuthentication = makeAuthenticationCache();
 
@@ -218,12 +218,7 @@ function breadcrumbsForRoute(
     truncate: true,
   };
   const parents: readonly BreadcrumbItem[] =
-    !deleted && isWikiPage(document)
-      ? [
-          section,
-          { href: documentHref(WIKI_DOCUMENT_ID, undefined, false, "read", ""), label: "Wiki" },
-        ]
-      : [section];
+    !deleted && isWikiPage(document) ? [section, { href: WIKI_PATH, label: "Wiki" }] : [section];
   return model.screen === "editor"
     ? [home, ...parents, documentBreadcrumb, { label: "Edit" }]
     : [home, ...parents, documentBreadcrumb];

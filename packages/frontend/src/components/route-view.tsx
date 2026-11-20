@@ -129,6 +129,7 @@ export function RouteView({ navigationKey, refresh, state }: RouteViewProps): Re
             publicDocument={model.publicDocument}
             references={model.references}
             shared={model.shared}
+            wiki={model.wiki}
           />
         </Suspense>
       );

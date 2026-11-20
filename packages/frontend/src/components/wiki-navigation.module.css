@@ -1,0 +1,19 @@
+/*
+ * The wiki's navigation: in the aside on wide screens (reader-screen.tsx), in
+ * a side panel on narrow ones.
+ */
+
+.navigation {
+  min-inline-size: 0;
+}
+
+.drawerTrigger {
+  margin-block-end: var(--semantic-dimension-space-gap-large);
+}
+
+/* Above Inkling's header, which has its own layer. */
+.drawerPortal {
+  position: fixed;
+  z-index: var(--semantic-number-layer-overlay);
+  inset: 0;
+}

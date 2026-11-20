@@ -1252,5 +1252,6 @@ test("comment authors may edit their messages while stable anchors remain struct
 test("visible labels hide the navigation-only wiki label", () => {
   assert.deepEqual(visibleLabels(["platform", "wiki", "team"]), ["platform", "team"]);
   assert.deepEqual(visibleLabels(["wiki"]), []);
+  assert.deepEqual(visibleLabels(["wiki-index", "team"]), ["team"]);
   assert.deepEqual(visibleLabels([]), []);
 });

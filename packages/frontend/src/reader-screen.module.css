@@ -1,0 +1,28 @@
+/*
+ * The wiki's reader (reader-screen.tsx): its navigation in an aside beside the
+ * page from Layout's breakpoint (semantic.dimension.breakpoint.medium, where
+ * Body becomes a row and asides stick); narrower, in a side panel that a
+ * button above the page opens.
+ */
+
+.aside {
+  display: none;
+}
+
+@media (width >= 64rem /* token: semantic.dimension.breakpoint.medium */) {
+  .body {
+    border-block-start: 0;
+  }
+
+  .aside {
+    display: block;
+    padding: var(--semantic-dimension-space-padding-xxx-large)
+      var(--semantic-dimension-space-padding-x-large);
+    border-inline-end: var(--semantic-dimension-border-width-small) solid
+      var(--semantic-color-border-secondary);
+  }
+
+  .drawer {
+    display: none;
+  }
+}

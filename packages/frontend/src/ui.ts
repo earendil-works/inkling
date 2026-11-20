@@ -1,4 +1,4 @@
-import { taggedId, uuidV7Bytes, wikiLabel } from "@earendil-works/inkling-core";
+import { taggedId, uuidV7Bytes, wikiIndexLabel, wikiLabel } from "@earendil-works/inkling-core";
 import type { IdentifierTag } from "@earendil-works/inkling-core";
 
 export function randomId(tag: IdentifierTag): string {
@@ -31,23 +31,29 @@ export function signInHref(url: URL): string {
   return `/api/auth/google/start?next=${encodeURIComponent(`${url.pathname}${url.search}${url.hash}`)}`;
 }
 
-/**
- * The wiki's index note. Other notes labelled `wiki` show it as a breadcrumb.
- * Inkling has no deployment-level frontend configuration yet, so this is rfc.earendil.com's index.
- */
-export const WIKI_DOCUMENT_ID = "doc_350cqpzub87Kx5nMlXNBv";
+/** Where the wiki's index note is read: `route-loader.ts` finds it by its label. */
+export const WIKI_PATH = "/wiki";
 
-/** Whether a note is a wiki page below the wiki index. RFCs are never wiki pages. */
-export function isWikiPage(document: {
-  readonly id: string;
+/**
+ * Whether a document belongs to the wiki, so its reader shows the wiki's navigation: a note
+ * labelled `wiki`, or the index itself. RFCs are never wiki pages.
+ */
+export function isWikiDocument(document: {
   readonly labels: readonly string[];
   readonly rfcNumber?: number | undefined;
 }): boolean {
   return (
-    document.rfcNumber === undefined &&
-    document.id !== WIKI_DOCUMENT_ID &&
-    document.labels.includes(wikiLabel)
+    document.labels.includes(wikiIndexLabel) ||
+    (document.rfcNumber === undefined && document.labels.includes(wikiLabel))
   );
+}
+
+/** Whether a note is a wiki page below the wiki index. RFCs are never wiki pages. */
+export function isWikiPage(document: {
+  readonly labels: readonly string[];
+  readonly rfcNumber?: number | undefined;
+}): boolean {
+  return isWikiDocument(document) && !document.labels.includes(wikiIndexLabel);
 }
 
 /** An RFC number as Inkling shows and routes it, zero-padded to four digits. */

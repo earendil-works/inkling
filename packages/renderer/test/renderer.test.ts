@@ -7,6 +7,7 @@ import {
   collectReferences,
   makeMarkdownRenderer,
   outlineDocument,
+  outlineWiki,
   redactReferences,
   serializeDocumentFrontmatter,
 } from "../src/index.ts";
@@ -369,4 +370,88 @@ test("anonymous bodies hide sections of references they cannot open", () => {
     ].join("\n"),
   );
   assert.doesNotMatch(redacted, /secret|hidden/u);
+});
+
+/** A wiki outline's page, by its reference key, for comparing outlines. */
+function page(key: string, label?: string, items: unknown[] = []) {
+  return { items, key, kind: "page", label };
+}
+
+test("wiki outlines read groups, folding sections, and pages from the index", async () => {
+  const outline = await Effect.runPromise(
+    outlineWiki(`---
+labels:
+  - wiki-index
+---
+
+# Earendil Wiki
+
+How we work. Text and [ordinary links](https://example.com) stay out.
+
+- [](doc:doc_wifi000000)
+
+## Company
+
+- [](doc:doc_howwework0)
+- [Holidays](doc:doc_holidays00#regions)
+- Just text, no list
+
+## Engineering
+
+### Decisions
+
+- <rfc:12>
+
+#### Older
+
+- [](rfc:0007)
+
+### Runbooks
+
+- [Deploying](doc:doc_deploys000)
+  - [](doc:doc_rollback00)
+- Incidents
+  - [](doc:doc_oncall0000)
+`),
+  );
+  const simplify = (items: readonly unknown[]): unknown[] =>
+    items.map((item) => {
+      const entry = item as {
+        kind: string;
+        label?: string;
+        reference?: { key: string };
+        items: unknown[];
+      };
+      return entry.kind === "page"
+        ? page(entry.reference!.key, entry.label, simplify(entry.items))
+        : { items: simplify(entry.items), kind: "section", label: entry.label };
+    });
+  assert.deepEqual(
+    outline.map((group) => ({ items: simplify(group.items), label: group.label })),
+    [
+      { items: [page("doc:doc_wifi000000")], label: undefined },
+      {
+        items: [page("doc:doc_howwework0"), page("doc:doc_holidays00", "Holidays")],
+        label: "Company",
+      },
+      {
+        items: [
+          {
+            items: [page("rfc:12"), { items: [page("rfc:7")], kind: "section", label: "Older" }],
+            kind: "section",
+            label: "Decisions",
+          },
+          {
+            items: [
+              page("doc:doc_deploys000", "Deploying", [page("doc:doc_rollback00")]),
+              { items: [page("doc:doc_oncall0000")], kind: "section", label: "Incidents" },
+            ],
+            kind: "section",
+            label: "Runbooks",
+          },
+        ],
+        label: "Engineering",
+      },
+    ],
+  );
 });

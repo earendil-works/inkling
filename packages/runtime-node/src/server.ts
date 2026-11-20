@@ -152,6 +152,7 @@ export function startServer(
       });
     }
     app.get("/trash", serveStatic({ path: "index.html", root: frontendRoot }));
+    app.get("/wiki", serveStatic({ path: "index.html", root: frontendRoot }));
     app.get("/documents/*", serveStatic({ path: "index.html", root: frontendRoot }));
     app.get("/rfc/*", serveStatic({ path: "index.html", root: frontendRoot }));
     app.get("/share/*", serveStatic({ path: "index.html", root: frontendRoot }));

@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  WIKI_DOCUMENT_ID,
   colorFor,
   documentHref,
+  isWikiDocument,
   isWikiPage,
   publicDocumentHref,
 } from "../src/ui.ts";
@@ -38,8 +38,13 @@ test("participant colors are stable and use perceptual OKLCH values", () => {
 });
 
 test("notes labelled wiki are wiki pages below the wiki index", () => {
-  assert.equal(isWikiPage({ id: "doc_example123", labels: ["team", "wiki"] }), true);
-  assert.equal(isWikiPage({ id: "doc_example123", labels: ["team"] }), false);
-  assert.equal(isWikiPage({ id: "doc_example123", labels: ["wiki"], rfcNumber: 42 }), false);
-  assert.equal(isWikiPage({ id: WIKI_DOCUMENT_ID, labels: ["wiki"] }), false);
+  assert.equal(isWikiPage({ labels: ["team", "wiki"] }), true);
+  assert.equal(isWikiPage({ labels: ["team"] }), false);
+  assert.equal(isWikiPage({ labels: ["wiki"], rfcNumber: 42 }), false);
+  assert.equal(isWikiPage({ labels: ["wiki", "wiki-index"] }), false);
+  // The index and wiki pages read with the wiki's navigation; RFCs and other notes don't.
+  assert.equal(isWikiDocument({ labels: ["wiki-index"] }), true);
+  assert.equal(isWikiDocument({ labels: ["wiki"] }), true);
+  assert.equal(isWikiDocument({ labels: ["wiki"], rfcNumber: 42 }), false);
+  assert.equal(isWikiDocument({ labels: ["team"] }), false);
 });

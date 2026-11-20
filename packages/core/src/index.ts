@@ -30,6 +30,7 @@ export {
   isDocumentTrashExpired,
   knownLifecycleStates,
   visibleLabels,
+  wikiIndexLabel,
   wikiLabel,
   markDeleted,
   markPublished,
