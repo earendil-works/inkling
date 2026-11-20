@@ -1,7 +1,11 @@
 import { Effect, Schema } from "effect";
 
 import { wikiIndexLabel, wikiLabel } from "@earendil-works/inkling-core";
-import type { CatalogResponse, DocumentSummary } from "@earendil-works/inkling-protocol";
+import type {
+  CatalogResponse,
+  DocumentSummary,
+  ReferenceResolutionDto,
+} from "@earendil-works/inkling-protocol";
 import { outlineWiki, resolvedReferenceLabel } from "@earendil-works/inkling-renderer";
 import type { WikiOutlineItem } from "@earendil-works/inkling-renderer";
 
@@ -58,44 +62,91 @@ export function findWikiIndex(
     );
 }
 
+/** How long the browser reuses the navigation while the reader moves between wiki pages. */
+const navigationLifetimeMilliseconds = 30_000;
+let browserNavigation:
+  | { readonly expires: number; readonly navigation: WikiNavigation | undefined }
+  | undefined;
+
 /**
- * Builds the reader's wiki navigation from the published index, resolving its
- * links with the reader's own access, so nobody sees a page they cannot open.
+ * Builds the reader's wiki navigation from the published index, with the
+ * reader's own access, so nobody sees a page they cannot open. Titles come from
+ * the reader's catalog, which finds the index, the wiki's pages, and the RFCs at
+ * once; only links to other documents are resolved one by one. The browser
+ * reuses it for a while, so moving between wiki pages doesn't build it again;
+ * the server never shares it between readers.
  */
 export function loadWikiNavigation(
   api: ApiClientService,
 ): Effect.Effect<WikiNavigation | undefined, ApiError> {
-  return findWikiIndex(api).pipe(
-    Effect.flatMap((index) =>
+  const remembers = typeof window !== "undefined";
+  if (remembers && browserNavigation !== undefined && browserNavigation.expires > Date.now()) {
+    return Effect.succeed(browserNavigation.navigation);
+  }
+  return Effect.all(
+    [
+      findWikiIndex(api),
+      api.listDocuments(`label:${wikiLabel} is:published`),
+      api.listDocuments("is:rfc"),
+    ],
+    { concurrency: "unbounded" },
+  ).pipe(
+    Effect.flatMap(([index, catalog, rfcs]) =>
       index === undefined
         ? Effect.succeed(undefined)
-        : Effect.all(
-            [
-              api.readDocument(index.metadata.id, true),
-              api.listDocuments(`label:${wikiLabel} is:published`),
-            ],
-            { concurrency: "unbounded" },
-          ).pipe(Effect.flatMap(([document, catalog]) => navigationFrom(api, document, catalog))),
+        : api
+            .readDocument(index.metadata.id, true)
+            .pipe(Effect.flatMap((document) => navigationFrom(api, document, catalog, rfcs))),
+    ),
+    Effect.tap((navigation) =>
+      Effect.sync(() => {
+        if (remembers) {
+          browserNavigation = { expires: Date.now() + navigationLifetimeMilliseconds, navigation };
+        }
+      }),
     ),
   );
+}
+
+/** What the reader's catalogs say about the documents references name, by reference key. */
+function catalogResolutions(
+  catalogs: readonly CatalogResponse[],
+): Readonly<Record<string, ReferenceResolutionDto>> {
+  const resolutions: Record<string, ReferenceResolutionDto> = {};
+  for (const { metadata } of catalogs.flatMap((catalog) => catalog.documents)) {
+    const resolution: ReferenceResolutionDto = {
+      href: documentHref(metadata.id, metadata.rfcNumber, false, "read", ""),
+      status: "available",
+      title: metadata.title,
+      ...(metadata.rfcNumber === undefined ? {} : { rfcNumber: metadata.rfcNumber }),
+    };
+    resolutions[`doc:${metadata.id}`] = resolution;
+    if (metadata.rfcNumber !== undefined) resolutions[`rfc:${metadata.rfcNumber}`] = resolution;
+  }
+  return resolutions;
 }
 
 function navigationFrom(
   api: ApiClientService,
   index: { readonly body: string; readonly metadata: { id: string; title: string } },
   catalog: CatalogResponse,
+  rfcs: CatalogResponse,
 ): Effect.Effect<WikiNavigation, ApiError> {
   return outlineWiki(index.body).pipe(
     // An index that does not parse lays nothing out; its pages are still unsorted.
     Effect.orElseSucceed(() => []),
     Effect.flatMap((outline) => {
-      const keys = [...new Set(outline.flatMap((group) => referenceKeys(group.items)))];
+      const known = catalogResolutions([catalog, rfcs]);
+      const unknown = [...new Set(outline.flatMap((group) => referenceKeys(group.items)))].filter(
+        (key) => known[key] === undefined,
+      );
       return (
-        keys.length === 0
+        unknown.length === 0
           ? Effect.succeed({})
-          : api.resolveReferences(keys).pipe(Effect.map((response) => response.references))
+          : api.resolveReferences(unknown).pipe(Effect.map((response) => response.references))
       ).pipe(
-        Effect.map((resolutions) => {
+        Effect.map((resolved) => {
+          const resolutions = { ...resolved, ...known };
           const toItems = (items: readonly WikiOutlineItem[]): WikiNavigationItem[] =>
             items.flatMap((item): WikiNavigationItem[] => {
               const children = toItems(item.items);

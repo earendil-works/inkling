@@ -71,6 +71,11 @@ const responses: Readonly<Record<string, unknown>> = {
   [`/api/documents?q=${encodeURIComponent("label:wiki is:published")}`]: {
     documents: [...wikiNotes, index].map((entry) => ({ excerpt: "", metadata: entry })),
   },
+  [`/api/documents?q=${encodeURIComponent("is:rfc")}`]: {
+    documents: [
+      { excerpt: "", metadata: metadata("doc_rfc0012000", "One wiki", [], { rfcNumber: 12 }) },
+    ],
+  },
   "/api/documents/doc_index00000?published=true": {
     body: indexBody,
     comments: { revision: 0, threads: [] },
@@ -94,12 +99,16 @@ function resolution(key: string): unknown {
     : { href: `/documents/${key.slice("doc:".length)}`, status: "available", title };
 }
 
+/** The references resolved one by one, rather than from the reader's catalogs. */
+const resolvedOneByOne: string[] = [];
+
 function environment(): RouteEnvironment {
   return {
     api: (capabilityToken) =>
       makeApiClient(capabilityToken, (path) => {
         if (path.startsWith("/api/references?")) {
           const keys = new URLSearchParams(path.slice(path.indexOf("?"))).getAll("ref");
+          resolvedOneByOne.push(...keys);
           return Promise.resolve(
             Response.json({
               references: Object.fromEntries(keys.map((key) => [key, resolution(key)])),
@@ -121,7 +130,10 @@ function environment(): RouteEnvironment {
 }
 
 test("the wiki's navigation lays out the index for the reader and gathers the rest", async () => {
+  resolvedOneByOne.length = 0;
   const navigation = await Effect.runPromise(loadWikiNavigation(environment().api(undefined)));
+  // The catalogs name the wiki's pages and the RFCs; only other documents are looked up.
+  assert.deepEqual(resolvedOneByOne, ["doc:doc_secret0000"]);
   assert.deepEqual(navigation, {
     groups: [
       {
