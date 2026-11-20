@@ -1,11 +1,16 @@
 /*
  * The wiki's shell (reader-screen.tsx), like Elanor's and pi.dev's docs, with
- * pi.dev's geometry: the sticky top bar (wiki-header.tsx); from 61.625rem, the
+ * pi.dev's geometry: the fixed top bar (wiki-header.tsx), the page starting
+ * below it; from 61.625rem, the
  * side navigation (`size.sidebar`) fixed at the window's start below it, with
  * the search above the navigation. The content is Elanor's Container, centered
  * in the window unless that would put it under the side navigation.
  * Narrower, the top bar's menu holds the navigation.
  */
+
+.main {
+  padding-block-start: var(--semantic-dimension-size-top-navigation);
+}
 
 .main:focus {
   outline: 0;
@@ -29,7 +34,7 @@
 @media (width >= 61.625rem) {
   .navigation {
     position: fixed;
-    /* Above the content, below the sticky top bar. */
+    /* Above the content, below the top bar. */
     z-index: var(--semantic-number-layer-raised);
     inset-block: var(--semantic-dimension-size-top-navigation) 0;
     inset-inline-start: 0;

@@ -1,15 +1,20 @@
 /*
  * The wiki's top bar (wiki-header.tsx), like pi.dev's docs: Elanor's
- * TopNavigation as a sticky bar, `size.topNavigation` tall with its bottom
- * border, full width, the identity and the actions at the window's edges.
+ * TopNavigation as a bar fixed at the window's top, `size.topNavigation` tall
+ * with its bottom border, full width, the identity and the actions at the
+ * window's edges. Fixed rather than sticky, it stays put like the side
+ * navigation while the page bounces when scrolled past its ends; the page
+ * starts below it (reader-screen.module.css).
  * Below 61.625rem, where the side navigation leaves, the search button and the
- * menu show.
+ * menu show, and the link back to Inkling keeps only its arrow.
  */
 
 .header {
-  position: sticky;
+  position: fixed;
   z-index: var(--semantic-number-layer-sticky);
+  flex-wrap: nowrap;
   inset-block-start: 0;
+  inset-inline: 0;
   padding-inline: var(--semantic-dimension-space-padding-x-large);
   border-block-end: var(--semantic-dimension-border-width-small) solid
     var(--semantic-color-border-secondary);
@@ -42,8 +47,64 @@
   translate: 0 calc(38 / 570 * 1cap);
 }
 
+/*
+ * The bar keeps to one row: Elanor's would wrap its actions below the identity when they do not
+ * fit, so instead the account's name gives way, shortened with an ellipsis.
+ */
+.brand {
+  flex: none;
+}
+
 .actions {
+  flex-wrap: nowrap;
   align-items: center;
+}
+
+.actions [data-account-trigger] {
+  min-inline-size: 0;
+}
+
+/*
+ * The way back to Inkling: neutral like the bar's other actions, the arrow and Inkling's name
+ * set like the account's button beside it, with its padding and so its height, and the action
+ * buttons' ghost background; on narrow screens only the arrow, as one of those buttons.
+ */
+.inkling:any-link {
+  flex: none;
+  gap: var(--semantic-dimension-space-control-gap-small);
+  block-size: auto;
+  padding-block: var(--semantic-dimension-space-control-padding-block-small);
+  padding-inline: var(--semantic-dimension-space-control-padding-inline-small);
+  border-radius: var(--semantic-dimension-radius-small);
+  background: var(--semantic-color-background-fill-ghost-neutral);
+}
+
+.inkling:hover {
+  background: var(--semantic-color-background-fill-ghost-neutral-hover);
+}
+
+.inkling > svg {
+  flex: none;
+  inline-size: var(--semantic-dimension-size-icon);
+  block-size: var(--semantic-dimension-size-icon);
+  color: var(--semantic-color-icon-secondary);
+}
+
+.inkling:hover > svg {
+  color: var(--semantic-color-icon-primary);
+}
+
+@media (width < 61.625rem) {
+  .inkling:any-link {
+    justify-content: center;
+    inline-size: var(--semantic-dimension-size-large);
+    block-size: var(--semantic-dimension-size-large);
+    padding: 0;
+  }
+
+  .inklingLabel {
+    display: none;
+  }
 }
 
 @media (width >= 61.625rem) {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { SearchIcon } from "@earendil-works/elanor-icons-react";
+import { ArrowBackIcon, SearchIcon } from "@earendil-works/elanor-icons-react";
 import { EarendilSymbolMonochrome } from "@earendil-works/elanor-logos-react/earendil/symbol-monochrome";
 import { TopNavigation } from "@earendil-works/elanor-react";
 
@@ -16,9 +16,10 @@ import styles from "./wiki-header.module.css";
 
 /*
  * The wiki's top bar, like pi.dev's docs: the Earendil symbol and the wiki's
- * name, which lead to the index, then the theme and the reader's account.
- * Below the wide layout, where the side navigation and its search leave, a
- * search button and the menu with the navigation join them. It replaces
+ * name, which lead to the index, then the way back to Inkling, the theme, and
+ * the reader's account. Below the wide layout, where the side navigation and
+ * its search leave, a search button and the menu with the navigation join
+ * them, and the way back to Inkling keeps only its arrow. It replaces
  * Inkling's header on the wiki's pages.
  */
 
@@ -42,13 +43,23 @@ export function WikiHeader({ account, api, current, wiki }: WikiHeaderProps): Re
   }, [menuOpen]);
   return (
     <TopNavigation.Root className={styles["header"]} data-wiki-header="">
-      <TopNavigation.Identity>
+      <TopNavigation.Identity className={styles["brand"]}>
         <a aria-label="Wiki home" className={styles["identity"]} href={WIKI_PATH}>
           <EarendilSymbolMonochrome aria-hidden="true" className={styles["mark"]} height="1em" />
           <span>Wiki</span>
         </a>
       </TopNavigation.Identity>
       <TopNavigation.Actions className={styles["actions"]}>
+        <TopNavigation.Link
+          aria-label="Back to Inkling"
+          className={styles["inkling"]}
+          data-wiki-inkling=""
+          href="/"
+          title="Back to Inkling"
+        >
+          <ArrowBackIcon aria-hidden="true" />
+          <span className={styles["inklingLabel"]}>Inkling</span>
+        </TopNavigation.Link>
         <TopNavigation.ActionButton
           aria-label="Search the wiki"
           className={styles["search"]}
